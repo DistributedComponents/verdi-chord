@@ -1,6 +1,4 @@
 language: c
-script: bash -ex .travis-ci.sh
-sudo: false
 addons:
   apt:
     sources:
@@ -9,17 +7,11 @@ addons:
       - ocaml
       - opam
 env:
-  global:
-    - STRUCTTACT_BRANCH=master
-  matrix:
-    - DOWNSTREAM=none
-before_install:
-  - openssl aes-256-cbc -K $encrypted_130bc391cda8_key -iv $encrypted_130bc391cda8_iv -in .travis/travis_rsa.enc -out .travis/travis_rsa -d
-  - cp .travis/travis_rsa ~/.ssh
-  - chmod 600 ~/.ssh/travis_rsa
-  - cp .travis/ssh_config ~/.ssh/config
+  - MODE=build
+script: bash -ex .travis-ci.sh
+sudo: false
 notifications:
   slack:
     on_start: always
     rooms:
-      - secure: QNV6vNowWxm2I9HkiZWSMvzuCF0IZ0DkOtrSjSeca2HhSZ5tmk7/bo6Yg21+ADJzoFeiFGqV8Zs+5BAZDDWik9DO6yS5IFPPqtQAtiHy5xeVjjfZtdBLgGnDBkCGyIcJCsM9f3x6H6atnLTs2u3LGqhsL0+AJULXteNRQ03XiU0=
+      - secure: zYqwI+++pjzZBHDjzIq8vmVUEYVHGxitauxDWLHz2FpqAGhrYrlhYeStkMMTOXHgz5I6W9r1Que0TRBl5nQ/RJ3cqaEHZnJHbKRBHn6V5iE09c2YkQzdECqIN7VNfVQ2vmYffx3ro22IvJZEJgi65NWkb8yqQJ5gvXry82+uUFb8d2pxzkmNk5lLPswzvujXPouVmSCdWzpLILaT+Pv5Z+nmKAW/7DXIyjpttZPo8E1nalhGBz6gPkRi8szV9OrhhTJ46rtjfGPxwtZBc8hFTYjrAHGmegPTcNurUlBXLsOGNEeCZ5hzoZO9c9h4FichnVUHJBG1MMLVst4Tm0JsD/YTsjq2o2osoMmACwdvVTNFJZac1vwmVhV2y3F0CT5YUNvifHyOivrnD/8l+ph3MJ7Sh5cAQI66FRt4zg7HxPYn/MrinhewDIHqgHWSl9deq7p2glHe/kYzds8/mYbpxYY9xrl7arJuXUw2f0U3dcuV7c9Dk2vrhPCFOQU2F6yxmRiJzyKNDh0Sy/j+Ps218rtlkbvLwnwnll/9y8vh9uit7WnHEKdESUQf2GbDbWIp2Gqmb8EbunFIrMi9AisfpJxN4tJ7f4UNFkdnQQtn4RZH9gJTf6Mk27PQXb+vyCpzJisE5NEYBN5PwJSLTD3rjAwFWG5O8ubXRwiR9Q4qIDw=
