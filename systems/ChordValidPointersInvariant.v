@@ -6,7 +6,7 @@ Require Import StructTact.Update.
 Require Import Chord.Chord.
 Require Import Chord.ChordProof.
 Require Import Chord.ChordDefinitionLemmas.
-Require Import Chord.DynamicNet.
+Require Import Verdi.DynamicNet.
 
 Set Bullet Behavior "Strict Subproofs".
 

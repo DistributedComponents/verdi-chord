@@ -2,7 +2,7 @@ Require Import List.
 Require Import PeanoNat.
 Import ListNotations.
 
-Require Import Chord.DynamicNet.
+Require Import Verdi.DynamicNet.
 Require Import Shed.Shed.
 Require Import StructTact.Update.
 

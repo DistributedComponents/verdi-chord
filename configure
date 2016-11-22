@@ -5,7 +5,7 @@
 ## Configuration options for coqproject.sh
 DEPS=(StructTact InfSeqExt Verdi)
 DIRS=(core systems shed extraction/coq extraction/chord/coq)
-NAMESPACE_core="Chord"
+NAMESPACE_core="Verdi"
 NAMESPACE_systems="Chord"
 NAMESPACE_shed="Shed"
 CANARIES=("mathcomp.ssreflect.ssreflect" "Verdi requires mathcomp to be installed" "StructTact.StructTactics" "Build StructTact before building Verdi" "InfSeqExt.infseq" "Build InfSeqExt before building Verdi")

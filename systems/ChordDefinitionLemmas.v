@@ -5,7 +5,7 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 Require Import Chord.Chord.
 Require Import Chord.ChordLocalProps.
-Require Import Chord.DynamicNet.
+Require Import Verdi.DynamicNet.
 
 Ltac expand_def :=
   repeat (try break_or_hyp; try break_and; try break_exists);

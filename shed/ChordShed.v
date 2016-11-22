@@ -6,7 +6,7 @@ Require Import StructTact.Before.
 Require Import Chord.Chord.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordProof.
-Require Import Chord.DynamicNet.
+Require Import Verdi.DynamicNet.
 Require Import Shed.DynamicShed.
 Require Import Shed.Shed.
 

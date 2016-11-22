@@ -1,6 +1,6 @@
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
-Require Import Chord.DynamicNet.
+Require Import Verdi.DynamicNet.
 Require Import Chord.Chord.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordProof.
