@@ -1,9 +1,9 @@
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
-Require Import Verdi.DynamicNet.
-Require Import Verdi.Chord.
-Require Import Verdi.ChordLocalProps.
-Require Import Verdi.ChordProof.
+Require Import Chord.DynamicNet.
+Require Import Chord.Chord.
+Require Import Chord.ChordLocalProps.
+Require Import Chord.ChordProof.
 Require Import List.
 Import ListNotations.
 (*Require Import Wf_nat.*)

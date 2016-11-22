@@ -1,10 +1,10 @@
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
-Require Import Verdi.DynamicNet.
-Require Import Verdi.Chord.
+Require Import Chord.DynamicNet.
+Require Import Chord.Chord.
 Require Import Arith.
-Require Import Verdi.ChordLocalProps.
-Require Import Verdi.ChordDefinitionLemmas.
+Require Import Chord.ChordLocalProps.
+Require Import Chord.ChordDefinitionLemmas.
 Require Coqlib.
 Import FunctionalExtensionality.
 Require Import List.

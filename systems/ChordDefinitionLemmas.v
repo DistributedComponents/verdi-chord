@@ -3,9 +3,9 @@ Import ListNotations.
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
-Require Import Verdi.Chord.
-Require Import Verdi.ChordLocalProps.
-Require Import Verdi.DynamicNet.
+Require Import Chord.Chord.
+Require Import Chord.ChordLocalProps.
+Require Import Chord.DynamicNet.
 
 Ltac expand_def :=
   repeat (try break_or_hyp; try break_and; try break_exists);

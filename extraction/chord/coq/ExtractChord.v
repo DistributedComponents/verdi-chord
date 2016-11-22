@@ -3,8 +3,8 @@ Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlNatInt.
 Require Import ExtrOcamlString.
 
-Require Import Verdi.Chord.
-Require Import Verdi.ChordShed.
+Require Import Chord.Chord.
+Require Import Shed.ChordShed.
 
 Definition SUCC_LIST_LEN := 3.
 

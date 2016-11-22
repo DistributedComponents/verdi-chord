@@ -1,6 +1,6 @@
 Require Import Omega.
 
-Require Import Verdi.Chord.
+Require Import Chord.Chord.
 Require Import StructTact.StructTactics.
 
 (* Requests and responses *)

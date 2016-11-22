@@ -3,10 +3,16 @@
 ## Configures and calls coqproject.sh (https://github.com/dwoos/coqproject)
 
 ## Configuration options for coqproject.sh
-DEPS=(StructTact InfSeqExt)
+DEPS=(StructTact InfSeqExt Verdi)
 DIRS=(core lib systems shed extraction/coq extraction/chord/coq)
+NAMESPACE_core="Chord"
+NAMESPACE_systems="Chord"
+NAMESPACE_shed="Shed"
 CANARIES=("mathcomp.ssreflect.ssreflect" "Verdi requires mathcomp to be installed" "StructTact.StructTactics" "Build StructTact before building Verdi" "InfSeqExt.infseq" "Build InfSeqExt before building Verdi")
-NAMESPACE_core="Verdi"
-NAMESPACE_systems="Verdi"
-NAMESPACE_shed="Verdi"
+Verdi_PATH=../verdi
+#Verdi_PATH=$(readlink --canonicalize ${Verdi_PATH:="../verdi"})
+Verdi_DIRS=(core lib systems extraction/coq)
+NAMESPACE_Verdi_lib="\"\""
+NAMESPACE_Verdi_extraction_coq="\"\""
 source script/coqproject.sh
+#ln -sfn $Verdi_PATH/extraction/ocaml extraction/vard/lib

@@ -3,10 +3,10 @@ Import ListNotations.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 
-Require Import Verdi.Chord.
-Require Import Verdi.ChordProof.
-Require Import Verdi.ChordDefinitionLemmas.
-Require Import Verdi.DynamicNet.
+Require Import Chord.Chord.
+Require Import Chord.ChordProof.
+Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.DynamicNet.
 
 Set Bullet Behavior "Strict Subproofs".
 
