@@ -1,7 +1,7 @@
 Verdi
 =====
 
-[![Build Status](https://api.travis-ci.org/uwplse/verdi.svg?branch=master)](https://travis-ci.org/uwplse/verdi)
+[![Build Status](https://api.travis-ci.org/DistributedComponents/verdi-chord.svg?branch=master)](https://travis-ci.org/DistributedComponents/verdi-chord)
 
 A framework for formally verifying distributed systems implementations in Coq.
 
