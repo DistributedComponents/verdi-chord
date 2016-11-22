@@ -4,7 +4,7 @@
 
 ## Configuration options for coqproject.sh
 DEPS=(StructTact InfSeqExt Verdi)
-DIRS=(core lib systems shed extraction/coq extraction/chord/coq)
+DIRS=(core systems shed extraction/coq extraction/chord/coq)
 NAMESPACE_core="Chord"
 NAMESPACE_systems="Chord"
 NAMESPACE_shed="Shed"
