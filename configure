@@ -9,7 +9,7 @@ NAMESPACE_core="Verdi"
 NAMESPACE_systems="Chord"
 NAMESPACE_shed="Shed"
 CANARIES=("mathcomp.ssreflect.ssreflect" "Verdi requires mathcomp to be installed" "StructTact.StructTactics" "Build StructTact before building Verdi" "InfSeqExt.infseq" "Build InfSeqExt before building Verdi")
-Verdi_PATH=$(readlink -f ${Verdi_PATH:="../verdi"})
+Verdi_PATH=$(perl -MCwd -e 'print Cwd::abs_path shift' ${Verdi_PATH:="../verdi"})
 Verdi_DIRS=(core lib systems extraction/coq)
 NAMESPACE_Verdi_lib="\"\""
 NAMESPACE_Verdi_extraction_coq="\"\""
