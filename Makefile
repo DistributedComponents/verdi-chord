@@ -32,7 +32,7 @@ clean:
 
 chord: Makefile.coq
 	$(MAKE) -f Makefile.coq extraction/chord/coq/ExtractChord.vo
-	cd extraction/chord; make
+	$(MAKE) -C extraction/chord
 
 lint:
 	@echo "Possible use of hypothesis names:"
@@ -41,4 +41,4 @@ lint:
 distclean: clean
 	rm -f _CoqProject
 
-.PHONY: default quick clean lint distclean
+.PHONY: default quick clean lint distclean chord

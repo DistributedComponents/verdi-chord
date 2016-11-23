@@ -1,37 +1,28 @@
+opam init --yes --no-setup
+eval $(opam config env)
+opam repo add coq-released https://coq.inria.fr/opam/released
+opam install coq.$COQ_VERSION coq-mathcomp-ssreflect.$SSREFLECT_VERSION ounit.2.0.0 --yes --verbose
+
 pushd ..
-  wget 'http://homes.cs.washington.edu/~jrw12/coq-8.5-build-local.tgz'
-  tar xf coq-8.5-build-local.tgz
-  export PATH=$PWD/coq-8.5/bin:$PATH
-
-  opam init --yes --no-setup
-  eval $(opam config env)
-  opam install ounit --yes
-
-  git clone 'http://github.com/uwplse/StructTact'
+  git clone 'https://github.com/uwplse/StructTact.git'
   pushd StructTact
     ./build.sh
   popd
 
-  git clone 'http://github.com/palmskog/InfSeqExt'
+  git clone 'https://github.com/DistributedComponents/InfSeqExt.git'
   pushd InfSeqExt
     ./build.sh
   popd
 
-  git clone 'http://github.com/uwplse/verdi' verdi
+  git clone 'https://github.com/uwplse/verdi.git'
   pushd verdi
     ./build.sh
   popd
 popd
 
 case $MODE in
-  analytics)
-    ./analytics.sh
-    ;;
-  vard-quick)
-    ./vard-quick.sh
-    ;;
-  vard-test)
-    ./vard-test.sh
+  chord)
+    ./build.sh chord
     ;;
   *)
     ./build.sh
