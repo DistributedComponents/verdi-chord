@@ -14,4 +14,4 @@ Verdi_DIRS=(core lib systems extraction/coq)
 NAMESPACE_Verdi_lib="\"\""
 NAMESPACE_Verdi_extraction_coq="\"\""
 source script/coqproject.sh
-#ln -sfn $Verdi_PATH/extraction/ocaml extraction/chord/lib
+ln -sfn $Verdi_PATH/extraction/ocaml extraction/chord/lib

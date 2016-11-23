@@ -3,3 +3,4 @@ coq/*.mli
 _build
 chord.native
 chordshed.native
+lib
