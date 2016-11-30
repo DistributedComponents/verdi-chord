@@ -58,10 +58,6 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
   let unpack_msg buf : A.msg =
     M.from_string buf 0
 
-  let keys_of_hashtbl h =
-    let add_value_to_list k _ l = k :: l in
-    Hashtbl.fold add_value_to_list h []
-
   let recv_fds env =
     keys_of_hashtbl (env.recv_conns)
 
@@ -277,11 +273,6 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
     let s', ts' = handle_readable_fds env nm s ts fds in
     let s'', ts'' = timeout_step env nm s' ts' in
     eloop env nm (s'', ts'')
-
-  let default v o =
-    match o with
-    | None -> v
-    | Some v' -> v'
 
   let init nm knowns =
     let (st, sends, nts) = A.init nm knowns in
