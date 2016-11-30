@@ -74,13 +74,12 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
     Unix.setsockopt sock Unix.SO_REUSEADDR true;
     Unix.bind sock sa;
     Unix.listen sock 20;
-    ip, sock
+    ip, port, sock
 
   let setup nm =
     Hashtbl.randomize ();
     Random.self_init ();
-    let ip, sock = mk_sock_and_listen nm in
-    let ip, port = A.addr_of_name nm in
+    let ip, port, sock = mk_sock_and_listen nm in
     { bound_ip = ip
     ; bound_port = port
     ; listen_sock = sock
