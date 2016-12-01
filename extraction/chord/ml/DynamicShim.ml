@@ -1,5 +1,6 @@
 open Printf
 open Sys
+open Util
 
 module M = Marshal
 
@@ -23,12 +24,16 @@ module type DYNAMIC_ARRANGEMENT = sig
 end
 module Shim (A: DYNAMIC_ARRANGEMENT) = struct
   type env =
-    { bound_addr : string * int
+    { bound_ip : string
+    ; bound_port : int
     ; listen_sock : Unix.file_descr
     ; recv_conns : (Unix.file_descr, A.name) Hashtbl.t
     ; send_conns : (A.name, Unix.file_descr) Hashtbl.t
     ; mutable last_tick : float
     }
+
+  let bound_addr env =
+    (env.bound_ip, env.bound_port)
 
   let debug_log s =
     if A.debug then print_endline s else ()
@@ -53,37 +58,30 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
   let unpack_msg buf : A.msg =
     M.from_string buf 0
 
-  let keys_of_hashtbl h =
-    let add_value_to_list k _ l = k :: l in
-    Hashtbl.fold add_value_to_list h []
-
   let recv_fds env =
     keys_of_hashtbl (env.recv_conns)
 
   let readable_socks_in_env env =
     env.listen_sock :: keys_of_hashtbl env.recv_conns
 
-  let mk_addr_inet nm =
-    let ip, port = A.addr_of_name nm in
-    Unix.ADDR_INET (Unix.inet_addr_of_string ip, port)
-
-  let mk_addr_inet_random_port env =
-    let ip, _ = env.bound_addr in
-    Unix.ADDR_INET (Unix.inet_addr_of_string ip, 0)
-
+  (* Create a socket listening at A.addr_of_name nm.
+     Returns the ip address that the socket is bound to,
+     or (TODO) a host ip if the address is 0.0.0.0. *)
   let mk_sock_and_listen nm =
-    let sa = mk_addr_inet nm in
+    let ip, port = A.addr_of_name nm in
+    let sa = mk_addr_inet (ip, port) in
     let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     Unix.setsockopt sock Unix.SO_REUSEADDR true;
     Unix.bind sock sa;
     Unix.listen sock 20;
-    sock
+    ip, port, sock
 
   let setup nm =
     Hashtbl.randomize ();
     Random.self_init ();
-    let sock = mk_sock_and_listen nm in
-    { bound_addr = A.addr_of_name nm
+    let ip, port, sock = mk_sock_and_listen nm in
+    { bound_ip = ip
+    ; bound_port = port
     ; listen_sock = sock
     ; recv_conns = Hashtbl.create 64
     ; send_conns = Hashtbl.create 64
@@ -92,7 +90,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
 
   let connect_to env remote =
     let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
-    let sa = mk_addr_inet_random_port env in
+    let sa = mk_addr_inet_random_port env.bound_ip  in
     Unix.bind sock sa;
     Unix.connect sock (mk_addr_inet remote);
     sock
@@ -118,7 +116,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
         find_conn_and_send_all env nm buf
     else
       try
-        let conn = connect_to env nm in
+        let conn = connect_to env (A.addr_of_name nm) in
         send_all conn buf;
         Hashtbl.replace env.send_conns nm conn
       with Unix.Unix_error (errno, fn, arg) ->
@@ -274,11 +272,6 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
     let s', ts' = handle_readable_fds env nm s ts fds in
     let s'', ts'' = timeout_step env nm s' ts' in
     eloop env nm (s'', ts'')
-
-  let default v o =
-    match o with
-    | None -> v
-    | Some v' -> v'
 
   let init nm knowns =
     let (st, sends, nts) = A.init nm knowns in
