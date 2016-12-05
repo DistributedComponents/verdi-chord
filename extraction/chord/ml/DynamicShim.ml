@@ -12,17 +12,25 @@ module type DYNAMIC_ARRANGEMENT = sig
   type res = state * (name * msg) list * timeout list * timeout list
   val addr_of_name : name -> (string * int)
   val name_of_addr : (string * int) -> name
-  val init : name -> name list -> state * (name * msg) list * timeout list
-  val handleNet : name -> name -> state -> msg -> res
-  val handleTimeout : name -> state -> timeout -> res
-  val setTimeout : timeout -> float
+  val start_handler : name -> name list -> state * (name * msg) list * timeout list
+  val recv_handler : name -> name -> state -> msg -> res
+  val timeout_handler : name -> state -> timeout -> res
+  val set_timeout : timeout -> float
   val default_timeout : float
   val debug : bool
-  val debugRecv : state -> (name * msg) -> unit
-  val debugSend : state -> (name * msg) -> unit
-  val debugTimeout : state -> timeout -> unit
+  val debug_recv : state -> (name * msg) -> unit
+  val debug_send : state -> (name * msg) -> unit
+  val debug_timeout : state -> timeout -> unit
 end
-module Shim (A: DYNAMIC_ARRANGEMENT) = struct
+
+module type ShimSig = sig
+  type addr = string * int
+  val main : addr -> addr list -> unit
+end
+
+module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
+  type addr = string * int
+
   type env =
     { bound_ip : string
     ; bound_port : int
@@ -40,15 +48,15 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
 
   let debug_timeout s' t =
     if A.debug
-    then A.debugTimeout s' t
+    then A.debug_timeout s' t
 
   let debug_recv st packet =
     if A.debug
-    then A.debugRecv st packet
+    then A.debug_recv st packet
 
   let debug_send st packet =
     if A.debug
-    then A.debugSend st packet
+    then A.debug_send st packet
 
   let debug_unix_error prefix errno fn arg =
     let err_msg = Unix.error_message errno in
@@ -134,7 +142,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
 
   let add_times ts =
     let now = Unix.gettimeofday () in
-    let add_time t = (now +. A.setTimeout t, t) in
+    let add_time t = (now +. A.set_timeout t, t) in
     List.map add_time ts
 
   let respond env ts (s, ps, newts, clearedts) =
@@ -202,7 +210,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
   let do_timeout env nm (s, sends, newts, clearedts) (deadline, t) =
     if not (List.mem t clearedts)
     then
-      let (s', sends', newts', clearedts') = A.handleTimeout nm s t in
+      let (s', sends', newts', clearedts') = A.timeout_handler nm s t in
       debug_timeout s' t;
       (s', sends @ sends', newts @ newts', uniqappend clearedts clearedts')
     else (s, sends, newts, clearedts)
@@ -252,7 +260,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
     match read_and_unpack sock with
     | Some m ->
        let src = Hashtbl.find env.recv_conns sock in
-       let (s', ms, newts, clearedts) = A.handleNet src nm s m in
+       let (s', ms, newts, clearedts) = A.recv_handler src nm s m in
        debug_recv s' (src, m);
        respond env ts (s', ms, newts, clearedts)
     | None ->
@@ -274,10 +282,12 @@ module Shim (A: DYNAMIC_ARRANGEMENT) = struct
     eloop env nm (s'', ts'')
 
   let init nm knowns =
-    let (st, sends, nts) = A.init nm knowns in
+    let (st, sends, nts) = A.start_handler nm knowns in
     (st, sends, nts, [])
 
-  let main nm knowns =
+  let main bind knowns =
+    let nm = A.name_of_addr bind in
+    let knowns = List.map A.name_of_addr knowns in
     let env = Unix.handle_unix_error setup nm in
     print_endline "starting";
     eloop env nm (respond env [] (init nm knowns));

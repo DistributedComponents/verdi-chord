@@ -3,8 +3,6 @@ open Util
 open Printf
 open Str
 
-let chord_port = 8000
-
 let show_pointer p =
   string_of_int (id_of p)
 
@@ -82,16 +80,33 @@ let log_timeout st = function
                      ^ " from " ^ show_pointer (ptr st)
                      ^ " to " ^ show_addr dead ^ " timed out")
 
-let set_timeout = function
- | Tick -> 15.0 +. Random.float 10.0
- (* must be less than the request timeout *)
- | KeepaliveTick -> 5.0
- | Request (a, b) -> 30.0
-
 let rebracket4 (((a, b), c), d) = (a, b, c, d)
 let rebracket3 ((a, b), c) = (a, b, c)
 
-module ChordDebugArrangement = struct
+module type ChordConfig = sig
+  val tick_timeout : float
+  val keepalive_timeout : float
+  val request_timeout : float
+  val debug : bool
+end
+
+type chord_config =
+  { tick_timeout : float
+  ; keepalive_timeout : float
+  ; request_timeout : float
+  ; debug : bool
+  }
+
+let make_config_module cc =
+  (module struct
+     let tick_timeout = cc.tick_timeout
+     let keepalive_timeout = cc.keepalive_timeout
+     let request_timeout = cc.request_timeout
+     let debug = cc.debug
+   end : ChordConfig)
+
+module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = struct
+  let chord_port = 8000
   type name = addr
   type state = data
   type msg = payload
@@ -101,22 +116,38 @@ module ChordDebugArrangement = struct
     (ip_of_int n, chord_port)
   let name_of_addr (s, p) =
     int_of_ip s
-  let init n ks =
+  let start_handler n ks =
     Random.self_init ();
     rebracket3 (init n ks)
-  let handleNet s d m st =
+  let recv_handler s d m st =
     rebracket4 (handleNet s d m st)
-  let handleTimeout n s t =
+  let timeout_handler n s t =
     rebracket4 (handleTimeout n s t)
-  let setTimeout = set_timeout
+
+  let fuzzy_timeout t =
+    let fuzz = max (t /. 5.0) 2.0 in
+    t +. Random.float fuzz
+
+  let set_timeout = function
+    | Tick -> fuzzy_timeout C.tick_timeout
+    (* must be less than the request timeout *)
+    | KeepaliveTick -> C.keepalive_timeout
+    | Request (a, b) -> C.request_timeout
+
   let default_timeout = 1.0
-  let debug = true
-  let debugRecv st (src, msg) = log_st st; log_recv st src msg
-  let debugSend st (dst, msg) = log_st st; log_send st dst msg
-  let debugTimeout st t = log_timeout st t
-  let showTimeout = function
-      | Tick -> "Tick"
-      | KeepaliveTick -> "KeepaliveTick"
-      | Request (dead, msg) ->
-        "Request(" ^ show_addr dead ^ ", " ^ show_msg msg ^ ")"
+  let debug = C.debug
+  let debug_recv st (src, msg) = log_st st; log_recv st src msg
+  let debug_send st (dst, msg) = log_st st; log_send st dst msg
+  let debug_timeout st t = log_timeout st t
+  let show_timeout = function
+    | Tick -> "Tick"
+    | KeepaliveTick -> "KeepaliveTick"
+    | Request (dead, msg) ->
+       sprintf "Request(%s, %s)" (show_addr dead) (show_msg msg)
 end
+
+let run cc nm knowns =
+  let (module Conf) = make_config_module cc in
+  let (module Shim : DynamicShim.ShimSig) =
+    (module DynamicShim.Shim(ChordArrangement(Conf))) in
+  Shim.main nm knowns
