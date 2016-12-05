@@ -85,7 +85,7 @@ let parse argv =
   in
   Arg.parse spec anonarg usage;
   try
-    validate !bind !node !query_type !lookup_id;
+    validate !bind !node !query_type !lookup_id
   with Invalid_argument msg ->
     Arg.usage spec msg;
     exit 1
