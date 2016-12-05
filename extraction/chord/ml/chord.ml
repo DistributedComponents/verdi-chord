@@ -43,7 +43,7 @@ let mk_default_opts () : command_line_opts =
   ; known = ref None
   ; debug = ref true
   ; request_timeout = ref 30.0
-  ; tick_timeout = ref 5.0
+  ; tick_timeout = ref 10.0
   ; keepalive_timeout = ref 5.0
   }
 
@@ -104,9 +104,13 @@ let parse argv opts =
   try
     Arg.parse_argv argv spec anon_args_fun "Try -help for help or one of the following.";
     validate opts
-  with Invalid_argument msg ->
-    Arg.usage spec msg;
-    exit 1
+  with
+  | Invalid_argument msg ->
+     Arg.usage spec msg;
+     exit 1
+  | Arg.Bad msg ->
+     print_string msg;
+     exit 1
 
 let _ =
   let opts = mk_default_opts () in
