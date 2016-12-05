@@ -101,6 +101,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
     let sa = mk_addr_inet_random_port env.bound_ip  in
     Unix.bind sock sa;
     Unix.connect sock (mk_addr_inet remote);
+    Unix.set_nonblock sock;
     sock
 
   let send_all sock buf =
@@ -126,7 +127,8 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
       try
         let conn = connect_to env (A.addr_of_name nm) in
         send_all conn buf;
-        Hashtbl.replace env.send_conns nm conn
+        Hashtbl.replace env.send_conns nm conn;
+        Hashtbl.add env.recv_conns conn nm
       with Unix.Unix_error (errno, fn, arg) ->
         (* this should do something different if errno = EAGAIN, etc *)
         debug_unix_error "find_conn_and_send_all (made conn)" errno fn arg
@@ -134,7 +136,11 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
   let respond_one env st (dst, msg) =
     debug_send st (dst, msg);
     let serialized = M.to_string msg [] in
-    find_conn_and_send_all env dst serialized
+    try
+      find_conn_and_send_all env dst serialized
+    with Unix.Unix_error (errno, fn, arg) ->
+      (* this should do something different if errno = EAGAIN, etc *)
+      debug_unix_error "respond_one" errno fn arg
 
   let filter_cleared clearedts ts =
     let not_cleared (_, t) = not (List.mem t clearedts) in
@@ -234,11 +240,15 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
 
   let accept_connection env =
     let conn, sa = Unix.accept env.listen_sock in
-    Hashtbl.add env.recv_conns conn (sockaddr_to_name sa)
+    let nm = sockaddr_to_name sa in
+    Unix.set_nonblock conn;
+    Hashtbl.add env.recv_conns conn nm;
+    (* this is definitely leaking FDs *)
+    Hashtbl.replace env.send_conns nm conn
 
   let send_connected_filter nm fd =
     try
-      ignore (Unix.getpeername fd);
+      ignore (Unix.send fd "" 0 0 []);
       Some fd
     with Unix.Unix_error (errno, fn, arg) ->
       debug_unix_error "send_connected_filter" errno fn arg;
@@ -246,11 +256,14 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
 
   let recv_connected_filter fd nm =
     try
-      ignore (Unix.getpeername fd);
-      Some nm
+      let count = Unix.recv fd "\x00" 0 1 [Unix.MSG_PEEK] in
+      if count > 0
+      then Some nm
+      else None
     with Unix.Unix_error (errno, fn, arg) ->
-      debug_unix_error "recv_connected_filter" errno fn arg;
-      None
+      if errno = Unix.EAGAIN || errno = Unix.EWOULDBLOCK
+      then Some nm
+      else (debug_unix_error "recv_connected_filter" errno fn arg; None)
 
   let prune_conns env =
     Hashtbl.filter_map_inplace recv_connected_filter env.recv_conns;
@@ -286,6 +299,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
     (st, sends, nts, [])
 
   let main bind knowns =
+    Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
     let nm = A.name_of_addr bind in
     let knowns = List.map A.name_of_addr knowns in
     let env = Unix.handle_unix_error setup nm in
