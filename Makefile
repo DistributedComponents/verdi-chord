@@ -18,8 +18,6 @@ endif
 
 MLFILES = extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli \
 	extraction/chord/coq/ExtractedChordShed.ml extraction/chord/coq/ExtractedChordShed.mli
-MLFILES_DEPS = 'extraction/chord/coq/ExtractChord.v systems/Chord.vo shed/ChordShed.vo'
-MLFILES_COMMAND = '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v'
 
 default: Makefile.coq
 	$(MAKE) -f Makefile.coq
@@ -29,7 +27,9 @@ quick: Makefile.coq
 
 Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq \
-	  -extra 'extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli extraction/chord/coq/ExtractedChordShed.ml extraction/chord/coq/ExtractedChordShed.mli' $(MLFILES_DEPS) $(MLFILES_COMMAND)
+	  -extra '$(MLFILES)' \
+	    'extraction/chord/coq/ExtractChord.v systems/Chord.vo shed/ChordShed.vo' \
+	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v'
 
 clean:
 	if [ -f Makefile.coq ]; then \
