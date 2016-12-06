@@ -3,12 +3,10 @@ OCAMLBUILD = ocamlbuild -lib str -lib unix -I lib -I ml -I coq
 default: chord.native client.native chordshed.native
 
 coq/ExtractedChord.ml:
-	# there has to be a -B flag here becuase there's no way to explicitly
-	# ask a Makefile.coq for extraction targets
-	make -B -C ../../ -f Makefile.coq extraction/chord/coq/ExtractChord.vo
+	make -C ../.. extraction/chord/coq/ExtractedChord.ml
 
 coq/ExtractedChordShed.ml:
-	make -B -C ../../ -f Makefile.coq extraction/chord/coq/ExtractChord.vo
+	make -C ../.. extraction/chord/coq/ExtractedChordShed.ml
 
 chord.native: coq/ExtractedChord.ml ml/*.ml lib/*.ml
 	$(OCAMLBUILD) chord.native
