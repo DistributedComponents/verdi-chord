@@ -1,12 +1,12 @@
 OCAMLBUILD = ocamlbuild -lib str -lib unix -I lib -I ml -I coq
 
+MLFILES = coq/ExtractedChord.ml coq/ExtractedChord.mli \
+	coq/ExtractedChordShed.ml coq/ExtractedChordShed.mli
+
 default: chord.native client.native chordshed.native
 
-coq/ExtractedChord.ml:
-	make -C ../.. extraction/chord/coq/ExtractedChord.ml
-
-coq/ExtractedChordShed.ml:
-	make -C ../.. extraction/chord/coq/ExtractedChordShed.ml
+$(MLFILES):
+	make -C ../.. extraction/chord/$@
 
 chord.native: coq/ExtractedChord.ml ml/*.ml lib/*.ml
 	$(OCAMLBUILD) chord.native
@@ -20,4 +20,6 @@ chordshed.native: coq/ExtractedChordShed.ml ml/*.ml lib/*.ml
 clean:
 	$(OCAMLBUILD) chord.native -clean
 
-.PHONY : default clean
+.PHONY : default clean $(MLFILES)
+
+.NOTPARALLEL: chord.native client.native chordshed.native
