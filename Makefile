@@ -16,6 +16,9 @@ $(info $(CHECKPATH))
 $(warning checkpath reported an error)
 endif
 
+MLFILES = extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli \
+	extraction/chord/coq/ExtractedChordShed.ml extraction/chord/coq/ExtractedChordShed.mli
+
 default: Makefile.coq
 	$(MAKE) -f Makefile.coq
 
@@ -23,16 +26,21 @@ quick: Makefile.coq
 	$(MAKE) -f Makefile.coq quick
 
 Makefile.coq: _CoqProject
-	coq_makefile -f _CoqProject -o Makefile.coq
+	coq_makefile -f _CoqProject -o Makefile.coq \
+	  -extra '$(MLFILES)' \
+	    'extraction/chord/coq/ExtractChord.v systems/Chord.vo shed/ChordShed.vo' \
+	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v'
 
 clean:
 	if [ -f Makefile.coq ]; then \
 	  $(MAKE) -f Makefile.coq cleanall; fi
 	rm -f Makefile.coq
 
-chord: Makefile.coq
-	$(MAKE) -f Makefile.coq extraction/chord/coq/ExtractChord.vo
+chord: $(MLFILES)
 	$(MAKE) -C extraction/chord
+
+$(MLFILES): Makefile.coq
+	$(MAKE) -f Makefile.coq $@
 
 lint:
 	@echo "Possible use of hypothesis names:"
