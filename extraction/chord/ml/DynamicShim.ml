@@ -265,9 +265,22 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
       then Some nm
       else (debug_unix_error "recv_connected_filter" errno fn arg; None)
 
+  (* to use instead of Hashtbl.filter_map_inplace (not in-place though) *)
+  let filter_map f h =
+    let size = Hashtbl.length h in
+    let h' = Hashtbl.create size in
+    let filter_map_step k v acc =
+      match f k v with
+      | Some v' -> Hashtbl.add acc k v'; acc
+      | None -> acc
+    in
+    Hashtbl.fold filter_map_step h h'
+
   let prune_conns env =
-    Hashtbl.filter_map_inplace recv_connected_filter env.recv_conns;
-    Hashtbl.filter_map_inplace send_connected_filter env.send_conns
+    { env with
+      recv_conns = filter_map recv_connected_filter env.recv_conns
+    ; send_conns = filter_map send_connected_filter env.send_conns
+    }
 
   let recv_step env nm s ts sock =
     match read_and_unpack sock with
@@ -288,7 +301,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
     else s, ts
 
   let rec eloop env nm (s, ts) =
-    prune_conns env;
+    let env = prune_conns env in
     let fds, _, _ = iterated_select (readable_socks_in_env env) (free_time ts) in
     let s', ts' = handle_readable_fds env nm s ts fds in
     let s'', ts'' = timeout_step env nm s' ts' in
