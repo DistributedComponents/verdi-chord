@@ -13,6 +13,7 @@ env:
     - SSREFLECT_VERSION=1.6
   matrix:
   - MODE=build
+  - MODE=chord
 script: bash -ex .travis-ci.sh
 sudo: false
 notifications:

@@ -6,7 +6,7 @@ MLFILES = coq/ExtractedChord.ml coq/ExtractedChord.mli \
 default: chord.native client.native chordshed.native
 
 $(MLFILES):
-	make -C ../.. extraction/chord/$@
+	+$(MAKE) -C ../.. extraction/chord/$@
 
 chord.native: coq/ExtractedChord.ml ml/*.ml lib/*.ml
 	$(OCAMLBUILD) chord.native
@@ -18,8 +18,9 @@ chordshed.native: coq/ExtractedChordShed.ml ml/*.ml lib/*.ml
 	$(OCAMLBUILD) chordshed.native
 
 clean:
-	$(OCAMLBUILD) chord.native -clean
+	$(OCAMLBUILD) -clean
 
-.PHONY : default clean $(MLFILES)
+.PHONY: default clean $(MLFILES)
 
 .NOTPARALLEL: chord.native client.native chordshed.native
+.NOTPARALLEL: $(MLFILES)

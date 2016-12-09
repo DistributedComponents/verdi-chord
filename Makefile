@@ -35,9 +35,10 @@ clean:
 	if [ -f Makefile.coq ]; then \
 	  $(MAKE) -f Makefile.coq cleanall; fi
 	rm -f Makefile.coq
+	$(MAKE) -C extraction/chord clean
 
-chord: $(MLFILES)
-	$(MAKE) -C extraction/chord
+chord:
+	+$(MAKE) -C extraction/chord
 
 $(MLFILES): Makefile.coq
 	$(MAKE) -f Makefile.coq $@
