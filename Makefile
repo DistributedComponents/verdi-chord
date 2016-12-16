@@ -50,4 +50,4 @@ lint:
 distclean: clean
 	rm -f _CoqProject
 
-.PHONY: default quick clean lint distclean chord
+.PHONY: default quick clean lint distclean chord $(MLFILES)
