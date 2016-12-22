@@ -1,14 +1,14 @@
 # config valid only for current version of Capistrano
 lock "3.7.1"
 
-set :application, "my_app_name"
-set :repo_url, "git@example.com:me/my_repo.git"
+set :application, "verdi-chord"
+set :repo_url, "git@github.com:DistributedComponents/verdi-chord.git"
 
 # Default branch is :master
 # ask :branch, `git rev-parse --abbrev-ref HEAD`.chomp
 
 # Default deploy_to directory is /var/www/my_app_name
-# set :deploy_to, "/var/www/my_app_name"
+set :deploy_to, "/home/pi/lib/verdi-chord"
 
 # Default value for :format is :airbrussh.
 # set :format, :airbrussh
@@ -25,9 +25,17 @@ set :repo_url, "git@example.com:me/my_repo.git"
 
 # Default value for linked_dirs is []
 # append :linked_dirs, "log", "tmp/pids", "tmp/cache", "tmp/sockets", "public/system"
+append :linked_dirs, "extraction/chord/tmp", "extraction/chord/log"
 
 # Default value for default_env is {}
 # set :default_env, { path: "/opt/ruby/bin:$PATH" }
+set :default_env, {
+  "Verdi_PATH" => "/home/pi/lib/verdi/current",
+  "StructTact_PATH" => "/home/pi/lib/StructTact/current",
+  "InfSeqExt_PATH" => "/home/pi/lib/InfSeqExt/current"
+}
 
 # Default value for keep_releases is 5
 # set :keep_releases, 5
+
+after "deploy:published", "compilation:build"
