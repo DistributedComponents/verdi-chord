@@ -16,8 +16,9 @@ $(info $(CHECKPATH))
 $(warning checkpath reported an error)
 endif
 
-MLFILES = extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli \
-	extraction/chord/coq/ExtractedChordShed.ml extraction/chord/coq/ExtractedChordShed.mli
+CHORDMLFILES = extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli
+SHEDMLFILES = extraction/chord/coq/ExtractedChordShed.ml extraction/chord/coq/ExtractedChordShed.mli
+MLFILES = $(CHORDMLFILES) $(SHEDMLFILES)
 
 default: Makefile.coq
 	$(MAKE) -f Makefile.coq
@@ -27,9 +28,12 @@ quick: Makefile.coq
 
 Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq \
-	  -extra '$(MLFILES)' \
-	    'extraction/chord/coq/ExtractChord.v systems/Chord.vo shed/ChordShed.vo' \
-	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v'
+	  -extra '$(CHORDMLFILES)' \
+	    'extraction/chord/coq/ExtractChord.v systems/Chord.vo' \
+	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v' \
+	  -extra '$(SHEDMLFILES)' \
+            'extraction/chord/coq/ExtractChordShed.v systems/Chord.vo shed/ChordShed.vo' \
+	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChordShed.v'
 
 clean:
 	if [ -f Makefile.coq ]; then \
@@ -38,7 +42,7 @@ clean:
 	$(MAKE) -C extraction/chord clean
 
 chord:
-	+$(MAKE) -C extraction/chord
+	+$(MAKE) -C extraction/chord chord.native
 
 $(MLFILES): Makefile.coq
 	$(MAKE) -f Makefile.coq $@
