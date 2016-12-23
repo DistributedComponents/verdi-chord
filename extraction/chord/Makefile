@@ -15,6 +15,7 @@ client.native: $(CHORDMLFILES) ml/client.ml lib/*.ml
 	$(OCAMLBUILD) client.native
 
 chordshed.native: $(SHEDMLFILES) ml/*.ml lib/*.ml
+	@echo $?
 	$(OCAMLBUILD) chordshed.native
 
 clean:

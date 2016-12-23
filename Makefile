@@ -42,7 +42,10 @@ clean:
 	$(MAKE) -C extraction/chord clean
 
 chord:
-	+$(MAKE) -C extraction/chord chord.native
+	+$(MAKE) -C extraction/chord chord.native client.native
+
+chordshed:
+	+$(MAKE) -C extraction/chord chordshed.native
 
 $(MLFILES): Makefile.coq
 	$(MAKE) -f Makefile.coq $@
@@ -54,4 +57,4 @@ lint:
 distclean: clean
 	rm -f _CoqProject
 
-.PHONY: default quick clean lint distclean chord $(MLFILES)
+.PHONY: default quick clean lint distclean chord chordshed $(MLFILES)

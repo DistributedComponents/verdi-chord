@@ -1,6 +1,9 @@
 open Printf
 
 open ExtractedChordShed
+open ExtractedChordShed.DecidableChord
+open ExtractedChordShed.ChordShedSemantics
+open ExtractedChordShed.ChordShed
 
 let show_pointer p =
   sprintf "(id=%d, addr=%d)" (id_of p) (addr_of p)
@@ -51,11 +54,11 @@ let pick_timeout gst r =
                      (nodes gst) in
   let h = pick r hosts in
   let t = pick r (timeouts gst h) in
-  Op_timeout (h, t)
+  Coq_op_timeout (h, t)
 
 let pick_msg gst r =
   let (i, m) = picki r (msgs gst) in
-  Op_deliver (i, m)
+  Coq_op_deliver (i, m)
 
 let init_nodes =
     [10;30;50;70;90]
@@ -76,7 +79,7 @@ let succs_for_init = function
   | 90 -> [10;30]
   | _ -> []
 
-let mp = make_pointer (fun a -> a mod 256)
+let mp = make_pointer
 let init_sigma h =
     if List.mem h init_nodes
     then Some ({ ptr = mp h
@@ -173,13 +176,13 @@ let show_net n =
   String.concat "\n" (node_strs @ msgs_strs)
 
 let show_operation = function
-  | Op_start (a, ks) ->
+  | Coq_op_start (a, ks) ->
       sprintf "op_start %d %s" a (show_addr_list ks)
-  | Op_fail a ->
+  | Coq_op_fail a ->
       sprintf "op_fail %d" a
-  | Op_timeout (a, t) ->
+  | Coq_op_timeout (a, t) ->
       sprintf "op_timeout %d %s" a (show_timeout t)
-  | Op_deliver (n, (src, (dst, p))) ->
+  | Coq_op_deliver (n, (src, (dst, p))) ->
       sprintf "op_deliver %d %d %d %s" n src dst (show_payload p)
 
 module ChordArrangement = struct

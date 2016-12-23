@@ -1,5 +1,7 @@
+open ExtractedChord.Chord
+
 module type ClientSig = sig
-  type ptr = ExtractedChord.pointer
+  type ptr = pointer
 
   exception Wrong_response of string
 
@@ -8,7 +10,7 @@ module type ClientSig = sig
 end
 
 module Client : ClientSig = struct
-  type ptr = ExtractedChord.pointer
+  type ptr = pointer
 
   let connect_and_send me addr msg =
     let remote = Util.mk_addr_inet addr in
@@ -30,7 +32,7 @@ module Client : ClientSig = struct
     let full_msg = Printf.sprintf "in %s - %s(%s): %s" prefix fn arg err_msg in
     print_endline full_msg
 
-  let query bind node p : ExtractedChord.payload =
+  let query bind node p : payload =
     let send_chan, recv_chan, conn = connect_and_send bind node p in
     let res = input_value recv_chan in
     Unix.shutdown conn Unix.SHUTDOWN_ALL;
@@ -39,13 +41,13 @@ module Client : ClientSig = struct
   exception Wrong_response of string
 
   let lookup bind node id =
-    match query bind node (ExtractedChord.GetBestPredecessor (id, id)) with
-    | ExtractedChord.GotBestPredecessor p -> p
+    match query bind node (GetBestPredecessor (id, id)) with
+    | GotBestPredecessor p -> p
     | r -> raise (Wrong_response (ChordArrangement.show_msg r))
 
   let get_pred_and_succs bind node =
-    match query bind node ExtractedChord.GetPredAndSuccs with
-    | ExtractedChord.GotPredAndSuccs (p, ss) -> (p, ss)
+    match query bind node GetPredAndSuccs with
+    | GotPredAndSuccs (p, ss) -> (p, ss)
     | r -> raise (Wrong_response (ChordArrangement.show_msg r))
 end
 

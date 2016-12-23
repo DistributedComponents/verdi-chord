@@ -1,4 +1,5 @@
 open ExtractedChord
+open ExtractedChord.Chord
 open Util
 open Printf
 open Str
@@ -110,7 +111,7 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
   type name = addr
   type state = data
   type msg = payload
-  type timeout = ExtractedChord.timeout
+  type timeout = ExtractedChord.Chord.timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let addr_of_name n =
     (ip_of_int n, chord_port)
