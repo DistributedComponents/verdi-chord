@@ -21,7 +21,7 @@ Module Type ShedSemantics.
      For example, an operation that crashes a node h won't be valid if
      h isn't a live node. *)
   Variable run : net -> operation -> option net.
-  (*
+(*
   Variable run_valid :
     forall gst op gst',
       run gst op = Some gst' ->
@@ -165,11 +165,11 @@ Module Shed (S : ShedSemantics).
     existsb (Bool.eqb false) (map (fun p => proj_sumbool (np_dec p gst)) preds).
 
   Record test_state := { (* trace of program thus far *)
-                         ts_trace : list occurrence;
-                         (* latest state, since occurrences have a sort of fencepost issue *)
-                         ts_latest : net;
-                         ts_netpreds : list (netpred * list bool);
-                         ts_tracepreds : list (tracepred * list (option bool)) }.
+                        ts_trace : list occurrence;
+                        (* latest state, since occurrences have a sort of fencepost issue *)
+                        ts_latest : net;
+                        ts_netpreds : list (netpred * list bool);
+                        ts_tracepreds : list (tracepred * list (option bool)) }.
 
   Definition extend_by (st : test_state) (gst : net) (op : operation) : test_state :=
     {| ts_trace := ts_trace st ++ [(ts_latest st, op)];

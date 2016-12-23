@@ -19,231 +19,231 @@ Require Chord.ChordSemantics.
 Import Chord.ChordSemantics.ChordSemantics.
 Import Chord.ChordSemantics.ConstrainedChord.
 
-  (* assuming sigma gst h = Some st *)
-  Definition failed_successors (gst : global_state) (st : data) : list pointer :=
-    filter (fun p : pointer => In_dec addr_eq_dec (snd p) (failed_nodes gst)) (succ_list st).
+(* assuming sigma gst h = Some st *)
+Definition failed_successors (gst : global_state) (st : data) : list pointer :=
+  filter (fun p : pointer => In_dec addr_eq_dec (snd p) (failed_nodes gst)) (succ_list st).
 
-  Lemma l_enabled_RecvMsg_In_msgs :
-    forall e src dst m d,
-      In dst (nodes (occ_gst e)) ->
-      ~ In dst (failed_nodes (occ_gst e)) ->
-      In (src, (dst, m)) (msgs (occ_gst e)) ->
-      sigma (occ_gst e) dst = Some d ->
-      l_enabled (RecvMsg src dst m) e.
-  Proof using.
+Lemma l_enabled_RecvMsg_In_msgs :
+  forall e src dst m d,
+    In dst (nodes (occ_gst e)) ->
+    ~ In dst (failed_nodes (occ_gst e)) ->
+    In (src, (dst, m)) (msgs (occ_gst e)) ->
+    sigma (occ_gst e) dst = Some d ->
+    l_enabled (RecvMsg src dst m) e.
+Proof using.
   move => e src dst m d H_in_n H_in_f H_in H_s.
   find_apply_lem_hyp in_split.
   break_exists.
   rewrite /l_enabled /enabled.
   case H_r: (recv_handler_l src dst d m) => [[[[st ms] newts] clearedts] lb].
   have H_lb: lb = RecvMsg src dst m.
-    rewrite /recv_handler_l /= in H_r.
+  rewrite /recv_handler_l /= in H_r.
     by tuple_inversion.
-  rewrite H_lb {H_lb} in H_r.
-  pose gst' := apply_handler_result
-                 dst
-                 (st, ms, newts, clearedts)
-                 [e_recv (src, (dst, m))]
-                 (update_msgs (occ_gst e) (x ++ x0)).
-  exists gst'.
-  by eapply LDeliver_node; eauto.
-  Qed.
+    rewrite H_lb {H_lb} in H_r.
+    pose gst' := apply_handler_result
+                   dst
+                   (st, ms, newts, clearedts)
+                   [e_recv (src, (dst, m))]
+                   (update_msgs (occ_gst e) (x ++ x0)).
+    exists gst'.
+      by eapply LDeliver_node; eauto.
+Qed.
 
-  Ltac break_labeled_step :=
-    match goal with
-      | H : labeled_step_dynamic _ _ _ |- _ =>
-        destruct H
-    end; subst.
+Ltac break_labeled_step :=
+  match goal with
+  | H : labeled_step_dynamic _ _ _ |- _ =>
+    destruct H
+  end; subst.
 
-  Ltac inv_labeled_step :=
-    match goal with
-      | H : labeled_step_dynamic _ _ _ |- _ =>
-        inv H; try now (unfold recv_handler_l, timeout_handler_l in *; tuple_inversion)
-    end.
+Ltac inv_labeled_step :=
+  match goal with
+  | H : labeled_step_dynamic _ _ _ |- _ =>
+    inv H; try now (unfold recv_handler_l, timeout_handler_l in *; tuple_inversion)
+  end.
 
-  Ltac invc_labeled_step :=
-    match goal with
-      | H : labeled_step_dynamic _ _ _ |- _ =>
-        invc H; try now (unfold recv_handler_l, timeout_handler_l in *; tuple_inversion)
-    end.
+Ltac invc_labeled_step :=
+  match goal with
+  | H : labeled_step_dynamic _ _ _ |- _ =>
+    invc H; try now (unfold recv_handler_l, timeout_handler_l in *; tuple_inversion)
+  end.
 
-  Ltac inv_timeout_constraint :=
-    match goal with
-    | H : timeout_constraint _ _ _ |- _ =>
-      inv H
-    end.
+Ltac inv_timeout_constraint :=
+  match goal with
+  | H : timeout_constraint _ _ _ |- _ =>
+    inv H
+  end.
 
-  Lemma sigma_ahr_updates :
-    forall gst n st ms nts cts e,
-      sigma (apply_handler_result n (st, ms, nts, cts) e gst) n = Some st.
-  Proof using.
-    unfold apply_handler_result.
-    simpl.
-    intuition.
-    exact: update_eq.
-  Qed.
+Lemma sigma_ahr_updates :
+  forall gst n st ms nts cts e,
+    sigma (apply_handler_result n (st, ms, nts, cts) e gst) n = Some st.
+Proof using.
+  unfold apply_handler_result.
+  simpl.
+  intuition.
+  exact: update_eq.
+Qed.
 
-  Lemma sigma_ahr_passthrough :
-    forall gst n st ms nts cts e h d,
-      n <> h ->
-      sigma gst h = Some d ->
-      sigma (apply_handler_result n (st, ms, nts, cts) e gst) h = Some d.
-  Proof using.
-    unfold apply_handler_result.
-    simpl.
-    intuition.
-    find_reverse_rewrite.
-    exact: update_diff.
-  Qed.
+Lemma sigma_ahr_passthrough :
+  forall gst n st ms nts cts e h d,
+    n <> h ->
+    sigma gst h = Some d ->
+    sigma (apply_handler_result n (st, ms, nts, cts) e gst) h = Some d.
+Proof using.
+  unfold apply_handler_result.
+  simpl.
+  intuition.
+  find_reverse_rewrite.
+  exact: update_diff.
+Qed.
 
-  Lemma labeled_step_preserves_state_existing :
-    forall gst gst' l h d,
-      sigma gst h = Some d ->
-      labeled_step_dynamic gst l gst' ->
-      exists d',
-        sigma gst' h = Some d'.
-  Proof using.
-    intuition.
-    break_labeled_step;
-      try (
-      match goal with
-      | H: In ?n (nodes _) |- exists _, sigma _ ?h = _ => destruct (addr_eq_dec n h)
-      end;
-      subst_max;
-      eexists;
-      eauto using sigma_ahr_updates, sigma_ahr_passthrough
+Lemma labeled_step_preserves_state_existing :
+  forall gst gst' l h d,
+    sigma gst h = Some d ->
+    labeled_step_dynamic gst l gst' ->
+    exists d',
+      sigma gst' h = Some d'.
+Proof using.
+  intuition.
+  break_labeled_step;
+    try (
+        match goal with
+        | H: In ?n (nodes _) |- exists _, sigma _ ?h = _ => destruct (addr_eq_dec n h)
+        end;
+        subst_max;
+        eexists;
+        eauto using sigma_ahr_updates, sigma_ahr_passthrough
       ).
-    admit. admit.
-  Admitted.
+  admit. admit.
+Admitted.
 
-  Lemma other_elements_remain_after_removal :
-    forall A (l xs ys : list A) (a b : A),
-      l = xs ++ b :: ys ->
-      In a l ->
-      a <> b ->
-      In a (xs ++ ys).
-  Proof using.
-    intuition.
-    subst_max.
-    do_in_app.
-    break_or_hyp.
-    - intuition.
-    - find_apply_lem_hyp in_inv.
-      break_or_hyp; auto using in_or_app || congruence.
-  Qed.
+Lemma other_elements_remain_after_removal :
+  forall A (l xs ys : list A) (a b : A),
+    l = xs ++ b :: ys ->
+    In a l ->
+    a <> b ->
+    In a (xs ++ ys).
+Proof using.
+  intuition.
+  subst_max.
+  do_in_app.
+  break_or_hyp.
+  - intuition.
+  - find_apply_lem_hyp in_inv.
+    break_or_hyp; auto using in_or_app || congruence.
+Qed.
 
-  Lemma define_msg_from_recv_step_equality :
-    forall m d st ms nts cts src dst p,
-      recv_handler_l (fst m) (fst (snd m)) d (snd (snd m)) = (st, ms, nts, cts, RecvMsg src dst p) ->
-      (m = (src, (dst, p)) /\ fst m = src /\ fst (snd m) = dst /\ snd (snd m) = p).
-  Proof using.
-    unfold recv_handler_l.
-    intuition;
-      now tuple_inversion.
-  Qed.
+Lemma define_msg_from_recv_step_equality :
+  forall m d st ms nts cts src dst p,
+    recv_handler_l (fst m) (fst (snd m)) d (snd (snd m)) = (st, ms, nts, cts, RecvMsg src dst p) ->
+    (m = (src, (dst, p)) /\ fst m = src /\ fst (snd m) = dst /\ snd (snd m) = p).
+Proof using.
+  unfold recv_handler_l.
+  intuition;
+    now tuple_inversion.
+Qed.
 
-  Ltac recover_msg_from_recv_step_equality :=
-    find_copy_apply_lem_hyp define_msg_from_recv_step_equality;
-    break_and.
+Ltac recover_msg_from_recv_step_equality :=
+  find_copy_apply_lem_hyp define_msg_from_recv_step_equality;
+  break_and.
 
-  Ltac recover_msg_from_recv_step_equality_clear :=
-    find_apply_lem_hyp define_msg_from_recv_step_equality;
-    break_and.
+Ltac recover_msg_from_recv_step_equality_clear :=
+  find_apply_lem_hyp define_msg_from_recv_step_equality;
+  break_and.
 
-  Lemma irrelevant_message_not_removed :
-    forall m p dst src to from gst gst',
-      labeled_step_dynamic gst (RecvMsg src dst p) gst' ->
-      In (from, (to, m)) (msgs gst) ->
-      (from, (to, m)) <> (src, (dst, p)) ->
-      In (from, (to, m)) (msgs gst').
-  Proof using.
-    intuition.
-    inv_labeled_step.
-    apply in_or_app.
-    right.
-    recover_msg_from_recv_step_equality.
-    eapply other_elements_remain_after_removal; eauto.
-    now repeat find_rewrite.
-  Admitted.
+Lemma irrelevant_message_not_removed :
+  forall m p dst src to from gst gst',
+    labeled_step_dynamic gst (RecvMsg src dst p) gst' ->
+    In (from, (to, m)) (msgs gst) ->
+    (from, (to, m)) <> (src, (dst, p)) ->
+    In (from, (to, m)) (msgs gst').
+Proof using.
+  intuition.
+  inv_labeled_step.
+  apply in_or_app.
+  right.
+  recover_msg_from_recv_step_equality.
+  eapply other_elements_remain_after_removal; eauto.
+  now repeat find_rewrite.
+Admitted.
 
-  Ltac destruct_recv_handler_l :=
-    match goal with
-      |- context[recv_handler_l ?from ?to ?st ?p] =>
-      unfold recv_handler_l;
-        destruct (recv_handler from to st p) as [[[?st ?ms] ?cts] ?nts] eqn:?H
-    end.
+Ltac destruct_recv_handler_l :=
+  match goal with
+    |- context[recv_handler_l ?from ?to ?st ?p] =>
+    unfold recv_handler_l;
+    destruct (recv_handler from to st p) as [[[?st ?ms] ?cts] ?nts] eqn:?H
+  end.
 
-  Lemma when_RecvMsg_enabled :
-    forall from to p gst,
-      In to (nodes gst) ->
-      ~ In to (failed_nodes gst) ->
-      (exists st, sigma gst to = Some st) ->
-      In (from, (to, p)) (msgs gst) ->
-      enabled (RecvMsg from to p) gst.
-  Proof using.
-    intuition.
-    find_apply_lem_hyp in_split.
-    break_exists.
-    match goal with
-      | H: sigma ?gst ?to = Some ?d |- enabled (RecvMsg ?from ?to ?p) ?gst =>
-        assert (exists st ms nts cts, recv_handler_l from to d p = (st, ms, nts, cts, RecvMsg from to p))
-    end.
-    destruct_recv_handler_l.
-    repeat eexists.
-    break_exists.
-    unfold enabled.
-    eauto using LDeliver_node.
-  Qed.
+Lemma when_RecvMsg_enabled :
+  forall from to p gst,
+    In to (nodes gst) ->
+    ~ In to (failed_nodes gst) ->
+    (exists st, sigma gst to = Some st) ->
+    In (from, (to, p)) (msgs gst) ->
+    enabled (RecvMsg from to p) gst.
+Proof using.
+  intuition.
+  find_apply_lem_hyp in_split.
+  break_exists.
+  match goal with
+  | H: sigma ?gst ?to = Some ?d |- enabled (RecvMsg ?from ?to ?p) ?gst =>
+    assert (exists st ms nts cts, recv_handler_l from to d p = (st, ms, nts, cts, RecvMsg from to p))
+  end.
+  destruct_recv_handler_l.
+  repeat eexists.
+  break_exists.
+  unfold enabled.
+  eauto using LDeliver_node.
+Qed.
 
-  Lemma recv_implies_state_exists :
-    forall gst gst' gst'' from to src dst p m,
-      labeled_step_dynamic gst (RecvMsg from to p) gst'  ->
-      labeled_step_dynamic gst (RecvMsg src dst m) gst'' ->
-      exists st,
-        sigma gst' dst = Some st.
-  Proof using.
-    intuition.
-    invc_labeled_step.
-    invc_labeled_step.
-    recover_msg_from_recv_step_equality_clear.
-    recover_msg_from_recv_step_equality_clear.
-    repeat find_rewrite.
-    unfold update_msgs.
-    destruct (addr_eq_dec to dst).
-    - repeat find_rewrite.
-      eauto using sigma_ahr_updates.
-    - eauto using sigma_ahr_passthrough.
-    - admit.
-    - admit.
-  Admitted.
+Lemma recv_implies_state_exists :
+  forall gst gst' gst'' from to src dst p m,
+    labeled_step_dynamic gst (RecvMsg from to p) gst'  ->
+    labeled_step_dynamic gst (RecvMsg src dst m) gst'' ->
+    exists st,
+      sigma gst' dst = Some st.
+Proof using.
+  intuition.
+  invc_labeled_step.
+  invc_labeled_step.
+  recover_msg_from_recv_step_equality_clear.
+  recover_msg_from_recv_step_equality_clear.
+  repeat find_rewrite.
+  unfold update_msgs.
+  destruct (addr_eq_dec to dst).
+  - repeat find_rewrite.
+    eauto using sigma_ahr_updates.
+  - eauto using sigma_ahr_passthrough.
+  - admit.
+  - admit.
+Admitted.
 
-  Lemma recv_implies_msg_in_before :
-    forall gst gst' src dst p,
-      labeled_step_dynamic gst (RecvMsg src dst p) gst' ->
-      In (src, (dst, p)) (msgs gst).
-  Proof using.
-    intuition.
-    invc_labeled_step.
-    recover_msg_from_recv_step_equality_clear.
-    repeat find_rewrite.
-    auto using in_or_app, in_eq.
-    - admit.
-    - admit.
-  Admitted.
+Lemma recv_implies_msg_in_before :
+  forall gst gst' src dst p,
+    labeled_step_dynamic gst (RecvMsg src dst p) gst' ->
+    In (src, (dst, p)) (msgs gst).
+Proof using.
+  intuition.
+  invc_labeled_step.
+  recover_msg_from_recv_step_equality_clear.
+  repeat find_rewrite.
+  auto using in_or_app, in_eq.
+  - admit.
+  - admit.
+Admitted.
 
-  Lemma recv_implies_msg_in_after :
-    forall gst gst' gst'' dst to src from m p,
-      labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-      labeled_step_dynamic gst (RecvMsg src dst m) gst'' ->
-      (src, (dst, m)) <> (from, (to, p)) ->
-      In (src, (dst, m)) (msgs gst').
-  Proof using.
-    intuition.
-    eapply irrelevant_message_not_removed.
-    - eauto.
-    - admit.
-    - admit.
-      (*
+Lemma recv_implies_msg_in_after :
+  forall gst gst' gst'' dst to src from m p,
+    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
+    labeled_step_dynamic gst (RecvMsg src dst m) gst'' ->
+    (src, (dst, m)) <> (from, (to, p)) ->
+    In (src, (dst, m)) (msgs gst').
+Proof using.
+  intuition.
+  eapply irrelevant_message_not_removed.
+  - eauto.
+  - admit.
+  - admit.
+(*
     - invc_labeled_step.
       invc_labeled_step.
       recover_msg_from_recv_step_equality_clear.
@@ -256,31 +256,31 @@ Import Chord.ChordSemantics.ConstrainedChord.
       end.
       auto using in_or_app, in_eq.
     - congruence. *)
-  Admitted.
+Admitted.
 
-  Ltac construct_gst_RecvMsg :=
-    match goal with
-    | Hst: sigma ?gst ?d = Some ?st,
-      Hmsgs: msgs ?gst = ?xs ++ (?s, (?d, ?p)) :: ?ys
-      |- enabled (RecvMsg ?s ?d ?p) ?gst =>
-      destruct (recv_handler_l s d st p) as [[[[?st' ?ms] ?nts] ?cts] ?l] eqn:?H;
-        remember (apply_handler_result
-                    d
-                    (st', ms, nts, cts)
-                    (e_recv (s, (d, p)))
-                    (update_msgs gst (xs ++ ys))) as egst
-    end.
+Ltac construct_gst_RecvMsg :=
+  match goal with
+  | Hst: sigma ?gst ?d = Some ?st,
+         Hmsgs: msgs ?gst = ?xs ++ (?s, (?d, ?p)) :: ?ys
+    |- enabled (RecvMsg ?s ?d ?p) ?gst =>
+    destruct (recv_handler_l s d st p) as [[[[?st' ?ms] ?nts] ?cts] ?l] eqn:?H;
+    remember (apply_handler_result
+                d
+                (st', ms, nts, cts)
+                (e_recv (s, (d, p)))
+                (update_msgs gst (xs ++ ys))) as egst
+  end.
 
-  Lemma recv_implies_node_in :
-    forall gst gst' src dst p,
-      labeled_step_dynamic gst (RecvMsg src dst p) gst' ->
-       In dst (nodes gst).
-  Proof using.
-    intuition.
-    invc_labeled_step.
-  Admitted.
+Lemma recv_implies_node_in :
+  forall gst gst' src dst p,
+    labeled_step_dynamic gst (RecvMsg src dst p) gst' ->
+    In dst (nodes gst).
+Proof using.
+  intuition.
+  invc_labeled_step.
+Admitted.
 
-  (*
+(*
   Lemma recv_implies_node_not_failed :
     forall gst gst' src dst p,
       labeled_step_dynamic gst (RecvMsg src dst p) gst' ->
@@ -1590,4 +1590,4 @@ Inductive further_succ_error_spec (gst : global_state) (h s : pointer) (n : nat)
       sigma gst (addr_of s1) = Some succ_st ->
       nth_error (succ_list succ_st) (n - 1) <> Some s ->
       further_succ_error_spec gst h s n 1.
-*)
+ *)

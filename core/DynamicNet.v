@@ -42,8 +42,8 @@ Module Type DynamicSystem.
   Variable timeout_handler_labeling :
     forall h st t r,
       (timeout_handler h st t = r ->
-      exists l,
-        timeout_handler_l h st t = (r, l)) /\
+       exists l,
+         timeout_handler_l h st t = (r, l)) /\
       (forall l,
           timeout_handler_l h st t = (r, l) ->
           timeout_handler h st t = r).
@@ -164,8 +164,8 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
 
   Lemma update_for_start_sigma_h_exists :
     forall gst h res,
-      exists st,
-        sigma (update_for_start gst h res) h = Some st.
+    exists st,
+      sigma (update_for_start gst h res) h = Some st.
   Proof using.
     unfold update_for_start.
     intros.
@@ -351,7 +351,7 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
     unfold weak_local_fairness. unfold cont_enabled, inf_occurred, continuously, inf_often.
     intros e s fair l eval.
     assert (eval_es: eventually (always (now (l_enabled l))) (Cons e s)).
-      apply E_next. assumption.
+    apply E_next. assumption.
     apply fair in eval_es.
     apply always_invar in eval_es.
     assumption.
@@ -360,12 +360,12 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
   Lemma strong_local_fairness_weak :
     forall s, strong_local_fairness s -> weak_local_fairness s.
   Proof using.
-  intros [e s].
-  unfold strong_local_fairness, weak_local_fairness, inf_enabled, cont_enabled.
-  intros H_str l H_cont.
-  apply H_str.
-  apply continuously_inf_often.
-  assumption.
+    intros [e s].
+    unfold strong_local_fairness, weak_local_fairness, inf_enabled, cont_enabled.
+    intros H_str l H_cont.
+    apply H_str.
+    apply continuously_inf_often.
+    assumption.
   Qed.
 
   CoInductive lb_execution : infseq occurrence -> Prop :=
@@ -388,8 +388,8 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
   Proof using.
     intuition.
     match goal with
-      | H: labeled_step_dynamic _ _ _ |- _ =>
-        invc H
+    | H: labeled_step_dynamic _ _ _ |- _ =>
+      invc H
     end.
     - find_apply_lem_hyp timeout_handler_labeling.
       eapply Timeout; eauto.
@@ -400,13 +400,13 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
   Qed.
 
   Inductive churn_between (gst gst' : global_state) : Prop :=
-    | fail_churn : failed_nodes gst <> failed_nodes gst' -> churn_between gst gst'
-    | join_churn : nodes gst <> nodes gst' -> churn_between gst gst'.
+  | fail_churn : failed_nodes gst <> failed_nodes gst' -> churn_between gst gst'
+  | join_churn : nodes gst <> nodes gst' -> churn_between gst gst'.
 
   Ltac invc_lstep :=
     match goal with
-      | H: labeled_step_dynamic _ _ _ |- _ =>
-        invc H
+    | H: labeled_step_dynamic _ _ _ |- _ =>
+      invc H
     end.
 
   Lemma list_neq_cons :
@@ -427,8 +427,8 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
   Proof using.
     intuition.
     match goal with
-      | H: step_dynamic _ _ |- _ =>
-        invc H
+    | H: step_dynamic _ _ |- _ =>
+      invc H
     end.
     - right.
       split.
