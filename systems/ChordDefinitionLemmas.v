@@ -3,26 +3,28 @@ Import ListNotations.
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
-Require Import Chord.Chord.
+Require Chord.Chord.
+Import Chord.Chord.Chord.
 Require Import Chord.ChordLocalProps.
-Require Import Verdi.DynamicNet.
+Require Chord.ChordSemantics.
+Import Chord.ChordSemantics.ChordSemantics.
 
-Ltac expand_def :=
-  repeat (try break_or_hyp; try break_and; try break_exists);
-  subst_max;
-  try tuple_inversion;
-  try (exfalso; tauto).
+  Ltac expand_def :=
+    repeat (try break_or_hyp; try break_and; try break_exists);
+    subst_max;
+    try tuple_inversion;
+    try (exfalso; tauto).
 
-Ltac smash_handler :=
-  match goal with
-  | [H : context[?f ?h] |- _] =>
-    match type of (f h) with
-    | Chord.res => destruct (f h) as [[[?st ?ms] ?newts] ?clearedts] eqn:?H
-    | _ => fail
-    end
-  end.
+  Ltac smash_handler :=
+    match goal with
+    | [H : context[?f ?h] |- _] =>
+      match type of (f h) with
+      | res => destruct (f h) as [[[?st ?ms] ?newts] ?clearedts] eqn:?H
+      | _ => fail
+      end
+    end.
 
-Section ChordDefinitionLemmas.
+  (*
   Variable SUCC_LIST_LEN : nat.
   Variable N : nat.
   Variable hash : addr -> id.
@@ -50,6 +52,7 @@ Section ChordDefinitionLemmas.
   Notation e_recv := (e_recv addr payload timeout).
   Notation e_timeout := (e_timeout addr payload timeout).
   Notation e_fail := (e_fail addr payload timeout).
+  *)
 
   (* Definition lemmas *)
   Lemma handle_query_req_busy_definition :
@@ -60,7 +63,7 @@ Section ChordDefinitionLemmas.
       clearedts = [] /\
       ((delayed_queries st = [] /\ newts = [KeepaliveTick]) \/
        (delayed_queries st <> [] /\ newts = [])).
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     unfold handle_query_req_busy.
     intros.
     repeat break_match; tuple_inversion; tauto.
@@ -254,7 +257,7 @@ Section ChordDefinitionLemmas.
             cts' = []))) \/
       ((joined st = false \/ rectify_with st = None \/ exists r, cur_request st = Some r) /\
        st' = st /\ ms' = [] /\ nts' = [] /\ cts' = []).
-  Proof using SUCC_LIST_LEN.
+  Proof using.
     unfold do_rectify.
     intros.
     repeat break_match; try tuple_inversion; try tauto.
@@ -268,12 +271,12 @@ Section ChordDefinitionLemmas.
     forall h st k st' ms nts cts,
       start_query h st k = (st', ms, nts, cts) ->
       (exists dst msg,
-          make_request hash h st k = Some (dst, msg) /\
+          make_request h st k = Some (dst, msg) /\
           st' = update_query st dst k msg /\
           ms = [(addr_of dst, msg)] /\
           nts = [Request (addr_of dst) msg] /\
           cts = timeouts_in st) \/
-      (make_request hash h st k = None /\
+      (make_request h st k = None /\
        st' = st /\
        ms = [] /\
        ms = [] /\
@@ -296,7 +299,7 @@ Section ChordDefinitionLemmas.
       ms = concat (map (handle_delayed_query h st) (delayed_queries st)) /\
       nts = [] /\
       cts = [KeepaliveTick]).
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     unfold do_delayed_queries.
     intros.
     repeat break_match; tuple_inversion;
@@ -310,7 +313,7 @@ Section ChordDefinitionLemmas.
       ms' = ms /\
       newts' = newts /\
       clearedts' = timeouts_in st ++ clearedts.
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     unfold end_query; simpl.
     intros.
     tuple_inversion; tauto.
@@ -371,5 +374,3 @@ Section ChordDefinitionLemmas.
     tuple_inversion.
     eexists; eauto.
   Qed.
-
-End ChordDefinitionLemmas.

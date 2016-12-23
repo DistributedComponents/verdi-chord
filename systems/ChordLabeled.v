@@ -1,7 +1,8 @@
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 Require Import Verdi.DynamicNet.
-Require Import Chord.Chord.
+Require Chord.Chord.
+Import Chord.Chord.Chord.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordProof.
 Require Import List.
@@ -14,78 +15,9 @@ Require Import mathcomp.ssreflect.ssrbool.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Section ChordLabeled.
-  Variable SUCC_LIST_LEN : nat.
-  Variable hash : addr -> id.
-  Variable base : list addr.
-  Variable client_addr : addr -> Prop.
-  Variable client_addr_dec : forall a : addr, {client_addr a} + {~ client_addr a}.
-  Variable client_payload : payload -> Prop.
-  Variable client_payload_dec : forall p : payload, {client_payload p} + {~ client_payload p}.
-
-  Notation msg := (msg addr payload).
-  Notation global_state := (global_state addr payload data timeout).
-  Notation msgs := (msgs addr payload data timeout).
-  Notation e_recv := (e_recv addr payload timeout).
-  Notation e_timeout := (e_timeout addr payload timeout).
-  Notation trace := (trace addr payload data timeout).
-  Notation update := (update addr addr_eq_dec data).
-  Notation make_pointer := (make_pointer hash).
-
-  Inductive label :=
-  | RecvMsg : addr -> addr -> payload -> label
-  | Timeout : addr -> timeout -> label.
-
-  Definition label_eq_dec : forall x y : label, {x = y} + {x <> y}.
-  Proof using.
-    decide equality; eauto using addr_eq_dec, payload_eq_dec, timeout_eq_dec.
-  Defined.
-
-  Notation occ_gst := (occ_gst addr payload data timeout label).
-  Notation occurrence := (occurrence addr payload data timeout label).
-  Notation recv_handler := (recv_handler SUCC_LIST_LEN hash).
-  Notation timeout_handler := (timeout_handler hash).
-
-  Definition timeout_handler_l (h : addr) (st : data) (t : timeout) :=
-    (timeout_handler h st t, Timeout h t).
-
-  Definition recv_handler_l (src : addr) (dst : addr) (st : data) (msg : payload) :=
-    (recv_handler src dst st msg, RecvMsg src dst msg).
-
-  Lemma recv_handler_labeling :
-    forall src dst st p r,
-      (recv_handler src dst st p = r ->
-       exists l,
-         recv_handler_l src dst st p = (r, l)) /\
-      (forall l,
-          recv_handler_l src dst st p = (r, l) ->
-          recv_handler src dst st p = r).
-  Proof using.
-    unfold recv_handler_l.
-    intuition.
-    - find_rewrite.
-      now eexists.
-    - by tuple_inversion.
-  Qed.
-
-  Definition label_input : addr -> addr -> payload -> label := RecvMsg.
-  Definition label_output : addr -> addr -> payload -> label := RecvMsg.
-
-  Notation labeled_step_dynamic := (labeled_step_dynamic addr client_addr addr_eq_dec payload client_payload data timeout timeout_eq_dec label recv_handler_l timeout_handler_l label_input label_output timeout_constraint).
-  Notation lb_execution := (lb_execution addr addr_eq_dec payload data timeout timeout_eq_dec label recv_handler_l timeout_handler_l timeout_constraint).
-  Notation strong_local_fairness := (strong_local_fairness addr addr_eq_dec payload data timeout timeout_eq_dec label recv_handler_l timeout_handler_l timeout_constraint).
-  Notation weak_local_fairness := (weak_local_fairness addr addr_eq_dec payload data timeout timeout_eq_dec label recv_handler_l timeout_handler_l timeout_constraint).
-  Notation inf_occurred := (inf_occurred addr payload data timeout label).
-  Notation enabled := (enabled addr client_addr addr_eq_dec payload client_payload data timeout timeout_eq_dec label recv_handler_l timeout_handler_l label_input label_output timeout_constraint).
-  Notation l_enabled := (l_enabled addr client_addr addr_eq_dec payload client_payload data timeout timeout_eq_dec label recv_handler_l timeout_handler_l label_input label_output timeout_constraint).
-  Notation occurred := (occurred addr payload data timeout label).
-  Notation nodes := (nodes addr payload data timeout).
-  Notation failed_nodes := (failed_nodes addr payload data timeout).
-  Notation sigma := (sigma addr payload data timeout).
-  Notation timeouts := (timeouts addr payload data timeout).
-  Notation apply_handler_result := (apply_handler_result addr addr_eq_dec payload data timeout timeout_eq_dec).
-  Notation update_msgs := (update_msgs addr payload data timeout).
-  Notation occ_label := (occ_label addr payload data timeout label).
+Require Chord.ChordSemantics.
+Import Chord.ChordSemantics.ChordSemantics.
+Import Chord.ChordSemantics.ConstrainedChord.
 
   (* assuming sigma gst h = Some st *)
   Definition failed_successors (gst : global_state) (st : data) : list pointer :=
@@ -144,7 +76,7 @@ Section ChordLabeled.
   Lemma sigma_ahr_updates :
     forall gst n st ms nts cts e,
       sigma (apply_handler_result n (st, ms, nts, cts) e gst) n = Some st.
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     unfold apply_handler_result.
     simpl.
     intuition.
@@ -156,7 +88,7 @@ Section ChordLabeled.
       n <> h ->
       sigma gst h = Some d ->
       sigma (apply_handler_result n (st, ms, nts, cts) e gst) h = Some d.
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     unfold apply_handler_result.
     simpl.
     intuition.
@@ -190,7 +122,7 @@ Section ChordLabeled.
       In a l ->
       a <> b ->
       In a (xs ++ ys).
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     intuition.
     subst_max.
     do_in_app.
@@ -1659,4 +1591,3 @@ Inductive further_succ_error_spec (gst : global_state) (h s : pointer) (n : nat)
       nth_error (succ_list succ_st) (n - 1) <> Some s ->
       further_succ_error_spec gst h s n 1.
 *)
-End ChordLabeled.

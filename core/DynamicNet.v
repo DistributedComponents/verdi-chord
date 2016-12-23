@@ -6,7 +6,7 @@ Require Import StructTact.RemoveAll.
 Require Import InfSeqExt.infseq.
 Import ListNotations.
 
-Section Dynamic.
+Module Type DynamicSystem.
   Variable addr : Type. (* must be finite, decidable *)
   Variable client_addr : addr -> Prop.
   Variable client_addr_dec : forall a : addr, {client_addr a} + {~ client_addr a}.
@@ -22,9 +22,7 @@ Section Dynamic.
   Variable label_eq_dec : forall x y : label, {x = y} + {x <> y}.
 
   Variable start_handler : addr -> list addr -> data * list (addr * payload) * list timeout.
-
   Definition res := (data * list (addr * payload) * list timeout * list timeout)%type.
-
   Variable recv_handler : addr -> addr -> data -> payload -> res.
   Variable timeout_handler : addr -> data -> timeout -> res.
   Variable recv_handler_l : addr -> addr -> data -> payload -> (res * label).
@@ -50,19 +48,15 @@ Section Dynamic.
           timeout_handler_l h st t = (r, l) ->
           timeout_handler h st t = r).
 
+End DynamicSystem.
+
+Module Type ConstrainedDynamicSystem.
+  Include DynamicSystem.
   (* msgs *)
-  Definition msg := (addr * (addr * payload))%type.
-  Definition msg_eq_dec :
-    forall x y : msg, {x = y} + {x <> y}.
-  Proof.
-    repeat decide equality.
-  Defined.
 
-  Definition send (a : addr) (p : addr * payload) : msg :=
-    (a, p).
+  Definition msg : Type := (addr * (addr * payload))%type.
 
-  (* traces *)
-  Inductive event :=
+  Inductive event : Type :=
   | e_send : msg -> event
   | e_recv : msg -> event
   | e_timeout : addr -> timeout -> event
@@ -82,6 +76,19 @@ Section Dynamic.
      address of the failing node, and what the state would be after
      the failure. *)
   Variable failure_constraint : global_state -> addr -> global_state -> Prop.
+End ConstrainedDynamicSystem.
+
+Module DynamicSemantics (S : ConstrainedDynamicSystem).
+  Include S.
+  Definition msg_eq_dec :
+    forall x y : msg, {x = y} + {x <> y}.
+  Proof.
+    repeat decide equality;
+      auto using addr_eq_dec, payload_eq_dec.
+  Defined.
+
+  Definition send (a : addr) (p : addr * payload) : msg :=
+    (a, p).
 
   Definition update_msgs (gst : global_state) (ms : list msg) : global_state :=
     {| nodes := nodes gst;
@@ -378,7 +385,7 @@ Section Dynamic.
     forall gst l gst',
       labeled_step_dynamic gst l gst' ->
       step_dynamic gst gst'.
-  Proof using timeout_handler_labeling recv_handler_labeling.
+  Proof using.
     intuition.
     match goal with
       | H: labeled_step_dynamic _ _ _ |- _ =>
@@ -417,7 +424,7 @@ Section Dynamic.
       step_dynamic gst gst' ->
       ((exists l, labeled_step_dynamic gst l gst') /\ ~ churn_between gst gst') \/
       ((~ exists l, labeled_step_dynamic gst l gst') /\ churn_between gst gst').
-  Proof using timeout_handler_labeling recv_handler_labeling.
+  Proof using.
     intuition.
     match goal with
       | H: step_dynamic _ _ |- _ =>
@@ -468,26 +475,9 @@ Section Dynamic.
     - admit.
   Admitted.
 
-End Dynamic.
-
-Ltac break_step :=
-  match goal with
-  | [ H : step_dynamic
-            ?addr
-            ?client_addr
-            ?addr_eq_dec
-            ?payload
-            ?client_payload
-            ?data
-            ?timeout
-            ?timeout_eq_dec
-            ?start_handler
-            ?recv_handler
-            ?timeout_handler
-            ?timeout_constraint
-            ?failure_constraint
-            ?gst
-            ?gst'
-      |- _ ] =>
-    induction H
-  end; subst.
+  Ltac break_step :=
+    match goal with
+    | [ H : step_dynamic _ _ |- _ ] =>
+      induction H
+    end; subst.
+End DynamicSemantics.

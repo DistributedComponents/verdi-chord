@@ -7,7 +7,7 @@ Require Import Coqlib.
 Require Import InfSeqExt.infseq.
 Require Import StructTact.StructTactics.
 
-Section Shed.
+Module Type ShedSemantics.
   (* The global state type. *)
   Variable net : Type.
   (* Relation defining whether one state can transition to another. *)
@@ -31,6 +31,10 @@ Section Shed.
       step gst gst' ->
       exists op,
         run gst op = Some gst'.*)
+End ShedSemantics.
+
+Module Shed (S : ShedSemantics).
+  Include S.
 
   Definition run_lifted (gst : option net) (o : operation) : option net :=
     match gst with
@@ -51,7 +55,6 @@ Section Shed.
   Record netpred := { np_prop : net -> Prop;
                       np_dec : forall gst, {np_prop gst} + {~ np_prop gst};
                       np_name : string }.
-
 
   Definition const_true {A} (_ : A) : Prop :=
     True.

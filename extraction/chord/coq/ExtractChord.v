@@ -4,24 +4,21 @@ Require Import ExtrOcamlNatInt.
 Require Import ExtrOcamlString.
 
 Require Import Chord.Chord.
+Import Chord.Chord.Chord.
 
-Definition SUCC_LIST_LEN := 3.
-
-Definition hash (a : addr) : id :=
-  a mod 256.
-
-Extract Constant Nat.modulo => "fun n m -> n mod m".
+Extract Inlined Constant Chord.SUCC_LIST_LEN => "3".
+Extract Constant Chord.hash => "fun n -> n mod 256".
 
 Definition handleNet : addr -> addr -> data -> payload -> res :=
-  recv_handler SUCC_LIST_LEN hash.
+  recv_handler.
 
 Definition init : addr -> list addr -> data * list (addr * payload) * list timeout :=
-  start_handler SUCC_LIST_LEN hash.
+  start_handler.
 
 Definition handleTick : addr -> data -> res :=
-  tick_handler hash.
+  tick_handler.
 
 Definition handleTimeout : addr -> data -> timeout -> res :=
-  timeout_handler hash.
+  timeout_handler.
 
 Extraction "extraction/chord/coq/ExtractedChord.ml" init handleNet handleTick handleTimeout is_request closes_request.

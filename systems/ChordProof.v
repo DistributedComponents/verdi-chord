@@ -1,7 +1,8 @@
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 Require Import Verdi.DynamicNet.
-Require Import Chord.Chord.
+Require Chord.Chord.
+Import Chord.
 Require Import Arith.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordDefinitionLemmas.
@@ -15,61 +16,9 @@ Set Bullet Behavior "Strict Subproofs".
 
 Close Scope boolean_if_scope.
 Open Scope general_if_scope.
-
-Section ChordProof.
-  Variable SUCC_LIST_LEN : nat.
-  Variable N : nat.
-  Variable hash : addr -> id.
-  Variable hash_inj : forall a b : addr,
-      hash a = hash b -> a = b.
-  Variable client_addr : addr -> Prop.
-  Variable client_addr_dec : forall a : addr,
-      {client_addr a} + {~ client_addr a}.
-
-  Notation start_handler := (start_handler SUCC_LIST_LEN hash).
-  Notation recv_handler := (recv_handler SUCC_LIST_LEN hash).
-  Notation timeout_handler := (timeout_handler hash).
-  Notation tick_handler := (tick_handler hash).
-  Notation request_timeout_handler := (request_timeout_handler hash).
-  Notation handle_msg := (handle_msg SUCC_LIST_LEN hash).
-
-  Notation handle_query_res := (handle_query_res SUCC_LIST_LEN hash).
-  Notation handle_query_timeout := (handle_query_timeout hash).
-  Notation send := (send addr payload).
-
-  Notation global_state := (global_state addr payload data timeout).
-  Notation nodes := (nodes addr payload data timeout).
-  Notation failed_nodes := (failed_nodes addr payload data timeout).
-  Notation sigma := (sigma addr payload data timeout).
-  Notation timeouts := (timeouts addr payload data timeout).
-  Notation msgs := (msgs addr payload data timeout).
-  Notation trace := (trace addr payload data timeout).
-  Notation update_msgs := (update_msgs addr payload data timeout).
-  Notation make_pointer := (make_pointer hash).
-  Notation fail_node := (fail_node addr payload data timeout).
-  Notation update_for_start := (update_for_start addr addr_eq_dec payload data timeout).
-
-  Notation apply_handler_result := (apply_handler_result addr addr_eq_dec payload data timeout timeout_eq_dec).
-  Notation start_query := (start_query hash).
-  Notation handle_stabilize := (handle_stabilize SUCC_LIST_LEN hash).
-  Notation do_rectify := (do_rectify hash).
-
-  Notation msg := (msg addr payload).
-  Notation event := (event addr payload timeout).
-  Notation e_send := (e_send addr payload timeout).
-  Notation e_recv := (e_recv addr payload timeout).
-  Notation e_timeout := (e_timeout addr payload timeout).
-  Notation e_fail := (e_fail addr payload timeout).
-
-  Inductive timeout_constraint : global_state -> addr -> timeout -> Prop :=
-  | Tick_unconstrained : forall gst h,
-      timeout_constraint gst h Tick
-  | KeepaliveTick_unconstrained : forall gst h,
-      timeout_constraint gst h KeepaliveTick
-  | Request_needs_dst_dead_and_no_msgs : forall gst dst h p,
-      In dst (failed_nodes gst) ->
-      (forall m, request_response_pair p m -> ~ In (dst, (h, m)) (msgs gst)) ->
-      timeout_constraint gst h (Request dst p).
+Require Chord.ChordSemantics.
+Import Chord.ChordSemantics.ConstrainedChord.
+Import Chord.ChordSemantics.ChordSemantics.
 
   Definition timeouts_detect_failure (gst : global_state) : Prop :=
     forall xs t ys h dead req,
@@ -78,84 +27,6 @@ Section ChordProof.
       t = (e_timeout h (Request dead req)) ->
       (* then it corresponds to an earlier node failure. *)
       In (e_fail dead) xs.
-
-  (* tip: treat this as opaque and use lemmas: it never gets stopped except by failure *)
-  Definition live_node (gst : global_state) (h : addr) : Prop :=
-    In h (nodes gst) /\
-    ~ In h (failed_nodes gst) /\
-    exists st,
-      sigma gst h = Some st /\
-      joined st = true.
-
-  Definition dead_node (gst : global_state) (h : addr) : Prop :=
-    In h (nodes gst) /\
-    In h (failed_nodes gst) /\
-    exists st,
-      sigma gst h = Some st.
-
-  Definition joining_node (gst : global_state) (h : addr) : Prop :=
-    exists st,
-      sigma gst h = Some st /\
-      joined st = false /\
-      In h (nodes gst) /\
-      ~ In h (failed_nodes gst).
-
-  Definition best_succ (gst : global_state) (h s : addr) : Prop :=
-    exists st xs ys,
-      live_node gst h /\
-      sigma gst h = Some st /\
-      map addr_of (succ_list st) = xs ++ s :: ys /\
-      (forall o, In o xs -> dead_node gst o) /\
-      live_node gst s.
-
-  Definition live_node_in_succ_lists (gst : global_state) : Prop :=
-    forall h st,
-      sigma gst h = Some st ->
-      live_node gst h ->
-      exists s,
-        best_succ gst h s.
-
-  (* This is a way of dealing with succ lists missing entries
-     mid-stabilization that doesn't involve putting artificial entries
-     into the actual successor list. *)
-  Definition ext_succ_list_span_includes (h : id) (succs : list id) (n : id) :=
-    forall n l e,
-      length (h :: succs) = n ->
-      l = last succs h ->
-      e = l + (SUCC_LIST_LEN - n) ->
-      between h n e.
-
-  (* "A principal node is a member that is not skipped by any member's
-     extended successor list" *)
-  Definition principal (gst : global_state) (p : addr) : Prop :=
-    forall h st succs,
-      live_node gst h ->
-      sigma gst h = Some st ->
-      map id_of (succ_list st) = succs ->
-      ext_succ_list_span_includes h succs p ->
-      In p succs.
-
-  Definition principals (gst : global_state) (ps : list addr) : Prop :=
-    NoDup ps /\
-    Forall (principal gst) ps /\
-    forall p, principal gst p -> In p ps.
-
-  Definition sufficient_principals (gst : global_state) : Prop :=
-    exists ps,
-      principals gst ps /\
-      length ps > SUCC_LIST_LEN.
-
-  Definition principal_failure_constraint (gst : global_state) (f : addr) : Prop :=
-    principal gst f ->
-    forall ps,
-      principals gst ps ->
-      length ps > (SUCC_LIST_LEN + 1).
-
-  Definition failure_constraint (gst : global_state) (f : addr) (gst' : global_state) : Prop :=
-    live_node_in_succ_lists gst' /\
-    principal_failure_constraint gst f.
-
-  Notation step_dynamic := (step_dynamic addr client_addr addr_eq_dec payload client_payload data timeout timeout_eq_dec start_handler recv_handler timeout_handler timeout_constraint failure_constraint).
 
   Lemma busy_response_exists :
     forall msg st' sends nts cts src st,
@@ -1751,5 +1622,3 @@ Section ChordProof.
         (* and we're done *)
         now repeat find_rewrite.
   Abort.
-
-End ChordProof.

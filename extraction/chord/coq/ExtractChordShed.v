@@ -6,22 +6,21 @@ Require Import ExtrOcamlString.
 Require Import Chord.Chord.
 Require Import Shed.ChordShed.
 
-Definition SUCC_LIST_LEN := 3.
+Import Chord.Chord.Chord.
 
-Definition hash (a : addr) : id :=
-  a mod 256.
+Extract Inlined Constant Chord.SUCC_LIST_LEN => "3".
+Extract Constant Chord.hash => "fun n -> n mod 256".
 
-Extract Constant Nat.modulo => "fun n m -> n mod m".
-
-Definition chord_net := net.
-Definition chord_operation := operation.
-Definition chord_run := run SUCC_LIST_LEN hash.
-Definition chord_test_state := test_state SUCC_LIST_LEN hash.
-Definition chord_advance_test := advance_test SUCC_LIST_LEN hash.
-Definition chord_netpred := netpred.
-Definition chord_tracepred := tracepred SUCC_LIST_LEN hash.
-Definition chord_mk_init_state := mk_init_state SUCC_LIST_LEN hash.
-Definition const_true_tracepred := tp_const_true SUCC_LIST_LEN hash.
-Definition chord_plan_deliver_or_timeout := plan_deliver_or_timeout SUCC_LIST_LEN hash.
+Definition chord_net := ChordShed.ChordShed.net.
+Definition chord_operation := ChordShed.ChordShed.operation.
+Definition chord_run := ChordShed.ChordShed.run.
+Definition chord_test_state := ChordShed.ChordShed.test_state.
+Definition chord_advance_test := ChordShed.ChordShed.advance_test.
+Definition chord_netpred := ChordShed.ChordShed.netpred.
+Definition chord_tracepred := ChordShed.ChordShed.tracepred.
+Definition chord_mk_init_state := ChordShed.ChordShed.make_initial_state.
+Definition const_true_tracepred := ChordShed.ChordShed.tp_const_true.
+Definition chord_plan_deliver_or_timeout := ChordShedSemantics.plan_deliver_or_timeout.
+Definition all_nodes_live_netpred := ChordShed.all_nodes_live_netpred.
 
 Extraction "extraction/chord/coq/ExtractedChordShed.ml" chord_net chord_operation chord_netpred chord_tracepred all_nodes_live_netpred const_true_tracepred chord_test_state chord_advance_test chord_mk_init_state chord_plan_deliver_or_timeout.

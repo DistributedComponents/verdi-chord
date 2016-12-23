@@ -4,69 +4,15 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 
 Require Import Chord.Chord.
+Require Import Chord.ChordSemantics.
+Import Chord.ChordSemantics.ChordSemantics.
+Import Chord.ChordSemantics.ConstrainedChord.
 Require Import Chord.ChordProof.
 Require Import Chord.ChordDefinitionLemmas.
-Require Import Verdi.DynamicNet.
+
+Notation hash := Chord.hash.
 
 Set Bullet Behavior "Strict Subproofs".
-
-Section ChordValidPointersInvariant.
-  Variable SUCC_LIST_LEN : nat.
-  Variable N : nat.
-  Variable hash : addr -> id.
-  Variable hash_inj :
-    forall a b,
-      hash a = hash b -> a = b.
-  Variable client_addr : addr -> Prop.
-  Variable client_addr_dec : forall a : addr,
-      {client_addr a} + {~ client_addr a}.
-
-  Notation start_handler := (start_handler SUCC_LIST_LEN hash).
-  Notation recv_handler := (recv_handler SUCC_LIST_LEN hash).
-  Notation timeout_handler := (timeout_handler hash).
-  Notation tick_handler := (tick_handler hash).
-  Notation request_timeout_handler := (request_timeout_handler hash).
-  Notation handle_msg := (handle_msg SUCC_LIST_LEN hash).
-
-  Notation handle_query_res := (handle_query_res SUCC_LIST_LEN hash).
-  Notation handle_query_timeout := (handle_query_timeout hash).
-  Notation send := (send addr payload).
-
-  Notation global_state := (global_state addr payload data timeout).
-  Notation nodes := (nodes addr payload data timeout).
-  Notation failed_nodes := (failed_nodes addr payload data timeout).
-  Notation sigma := (sigma addr payload data timeout).
-  Notation timeouts := (timeouts addr payload data timeout).
-  Notation msgs := (msgs addr payload data timeout).
-  Notation trace := (trace addr payload data timeout).
-  Notation update_msgs := (update_msgs addr payload data timeout).
-  Notation make_pointer := (make_pointer hash).
-  Notation fail_node := (fail_node addr payload data timeout).
-  Notation update_for_start := (update_for_start addr addr_eq_dec payload data timeout).
-
-  Notation apply_handler_result := (apply_handler_result addr addr_eq_dec payload data timeout timeout_eq_dec).
-  Notation start_query := (start_query hash).
-  Notation handle_stabilize := (handle_stabilize SUCC_LIST_LEN hash).
-  Notation do_rectify := (do_rectify hash).
-
-  Notation msg := (msg addr payload).
-  Notation event := (event addr payload timeout).
-  Notation e_send := (e_send addr payload timeout).
-  Notation e_recv := (e_recv addr payload timeout).
-  Notation e_timeout := (e_timeout addr payload timeout).
-  Notation e_fail := (e_fail addr payload timeout).
-
-  Notation failure_constraint := (failure_constraint SUCC_LIST_LEN).
-  Notation step_dynamic := (step_dynamic addr client_addr addr_eq_dec payload client_payload data timeout timeout_eq_dec start_handler recv_handler timeout_handler timeout_constraint failure_constraint).
-  Notation reachable_st := (reachable_st SUCC_LIST_LEN N hash hash_inj client_addr client_addr_dec).
-  Notation chord_start_invariant := (chord_start_invariant SUCC_LIST_LEN hash).
-  Notation chord_fail_invariant := (chord_fail_invariant SUCC_LIST_LEN hash).
-  Notation chord_tick_invariant := (chord_tick_invariant hash).
-  Notation chord_keepalive_invariant := (chord_keepalive_invariant SUCC_LIST_LEN hash).
-  Notation chord_request_invariant := (chord_request_invariant SUCC_LIST_LEN hash).
-  Notation chord_handle_msg_invariant := (chord_handle_msg_invariant SUCC_LIST_LEN hash).
-  Notation chord_do_delayed_queries_invariant := (chord_do_delayed_queries_invariant SUCC_LIST_LEN hash).
-  Notation chord_do_rectify_invariant := (chord_do_rectify_invariant SUCC_LIST_LEN hash).
 
   (** Valid pointers *)
   Definition valid_ptr (gst : global_state) (p : pointer) : Prop :=
@@ -592,7 +538,7 @@ Section ChordValidPointersInvariant.
       step_dynamic gst gst' ->
       forall h,
         valid_ptrs_timeouts gst' (timeouts gst' h).
-  Proof using hash_inj N.
+  Proof using.
     intros.
     copy_elim_valid_ptrs_global.
     break_step.
@@ -722,7 +668,7 @@ Section ChordValidPointersInvariant.
   Proof.
     unfold chord_start_invariant.
     intros.
-    destruct (start_handler _ _) as [[?st ?ms] ?newts] eqn:?H; subst res.
+    destruct (start_handler _ _) as [[?st ?ms] ?newts] eqn:?H; subst res0.
     find_eapply_lem_hyp update_for_start_definition; expand_def.
     find_copy_eapply_lem_hyp valid_ptrs_global_elim; break_and.
     apply valid_ptrs_global_intro; try intro h'; intros; subst_max.
@@ -796,5 +742,3 @@ Section ChordValidPointersInvariant.
       + eapply valid_ptrs_global_net; eauto.
       + eapply valid_ptrs_global_trace; eauto.
   Admitted.
-
-End ChordValidPointersInvariant.

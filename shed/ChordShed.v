@@ -4,37 +4,25 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.Before.
 
 Require Import Chord.Chord.
+Import Chord.
+Require Import Chord.ChordSemantics.
+Import ConstrainedChord.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordProof.
 Require Import Verdi.DynamicNet.
-Require Import Shed.DynamicShed.
 Require Import Shed.Shed.
+Require Import Shed.DynamicShed.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Section ChordShed.
+Module DecidableChord <: DecidableDynamicSystem.
+  Include ConstrainedChord.
 
-  Variable SUCC_LIST_LEN : nat.
-  Variable hash : addr -> id.
-
-  Definition net := (global_state addr payload data timeout).
-  Notation start_handler := (start_handler SUCC_LIST_LEN hash).
-  Notation recv_handler := (recv_handler SUCC_LIST_LEN hash).
-  Notation timeout_handler := (timeout_handler hash).
-  Notation step_dynamic := (step_dynamic addr addr_eq_dec payload data timeout timeout_eq_dec start_handler recv_handler timeout_handler timeout_constraint failure_constraint).
-  Definition operation := (operation addr payload timeout).
-  Notation op_deliver := (op_deliver addr payload timeout).
-  Notation op_timeout := (op_timeout addr payload timeout).
-  Notation msg_eq_dec := (msg_eq_dec addr addr_eq_dec payload payload_eq_dec).
-  Notation msgs := (msgs addr payload data timeout).
-  Notation timeouts := (timeouts addr payload data timeout).
-  Notation sigma := (sigma addr payload data timeout).
-  Notation nodes := (nodes addr payload data timeout).
-  Notation failed_nodes := (failed_nodes addr payload data timeout).
+  Definition net := global_state.
 
   Definition request_response_pair_dec : forall p m,
       {request_response_pair p m} + {~ request_response_pair p m}.
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     intuition.
     destruct p;
       destruct m;
@@ -47,7 +35,7 @@ Section ChordShed.
       (* parens here to avoid clashing w/ some ssreflect notation *)
       {(forall m, request_response_pair p m -> ~ In (dst, (h, m)) l)} +
       {~ (forall m, request_response_pair p m -> ~ In (dst, (h, m)) l)}.
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     intros.
     induction l.
     - left.
@@ -92,7 +80,7 @@ Section ChordShed.
 
   Definition timeout_constraint_dec : forall gst h t,
       {timeout_constraint gst h t} + {~ timeout_constraint gst h t}.
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     intros.
     destruct t.
     - left.
@@ -114,6 +102,18 @@ Section ChordShed.
         easy.
   Defined.
 
+  Definition all_nodes_live (gst : global_state) : Prop :=
+    Forall (live_node gst) (nodes gst).
+
+  Definition all_nodes_live_dec :
+    forall gst,
+      {all_nodes_live gst} + {~ all_nodes_live gst}.
+  Proof using.
+    move => gst.
+    apply Forall_dec.
+    exact: live_node_dec.
+  Qed.
+
   Definition live_succ_exists_dec :
     forall gst l,
       {  (exists s xs ys, live_node gst s /\ l = xs ++ s :: ys /\ (forall o, In o xs -> dead_node gst o))} +
@@ -124,7 +124,7 @@ Section ChordShed.
     forall gst h st,
       sigma gst h = Some st ->
       {(exists s, best_succ gst h s)} + {~ exists s, best_succ gst h s}.
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     intros.
     unfold best_succ.
     set (addrs := map addr_of (succ_list st)).
@@ -158,13 +158,13 @@ Section ChordShed.
       auto.
   Defined.
 
-  Definition has_state (gst : net) (h : addr) : Prop :=
+  Definition has_state (gst : global_state) (h : addr) : Prop :=
     exists st, sigma gst h = Some st.
 
   Definition has_state_dec :
     forall gst h,
       {has_state gst h} + {~has_state gst h}.
-  Proof using hash SUCC_LIST_LEN.
+  Proof using.
     intuition.
     destruct (sigma gst h) as [st|] eqn:H_st.
     - left.
@@ -195,44 +195,15 @@ Section ChordShed.
           congruence. }
   Admitted.
 
-  Definition all_nodes_live (gst : net) : Prop :=
-    Forall (live_node gst) (nodes gst).
+End DecidableChord.
 
-  Definition all_nodes_live_dec :
-    forall gst,
-      {all_nodes_live gst} + {~ all_nodes_live gst}.
-  Proof using.
-    move => gst.
-    apply Forall_dec.
-    exact: live_node_dec.
-  Qed.
+Module ChordShedSemantics := DynamicShedSemantics(DecidableChord).
 
-  Definition run := run addr payload data timeout addr_eq_dec payload_eq_dec timeout_eq_dec start_handler recv_handler timeout_handler timeout_constraint timeout_constraint_dec.
-
-  Definition netpred : Type :=
-    netpred net.
-
-  Definition tracepred : Type :=
-    tracepred net operation run.
-
+Module ChordShed.
+  Module ShedWithChord := Shed(ChordShedSemantics).
+  Include ShedWithChord.
   Definition all_nodes_live_netpred : netpred :=
-    {| np_prop := all_nodes_live;
-       np_dec := all_nodes_live_dec;
-       np_name := "all_nodes_live" |}.
-
-  Definition tp_const_true : tracepred :=
-    tp_const_true net operation run.
-
-  Definition test_state : Type :=
-    test_state net operation run.
-
-  Definition advance_test : test_state -> operation -> option test_state :=
-    advance_test net operation run.
-
-  Definition mk_init_state : net -> list netpred -> list tracepred -> test_state :=
-    make_initial_state net operation run.
-
-  Definition plan_deliver_or_timeout : net -> nat -> (nat -> nat) -> option operation :=
-    plan_deliver_or_timeout addr payload data timeout timeout_constraint timeout_constraint_dec.
-
+    {| np_prop := DecidableChord.all_nodes_live;
+        np_dec := DecidableChord.all_nodes_live_dec;
+        np_name := "all_nodes_live" |}.
 End ChordShed.

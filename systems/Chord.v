@@ -3,22 +3,31 @@ Require Import List.
 Import ListNotations.
 Require Import StructTact.Dedup.
 Require Import StructTact.RemoveAll.
+Require Import StructTact.StructTactics.
+Require Import Verdi.DynamicNet.
 
-Section Chord.
-  Variable SUCC_LIST_LEN : nat.
 
+Variable SUCC_LIST_LEN : nat.
+Variable hash : nat -> nat.
+Variable hash_inj :
+  forall a b : nat,
+    hash a = hash b ->
+    a = b.
+Variable client_addr : nat -> Prop.
+Variable client_addr_dec :
+  forall a,
+    {client_addr a} + {~ client_addr a}.
+
+Module Chord <: DynamicSystem.
   Definition addr := nat.
   Definition id := nat.
   Definition pointer := (id * addr)%type.
 
-  Variable hash : addr -> id.
-  (* this is never actually true, of course *)
-  Variable hash_inj : forall a b : addr,
-      hash a = hash b -> a = b.
-
   Definition addr_eq_dec := Nat.eq_dec.
   Definition id_of (p : pointer) : id := fst p.
   Definition addr_of (p : pointer) : addr := snd p.
+  Definition client_addr := client_addr.
+  Definition client_addr_dec := client_addr_dec.
 
   Definition pointer_eq_dec : forall x y : pointer,
       {x = y} + {x <> y}.
@@ -28,21 +37,29 @@ Section Chord.
 
   Definition make_pointer (a : addr) : pointer := (hash a, a).
 
-  Inductive payload :=
-  | Busy : payload
-  | GetBestPredecessor : pointer -> payload
-  | GotBestPredecessor : pointer -> payload
-  | GetSuccList : payload
-  | GotSuccList : list pointer -> payload
-  | GetPredAndSuccs : payload
-  | GotPredAndSuccs : option pointer -> list pointer -> payload
-  | Notify : payload
-  | Ping : payload
-  | Pong : payload.
+  Inductive payload_ :=
+  | Busy : payload_
+  | GetBestPredecessor : pointer -> payload_
+  | GotBestPredecessor : pointer -> payload_
+  | GetSuccList : payload_
+  | GotSuccList : list pointer -> payload_
+  | GetPredAndSuccs : payload_
+  | GotPredAndSuccs : option pointer -> list pointer -> payload_
+  | Notify : payload_
+  | Ping : payload_
+  | Pong : payload_.
+  Definition payload := payload_.
 
-  Inductive client_payload : payload -> Prop :=
-  | CPGetBestPredecessor : forall p, client_payload (GetBestPredecessor p)
-  | CPGetSuccList : client_payload GetSuccList.
+  Inductive client_payload_ : payload -> Prop :=
+  | CPGetBestPredecessor : forall p, client_payload_ (GetBestPredecessor p)
+  | CPGetSuccList : client_payload_ GetSuccList.
+  Definition client_payload := client_payload_.
+  Definition client_payload_dec :
+    forall p,
+      {client_payload p} + {~client_payload p}.
+  Proof.
+    destruct p; (left; constructor) || right; intro H; inversion H.
+  Defined.
 
   Lemma option_eq_dec : forall A : Type,
     (forall x y : A, {x = y} + {x <> y}) ->
@@ -57,10 +74,11 @@ Section Chord.
     repeat decide equality.
   Defined.
 
-  Inductive timeout :=
-  | Tick : timeout
-  | KeepaliveTick : timeout
-  | Request : addr -> payload -> timeout.
+  Inductive timeout_ :=
+  | Tick : timeout_
+  | KeepaliveTick : timeout_
+  | Request : addr -> payload -> timeout_.
+  Definition timeout := timeout_.
 
   Definition timeout_eq_dec : forall x y : timeout,
       {x = y} + {x <> y}.
@@ -68,18 +86,19 @@ Section Chord.
     repeat decide equality.
   Defined.
 
-  Inductive query :=
+  Inductive query_ :=
   (* needs a pointer to the notifier *)
-  | Rectify : pointer -> query
-  | Stabilize : query
+  | Rectify : pointer -> query_
+  | Stabilize : query_
   (* needs a new successor *)
-  | Stabilize2 : pointer -> query
+  | Stabilize2 : pointer -> query_
   (* needs a known node *)
-  | Join : pointer -> query
+  | Join : pointer -> query_
   (* needs to know new successor *)
-  | Join2 : pointer -> query.
+  | Join2 : pointer -> query_.
+  Definition query := query_.
 
-  Record data := mkData { ptr : pointer;
+  Record data_ := mkData { ptr : pointer;
                           pred : option pointer;
                           succ_list : list pointer;
                           known : pointer;
@@ -87,6 +106,7 @@ Section Chord.
                           rectify_with : option pointer;
                           cur_request : option (pointer * query * payload);
                           delayed_queries : list (addr * payload) }.
+  Definition data := data_.
 
   Definition res := (data * list (addr * payload) * list timeout * list timeout)%type.
 
@@ -253,7 +273,7 @@ Section Chord.
       {x = y} + {x <> y}.
   Proof using.
     repeat decide equality.
-  Qed.
+  Defined.
 
   Definition delay_query (st : data) (src : addr) (msg : payload) : data :=
     {| ptr := ptr st;
@@ -491,4 +511,55 @@ Section Chord.
     | Tick => tick_handler h st
     | KeepaliveTick => keepalive_handler st
     end.
+
+  Inductive label_ : Set :=
+  | RecvMsg : addr -> addr -> payload -> label_
+  | Timeout : addr -> timeout -> label_.
+  Definition label := label_.
+
+  Definition label_eq_dec :
+    forall x y : label,
+      {x = y} + {x <> y}.
+  Proof using.
+    decide equality;
+      auto using addr_eq_dec, payload_eq_dec, timeout_eq_dec.
+  Defined.
+
+  Definition timeout_handler_l (h : addr) (st : data) (t : timeout) :=
+    (timeout_handler h st t, Timeout h t).
+
+  Definition recv_handler_l (src : addr) (dst : addr) (st : data) (msg : payload) :=
+    (recv_handler src dst st msg, RecvMsg src dst msg).
+
+  Lemma recv_handler_labeling :
+    forall src dst st p r,
+      (recv_handler src dst st p = r ->
+       exists l,
+         recv_handler_l src dst st p = (r, l)) /\
+      (forall l,
+          recv_handler_l src dst st p = (r, l) ->
+          recv_handler src dst st p = r).
+  Proof using.
+    unfold recv_handler_l.
+    intuition.
+    - find_rewrite.
+      now eexists.
+    - now tuple_inversion.
+  Qed.
+
+  Definition label_input : addr -> addr -> payload -> label := RecvMsg.
+  Definition label_output : addr -> addr -> payload -> label := RecvMsg.
+
+  Lemma timeout_handler_labeling :
+    forall h st t r,
+      (timeout_handler h st t = r ->
+      exists l,
+        timeout_handler_l h st t = (r, l)) /\
+      (forall l,
+          timeout_handler_l h st t = (r, l) ->
+          timeout_handler h st t = r).
+  Proof.
+    unfold timeout_handler_l.
+  Admitted.
+
 End Chord.

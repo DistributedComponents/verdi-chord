@@ -2,7 +2,6 @@ Require Import List.
 Require Import PeanoNat.
 Import ListNotations.
 
-Require Import Verdi.DynamicNet.
 Require Import Shed.Shed.
 Require Import StructTact.Update.
 
@@ -12,47 +11,29 @@ Set Bullet Behavior "Strict Subproofs".
 Close Scope boolean_if_scope.
 Open Scope general_if_scope.
 
-Section DynamicShed.
-  Variable addr payload data timeout : Type.
-  Notation msg := (msg addr payload).
-  Notation send := (send addr payload).
-  Notation global_state := (global_state addr payload data timeout).
-  Notation nodes := (nodes addr payload data timeout).
-  Notation failed_nodes := (failed_nodes addr payload data timeout).
-  Notation timeouts := (timeouts addr payload data timeout).
-  Notation sigma := (sigma addr payload data timeout).
-  Notation msgs := (msgs addr payload data timeout).
-  Notation trace := (trace addr payload data timeout).
-  Notation update_msgs := (update_msgs addr payload data timeout).
-  Notation e_send := (e_send addr payload timeout).
-  Notation e_recv := (e_recv addr payload timeout).
-  Notation e_fail := (e_fail addr payload timeout).
-  Notation e_timeout := (e_timeout addr payload timeout).
-  Notation fail_node := (fail_node addr payload data timeout).
-  Variable addr_eq_dec : forall x y : addr, {x = y} + {x <> y}.
-  Variable client_addr : addr -> Prop.
-  Variable payload_eq_dec : forall x y : payload, {x = y} + {x <> y}.
-  Notation msg_eq_dec := (msg_eq_dec addr addr_eq_dec payload payload_eq_dec).
-  Variable client_payload : payload -> Prop.
-  Variable timeout_eq_dec : forall x y : timeout, {x = y} + {x <> y}.
-  Notation apply_handler_result := (apply_handler_result addr addr_eq_dec payload data timeout timeout_eq_dec).
-  Variable start_handler : addr -> list addr -> data * list (addr * payload) * list timeout.
-  Variable recv_handler : addr -> addr -> data -> payload -> res addr payload data timeout.
-  Variable timeout_handler : addr -> data -> timeout -> res addr payload data timeout.
-  Variable timeout_constraint : global_state -> addr -> timeout -> Prop.
-  Variable timeout_constraint_dec : forall gst h t,
-      {timeout_constraint gst h t} + {~ timeout_constraint gst h t}.
-  Variable failure_constraint : global_state -> addr -> global_state -> Prop.
-  Variable failure_constraint_dec : forall gst h gst',
-      {failure_constraint gst h gst'} + {~ failure_constraint gst h gst'}.
+Require Import Verdi.DynamicNet.
 
-  Notation step_dynamic := (step_dynamic addr client_addr addr_eq_dec payload client_payload data timeout timeout_eq_dec start_handler recv_handler timeout_handler timeout_constraint failure_constraint).
-  Inductive operation :=
-  | op_start : addr -> list addr -> operation
-  | op_fail : addr -> operation
-  | op_timeout : addr -> timeout -> operation
+Module Type DecidableDynamicSystem.
+  Include ConstrainedDynamicSystem.
+  Variable timeout_constraint_dec :
+    forall gst a t,
+      {timeout_constraint gst a t} + {~ timeout_constraint gst a t}.
+End DecidableDynamicSystem.
+
+Module DynamicShedSemantics (S : DecidableDynamicSystem) <: ShedSemantics.
+  Module Semantics := DynamicSemantics(S).
+  Include Semantics.
+
+  Definition net := global_state.
+  Definition step := step_dynamic.
+
+  Inductive operation_ :=
+  | op_start : addr -> list addr -> operation_
+  | op_fail : addr -> operation_
+  | op_timeout : addr -> timeout -> operation_
   (* the nat here is the index of the msg in (msgs gst) *)
-  | op_deliver : nat -> msg -> operation.
+  | op_deliver : nat -> msg -> operation_.
+  Definition operation := operation_.
 
   Definition exists_and_not_failed (gst : global_state) (h : addr) : bool :=
     if In_dec addr_eq_dec h (nodes gst)
@@ -64,12 +45,12 @@ Section DynamicShed.
   Definition run_start_handler (gst : global_state) (h : addr) (knowns : list addr) : global_state :=
     let '(st, ms, nts) := start_handler h knowns in
     let new_msgs := map (send h) ms in
-    {| DynamicNet.nodes := h :: nodes gst;
-       DynamicNet.failed_nodes := failed_nodes gst;
-       DynamicNet.timeouts := update addr_eq_dec (timeouts gst) h nts;
-       DynamicNet.sigma := update addr_eq_dec (sigma gst) h (Some st);
-       DynamicNet.msgs := new_msgs ++ msgs gst;
-       DynamicNet.trace := trace gst ++ (map e_send new_msgs) |}.
+    {| nodes := h :: nodes gst;
+       failed_nodes := failed_nodes gst;
+       timeouts := update addr_eq_dec (timeouts gst) h nts;
+       sigma := update addr_eq_dec (sigma gst) h (Some st);
+       msgs := new_msgs ++ msgs gst;
+       trace := trace gst ++ (map e_send new_msgs) |}.
 
   Definition run_start (gst : global_state) (h : addr) (knowns : list addr) : option global_state :=
     if In_dec addr_eq_dec h (nodes gst)
@@ -95,7 +76,7 @@ Section DynamicShed.
     then match sigma gst h with
          | Some st =>
            if In_dec timeout_eq_dec t (timeouts gst h)
-           then if timeout_constraint_dec gst h t
+           then if S.timeout_constraint_dec gst h t
                 then Some (run_timeout_handler gst h st t)
                 else None
            else None
@@ -247,7 +228,7 @@ Section DynamicShed.
     end.
 
   Definition can_fire (gst : global_state) (h : addr) (t : timeout) : bool :=
-    if timeout_constraint_dec gst h t
+    if S.timeout_constraint_dec gst h t
     then true
     else false.
 
@@ -258,7 +239,7 @@ Section DynamicShed.
   Proof.
     intuition.
     unfold can_fire in *.
-    destruct (timeout_constraint_dec gst h t); easy.
+    destruct (S.timeout_constraint_dec gst h t); easy.
   Qed.
 
   Definition plan_timeout (rand : nat -> nat) (gst : global_state) : option operation :=
@@ -309,4 +290,11 @@ Section DynamicShed.
          | Some op => Some op
          | None => plan_timeout rand gst
          end.*)
+
+End DynamicShedSemantics.
+
+Module DynamicShed (S : DecidableDynamicSystem).
+  Module Sem := DynamicShedSemantics(S).
+  Module SShed := Shed.Shed.Shed(Sem).
+  Include SShed.
 End DynamicShed.
