@@ -16,6 +16,7 @@ set :deploy_to, "/home/pi/lib/verdi-chord"
 # You can configure the Airbrussh format using :format_options.
 # These are the defaults.
 # set :format_options, command_output: true, log_file: "log/capistrano.log", color: :auto, truncate: :auto
+set :format_options, command_output: true, log_file: "extraction/chord/log/capistrano.log", color: :auto, truncate: :auto
 
 # Default value for :pty is false
 # set :pty, true
@@ -36,6 +37,4 @@ set :default_env, {
 }
 
 # Default value for keep_releases is 5
-# set :keep_releases, 5
-
-after "deploy:published", "compilation:build"
+set :keep_releases, 3
