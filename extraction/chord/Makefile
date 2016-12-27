@@ -5,16 +5,13 @@ SHEDMLFILES = coq/ExtractedChordShed.ml coq/ExtractedChordShed.mli
 
 default: chord.native client.native chordshed.native
 
-$(CHORDMLFILES):
+$(CHORDMLFILES) $(SHEDMLFILES):
 	+$(MAKE) -C ../.. extraction/chord/$@
 
-$(SHEDMLFILES):
-	+$(MAKE) -C ../.. extraction/chord/$@
-
-chord.native: $(CHORDMLFILES) lib/*.ml
+chord.native: $(CHORDMLFILES) ml/*.ml lib/*.ml
 	$(OCAMLBUILD) chord.native
 
-client.native: ml/client.ml coq/ExtractedChord.ml lib/*.ml
+client.native: $(CHORDMLFILES) ml/client.ml lib/*.ml
 	$(OCAMLBUILD) client.native
 
 chordshed.native: $(SHEDMLFILES) ml/*.ml lib/*.ml
@@ -23,7 +20,7 @@ chordshed.native: $(SHEDMLFILES) ml/*.ml lib/*.ml
 clean:
 	$(OCAMLBUILD) -clean
 
-.PHONY: default clean $(MLFILES)
+.PHONY: default clean $(CHORDMLFILES) $(SHEDMLFILES)
 
 .NOTPARALLEL: chord.native client.native chordshed.native
-.NOTPARALLEL: $(MLFILES)
+.NOTPARALLEL: $(CHORDMLFILES) $(SHEDMLFILES)
