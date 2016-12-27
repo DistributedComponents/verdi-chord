@@ -7,8 +7,8 @@
 # server "example.com", user: "deploy", roles: %w{app web}, other_property: :other_value
 # server "db.example.com", user: "deploy", roles: %w{db}
 
-server "discoberry01.duckdns.org", user: "pi", roles: %w{node}, node_name: 0, client_port: 8000
-server "discoberry02.duckdns.org", user: "pi", roles: %w{node}, node_name: 1, client_port: 8000
+server "discoberry01.duckdns.org", user: "pi", roles: %w{node}, name: "0", succs: %w(1), preds: %w(1), ip: "128.208.7.17"
+server "discoberry02.duckdns.org", user: "pi", roles: %w{node}, name: "1", succs: %w(0), preds: %w(0), ip: "128.208.7.155"
 
 # role-based syntax
 # ==================
@@ -32,7 +32,7 @@ server "discoberry02.duckdns.org", user: "pi", roles: %w{node}, node_name: 1, cl
 # http://capistranorb.com/documentation/getting-started/configuration/
 # Feel free to add new variables to customise your setup.
 
-set :node_port, 9000
+set :node_port, 7000
 
 # Custom SSH Options
 # ==================

@@ -2,8 +2,10 @@ namespace :chord do
   
   desc 'start chord'
   task :start do
-    cluster = roles(:node).collect { |s| "-node #{s.properties.node_name},#{s.hostname}:#{fetch(:node_port)}" }.join(' ')
+    servers = Hash[roles(:node).collect { |s| [s.properties.name, s] }]
     on roles(:node) do |server|
+      preds = server.properties.preds.collect { |s| "-pred #{servers[s].properties.ip}:#{fetch(:node_port)}" }.join(' ')
+      succs = server.properties.succs.collect { |s| "-succ #{servers[s].properties.ip}:#{fetch(:node_port)}" }.join(' ')
       execute '/sbin/start-stop-daemon',
         '--start',
         '--quiet',
@@ -12,7 +14,7 @@ namespace :chord do
         '--background',
         "--chdir #{current_path}/extraction/chord",
         '--startas /bin/bash',
-        "-- -c \"exec ./chord.native -me #{server.properties.node_name} -port #{server.properties.client_port} #{cluster} > log/chord.log 2>&1\""
+        "-- -c \"exec ./chord.native -bind #{server.properties.ip}:#{fetch(:node_port)} #{preds} #{succs} > log/chord.log 2>&1\""
     end
   end
 
