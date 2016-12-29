@@ -295,6 +295,6 @@ End DynamicShedSemantics.
 
 Module DynamicShed (S : DecidableDynamicSystem).
   Module Sem := DynamicShedSemantics(S).
-  Module SShed := Shed.Shed.Shed(Sem).
-  Include SShed.
+  Module Self := Shed.Shed.Shed(Sem).
+  Include Self.
 End DynamicShed.
