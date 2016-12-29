@@ -23,16 +23,16 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       trace : list event
     }.
 
-  Inductive timeout_constraint_ : global_state -> addr -> timeout -> Prop :=
+  Inductive _timeout_constraint : global_state -> addr -> timeout -> Prop :=
   | Tick_unconstrained : forall gst h,
-      timeout_constraint_ gst h Tick
+      _timeout_constraint gst h Tick
   | KeepaliveTick_unconstrained : forall gst h,
-      timeout_constraint_ gst h KeepaliveTick
+      _timeout_constraint gst h KeepaliveTick
   | Request_needs_dst_dead_and_no_msgs : forall gst dst h p,
       In dst (failed_nodes gst) ->
       (forall m, request_response_pair p m -> ~ In (dst, (h, m)) (msgs gst)) ->
-      timeout_constraint_ gst h (Request dst p).
-  Definition timeout_constraint := timeout_constraint_.
+      _timeout_constraint gst h (Request dst p).
+  Definition timeout_constraint := _timeout_constraint.
 
   Definition timeouts_detect_failure (gst : global_state) : Prop :=
     forall xs t ys h dead req,

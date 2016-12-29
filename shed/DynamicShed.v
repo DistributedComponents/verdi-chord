@@ -27,13 +27,13 @@ Module DynamicShedSemantics (S : DecidableDynamicSystem) <: ShedSemantics.
   Definition net := global_state.
   Definition step := step_dynamic.
 
-  Inductive operation_ :=
-  | op_start : addr -> list addr -> operation_
-  | op_fail : addr -> operation_
-  | op_timeout : addr -> timeout -> operation_
+  Inductive _operation :=
+  | op_start : addr -> list addr -> _operation
+  | op_fail : addr -> _operation
+  | op_timeout : addr -> timeout -> _operation
   (* the nat here is the index of the msg in (msgs gst) *)
-  | op_deliver : nat -> msg -> operation_.
-  Definition operation := operation_.
+  | op_deliver : nat -> msg -> _operation.
+  Definition operation := _operation.
 
   Definition exists_and_not_failed (gst : global_state) (h : addr) : bool :=
     if In_dec addr_eq_dec h (nodes gst)

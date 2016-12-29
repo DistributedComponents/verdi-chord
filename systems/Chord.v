@@ -37,23 +37,23 @@ Module Chord <: DynamicSystem.
 
   Definition make_pointer (a : addr) : pointer := (hash a, a).
 
-  Inductive payload_ :=
-  | Busy : payload_
-  | GetBestPredecessor : pointer -> payload_
-  | GotBestPredecessor : pointer -> payload_
-  | GetSuccList : payload_
-  | GotSuccList : list pointer -> payload_
-  | GetPredAndSuccs : payload_
-  | GotPredAndSuccs : option pointer -> list pointer -> payload_
-  | Notify : payload_
-  | Ping : payload_
-  | Pong : payload_.
-  Definition payload := payload_.
+  Inductive _payload :=
+  | Busy : _payload
+  | GetBestPredecessor : pointer -> _payload
+  | GotBestPredecessor : pointer -> _payload
+  | GetSuccList : _payload
+  | GotSuccList : list pointer -> _payload
+  | GetPredAndSuccs : _payload
+  | GotPredAndSuccs : option pointer -> list pointer -> _payload
+  | Notify : _payload
+  | Ping : _payload
+  | Pong : _payload.
+  Definition payload := _payload.
 
-  Inductive client_payload_ : payload -> Prop :=
-  | CPGetBestPredecessor : forall p, client_payload_ (GetBestPredecessor p)
-  | CPGetSuccList : client_payload_ GetSuccList.
-  Definition client_payload := client_payload_.
+  Inductive _client_payload : payload -> Prop :=
+  | CPGetBestPredecessor : forall p, _client_payload (GetBestPredecessor p)
+  | CPGetSuccList : _client_payload GetSuccList.
+  Definition client_payload := _client_payload.
   Definition client_payload_dec :
     forall p,
       {client_payload p} + {~client_payload p}.
@@ -74,11 +74,11 @@ Module Chord <: DynamicSystem.
     repeat decide equality.
   Defined.
 
-  Inductive timeout_ :=
-  | Tick : timeout_
-  | KeepaliveTick : timeout_
-  | Request : addr -> payload -> timeout_.
-  Definition timeout := timeout_.
+  Inductive _timeout :=
+  | Tick : _timeout
+  | KeepaliveTick : _timeout
+  | Request : addr -> payload -> _timeout.
+  Definition timeout := _timeout.
 
   Definition timeout_eq_dec : forall x y : timeout,
       {x = y} + {x <> y}.
@@ -86,19 +86,19 @@ Module Chord <: DynamicSystem.
     repeat decide equality.
   Defined.
 
-  Inductive query_ :=
+  Inductive _query :=
   (* needs a pointer to the notifier *)
-  | Rectify : pointer -> query_
-  | Stabilize : query_
+  | Rectify : pointer -> _query
+  | Stabilize : _query
   (* needs a new successor *)
-  | Stabilize2 : pointer -> query_
+  | Stabilize2 : pointer -> _query
   (* needs a known node *)
-  | Join : pointer -> query_
+  | Join : pointer -> _query
   (* needs to know new successor *)
-  | Join2 : pointer -> query_.
-  Definition query := query_.
+  | Join2 : pointer -> _query.
+  Definition query := _query.
 
-  Record data_ := mkData { ptr : pointer;
+  Record _data := mkData { ptr : pointer;
                           pred : option pointer;
                           succ_list : list pointer;
                           known : pointer;
@@ -106,7 +106,7 @@ Module Chord <: DynamicSystem.
                           rectify_with : option pointer;
                           cur_request : option (pointer * query * payload);
                           delayed_queries : list (addr * payload) }.
-  Definition data := data_.
+  Definition data := _data.
 
   Definition res := (data * list (addr * payload) * list timeout * list timeout)%type.
 
