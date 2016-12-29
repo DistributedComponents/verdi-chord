@@ -1,16 +1,13 @@
 open ExtractedChord.Chord
 
 module type ClientSig = sig
-  type ptr = pointer
-
   exception Wrong_response of string
 
-  val lookup : string -> string * int -> int -> ptr
-  val get_pred_and_succs : string -> string * int -> ptr option * ptr list
+  val lookup : string -> string * int -> int -> pointer
+  val get_pred_and_succs : string -> string * int -> pointer option * pointer list
 end
 
 module Client : ClientSig = struct
-  type ptr = pointer
 
   let connect_and_send me addr msg =
     let remote = Util.mk_addr_inet addr in
