@@ -68,9 +68,10 @@ Module Shed (S : ShedSemantics).
     now left.
   Qed.
 
-  Definition np_const_true := {| np_prop := const_true;
-                                 np_dec := const_true_net_dec;
-                                 np_name := "np_const_true" |}.
+  Definition np_const_true :=
+    {| np_prop := const_true;
+       np_dec := const_true_net_dec;
+       np_name := "np_const_true" |}.
 
   (* prefix l s holds when s starts with the elements of l. *)
   Inductive prefix {A} : list A -> infseq A -> Prop :=
@@ -132,10 +133,11 @@ Module Shed (S : ShedSemantics).
 
   (* A tracepred is a predicate on infinite executions with a
      decidable analogue defined on finite executions and a name. *)
-  Record tracepred := { tp_prop : infseq occurrence -> Prop;
-                        tp_dec : list occurrence -> option bool;
-                        tp_correct : tracepred_correct tp_prop tp_dec;
-                        tp_name : string }.
+  Record tracepred :=
+    { tp_prop : infseq occurrence -> Prop;
+      tp_dec : list occurrence -> option bool;
+      tp_correct : tracepred_correct tp_prop tp_dec;
+      tp_name : string }.
 
   Definition const_true_tp_dec (t : list occurrence) : option bool :=
     Some true.
@@ -147,10 +149,11 @@ Module Shed (S : ShedSemantics).
     easy.
   Defined.
 
-  Definition tp_const_true := {| tp_prop := const_true;
-                                 tp_dec := const_true_tp_dec;
-                                 tp_correct := const_true_tp_dec_correct;
-                                 tp_name := "tp_const_true" |}.
+  Definition tp_const_true :=
+    {| tp_prop := const_true;
+       tp_dec := const_true_tp_dec;
+       tp_correct := const_true_tp_dec_correct;
+       tp_name := "tp_const_true" |}.
 
   Definition is_tp_false (p : option bool) : bool :=
     match p with
@@ -164,12 +167,13 @@ Module Shed (S : ShedSemantics).
   Definition any_netpreds_false (preds : list netpred) (gst : net) : bool :=
     existsb (Bool.eqb false) (map (fun p => proj_sumbool (np_dec p gst)) preds).
 
-  Record test_state := { (* trace of program thus far *)
-                        ts_trace : list occurrence;
-                        (* latest state, since occurrences have a sort of fencepost issue *)
-                        ts_latest : net;
-                        ts_netpreds : list (netpred * list bool);
-                        ts_tracepreds : list (tracepred * list (option bool)) }.
+  Record test_state :=
+    { (* trace of program thus far *)
+      ts_trace : list occurrence;
+      (* latest state, since occurrences have a sort of fencepost issue *)
+      ts_latest : net;
+      ts_netpreds : list (netpred * list bool);
+      ts_tracepreds : list (tracepred * list (option bool)) }.
 
   Definition extend_by (st : test_state) (gst : net) (op : operation) : test_state :=
     {| ts_trace := ts_trace st ++ [(ts_latest st, op)];
