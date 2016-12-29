@@ -512,10 +512,10 @@ Module Chord <: DynamicSystem.
     | KeepaliveTick => keepalive_handler st
     end.
 
-  Inductive label_ : Set :=
-  | RecvMsg : addr -> addr -> payload -> label_
-  | Timeout : addr -> timeout -> label_.
-  Definition label := label_.
+  Inductive _label : Set :=
+  | RecvMsg : addr -> addr -> payload -> _label
+  | Timeout : addr -> timeout -> _label.
+  Definition label := _label.
 
   Definition label_eq_dec :
     forall x y : label,
