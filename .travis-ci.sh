@@ -24,6 +24,9 @@ case $MODE in
   chord)
     ./build.sh chord
     ;;
+  chordshed)
+    ./build.sh chordshed
+    ;;
   *)
     ./build.sh
     ;;

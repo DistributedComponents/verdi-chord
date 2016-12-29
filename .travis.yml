@@ -14,6 +14,7 @@ env:
   matrix:
   - MODE=build
   - MODE=chord
+  - MODE=chordshed
 script: bash -ex .travis-ci.sh
 sudo: false
 notifications:
