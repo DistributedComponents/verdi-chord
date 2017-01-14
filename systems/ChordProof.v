@@ -6,7 +6,7 @@ Import Chord.Chord.Chord.
 Require Import Arith.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordDefinitionLemmas.
-Require Coqlib.
+Require Verdi.Coqlib.
 Import FunctionalExtensionality.
 Require Import List.
 Import ListNotations.

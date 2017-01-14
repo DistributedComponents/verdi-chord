@@ -1,4 +1,4 @@
-OCAMLBUILD = ocamlbuild -lib str -lib unix -I lib -I ml -I coq
+OCAMLBUILD = ocamlbuild -package verdi-runtime -I ml -I coq -cflag -g
 
 CHORDMLFILES = coq/ExtractedChord.ml coq/ExtractedChord.mli
 SHEDMLFILES = coq/ExtractedChordShed.ml coq/ExtractedChordShed.mli
@@ -8,13 +8,13 @@ default: chord.native client.native chordshed.native
 $(CHORDMLFILES) $(SHEDMLFILES):
 	+$(MAKE) -C ../.. extraction/chord/$@
 
-chord.native: $(CHORDMLFILES) ml/*.ml lib/*.ml
+chord.native: $(CHORDMLFILES) ml/*.ml
 	$(OCAMLBUILD) chord.native
 
-client.native: $(CHORDMLFILES) ml/client.ml lib/*.ml
+client.native: $(CHORDMLFILES) ml/client.ml
 	$(OCAMLBUILD) client.native
 
-chordshed.native: $(SHEDMLFILES) ml/*.ml lib/*.ml
+chordshed.native: $(SHEDMLFILES) ml/*.ml
 	@echo $?
 	$(OCAMLBUILD) chordshed.native
 

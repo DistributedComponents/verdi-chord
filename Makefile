@@ -1,7 +1,7 @@
 COQVERSION := $(shell coqc --version|grep "version 8.5")
 
 ifeq "$(COQVERSION)" ""
-$(error "Verdi is only compatible with Coq version 8.5")
+$(error "Verdi Chord is only compatible with Coq version 8.5")
 endif
 
 COQPROJECT_EXISTS=$(wildcard _CoqProject)
@@ -27,17 +27,19 @@ quick: Makefile.coq
 	$(MAKE) -f Makefile.coq quick
 
 Makefile.coq: _CoqProject
-	coq_makefile -f _CoqProject -o Makefile.coq \
+	coq_makefile -f _CoqProject -o Makefile.coq -no-install \
 	  -extra '$(CHORDMLFILES)' \
 	    'extraction/chord/coq/ExtractChord.v systems/Chord.vo' \
 	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v' \
 	  -extra '$(SHEDMLFILES)' \
             'extraction/chord/coq/ExtractChordShed.v systems/Chord.vo shed/ChordShed.vo' \
-	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChordShed.v'
+	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChordShed.v' \
+	  -extra-phony 'distclean' 'clean' \
+	    'rm -f $$(join $$(dir $$(VFILES)),$$(addprefix .,$$(notdir $$(patsubst %.v,%.aux,$$(VFILES)))))'
 
 clean:
 	if [ -f Makefile.coq ]; then \
-	  $(MAKE) -f Makefile.coq cleanall; fi
+	  $(MAKE) -f Makefile.coq distclean; fi
 	rm -f Makefile.coq
 	$(MAKE) -C extraction/chord clean
 
