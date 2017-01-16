@@ -30,11 +30,7 @@ append :linked_dirs, "extraction/chord/tmp", "extraction/chord/log"
 
 # Default value for default_env is {}
 # set :default_env, { path: "/opt/ruby/bin:$PATH" }
-set :default_env, {
-  "Verdi_PATH" => "/home/pi/lib/verdi/current",
-  "StructTact_PATH" => "/home/pi/lib/StructTact/current",
-  "InfSeqExt_PATH" => "/home/pi/lib/InfSeqExt/current"
-}
+set :default_env, {}
 
 # Default value for keep_releases is 5
 set :keep_releases, 3

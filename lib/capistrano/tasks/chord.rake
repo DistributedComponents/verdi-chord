@@ -9,12 +9,13 @@ namespace :chord do
       execute '/sbin/start-stop-daemon',
         '--start',
         '--quiet',
+        '--oknodo',
         '--make-pidfile',
         "--pidfile #{current_path}/extraction/chord/tmp/chord.pid",
         '--background',
         "--chdir #{current_path}/extraction/chord",
         '--startas /bin/bash',
-        "-- -c \"exec ./chord.native -bind #{server.properties.ip}:#{fetch(:node_port)} #{preds} #{succs} > log/chord.log 2>&1\""
+        "-- -c 'exec ./chord.native -bind #{server.properties.ip}:#{fetch(:node_port)} #{preds} #{succs} > log/chord.log 2>&1'"
     end
   end
 
@@ -23,6 +24,7 @@ namespace :chord do
     on roles(:node) do
       execute '/sbin/start-stop-daemon', 
         '--stop',
+        '--oknodo',
         "--pidfile #{current_path}/extraction/chord/tmp/chord.pid"
     end
   end
