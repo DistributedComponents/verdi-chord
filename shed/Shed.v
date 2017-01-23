@@ -3,7 +3,7 @@ Import ListNotations.
 Require Import PeanoNat.
 Require Import String.
 
-Require Import Coqlib.
+Require Import Verdi.Coqlib.
 Require Import InfSeqExt.infseq.
 Require Import StructTact.StructTactics.
 
