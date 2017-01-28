@@ -15,7 +15,7 @@ namespace :chord do
         '--background',
         "--chdir #{current_path}/extraction/chord",
         '--startas /bin/bash',
-        "-- -c 'exec ./chord.native -bind #{server.properties.ip}:#{fetch(:node_port)} #{preds} #{succs} > log/chord.log 2>&1'"
+        "-- -c 'exec ./chord.native -bind 0.0.0.0:#{fetch(:node_port)} #{preds} #{succs} > log/chord.log 2>&1'"
     end
   end
 
