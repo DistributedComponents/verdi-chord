@@ -3,3 +3,4 @@ coq/*.mli
 _build
 *.native
 lib
+log
