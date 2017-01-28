@@ -4,8 +4,8 @@ let parse_ip s =
 let parse_addr s =
   match Str.split (Str.regexp ":") s with
   | addr::port::[] ->
-     (* this will throw Invalid_argument if the ip is invalid... *)
-     (Util.ip_of_int (Util.int_of_ip addr), int_of_string port)
+     (* this should throw invalid arg when this is broken *)
+     (addr, port)
   | _ -> invalid_arg s
 
 let parse_addr_arg opt =
