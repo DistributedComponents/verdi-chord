@@ -1,10 +1,12 @@
 Require Import Arith.
+Require Import Omega.
 Require Import List.
 Import ListNotations.
 Require Import StructTact.Dedup.
 Require Import StructTact.RemoveAll.
 Require Import StructTact.StructTactics.
 Require Import Verdi.DynamicNet.
+Require Import Chord.Sorting.
 
 
 Variable SUCC_LIST_LEN : nat.
@@ -24,6 +26,8 @@ Module Chord <: DynamicSystem.
   Definition pointer := (id * addr)%type.
 
   Definition addr_eq_dec := Nat.eq_dec.
+  Definition id_eq_dec := Nat.eq_dec.
+
   Definition id_of (p : pointer) : id := fst p.
   Definition addr_of (p : pointer) : addr := snd p.
   Definition client_addr := client_addr.
@@ -208,11 +212,11 @@ Module Chord <: DynamicSystem.
        cur_request := cur_request st;
        delayed_queries := [] |}.
 
-  Definition init_state_preset (h pred : addr) (succs : list addr) : data :=
+  Definition init_state_preset (h : addr) (pred : option pointer) (succs : list pointer) : data :=
     {| ptr := make_pointer h;
-       pred := Some (make_pointer pred);
-       succ_list := chop_succs (map make_pointer succs);
-       known := make_pointer pred;
+       pred := pred;
+       succ_list := succs;
+       known := (make_pointer h);
        joined := true;
        rectify_with := None;
        cur_request := None;
@@ -450,14 +454,95 @@ Module Chord <: DynamicSystem.
   Definition pi {A B C D : Type} (t : A * B * C * D) : A * B * C :=
     let '(a, b, c, d) := t in (a, b, c).
 
+  (* this is a total linear less-than-or-equal relation, see proofs below *)
+  Definition unroll_between (h : id) (x y : id) : bool :=
+    if id_eq_dec h x
+    then true
+    else if id_eq_dec h y
+         then false
+         else if id_eq_dec x y
+              then true
+              else between_bool h x y.
+
+  Lemma unrolling_makes_h_least :
+    forall h x,
+      unroll_between h h x = true.
+  Proof.
+    unfold unroll_between.
+    intros.
+    break_if; auto.
+  Qed.
+
+  Lemma unrolling_antisymmetric :
+    forall h x y,
+      unroll_between h x y = true ->
+      unroll_between h y x = true ->
+      x = y.
+  Proof.
+    unfold unroll_between, between_bool.
+    intros.
+    repeat break_if; try omega || subst; auto; try congruence.
+  Qed.
+
+  Lemma unrolling_transitive :
+    forall h x y z,
+      unroll_between h x y = true ->
+      unroll_between h y z = true ->
+      unroll_between h x z = true.
+  Proof.
+    unfold unroll_between, between_bool.
+    intros.
+    repeat break_if; omega || subst; auto; congruence.
+  Qed.
+
+  Lemma unrolling_total :
+    forall h x y,
+      unroll_between h x y = true \/
+      unroll_between h y x = true.
+  Proof.
+    unfold unroll_between, between_bool.
+    intros.
+    repeat break_if; try omega || subst; auto; try congruence.
+  Qed.
+
+  Lemma unrolling_reflexive :
+    forall h x,
+      unroll_between h x x = true.
+  Proof.
+    unfold unroll_between, between_bool.
+    intros.
+    repeat break_if; try omega || subst; auto; try congruence.
+  Qed.
+
+  Definition unroll_between_ptr (h : addr) (a b : pointer) :=
+    unroll_between (hash h) (id_of a) (id_of b).
+
+  Definition sort_by_between (h : addr) : list pointer -> list pointer :=
+    sort pointer (unroll_between_ptr h).
+
+  Fixpoint find_succs (h : addr) (sorted_ring : list pointer) : list pointer :=
+    match sorted_ring with
+    | [] => []
+    | s :: rest =>
+      if pointer_eq_dec s (make_pointer h)
+      then find_succs h rest
+      else chop_succs (s :: rest)
+    end.
+
+  Fixpoint find_pred (h : addr) (sorted_ring : list pointer) : option pointer :=
+    hd_error (rev sorted_ring).
+
   Definition start_handler (h : addr) (knowns : list addr) : data * list (addr * payload) * list timeout :=
-    match knowns with
-    | k :: [] =>
-      pi (start_query h (init_state_join h k) (Join (make_pointer k)))
-    | k :: nowns =>
-      (init_state_preset h k nowns, [], [Tick])
-    (* garbage data, shouldn't happen *)
-    | [] => empty_start_res h
+    match sort_by_between h (map make_pointer knowns) with
+    (* prohibited by semantics *)
+    | [] =>
+      empty_start_res h
+    | [k] =>
+      pi (start_query h (init_state_join h (addr_of k)) (Join k))
+    | sorted_ring =>
+      let succs := find_succs h sorted_ring in
+      let pred := find_pred h sorted_ring in
+      (init_state_preset h pred succs, [], [Tick])
     end.
 
   Definition tick_handler (h : addr) (st : data) : res :=

@@ -4,8 +4,7 @@ open ChordUtil
 
 type command_line_opts =
   { bind : (string * int) option ref
-  ; pred : (string * int) option ref
-  ; succs : (string * int) list ref
+  ; ring : (string * int) list ref
   ; known : (string * int) option ref
   ; debug : bool ref
   ; request_timeout : float ref
@@ -15,8 +14,7 @@ type command_line_opts =
 
 let mk_default_opts () : command_line_opts =
   { bind = ref None
-  ; pred = ref None
-  ; succs = ref []
+  ; ring = ref []
   ; known = ref None
   ; debug = ref true
   ; request_timeout = ref 30.0
@@ -35,15 +33,12 @@ let mk_chord_config opts =
     }
 
 let validate_nm_knowns opts =
-  match !(opts.bind), !(opts.pred), !(opts.succs), !(opts.known) with
-  | Some b, Some p, s :: uccs, None -> b, p :: s :: uccs
-  | Some b, None, [], Some k -> b, [k]
-  | Some b, None, [], None -> invalid_arg "please provide either -known or both -succ and -pred"
-  | Some b, None, s :: uccs, None -> invalid_arg "please specify a predecessor with -pred"
-  | Some b, Some p, [], None -> invalid_arg "please specify a successor list with -succ"
-  | None, _, _, _ -> invalid_arg "please specify an address to bind to with -bind"
-  | Some b, Some p, _, Some k -> invalid_arg "-known and -pred are mutually exclusive"
-  | Some b, _, s :: uccs, Some k -> invalid_arg "-known and -succ are mutually exclusive"
+  match !(opts.bind), !(opts.ring), !(opts.known) with
+  | Some b, s :: uccs, None -> b, s :: uccs
+  | Some b, [], Some k -> b, [k]
+  | Some b, [], None -> invalid_arg "please provide either -known or an intial ring using -ring"
+  | Some b, s :: uccs, Some k -> invalid_arg "-known and -ring are mutually exclusive"
+  | None, _, _ -> invalid_arg "please specify an address to bind to using -bind"
 
 let validate (opts : command_line_opts) =
   let cc = mk_chord_config opts in
@@ -53,8 +48,7 @@ let validate (opts : command_line_opts) =
 let parse argv opts =
   let spec =
     [ addr_spec "-bind" opts.bind "{ip:port} address to listen for connections on"
-    ; addr_spec "-pred" opts.pred "{ip:port} node to start with as predecessor"
-    ; addrs_spec "-succ" opts.succs "{ip:port} node to append to succ_list"
+    ; addrs_spec "-ring" opts.ring "{ip:port} node in initial ring"
     ; addr_spec "-join" opts.known "{ip:port} node to join ring with"
     ; ( "-request-timeout"
       , Arg.Set_float opts.request_timeout
