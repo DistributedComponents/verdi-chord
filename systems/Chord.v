@@ -1,45 +1,60 @@
 Require Import Arith.
 Require Import Omega.
+Require Vectors.VectorEq.
+Require Bool.Bvector.
 Require Import List.
-Import ListNotations.
+Import List.ListNotations.
+Require Import String.
+Require ZArith.Zdigits.
+
 Require Import StructTact.Dedup.
 Require Import StructTact.RemoveAll.
 Require Import StructTact.StructTactics.
 Require Import Verdi.DynamicNet.
+
 Require Import Chord.Sorting.
 
-
+(* number of successors each node has to track *)
 Variable SUCC_LIST_LEN : nat.
-Variable hash : nat -> nat.
+(* bit-width of node identifiers *)
+Variable N : nat.
+(* hash function from names to identifiers *)
+Variable hash : string -> Bvector.Bvector N.
 Variable hash_inj :
-  forall a b : nat,
+  forall a b,
     hash a = hash b ->
     a = b.
-Variable client_addr : nat -> Prop.
+Variable client_addr : string -> Prop.
 Variable client_addr_dec :
   forall a,
     {client_addr a} + {~ client_addr a}.
 
 Module Chord <: DynamicSystem.
-  Definition addr := nat.
-  Definition id := nat.
+  Definition addr := string.
+  Definition addr_eq_dec :
+    forall a b : addr, {a = b} + {a <> b}
+    := string_dec.
+  Definition id := Bvector.Bvector N.
+  Definition id_eq_dec :
+    forall a b : id, {a = b} + {a <> b}
+    := (VectorEq.eq_dec _ Bool.eqb Bool.eqb_true_iff _).
+
   Definition pointer := (id * addr)%type.
-
-  Definition addr_eq_dec := Nat.eq_dec.
-  Definition id_eq_dec := Nat.eq_dec.
-
   Definition id_of (p : pointer) : id := fst p.
   Definition addr_of (p : pointer) : addr := snd p.
+
   Definition client_addr := client_addr.
   Definition client_addr_dec := client_addr_dec.
 
   Definition pointer_eq_dec : forall x y : pointer,
       {x = y} + {x <> y}.
   Proof using.
-    repeat decide equality.
+    decide equality;
+      auto using id_eq_dec, addr_eq_dec.
   Defined.
 
-  Definition make_pointer (a : addr) : pointer := (hash a, a).
+  Definition make_pointer (a : addr) : pointer :=
+    (hash a, a).
 
   Inductive _payload :=
   | Busy : _payload
@@ -75,7 +90,8 @@ Module Chord <: DynamicSystem.
   Definition payload_eq_dec : forall x y : payload,
       {x = y} + {x <> y}.
   Proof using.
-    repeat decide equality.
+    repeat decide equality;
+      auto using id_eq_dec, addr_eq_dec.
   Defined.
 
   Inductive _timeout :=
@@ -87,7 +103,8 @@ Module Chord <: DynamicSystem.
   Definition timeout_eq_dec : forall x y : timeout,
       {x = y} + {x <> y}.
   Proof using.
-    repeat decide equality.
+    repeat decide equality;
+      auto using id_eq_dec, addr_eq_dec.
   Defined.
 
   Inductive _query :=
@@ -131,6 +148,8 @@ Module Chord <: DynamicSystem.
     | Ping, Pong => true
     | _, _ => false
     end.
+  Definition t : timeout := Tick.
+  Definition tts (l : list timeout) := Tick :: l.
 
   Definition add_tick (r : res) : res :=
     let '(st, sends, newts, cts) := r in
@@ -244,12 +263,30 @@ Module Chord <: DynamicSystem.
      [],
      []).
 
+  Definition z_of_id : id -> Z :=
+    Zdigits.binary_value _.
+
+  Definition id_of_z : Z -> id :=
+    Zdigits.Z_to_binary _.
+
+  Lemma z_of_id_inv :
+    forall x,
+      id_of_z (z_of_id x) = x.
+  Proof.
+    unfold id_of_z, z_of_id.
+    intros.
+    apply Zdigits.binary_to_Z_to_binary.
+  Qed.
+
+  Definition bv_lt (x y : id) : bool :=
+    Z.ltb (z_of_id x) (z_of_id y).
+
   (* true iff x in (a, b) on some sufficiently large "circle" *)
   Definition between_bool (a x b : id) : bool :=
-    match lt_dec a b, lt_dec a x, lt_dec x b with
-    | left _, left _, left _ => true
-    | right _, left _, _ => true
-    | right _, _, left _ => true
+    match bv_lt a b, bv_lt a x, bv_lt x b with
+    | true, true, true => true
+    | false, true, _ => true
+    | false, _, true => true
     | _, _, _ => false
     end.
 
@@ -276,7 +313,8 @@ Module Chord <: DynamicSystem.
     forall x y : addr * payload,
       {x = y} + {x <> y}.
   Proof using.
-    repeat decide equality.
+    repeat decide equality;
+      auto using id_eq_dec, payload_eq_dec.
   Defined.
 
   Definition delay_query (st : data) (src : addr) (msg : payload) : data :=
@@ -473,6 +511,7 @@ Module Chord <: DynamicSystem.
     break_if; auto.
   Qed.
 
+  Require Import Lia.
   Lemma unrolling_antisymmetric :
     forall h x y,
       unroll_between h x y = true ->
@@ -481,7 +520,10 @@ Module Chord <: DynamicSystem.
   Proof.
     unfold unroll_between, between_bool.
     intros.
-    repeat break_if; try omega || subst; auto; try congruence.
+    repeat break_if; try subst; try congruence;
+    unfold bv_lt in *;
+    rewrite Z.ltb_lt in *;
+    omega.
   Qed.
 
   Lemma unrolling_transitive :
@@ -492,7 +534,21 @@ Module Chord <: DynamicSystem.
   Proof.
     unfold unroll_between, between_bool.
     intros.
-    repeat break_if; omega || subst; auto; congruence.
+    repeat break_if; try subst; try congruence;
+    unfold bv_lt in *;
+    rewrite Z.ltb_lt, Z.ltb_nlt in *;
+    omega.
+  Qed.
+  Lemma neq_in_id_implies_neq_in_z :
+    forall x y : id,
+      x <> y ->
+      z_of_id x <> z_of_id y.
+  Proof.
+    intros.
+    intro.
+    find_apply_lem_hyp (f_equal id_of_z).
+    repeat rewrite z_of_id_inv in *.
+    congruence.
   Qed.
 
   Lemma unrolling_total :
@@ -502,7 +558,14 @@ Module Chord <: DynamicSystem.
   Proof.
     unfold unroll_between, between_bool.
     intros.
-    repeat break_if; try omega || subst; auto; try congruence.
+    repeat break_if; try subst; try congruence; auto;
+      unfold bv_lt in *;
+      try rewrite Z.ltb_lt, Z.ltb_nlt in *;
+      find_apply_lem_hyp neq_in_id_implies_neq_in_z;
+      try lia.
+      rewrite Z.ltb_nlt in *.
+      find_apply_lem_hyp neq_in_id_implies_neq_in_z;
+      try lia.
   Qed.
 
   Lemma unrolling_reflexive :
