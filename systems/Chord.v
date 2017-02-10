@@ -1,11 +1,6 @@
-Require Import Arith.
-Require Import Omega.
-Require Vectors.VectorEq.
-Require Bool.Bvector.
 Require Import List.
 Import List.ListNotations.
 Require Import String.
-Require ZArith.Zdigits.
 
 Require Import StructTact.Dedup.
 Require Import StructTact.RemoveAll.
@@ -13,6 +8,7 @@ Require Import StructTact.StructTactics.
 Require Import Verdi.DynamicNet.
 
 Require Import Chord.Sorting.
+Require Chord.IdentifierSpaces.
 
 (* number of successors each node has to track *)
 Variable SUCC_LIST_LEN : nat.
@@ -20,12 +16,12 @@ Variable SUCC_LIST_LEN : nat.
 Variable N : nat.
 (* hash function from names to identifiers *)
 Variable hash : string -> Bvector.Bvector N.
-Variable hash_inj :
+Axiom hash_inj :
   forall a b,
     hash a = hash b ->
     a = b.
 Variable client_addr : string -> Prop.
-Variable client_addr_dec :
+Axiom client_addr_dec :
   forall a,
     {client_addr a} + {~ client_addr a}.
 
@@ -34,27 +30,21 @@ Module Chord <: DynamicSystem.
   Definition addr_eq_dec :
     forall a b : addr, {a = b} + {a <> b}
     := string_dec.
-  Definition id := Bvector.Bvector N.
-  Definition id_eq_dec :
-    forall a b : id, {a = b} + {a <> b}
-    := (VectorEq.eq_dec _ Bool.eqb Bool.eqb_true_iff _).
+  Definition id := IdentifierSpaces.id N.
+  Definition id_eq_dec : forall a b : id, {a = b} + {a <> b} :=
+    IdentifierSpaces.id_eq_dec _.
 
-  Definition pointer := (id * addr)%type.
-  Definition id_of (p : pointer) : id := fst p.
-  Definition addr_of (p : pointer) : addr := snd p.
+  Definition pointer : Type :=
+    IdentifierSpaces.pointer N.
+
+  Definition id_of (p : pointer) : id :=
+    IdentifierSpaces.id_of _ p.
+
+  Definition addr_of (p : pointer) : addr :=
+    IdentifierSpaces.addr_of _ p.
 
   Definition client_addr := client_addr.
   Definition client_addr_dec := client_addr_dec.
-
-  Definition pointer_eq_dec : forall x y : pointer,
-      {x = y} + {x <> y}.
-  Proof using.
-    decide equality;
-      auto using id_eq_dec, addr_eq_dec.
-  Defined.
-
-  Definition make_pointer (a : addr) : pointer :=
-    (hash a, a).
 
   Inductive _payload :=
   | Busy : _payload
@@ -232,10 +222,10 @@ Module Chord <: DynamicSystem.
        delayed_queries := [] |}.
 
   Definition init_state_preset (h : addr) (pred : option pointer) (succs : list pointer) : data :=
-    {| ptr := make_pointer h;
+    {| ptr := IdentifierSpaces.make_pointer _ h;
        pred := pred;
        succ_list := succs;
-       known := (make_pointer h);
+       known := (IdentifierSpaces.make_pointer _ h);
        joined := true;
        rectify_with := None;
        cur_request := None;
@@ -262,36 +252,6 @@ Module Chord <: DynamicSystem.
         delayed_queries := [] |},
      [],
      []).
-
-  Definition z_of_id : id -> Z :=
-    Zdigits.binary_value _.
-
-  Definition id_of_z : Z -> id :=
-    Zdigits.Z_to_binary _.
-
-  Lemma z_of_id_inv :
-    forall x,
-      id_of_z (z_of_id x) = x.
-  Proof.
-    unfold id_of_z, z_of_id.
-    intros.
-    apply Zdigits.binary_to_Z_to_binary.
-  Qed.
-
-  Definition bv_lt (x y : id) : bool :=
-    Z.ltb (z_of_id x) (z_of_id y).
-
-  (* true iff x in (a, b) on some sufficiently large "circle" *)
-  Definition between_bool (a x b : id) : bool :=
-    match bv_lt a b, bv_lt a x, bv_lt x b with
-    | true, true, true => true
-    | false, true, _ => true
-    | false, _, true => true
-    | _, _, _ => false
-    end.
-
-  Definition ptr_between_bool (a x b : pointer) : bool :=
-    between_bool (id_of a) (id_of x) (id_of b).
 
   Definition set_rectify_with (st : data) (rw : pointer) : data :=
     match rectify_with st with
@@ -492,93 +452,6 @@ Module Chord <: DynamicSystem.
   Definition pi {A B C D : Type} (t : A * B * C * D) : A * B * C :=
     let '(a, b, c, d) := t in (a, b, c).
 
-  (* this is a total linear less-than-or-equal relation, see proofs below *)
-  Definition unroll_between (h : id) (x y : id) : bool :=
-    if id_eq_dec h x
-    then true
-    else if id_eq_dec h y
-         then false
-         else if id_eq_dec x y
-              then true
-              else between_bool h x y.
-
-  Lemma unrolling_makes_h_least :
-    forall h x,
-      unroll_between h h x = true.
-  Proof.
-    unfold unroll_between.
-    intros.
-    break_if; auto.
-  Qed.
-
-  Require Import Lia.
-  Lemma unrolling_antisymmetric :
-    forall h x y,
-      unroll_between h x y = true ->
-      unroll_between h y x = true ->
-      x = y.
-  Proof.
-    unfold unroll_between, between_bool.
-    intros.
-    repeat break_if; try subst; try congruence;
-    unfold bv_lt in *;
-    rewrite Z.ltb_lt in *;
-    omega.
-  Qed.
-
-  Lemma unrolling_transitive :
-    forall h x y z,
-      unroll_between h x y = true ->
-      unroll_between h y z = true ->
-      unroll_between h x z = true.
-  Proof.
-    unfold unroll_between, between_bool.
-    intros.
-    repeat break_if; try subst; try congruence;
-    unfold bv_lt in *;
-    rewrite Z.ltb_lt, Z.ltb_nlt in *;
-    omega.
-  Qed.
-  Lemma neq_in_id_implies_neq_in_z :
-    forall x y : id,
-      x <> y ->
-      z_of_id x <> z_of_id y.
-  Proof.
-    intros.
-    intro.
-    find_apply_lem_hyp (f_equal id_of_z).
-    repeat rewrite z_of_id_inv in *.
-    congruence.
-  Qed.
-
-  Lemma unrolling_total :
-    forall h x y,
-      unroll_between h x y = true \/
-      unroll_between h y x = true.
-  Proof.
-    unfold unroll_between, between_bool.
-    intros.
-    repeat break_if; try subst; try congruence; auto;
-      unfold bv_lt in *;
-      try rewrite Z.ltb_lt, Z.ltb_nlt in *;
-      find_apply_lem_hyp neq_in_id_implies_neq_in_z;
-      try lia.
-      rewrite Z.ltb_nlt in *.
-      find_apply_lem_hyp neq_in_id_implies_neq_in_z;
-      try lia.
-  Qed.
-
-  Lemma unrolling_reflexive :
-    forall h x,
-      unroll_between h x x = true.
-  Proof.
-    unfold unroll_between, between_bool.
-    intros.
-    repeat break_if; try omega || subst; auto; try congruence.
-  Qed.
-
-  Definition unroll_between_ptr (h : addr) (a b : pointer) :=
-    unroll_between (hash h) (id_of a) (id_of b).
 
   Definition sort_by_between (h : addr) : list pointer -> list pointer :=
     sort pointer (unroll_between_ptr h).
