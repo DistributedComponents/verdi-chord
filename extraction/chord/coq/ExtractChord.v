@@ -1,13 +1,13 @@
 Require Import Arith.
 Require Import ExtrOcamlBasic.
-Require Import ExtrOcamlNatInt.
+Require Import Verdi.ExtrOcamlNatInt32.
 Require Import ExtrOcamlString.
 
 Require Import Chord.Chord.
 Import Chord.Chord.Chord.
 
-Extract Inlined Constant Chord.SUCC_LIST_LEN => "3".
-Extract Constant Chord.hash => "fun n -> n mod 256".
+Extract Inlined Constant Chord.SUCC_LIST_LEN => "3l".
+Extract Constant Chord.hash => "fun n -> Int32.rem n 256l".
 
 Definition handleNet : addr -> addr -> data -> payload -> res :=
   recv_handler.

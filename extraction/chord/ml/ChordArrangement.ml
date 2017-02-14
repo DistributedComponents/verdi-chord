@@ -1,24 +1,23 @@
 open ExtractedChord
 open ExtractedChord.Chord
-open Util
 open Printf
 open Str
 
 let show_pointer p =
-  string_of_int (id_of p)
+  Int32.to_string (id_of p)
 
 let show_pointer_list ps =
   let strs = map show_pointer ps in
   "[" ^ String.concat ", " strs ^ "]"
 
 let show_addr a =
-  ip_of_int a
+  ChordUtil.ip_of_int a
 
 let caps_bool b =
   if b then "True" else "False"
 
 let show_opt_pointer p =
-  map_default show_pointer "None" p
+  Util.map_default show_pointer "None" p
 
 let show_msg = function
   | GetBestPredecessor p -> "GetBestPredecessor " ^ show_pointer p
@@ -46,15 +45,15 @@ let show_request ((ptr, q), _) =
   Printf.sprintf "query(%s, %s)" (show_pointer ptr) (show_query q)
 
 let show_st_cur_request st =
-  map_default show_request "None" (cur_request st)
+  Util.map_default show_request "None" (cur_request st)
 
 let log_info_from st msg =
   let prefix = Printf.sprintf "node(%s):" (show_st_ptr st) in
-  info (prefix ^ msg)
+  Util.info (prefix ^ msg)
 
 let log_dbg_from st msg =
   let prefix = Printf.sprintf "node(%s):" (show_st_ptr st) in
-  dbg (prefix ^ msg)
+  Util.dbg (prefix ^ msg)
 
 let log_st st =
   let log = log_info_from st in
@@ -74,8 +73,8 @@ let log_send st dst msg =
   log ("send to " ^ show_addr dst ^ ":" ^ show_msg msg)
 
 let log_timeout st = function
-  | Tick -> dbg ("ticked")
-  | KeepaliveTick -> dbg ("ticked for keepalive")
+  | Tick -> log_dbg_from st "ticked"
+  | KeepaliveTick -> log_dbg_from st "ticked for keepalive"
   | Request (dead, msg) ->
     log_dbg_from st ("request " ^ show_msg msg
                      ^ " from " ^ show_pointer (ptr st)
@@ -114,9 +113,9 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
   type timeout = ExtractedChord.Chord.timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let addr_of_name n =
-    (ip_of_int n, chord_port)
+    (ChordUtil.ip_of_int n, chord_port)
   let name_of_addr (s, p) =
-    int_of_ip s
+    ChordUtil.int_of_ip s
   let start_handler n ks =
     Random.self_init ();
     rebracket3 (init n ks)

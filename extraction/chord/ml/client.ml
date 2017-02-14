@@ -3,7 +3,7 @@ open ExtractedChord.Chord
 module type ClientSig = sig
   exception Wrong_response of string
 
-  val lookup : string -> string * int -> int -> pointer
+  val lookup : string -> string * int -> id -> pointer
   val get_pred_and_succs : string -> string * int -> pointer option * pointer list
 end
 
@@ -53,17 +53,17 @@ let validate bind node query_type lookup_id =
   | "", _, _ -> invalid_arg "please specify an IP to connect from with -bind"
   | b, Some n, "" -> invalid_arg "please specify a query type with -query"
   | b, Some n, "lookup" ->
-     if lookup_id < 0
+     if lookup_id < 0l
      then invalid_arg "please specify an ID to look up"
      else b, n, "lookup", lookup_id
   | b, Some n, "get_pred_and_succs" ->
-     b, n, "get_pred_and_succs", -1
+     b, n, "get_pred_and_succs", -1l
   | _, _, _ -> invalid_arg "please specify both -bind and -node"
 
 let parse argv =
   let bind = ref "" in
   let node = ref None in
-  let lookup_id = ref (-1) in
+  let lookup_id = ref (-1l) in
   let query_type = ref "" in
   let set_query_type s = query_type := s in
   let spec =
@@ -76,7 +76,7 @@ let parse argv =
   in
   let anonarg a =
     if !query_type = "lookup"
-    then lookup_id := int_of_string a
+    then lookup_id := Int32.of_string a
     else raise (Arg.Bad "not a lookup")
   in
   let usage = "-bind {ip} -node {ip:port} \
