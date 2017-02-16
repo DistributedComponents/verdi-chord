@@ -4,8 +4,6 @@ Require Import ExtrOcamlBasic.
 Extract Inductive nat => int32 [ "0l" "Int32.succ" ]
  "(fun fO fS n -> if n=Int32.zero then fO () else fS (Int32.pred n))".
 
-Efficient (but uncertified) versions for usual nat functions
-
 Extract Constant plus => "(+)".
 Extract Constant pred => "fun n -> Pervasives.max 0l (n-1l)".
 Extract Constant minus => "fun n m -> Pervasives.max 0 (n-m)".
