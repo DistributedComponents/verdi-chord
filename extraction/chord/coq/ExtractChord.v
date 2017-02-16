@@ -1,6 +1,6 @@
 Require Import Arith.
 Require Import ExtrOcamlBasic.
-Require Import Verdi.ExtrOcamlNatInt32.
+Require Import Chord.ExtrOcamlNatInt32.
 Require Import ExtrOcamlString.
 
 Require Import Chord.Chord.
