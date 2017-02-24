@@ -1,10 +1,8 @@
-Require String.
 Require Import StructTact.StructTactics.
 
-(* This file defines and provides some lemmas about identifier spaces. An
- * identifier is the hash of a name, which is a string. The space of all
- * identifiers produced by a given hash function is cyclically ordered.
- * However, this cyclic ordering can be unrolled into a linear one. All
+(* This file defines and provides some lemmas about identifier spaces.
+ * The space of all identifiers produced by a given hash function is cyclically
+ * ordered. However, this cyclic ordering can be unrolled into a linear one. All
  * operations defined on identifiers are lifted to pointers, which are pairs of
  * a name and the hash of that name, i.e., its identifier. *)
 
@@ -13,12 +11,14 @@ Definition injective {A B : Type} (f : A -> B) : Prop :=
     f a = f b ->
     a = b.
 
-Definition name := String.string.
-
 Class IDSpaceParams :=
   { bits : nat;
+    name : Type;
+    name_eq_dec :
+      forall a b : name,
+        {a = b} + {a <> b};
     id : Type;
-    eq_dec :
+    id_eq_dec :
       forall a b : id,
         {a = b} + {a <> b};
     lt : id -> id -> bool;
@@ -59,15 +59,12 @@ Section IDSpace.
     now find_rewrite.
   Qed.
 
-  Definition id_eq_dec : forall a b : id, {a = b} + {a <> b} :=
-    eq_dec.
-
   Definition pointer_eq_dec : forall x y : pointer,
       {x = y} + {x <> y}.
   Proof.
     intros.
     repeat decide equality;
-      apply id_eq_dec.
+      auto using id_eq_dec, name_eq_dec.
   Defined.
 
   (* true iff x in (a, b) on some sufficiently large "circle" *)
@@ -104,7 +101,8 @@ Section IDSpace.
   Proof.
     unfold unroll_between.
     intros.
-    break_if; auto.
+    repeat break_if;
+      congruence.
   Qed.
 
   Lemma between_bool_yz_antisymmetric :

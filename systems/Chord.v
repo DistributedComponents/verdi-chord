@@ -1,6 +1,9 @@
 Require Import List.
 Import List.ListNotations.
 Require Import String.
+Require Bvector.
+Require ZArith.
+Require Zdigits.
 
 Require Import StructTact.Dedup.
 Require Import StructTact.RemoveAll.
@@ -14,36 +17,64 @@ Require Import Chord.IDSpace.
 
 (* number of successors each node has to track *)
 Variable SUCC_LIST_LEN : nat.
-(* bit-width of node identifiers *)
+(* byte-width of node identifiers *)
 Variable N : nat.
-(* actually just an ocaml string *)
-Variable id : Type.
-(* A total less-than relation on IDs. *)
-Variable id_lt : id -> id -> bool.
+Definition byte_len := Nat.div N 8.
+Definition id := Bvector.Bvector N.
+Definition addr := String.string.
+
 (* ID type is finite so it has decidable equality *)
-Variable id_eq_dec :
-  forall a b : id,
-    {a = b} + {a <> b}.
+Definition id_eq_dec :
+  forall a b : id, {a = b} + {a <> b}
+  := (VectorEq.eq_dec _ Bool.eqb Bool.eqb_true_iff _).
 
 (* hash function from names to our mystery type (it's probably a 16-byte string...) *)
-Variable hash : string -> id.
+Variable hash : addr -> id.
 
 (* We have to assume the injectivity of the hash function, which is a stretch
  * but remains true "most of the time" *)
-Axiom hash_inj : injective hash.
+Axiom hash_inj : IDSpace.injective hash.
 
 Variable client_addr : string -> Prop.
 Axiom client_addr_dec :
   forall a,
     {client_addr a} + {~ client_addr a}.
 
+Definition z_of_id : id -> BinNums.Z :=
+  Zdigits.binary_value _.
+
+Definition id_of_z : BinNums.Z -> id :=
+  Zdigits.Z_to_binary _.
+
+Lemma z_of_id_inv :
+  forall x,
+    id_of_z (z_of_id x) = x.
+Proof.
+  unfold id_of_z, z_of_id.
+  intros.
+  apply Zdigits.binary_to_Z_to_binary.
+Qed.
+
+Definition id_lt (x y : id) : bool :=
+  BinInt.Z.ltb (z_of_id x) (z_of_id y).
+
+Definition addr_eq_dec := String.string_dec.
+
 Instance ChordIDParams : IDSpaceParams :=
   { bits := N;
     id := id;
-    eq_dec := id_eq_dec;
+    name_eq_dec := addr_eq_dec;
+    id_eq_dec := id_eq_dec;
     lt := id_lt;
     hash := hash;
     hash_inj := hash_inj }.
+
+Definition pointer_eq_dec : forall x y : IDSpace.pointer,
+    {x = y} + {x <> y}.
+Proof using.
+  decide equality;
+    auto using id_eq_dec, addr_eq_dec.
+Defined.
 
 Module Chord <: DynamicSystem.
   Definition addr := string.
@@ -261,6 +292,19 @@ Module Chord <: DynamicSystem.
         delayed_queries := [] |},
      [],
      []).
+
+  (* true iff x in (a, b) on some sufficiently large "circle" *)
+  Definition between_bool (a x b : id) : bool :=
+    match id_lt a b, id_lt a x, id_lt x b with
+    | true, true, true => true
+    | false, true, _ => true
+    | false, _, true => true
+    | _, _, _ => false
+    end.
+
+  Definition ptr_between_bool (a x b : pointer) : bool :=
+    between_bool (id_of a) (id_of x) (id_of b).
+
 
   Definition set_rectify_with (st : data) (rw : pointer) : data :=
     match rectify_with st with
