@@ -8,40 +8,49 @@ Require Import StructTact.StructTactics.
 Require Import Verdi.DynamicNet.
 
 Require Import Chord.Sorting.
-Require Chord.IdentifierSpaces.
+Require Import Chord.IDSpace.
+
+(* Axioms and top-level parameters *)
 
 (* number of successors each node has to track *)
 Variable SUCC_LIST_LEN : nat.
 (* bit-width of node identifiers *)
 Variable N : nat.
-(* hash function from names to identifiers *)
-Variable hash : string -> Bvector.Bvector N.
-Axiom hash_inj :
-  forall a b,
-    hash a = hash b ->
-    a = b.
+(* actually just an ocaml string *)
+Variable id : Type.
+(* A total less-than relation on IDs. *)
+Variable id_lt : id -> id -> bool.
+(* ID type is finite so it has decidable equality *)
+Variable id_eq_dec :
+  forall a b : id,
+    {a = b} + {a <> b}.
+
+(* hash function from names to our mystery type (it's probably a 16-byte string...) *)
+Variable hash : string -> id.
+
+(* We have to assume the injectivity of the hash function, which is a stretch
+ * but remains true "most of the time" *)
+Axiom hash_inj : injective hash.
+
 Variable client_addr : string -> Prop.
 Axiom client_addr_dec :
   forall a,
     {client_addr a} + {~ client_addr a}.
+
+Instance ChordIDParams : IDSpaceParams :=
+  { bits := N;
+    id := id;
+    eq_dec := id_eq_dec;
+    lt := id_lt;
+    hash := hash;
+    hash_inj := hash_inj }.
 
 Module Chord <: DynamicSystem.
   Definition addr := string.
   Definition addr_eq_dec :
     forall a b : addr, {a = b} + {a <> b}
     := string_dec.
-  Definition id := IdentifierSpaces.id N.
-  Definition id_eq_dec : forall a b : id, {a = b} + {a <> b} :=
-    IdentifierSpaces.id_eq_dec _.
-
-  Definition pointer : Type :=
-    IdentifierSpaces.pointer N.
-
-  Definition id_of (p : pointer) : id :=
-    IdentifierSpaces.id_of _ p.
-
-  Definition addr_of (p : pointer) : addr :=
-    IdentifierSpaces.addr_of _ p.
+  Definition id := id.
 
   Definition client_addr := client_addr.
   Definition client_addr_dec := client_addr_dec.
@@ -222,10 +231,10 @@ Module Chord <: DynamicSystem.
        delayed_queries := [] |}.
 
   Definition init_state_preset (h : addr) (pred : option pointer) (succs : list pointer) : data :=
-    {| ptr := IdentifierSpaces.make_pointer _ h;
+    {| ptr := make_pointer h;
        pred := pred;
        succ_list := succs;
-       known := (IdentifierSpaces.make_pointer _ h);
+       known := make_pointer h;
        joined := true;
        rectify_with := None;
        cur_request := None;
@@ -533,7 +542,7 @@ Module Chord <: DynamicSystem.
     | KeepaliveTick => keepalive_handler st
     end.
 
-  Inductive _label : Set :=
+  Inductive _label :=
   | RecvMsg : addr -> addr -> payload -> _label
   | Timeout : addr -> timeout -> _label.
   Definition label := _label.
