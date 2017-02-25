@@ -19,8 +19,8 @@ Require Import Chord.IDSpace.
 Variable SUCC_LIST_LEN : nat.
 (* byte-width of node identifiers *)
 Variable N : nat.
-Definition byte_len := Nat.div N 8.
-Definition id := Bvector.Bvector N.
+Definition byte_len := N * 8.
+Definition id := Bvector.Bvector byte_len.
 Definition addr := String.string.
 
 (* ID type is finite so it has decidable equality *)
@@ -29,7 +29,16 @@ Definition id_eq_dec :
   := (VectorEq.eq_dec _ Bool.eqb Bool.eqb_true_iff _).
 
 (* hash function from names to our mystery type (it's probably a 16-byte string...) *)
-Variable hash : addr -> id.
+Variable ocaml_hash : addr -> { s : string | String.length s = N }.
+
+Definition ascii_to_id : { s : string | String.length s = N } -> id.
+Admitted.
+
+Definition id_to_ascii : id -> { s : string | String.length s = N }.
+Admitted.
+
+Definition hash (a : addr) : id :=
+  ascii_to_id (ocaml_hash a).
 
 (* We have to assume the injectivity of the hash function, which is a stretch
  * but remains true "most of the time" *)
