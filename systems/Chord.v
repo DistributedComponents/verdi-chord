@@ -12,6 +12,7 @@ Require Import Verdi.DynamicNet.
 
 Require Import Chord.Sorting.
 Require Import Chord.IDSpace.
+Require Import Chord.Bitvectors.
 
 (* Axioms and top-level parameters *)
 
@@ -32,54 +33,13 @@ Definition id_eq_dec :
 (* hash function from names to our mystery type (it's probably a 16-byte string...) *)
 Variable ocaml_hash : addr -> { s : string | String.length s = N }.
 
-Definition ascii_to_vec (a : Ascii.ascii) : Bvector.Bvector 8 :=
-  let (b1, b2, b3, b4, b5, b6, b7, b8) := a in
-  Vector.of_list [b1; b2; b3; b4; b5; b6; b7; b8].
-
-Lemma string_to_vec_helper :
-  forall a s,
-    8 + 8 * (String.length s) = 8 * length (String a s).
-Proof.
-  intros.
-  simpl.
-  now repeat rewrite plus_n_Sm.
-Qed.
-
-Fixpoint string_to_vec (s : string) : Bvector.Bvector (8 * String.length s).
-Proof.
-  refine match s as s' return Bvector.Bvector (8 * String.length s') with
-         | EmptyString => Bvector.Bnil
-         | String a s' =>
-           let bv := string_to_vec s' in
-           _
-         end.
-  rewrite <- (string_to_vec_helper a s').
-  exact (Vector.append (ascii_to_vec a) bv).
-Defined.
-
-Definition ascii_to_id (asc : { s : string | String.length s = N }) : id.
-Proof.
-  destruct asc as [str pf].
-  unfold id.
-  unfold bit_len.
-  rewrite <- pf.
-  exact (string_to_vec str).
-Defined.
-
-Definition bvec8_to_list (byte : Bvector.Bvector 8) : list bool :=
-  Vector.to_list byte.
-
-Fixpoint bit_list_to_string (bits : list bool) : string :=
-  match bits with
-  | b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: rest =>
-    let a := Ascii.Ascii b1 b2 b3 b4 b5 b6 b7 b8 in
-    String a (bit_list_to_string rest)
-  | _ => String.EmptyString
-  end.
+(* conversions between strings and ids *)
+Definition ascii_to_id (asc : { s : string | String.length s = N }) : id :=
+  Bitvectors.fixed_length_string_to_vec asc.
 
 (* n.b. only used in extracted code *)
-Definition id_to_ascii (i : id) : string :=
-  bit_list_to_string (Vector.to_list i).
+Definition id_to_ascii : id -> string :=
+  Bitvectors.vec_to_string.
 
 Definition hash (a : addr) : id :=
   ascii_to_id (ocaml_hash a).
@@ -102,7 +62,7 @@ Definition id_of_z : BinNums.Z -> id :=
 Lemma z_of_id_inv :
   forall x,
     id_of_z (z_of_id x) = x.
-Proof.
+Proof using.
   unfold id_of_z, z_of_id.
   intros.
   apply Zdigits.binary_to_Z_to_binary.
@@ -131,15 +91,6 @@ Import ChordIDSpace.
 Definition forge_pointer (i : id) : ChordIDSpace.pointer :=
   {| ptrAddr := "FAKE"%string;
      ptrId := i |}.
-
-Definition pointer_eq_dec :
-  forall x y : pointer,
-    {x = y} + {x <> y}.
-Proof using.
-  intros.
-  decide equality;
-    auto using id_eq_dec, addr_eq_dec.
-Defined.
 
 Module Chord <: DynamicSystem.
   Definition addr := addr.
@@ -171,7 +122,7 @@ Module Chord <: DynamicSystem.
   Definition client_payload_dec :
     forall p,
       {client_payload p} + {~client_payload p}.
-  Proof.
+  Proof using.
     destruct p; (left; constructor) || right; intro H; inversion H.
   Defined.
 
@@ -243,8 +194,6 @@ Module Chord <: DynamicSystem.
     | Ping, Pong => true
     | _, _ => false
     end.
-  Definition t : timeout := Tick.
-  Definition tts (l : list timeout) := Tick :: l.
 
   Definition add_tick (r : res) : res :=
     let '(st, sends, newts, cts) := r in
@@ -357,19 +306,6 @@ Module Chord <: DynamicSystem.
         delayed_queries := [] |},
      [],
      []).
-
-  (* true iff x in (a, b) on some sufficiently large "circle" *)
-  Definition between_bool (a x b : id) : bool :=
-    match id_lt a b, id_lt a x, id_lt x b with
-    | true, true, true => true
-    | false, true, _ => true
-    | false, _, true => true
-    | _, _, _ => false
-    end.
-
-  Definition ptr_between_bool (a x b : pointer) : bool :=
-    between_bool (id_of a) (id_of x) (id_of b).
-
 
   Definition set_rectify_with (st : data) (rw : pointer) : data :=
     match rectify_with st with
@@ -697,7 +633,7 @@ Module Chord <: DynamicSystem.
       (forall l,
           timeout_handler_l h st t = (r, l) ->
           timeout_handler h st t = r).
-  Proof.
+  Proof using.
     unfold timeout_handler_l.
   Admitted.
 

@@ -46,7 +46,7 @@ Module IDSpace(P : IDSpaceParams).
     forall p a,
       p = make_pointer a ->
       addr_of p = a.
-  Proof.
+  Proof using.
     intros.
     now find_rewrite.
   Qed.
@@ -55,14 +55,14 @@ Module IDSpace(P : IDSpaceParams).
     forall p a,
       p = make_pointer a ->
       id_of p = P.hash a.
-  Proof.
+  Proof using.
     intros.
     now find_rewrite.
   Qed.
 
   Definition pointer_eq_dec : forall x y : pointer,
       {x = y} + {x <> y}.
-  Proof.
+  Proof using.
     intros.
     repeat decide equality;
       auto using P.id_eq_dec, P.name_eq_dec.
@@ -99,7 +99,7 @@ Module IDSpace(P : IDSpaceParams).
   Lemma unrolling_makes_h_least :
     forall h x,
       unroll_between h h x = true.
-  Proof.
+  Proof using.
     unfold unroll_between.
     intros.
     repeat break_if;
@@ -110,7 +110,7 @@ Module IDSpace(P : IDSpaceParams).
     forall x y z,
       between_bool x y z = true ->
       ~ between_bool x z y = true.
-  Proof.
+  Proof using.
     unfold between_bool.
     intros.
     repeat break_if; try find_eapply_lem_hyp lt_antisymmetric;
@@ -122,7 +122,7 @@ Module IDSpace(P : IDSpaceParams).
       unroll_between h x y = true ->
       unroll_between h y x = true ->
       x = y.
-  Proof.
+  Proof using.
     unfold unroll_between.
     intros.
     repeat break_if;
@@ -141,7 +141,7 @@ Module IDSpace(P : IDSpaceParams).
     forall h x y,
       unroll_between h x y = true \/
       unroll_between h y x = true.
-  Proof.
+  Proof using.
     unfold unroll_between, between_bool.
     intros.
   Admitted.

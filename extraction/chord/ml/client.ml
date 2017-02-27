@@ -71,7 +71,6 @@ let validate bind node query_type lookup_id =
 let parse argv =
   let bind = ref "" in
   let node = ref None in
-  (* don't ask *)
   let lookup_id = ref None in
   let query_type = ref "" in
   let set_query_type s = query_type := s in
