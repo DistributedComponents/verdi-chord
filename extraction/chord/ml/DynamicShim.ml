@@ -33,7 +33,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
   type addr = string * int
 
   type env =
-    { bound_ip : string
+    { bound_ip : Unix.inet_addr
     ; bound_port : int
     ; listen_sock : Unix.file_descr
     ; recv_conns : (Unix.file_descr, A.name) Hashtbl.t
@@ -74,16 +74,18 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
     env.listen_sock :: keys_of_hashtbl env.recv_conns
 
   (* Create a socket listening at A.addr_of_name nm.
-     Returns the ip address that the socket is bound to,
-     or (TODO) a host ip if the address is 0.0.0.0. *)
+     Returns the ip address and port that the socket is bound to,
+     along with the socket itself. *)
   let mk_sock_and_listen nm =
-    let ip, port = A.addr_of_name nm in
-    let sa = mk_addr_inet (ip, port) in
+    let name, port = A.addr_of_name nm in
+    let entry = Unix.gethostbyname name in
+    let listen_ip = Array.get entry.h_addr_list 0 in
+    let sa = Unix.ADDR_INET (listen_ip, port) in
     let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     Unix.setsockopt sock Unix.SO_REUSEADDR true;
     Unix.bind sock sa;
     Unix.listen sock 20;
-    ip, port, sock
+    listen_ip, port, sock
 
   let setup nm =
     Hashtbl.randomize ();
@@ -97,11 +99,15 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
     ; last_tick = Unix.gettimeofday ()
     }
 
-  let connect_to env remote =
+  let connect_to env nm =
+    let (name, port) = A.addr_of_name nm in
+    let entry = Unix.gethostbyname name in
+    let ip = Array.get entry.Unix.h_addr_list 0 in
     let sock = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
-    let sa = mk_addr_inet_random_port env.bound_ip  in
+    (* port = 0 means to use a random port *)
+    let sa = Unix.ADDR_INET (env.bound_ip, 0) in
     Unix.bind sock sa;
-    Unix.connect sock (mk_addr_inet remote);
+    Unix.connect sock (Unix.ADDR_INET (ip, port));
     Unix.set_nonblock sock;
     sock
 
@@ -126,7 +132,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
         find_conn_and_send_all env nm buf
     else
       try
-        let conn = connect_to env (A.addr_of_name nm) in
+        let conn = connect_to env nm in
         send_all conn buf;
         Hashtbl.replace env.send_conns nm conn;
         Hashtbl.add env.recv_conns conn nm

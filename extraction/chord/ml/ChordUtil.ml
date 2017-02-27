@@ -14,10 +14,6 @@ let parse_addr_arg opt =
     let msg = (Printf.sprintf "invalid address '%s', should take the form ip:port" opt) in
     invalid_arg msg
 
-
-let mk_addr_inet (ip, port) =
-  Unix.ADDR_INET (Unix.inet_addr_of_string ip, port)
-
 let send_all sock buf =
   let rec send_chunk sock buf i l =
     let sent = Unix.send sock buf i l [] in
