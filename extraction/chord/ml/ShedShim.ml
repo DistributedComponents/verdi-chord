@@ -1,5 +1,6 @@
 open List
 open Printf
+open ChordUtil
 
 
 module type SHED_ARRANGEMENT = sig
@@ -27,13 +28,6 @@ module type SHED_ARRANGEMENT = sig
     val mk_init_state : net -> netpred list -> tracepred list -> test_state
     val advance_test : test_state -> operation -> test_state option
 end
-
-let explode s =
-  let rec exp i l =
-    if i < 0
-    then l
-    else exp (i - 1) (s.[i] :: l) in
-  exp (String.length s - 1) []
 
 module Shim (A: SHED_ARRANGEMENT) = struct
     type cfg =

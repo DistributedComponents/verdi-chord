@@ -3,15 +3,18 @@ open ExtractedChord.Chord
 open Printf
 open Str
 
+let show_id i =
+  Digest.to_hex (ChordUtil.implode (id_to_ascii i))
+
 let show_pointer p =
-  Int32.to_string (id_of p)
+  show_id p.ChordIDSpace.ptrId
 
 let show_pointer_list ps =
   let strs = map show_pointer ps in
   "[" ^ String.concat ", " strs ^ "]"
 
 let show_addr a =
-  ChordUtil.ip_of_int a
+  ChordUtil.implode a
 
 let caps_bool b =
   if b then "True" else "False"
@@ -113,9 +116,10 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
   type timeout = ExtractedChord.Chord.timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let addr_of_name n =
-    (ChordUtil.ip_of_int n, chord_port)
+    let (a :: p :: _) = split (regexp ":") (ChordUtil.implode n) in
+    (a, int_of_string p)
   let name_of_addr (s, p) =
-    ChordUtil.int_of_ip s
+    ChordUtil.explode (s ^ ":" ^ string_of_int p)
   let start_handler n ks =
     Random.self_init ();
     rebracket3 (init n ks)

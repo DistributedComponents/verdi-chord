@@ -1,45 +1,106 @@
-Require Import Arith.
-Require Import Omega.
 Require Import List.
-Import ListNotations.
+Require Import String.
+Import List.ListNotations.
+Require Bvector.
+Require ZArith.
+Require Zdigits.
+
 Require Import StructTact.Dedup.
 Require Import StructTact.RemoveAll.
 Require Import StructTact.StructTactics.
 Require Import Verdi.DynamicNet.
+
 Require Import Chord.Sorting.
+Require Import Chord.IDSpace.
+Require Import Chord.Bitvectors.
 
+(* Axioms and top-level parameters *)
 
+(* number of successors each node has to track *)
 Variable SUCC_LIST_LEN : nat.
-Variable hash : nat -> nat.
-Variable hash_inj :
-  forall a b : nat,
-    hash a = hash b ->
-    a = b.
-Variable client_addr : nat -> Prop.
-Variable client_addr_dec :
+(* byte-width of node identifiers *)
+Variable N : nat.
+(* bit-width of node identifiers *)
+Definition bit_len := 8 * N.
+Definition id := Bvector.Bvector bit_len.
+Definition addr := String.string.
+
+(* ID type is finite so it has decidable equality *)
+Definition id_eq_dec :
+  forall a b : id, {a = b} + {a <> b}
+  := (VectorEq.eq_dec _ Bool.eqb Bool.eqb_true_iff _).
+
+(* hash function from names to our mystery type (it's probably a 16-byte string...) *)
+Variable ocaml_hash : addr -> { s : string | String.length s = N }.
+
+(* conversions between strings and ids *)
+Definition ascii_to_id (asc : { s : string | String.length s = N }) : id :=
+  Bitvectors.fixed_length_string_to_vec asc.
+
+(* n.b. only used in extracted code *)
+Definition id_to_ascii : id -> string :=
+  Bitvectors.vec_to_string.
+
+Definition hash (a : addr) : id :=
+  ascii_to_id (ocaml_hash a).
+
+(* We have to assume the injectivity of the hash function, which is a stretch
+ * but remains true "most of the time" *)
+Axiom hash_inj : IDSpace.injective hash.
+
+Variable client_addr : string -> Prop.
+Axiom client_addr_dec :
   forall a,
     {client_addr a} + {~ client_addr a}.
 
+Definition z_of_id : id -> BinNums.Z :=
+  Zdigits.binary_value _.
+
+Definition id_of_z : BinNums.Z -> id :=
+  Zdigits.Z_to_binary _.
+
+Lemma z_of_id_inv :
+  forall x,
+    id_of_z (z_of_id x) = x.
+Proof using.
+  unfold id_of_z, z_of_id.
+  intros.
+  apply Zdigits.binary_to_Z_to_binary.
+Qed.
+
+Definition id_lt (x y : id) : bool :=
+  BinInt.Z.ltb (z_of_id x) (z_of_id y).
+
+Definition addr_eq_dec := String.string_dec.
+
+Module ChordIDParams <: IDSpaceParams.
+  Definition bits := N.
+  Definition name := addr.
+  Definition id := id.
+  Definition name_eq_dec := addr_eq_dec.
+  Definition id_eq_dec := id_eq_dec.
+  Definition lt := id_lt.
+  Definition hash := hash.
+  Definition hash_inj := hash_inj.
+End ChordIDParams.
+
+Module ChordIDSpace := IDSpace(ChordIDParams).
+Import ChordIDSpace.
+
+(* only need this to make client.ml work :/ *)
+Definition forge_pointer (i : id) : ChordIDSpace.pointer :=
+  {| ptrAddr := "FAKE"%string;
+     ptrId := i |}.
+
 Module Chord <: DynamicSystem.
-  Definition addr := nat.
-  Definition id := nat.
-  Definition pointer := (id * addr)%type.
+  Definition addr := addr.
+  Definition addr_eq_dec :
+    forall a b : addr, {a = b} + {a <> b}
+    := string_dec.
+  Definition id := id.
 
-  Definition addr_eq_dec := Nat.eq_dec.
-  Definition id_eq_dec := Nat.eq_dec.
-
-  Definition id_of (p : pointer) : id := fst p.
-  Definition addr_of (p : pointer) : addr := snd p.
   Definition client_addr := client_addr.
   Definition client_addr_dec := client_addr_dec.
-
-  Definition pointer_eq_dec : forall x y : pointer,
-      {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality.
-  Defined.
-
-  Definition make_pointer (a : addr) : pointer := (hash a, a).
 
   Inductive _payload :=
   | Busy : _payload
@@ -61,7 +122,7 @@ Module Chord <: DynamicSystem.
   Definition client_payload_dec :
     forall p,
       {client_payload p} + {~client_payload p}.
-  Proof.
+  Proof using.
     destruct p; (left; constructor) || right; intro H; inversion H.
   Defined.
 
@@ -75,7 +136,8 @@ Module Chord <: DynamicSystem.
   Definition payload_eq_dec : forall x y : payload,
       {x = y} + {x <> y}.
   Proof using.
-    repeat decide equality.
+    repeat decide equality;
+      auto using id_eq_dec, addr_eq_dec.
   Defined.
 
   Inductive _timeout :=
@@ -87,7 +149,8 @@ Module Chord <: DynamicSystem.
   Definition timeout_eq_dec : forall x y : timeout,
       {x = y} + {x <> y}.
   Proof using.
-    repeat decide equality.
+    repeat decide equality;
+      auto using id_eq_dec, addr_eq_dec.
   Defined.
 
   Inductive _query :=
@@ -216,7 +279,7 @@ Module Chord <: DynamicSystem.
     {| ptr := make_pointer h;
        pred := pred;
        succ_list := succs;
-       known := (make_pointer h);
+       known := make_pointer h;
        joined := true;
        rectify_with := None;
        cur_request := None;
@@ -244,18 +307,6 @@ Module Chord <: DynamicSystem.
      [],
      []).
 
-  (* true iff x in (a, b) on some sufficiently large "circle" *)
-  Definition between_bool (a x b : id) : bool :=
-    match lt_dec a b, lt_dec a x, lt_dec x b with
-    | left _, left _, left _ => true
-    | right _, left _, _ => true
-    | right _, _, left _ => true
-    | _, _, _ => false
-    end.
-
-  Definition ptr_between_bool (a x b : pointer) : bool :=
-    between_bool (id_of a) (id_of x) (id_of b).
-
   Definition set_rectify_with (st : data) (rw : pointer) : data :=
     match rectify_with st with
     | Some rw0 =>
@@ -276,7 +327,8 @@ Module Chord <: DynamicSystem.
     forall x y : addr * payload,
       {x = y} + {x <> y}.
   Proof using.
-    repeat decide equality.
+    repeat decide equality;
+      auto using id_eq_dec, payload_eq_dec.
   Defined.
 
   Definition delay_query (st : data) (src : addr) (msg : payload) : data :=
@@ -454,68 +506,6 @@ Module Chord <: DynamicSystem.
   Definition pi {A B C D : Type} (t : A * B * C * D) : A * B * C :=
     let '(a, b, c, d) := t in (a, b, c).
 
-  (* this is a total linear less-than-or-equal relation, see proofs below *)
-  Definition unroll_between (h : id) (x y : id) : bool :=
-    if id_eq_dec h x
-    then true
-    else if id_eq_dec h y
-         then false
-         else if id_eq_dec x y
-              then true
-              else between_bool h x y.
-
-  Lemma unrolling_makes_h_least :
-    forall h x,
-      unroll_between h h x = true.
-  Proof.
-    unfold unroll_between.
-    intros.
-    break_if; auto.
-  Qed.
-
-  Lemma unrolling_antisymmetric :
-    forall h x y,
-      unroll_between h x y = true ->
-      unroll_between h y x = true ->
-      x = y.
-  Proof.
-    unfold unroll_between, between_bool.
-    intros.
-    repeat break_if; try omega || subst; auto; try congruence.
-  Qed.
-
-  Lemma unrolling_transitive :
-    forall h x y z,
-      unroll_between h x y = true ->
-      unroll_between h y z = true ->
-      unroll_between h x z = true.
-  Proof.
-    unfold unroll_between, between_bool.
-    intros.
-    repeat break_if; omega || subst; auto; congruence.
-  Qed.
-
-  Lemma unrolling_total :
-    forall h x y,
-      unroll_between h x y = true \/
-      unroll_between h y x = true.
-  Proof.
-    unfold unroll_between, between_bool.
-    intros.
-    repeat break_if; try omega || subst; auto; try congruence.
-  Qed.
-
-  Lemma unrolling_reflexive :
-    forall h x,
-      unroll_between h x x = true.
-  Proof.
-    unfold unroll_between, between_bool.
-    intros.
-    repeat break_if; try omega || subst; auto; try congruence.
-  Qed.
-
-  Definition unroll_between_ptr (h : addr) (a b : pointer) :=
-    unroll_between (hash h) (id_of a) (id_of b).
 
   Definition sort_by_between (h : addr) : list pointer -> list pointer :=
     sort pointer (unroll_between_ptr h).
@@ -597,7 +587,7 @@ Module Chord <: DynamicSystem.
     | KeepaliveTick => keepalive_handler st
     end.
 
-  Inductive _label : Set :=
+  Inductive _label :=
   | RecvMsg : addr -> addr -> payload -> _label
   | Timeout : addr -> timeout -> _label.
   Definition label := _label.
@@ -643,7 +633,7 @@ Module Chord <: DynamicSystem.
       (forall l,
           timeout_handler_l h st t = (r, l) ->
           timeout_handler h st t = r).
-  Proof.
+  Proof using.
     unfold timeout_handler_l.
   Admitted.
 

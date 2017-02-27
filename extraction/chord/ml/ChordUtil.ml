@@ -14,10 +14,6 @@ let parse_addr_arg opt =
     let msg = (Printf.sprintf "invalid address '%s', should take the form ip:port" opt) in
     invalid_arg msg
 
-
-let mk_addr_inet (ip, port) =
-  Unix.ADDR_INET (Unix.inet_addr_of_string ip, port)
-
 let send_all sock buf =
   let rec send_chunk sock buf i l =
     let sent = Unix.send sock buf i l [] in
@@ -84,3 +80,14 @@ let addrs_spec arg addrs_ref doc =
   let parse opt =
     addrs_ref := !addrs_ref @ [parse_addr_arg opt]
   in (arg, Arg.String parse, doc)
+
+let explode s =
+  let rec exp i l =
+    if i < 0
+    then l
+    else exp (i - 1) (s.[i] :: l) in
+  exp (String.length s - 1) []
+
+let implode cs =
+  let nth_c n = List.nth cs n in
+  Bytes.init (List.length cs) nth_c
