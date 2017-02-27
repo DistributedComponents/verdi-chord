@@ -1,8 +1,9 @@
+open ExtractedChord
 open ExtractedChord.Chord
+open ExtractedChord.ChordIDSpace
 
 module type ClientSig = sig
   exception Wrong_response of string
-
   val lookup : string -> string * int -> id -> pointer
   val get_pred_and_succs : string -> string * int -> pointer option * pointer list
 end
@@ -29,7 +30,7 @@ module Client : ClientSig = struct
     let full_msg = Printf.sprintf "in %s - %s(%s): %s" prefix fn arg err_msg in
     print_endline full_msg
 
-  let query bind node p : payload =
+  let query bind node p =
     let send_chan, recv_chan, conn = connect_and_send bind node p in
     let res = input_value recv_chan in
     Unix.shutdown conn Unix.SHUTDOWN_ALL;
@@ -38,7 +39,8 @@ module Client : ClientSig = struct
   exception Wrong_response of string
 
   let lookup bind node id =
-    match query bind node (GetBestPredecessor (id, id)) with
+    let p = forge_pointer id in
+    match query bind node (GetBestPredecessor p) with
     | GotBestPredecessor p -> p
     | r -> raise (Wrong_response (ChordArrangement.show_msg r))
 
@@ -49,21 +51,28 @@ module Client : ClientSig = struct
 end
 
 let validate bind node query_type lookup_id =
+  let handle_lookup b n =
+    function
+    | None -> invalid_arg "please specify an ID to look up"
+    | Some id -> b, n, "lookup", id
+  in
   match bind, node, query_type with
-  | "", _, _ -> invalid_arg "please specify an IP to connect from with -bind"
-  | b, Some n, "" -> invalid_arg "please specify a query type with -query"
+  | "", _, _ ->
+     invalid_arg "please specify an IP to connect from with -bind"
+  | b, Some n, "" ->
+     invalid_arg "please specify a query type with -query"
   | b, Some n, "lookup" ->
-     if lookup_id < 0l
-     then invalid_arg "please specify an ID to look up"
-     else b, n, "lookup", lookup_id
+     handle_lookup b n (Some lookup_id)
   | b, Some n, "get_pred_and_succs" ->
-     b, n, "get_pred_and_succs", -1l
-  | _, _, _ -> invalid_arg "please specify both -bind and -node"
+     b, n, "get_pred_and_succs", lookup_id
+  | _, _, _ ->
+     invalid_arg "please specify both -bind and -node"
 
 let parse argv =
   let bind = ref "" in
   let node = ref None in
-  let lookup_id = ref (-1l) in
+  (* don't ask *)
+  let lookup_id = ref None in
   let query_type = ref "" in
   let set_query_type s = query_type := s in
   let spec =
@@ -76,7 +85,7 @@ let parse argv =
   in
   let anonarg a =
     if !query_type = "lookup"
-    then lookup_id := Int32.of_string a
+    then lookup_id := Some (ascii_to_id (Util.char_list_of_string a))
     else raise (Arg.Bad "not a lookup")
   in
   let usage = "-bind {ip} -node {ip:port} \
@@ -91,14 +100,14 @@ let parse argv =
 
 let _ =
   let bind, node, query_type, lookup_id = parse Sys.argv in
-  match query_type with
-  | "lookup" ->
-    let p = Client.lookup bind node lookup_id in
-    print_endline (ChordArrangement.show_pointer p)
-  | "get_pred_and_succs" ->
-    let p, succs = Client.get_pred_and_succs bind node in
-    print_endline (ChordArrangement.show_opt_pointer p);
-    print_endline (ChordArrangement.show_pointer_list succs)
+  match query_type, lookup_id with
+  | "lookup", Some id ->
+     let p = Client.lookup bind node id in
+     print_endline (ChordArrangement.show_pointer p)
+  | "get_pred_and_succs", _->
+     let p, succs = Client.get_pred_and_succs bind node in
+     print_endline (ChordArrangement.show_opt_pointer p);
+     print_endline (ChordArrangement.show_pointer_list succs)
   | _ ->
-    print_endline "unknown query type";
-    exit 1
+     print_endline "unknown query type";
+     exit 1

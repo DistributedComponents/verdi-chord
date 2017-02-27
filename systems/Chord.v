@@ -1,6 +1,6 @@
 Require Import List.
-Import List.ListNotations.
 Require Import String.
+Import List.ListNotations.
 Require Bvector.
 Require ZArith.
 Require Zdigits.
@@ -69,24 +69,36 @@ Definition id_lt (x y : id) : bool :=
 
 Definition addr_eq_dec := String.string_dec.
 
-Instance ChordIDParams : IDSpaceParams :=
-  { bits := N;
-    id := id;
-    name_eq_dec := addr_eq_dec;
-    id_eq_dec := id_eq_dec;
-    lt := id_lt;
-    hash := hash;
-    hash_inj := hash_inj }.
+Module ChordIDParams <: IDSpaceParams.
+  Definition bits := N.
+  Definition name := addr.
+  Definition id := id.
+  Definition name_eq_dec := addr_eq_dec.
+  Definition id_eq_dec := id_eq_dec.
+  Definition lt := id_lt.
+  Definition hash := hash.
+  Definition hash_inj := hash_inj.
+End ChordIDParams.
 
-Definition pointer_eq_dec : forall x y : IDSpace.pointer,
+Module ChordIDSpace := IDSpace(ChordIDParams).
+Import ChordIDSpace.
+
+(* only need this to make client.ml work :/ *)
+Definition forge_pointer (i : id) : ChordIDSpace.pointer :=
+  {| ptrAddr := "FAKE"%string;
+     ptrId := i |}.
+
+Definition pointer_eq_dec :
+  forall x y : pointer,
     {x = y} + {x <> y}.
 Proof using.
+  intros.
   decide equality;
     auto using id_eq_dec, addr_eq_dec.
 Defined.
 
 Module Chord <: DynamicSystem.
-  Definition addr := string.
+  Definition addr := addr.
   Definition addr_eq_dec :
     forall a b : addr, {a = b} + {a <> b}
     := string_dec.

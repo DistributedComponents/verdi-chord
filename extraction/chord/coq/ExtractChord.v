@@ -11,10 +11,18 @@ Import Chord.Chord.Chord.
 
 Extract Inlined Constant Chord.SUCC_LIST_LEN => "3".
 
-(* We use the ocaml standard library implementation of MD5 to compute IDs. *)
-Extract Constant Chord.ocaml_hash => "(fun s -> (ChordUtil.explode (Digest.string s)))".
+(* We use the ocaml standard library implementation of MD5 to compute IDs. Since
+ * Coq extracts strings to the ocaml type char list, we have to wrap the hash in
+ * a conversion function from verdi-runtime. *)
+Extract Constant Chord.ocaml_hash =>
+  "(fun s ->
+     (Util.char_list_of_string
+      (Digest.string
+        (Util.string_of_char_list s))))".
 (* MD5 digests are 16 bytes. *)
 Extract Inlined Constant Chord.N => "16".
+
+Extract Constant VectorEq.eqb => "(fun _ _ _ -> (=))".
 
 Definition handleNet : addr -> addr -> data -> payload -> res :=
   recv_handler.
@@ -28,4 +36,13 @@ Definition handleTick : addr -> data -> res :=
 Definition handleTimeout : addr -> data -> timeout -> res :=
   timeout_handler.
 
-Extraction "extraction/chord/coq/ExtractedChord.ml" init handleNet handleTick handleTimeout is_request closes_request ascii_to_id id_to_ascii.
+Extraction "extraction/chord/coq/ExtractedChord.ml"
+           init
+           handleNet
+           handleTick
+           handleTimeout
+           is_request
+           closes_request
+           ascii_to_id
+           id_to_ascii
+           forge_pointer.

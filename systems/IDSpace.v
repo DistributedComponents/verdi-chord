@@ -11,34 +11,35 @@ Definition injective {A B : Type} (f : A -> B) : Prop :=
     f a = f b ->
     a = b.
 
-Class IDSpaceParams :=
-  { bits : nat;
-    name : Type;
-    name_eq_dec :
+Module Type IDSpaceParams.
+  Variable bits : nat.
+  Variable name : Type.
+  Variable name_eq_dec :
       forall a b : name,
-        {a = b} + {a <> b};
-    id : Type;
-    id_eq_dec :
+        {a = b} + {a <> b}.
+  Variable id : Type.
+  Variable id_eq_dec :
       forall a b : id,
-        {a = b} + {a <> b};
-    lt : id -> id -> bool;
-    hash : name -> id;
-    hash_inj : injective hash }.
+        {a = b} + {a <> b}.
+  Variable lt : id -> id -> bool.
+  Variable hash : name -> id.
+  Variable hash_inj : injective hash.
+End IDSpaceParams.
 
-Section IDSpace.
-  Context `{p : IDSpaceParams}.
+Module IDSpace(P : IDSpaceParams).
+
   Record pointer :=
-    mkPointer { ptrId : id;
-                ptrAddr : name }.
+    mkPointer { ptrId : P.id;
+                ptrAddr : P.name }.
 
-  Definition make_pointer (n : name) : pointer :=
-    {| ptrId := hash n;
+  Definition make_pointer (n : P.name) : pointer :=
+    {| ptrId := P.hash n;
        ptrAddr := n |}.
 
-  Definition id_of : pointer -> id :=
+  Definition id_of : pointer -> P.id :=
     ptrId.
 
-  Definition addr_of : pointer -> name :=
+  Definition addr_of : pointer -> P.name :=
     ptrAddr.
 
   Lemma make_pointer_correct_addr :
@@ -53,7 +54,7 @@ Section IDSpace.
   Lemma make_pointer_correct_id :
     forall p a,
       p = make_pointer a ->
-      id_of p = hash a.
+      id_of p = P.hash a.
   Proof.
     intros.
     now find_rewrite.
@@ -64,12 +65,12 @@ Section IDSpace.
   Proof.
     intros.
     repeat decide equality;
-      auto using id_eq_dec, name_eq_dec.
+      auto using P.id_eq_dec, P.name_eq_dec.
   Defined.
 
   (* true iff x in (a, b) on some sufficiently large "circle" *)
-  Definition between_bool (a x b : id) : bool :=
-    match lt a b, lt a x, lt x b with
+  Definition between_bool (a x b : P.id) : bool :=
+    match P.lt a b, P.lt a x, P.lt x b with
     | true, true, true => true
     | false, true, _ => true
     | false, _, true => true
@@ -78,20 +79,20 @@ Section IDSpace.
 
   Lemma lt_antisymmetric :
     forall x y,
-      lt x y = true ->
-      ~ lt y x = true.
+      P.lt x y = true ->
+      ~ P.lt y x = true.
   Admitted.
 
   Definition ptr_between_bool (a x b : pointer) : bool :=
     between_bool (ptrId a) (ptrId x) (ptrId b).
 
   (* this is a total linear less-than-or-equal relation, see proofs below *)
-  Definition unroll_between (h : id) (x y : id) : bool :=
-    if id_eq_dec h x
+  Definition unroll_between (h : P.id) (x y : P.id) : bool :=
+    if P.id_eq_dec h x
     then true
-    else if id_eq_dec h y
+    else if P.id_eq_dec h y
          then false
-         else if id_eq_dec x y
+         else if P.id_eq_dec x y
               then true
               else between_bool h x y.
 
@@ -150,7 +151,7 @@ Section IDSpace.
       unroll_between h x x = true.
   Admitted.
 
-  Definition unroll_between_ptr (h : name) (a b : pointer) :=
-    unroll_between (hash h) (ptrId a) (ptrId b).
+  Definition unroll_between_ptr (h : P.name) (a b : pointer) :=
+    unroll_between (P.hash h) (ptrId a) (ptrId b).
 
 End IDSpace.

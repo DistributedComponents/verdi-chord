@@ -4,10 +4,10 @@ open Printf
 open Str
 
 let show_id i =
-  Digest.to_hex (ChordUtil.implode (Obj.magic (id_to_ascii i)))
+  Digest.to_hex (ChordUtil.implode (id_to_ascii i))
 
 let show_pointer p =
-  show_id (Obj.magic p.ptrId)
+  show_id p.ChordIDSpace.ptrId
 
 let show_pointer_list ps =
   let strs = map show_pointer ps in
