@@ -19,8 +19,9 @@ Require Import Chord.IDSpace.
 Variable SUCC_LIST_LEN : nat.
 (* byte-width of node identifiers *)
 Variable N : nat.
-Definition byte_len := N * 8.
-Definition id := Bvector.Bvector byte_len.
+(* bit-width of node identifiers *)
+Definition bit_len := 8 * N.
+Definition id := Bvector.Bvector bit_len.
 Definition addr := String.string.
 
 (* ID type is finite so it has decidable equality *)
@@ -31,11 +32,54 @@ Definition id_eq_dec :
 (* hash function from names to our mystery type (it's probably a 16-byte string...) *)
 Variable ocaml_hash : addr -> { s : string | String.length s = N }.
 
-Definition ascii_to_id : { s : string | String.length s = N } -> id.
-Admitted.
+Definition ascii_to_vec (a : Ascii.ascii) : Bvector.Bvector 8 :=
+  let (b1, b2, b3, b4, b5, b6, b7, b8) := a in
+  Vector.of_list [b1; b2; b3; b4; b5; b6; b7; b8].
 
-Definition id_to_ascii : id -> { s : string | String.length s = N }.
-Admitted.
+Lemma string_to_vec_helper :
+  forall a s,
+    8 + 8 * (String.length s) = 8 * length (String a s).
+Proof.
+  intros.
+  simpl.
+  now repeat rewrite plus_n_Sm.
+Qed.
+
+Fixpoint string_to_vec (s : string) : Bvector.Bvector (8 * String.length s).
+Proof.
+  refine match s as s' return Bvector.Bvector (8 * String.length s') with
+         | EmptyString => Bvector.Bnil
+         | String a s' =>
+           let bv := string_to_vec s' in
+           _
+         end.
+  rewrite <- (string_to_vec_helper a s').
+  exact (Vector.append (ascii_to_vec a) bv).
+Defined.
+
+Definition ascii_to_id (asc : { s : string | String.length s = N }) : id.
+Proof.
+  destruct asc as [str pf].
+  unfold id.
+  unfold bit_len.
+  rewrite <- pf.
+  exact (string_to_vec str).
+Defined.
+
+Definition bvec8_to_list (byte : Bvector.Bvector 8) : list bool :=
+  Vector.to_list byte.
+
+Fixpoint bit_list_to_string (bits : list bool) : string :=
+  match bits with
+  | b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: rest =>
+    let a := Ascii.Ascii b1 b2 b3 b4 b5 b6 b7 b8 in
+    String a (bit_list_to_string rest)
+  | _ => String.EmptyString
+  end.
+
+(* n.b. only used in extracted code *)
+Definition id_to_ascii (i : id) : string :=
+  bit_list_to_string (Vector.to_list i).
 
 Definition hash (a : addr) : id :=
   ascii_to_id (ocaml_hash a).
