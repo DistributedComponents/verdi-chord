@@ -12,21 +12,59 @@ Definition injective {A B : Type} (f : A -> B) : Prop :=
     a = b.
 
 Module Type IDSpaceParams.
-  Variable bits : nat.
   Variable name : Type.
+  Variable id : Type.
+  Variable hash : name -> id.
+  Variable ltb : id -> id -> bool.
+  Variable lt : id -> id -> Prop.
+
+  (* problematic (i.e. untrue) hypothesis, there might be a better way to handle this *)
+  Variable hash_inj : injective hash.
+
+  (* name and id have decidable equality *)
   Variable name_eq_dec :
       forall a b : name,
         {a = b} + {a <> b}.
-  Variable id : Type.
   Variable id_eq_dec :
       forall a b : id,
         {a = b} + {a <> b}.
-  Variable lt : id -> id -> bool.
-  Variable hash : name -> id.
-  Variable hash_inj : injective hash.
+
+  (* useful notations for lt and ltb *)
+  Notation "a < b" := (lt a b) (at level 70).
+  Notation "a < b < c" := (and (lt a b) (lt b c)).
+  Notation "a <? b <? c" := (andb (ltb a b) (ltb b c)) (at level 70).
+  Notation "a <? b" := (ltb a b) (at level 70).
+
+  (* ltb is a decision procedure for the lt relation *)
+  Variable ltb_correct :
+    forall a b,
+      a <? b = true <-> a < b.
+
+  (* The lt relation is a strict total order *)
+  Variable lt_asymm :
+    forall a b,
+      a < b ->
+      ~ b < a.
+  Variable lt_trans :
+    forall a b c,
+      a < b ->
+      b < c ->
+      a < c.
+  Variable lt_irrefl :
+    forall a,
+      ~ a < a.
+  Variable lt_total :
+    forall a b,
+      a < b \/ b < a \/ a = b.
 End IDSpaceParams.
 
 Module IDSpace(P : IDSpaceParams).
+
+  Locate "<".
+  Notation "a < b" := (P.lt a b) (at level 70).
+  Notation "a < b < c" := (and (P.lt a b) (P.lt b c)).
+  Notation "a <? b <? c" := (andb (P.ltb a b) (P.ltb b c)) (at level 70).
+  Notation "a <? b" := (P.ltb a b) (at level 70).
 
   Record pointer :=
     mkPointer { ptrId : P.id;
@@ -70,18 +108,113 @@ Module IDSpace(P : IDSpaceParams).
 
   (* true iff x in (a, b) on some sufficiently large "circle" *)
   Definition between_bool (a x b : P.id) : bool :=
-    match P.lt a b, P.lt a x, P.lt x b with
+    match a <? b, a <? x, x <? b with
     | true, true, true => true
     | false, true, _ => true
     | false, _, true => true
     | _, _, _ => false
     end.
 
-  Lemma lt_antisymmetric :
-    forall x y,
-      P.lt x y = true ->
-      ~ P.lt y x = true.
-  Admitted.
+  (* between_bool as a relation *)
+  Inductive between : P.id -> P.id -> P.id -> Prop :=
+  | BetweenMono :
+      forall a x b,
+        a < x < b ->
+        between a x b
+  | BetweenWrapL :
+      forall a x b,
+        ~ a < b ->
+        a < x ->
+        between a x b
+  | BetweenWrapR :
+      forall a x b,
+        ~ a < b ->
+        x < b ->
+        between a x b.
+
+  Ltac inv_between :=
+    match goal with
+    | [H: between _ _ _ |- _] => inv H
+    end.
+
+  Lemma ltb_true_lt :
+    forall a b,
+      a <? b = true ->
+      a < b.
+  Proof.
+    apply P.ltb_correct.
+  Qed.
+
+  Lemma ltb_false_lt :
+    forall a b,
+      a <? b = false ->
+      ~ a < b.
+  Proof.
+    intuition.
+    find_apply_lem_hyp P.ltb_correct.
+    congruence.
+  Qed.
+
+  Lemma lt_true_ltb :
+    forall a b,
+      a < b ->
+      a <? b = true.
+  Proof.
+    apply P.ltb_correct.
+  Qed.
+
+  Lemma lt_false_ltb :
+    forall a b,
+      ~ a < b ->
+      a <? b = false.
+  Proof.
+    intros.
+    destruct (a <? b) eqn:?H;
+      try find_apply_lem_hyp P.ltb_correct;
+      congruence.
+  Qed.
+
+  Ltac ltb_to_lt :=
+    repeat
+      match goal with
+      (* rewrite in goal *)
+      | [ |- ?a <? ?b = true ] =>
+        apply (lt_true_ltb a b)
+      | [ |- ?a <? ?b = false ] =>
+        apply (lt_false_ltb a b)
+      (* flip goal if that doesn't work *)
+      | [ |- true = ?a <? ?b ] =>
+        symmetry
+      | [ |- false = ?a <? ?b ] =>
+        symmetry
+      (* rewrite in hypotheses *)
+      | [ H : (?a <? ?b) = true |- _ ] =>
+        apply (ltb_true_lt a b) in H
+      | [ H : (?a <? ?b) = false |- _ ] =>
+        apply (ltb_false_lt a b) in H
+      (* flip hypotheses if that doesn't work *)
+      | [ H : true = (?a <? ?b) |- _ ] =>
+        symmetry in H
+      | [ H : false = (?a <? ?b) |- _ ] =>
+        symmetry in H
+      end.
+
+  Lemma between_between_bool_equiv :
+    forall a x b,
+      between a x b <-> between_bool a x b = true.
+  Proof.
+    unfold between_bool.
+    intros.
+    split; intros.
+    - inv_between;
+        repeat break_if;
+        ltb_to_lt;
+        break_and;
+        congruence.
+    - repeat break_if;
+        ltb_to_lt;
+        (constructor; tauto) || congruence.
+  Qed.
 
   Definition ptr_between_bool (a x b : pointer) : bool :=
     between_bool (ptrId a) (ptrId x) (ptrId b).
@@ -113,7 +246,9 @@ Module IDSpace(P : IDSpaceParams).
   Proof using.
     unfold between_bool.
     intros.
-    repeat break_if; try find_eapply_lem_hyp lt_antisymmetric;
+    repeat break_if;
+      ltb_to_lt;
+      try find_eapply_lem_hyp P.lt_asymm;
       congruence.
   Qed.
 
