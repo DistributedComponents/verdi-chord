@@ -176,13 +176,14 @@ Qed.
 
 Definition live_node_bool (gst : global_state) (h : addr) :=
   match sigma gst h with
-  | Some st => if joined st
-               then if in_dec addr_eq_dec h (nodes gst)
-                    then if in_dec addr_eq_dec h (failed_nodes gst)
-                         then false
-                         else true
-                    else false
-               else false
+  | Some st =>
+    if joined st
+    then if in_dec addr_eq_dec h (nodes gst)
+         then if in_dec addr_eq_dec h (failed_nodes gst)
+              then false
+              else true
+         else false
+    else false
   | None => false
   end.
 
