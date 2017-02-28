@@ -62,7 +62,6 @@ Module IDSpace(P : IDSpaceParams).
 
   Include P.
 
-  Locate "<".
   Notation "a < b" := (P.lt a b) (at level 70).
   Notation "a < b < c" := (and (P.lt a b) (P.lt b c)).
   Notation "a <? b <? c" := (andb (P.ltb a b) (P.ltb b c)) (at level 70).
@@ -217,6 +216,9 @@ Module IDSpace(P : IDSpaceParams).
         ltb_to_lt;
         (constructor; tauto) || congruence.
   Qed.
+
+  Definition ptr_between (a x b : pointer) : Prop :=
+    between (ptrId a) (ptrId x) (ptrId b).
 
   Definition ptr_between_bool (a x b : pointer) : bool :=
     between_bool (ptrId a) (ptrId x) (ptrId b).
