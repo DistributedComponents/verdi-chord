@@ -60,6 +60,8 @@ End IDSpaceParams.
 
 Module IDSpace(P : IDSpaceParams).
 
+  Include P.
+
   Locate "<".
   Notation "a < b" := (P.lt a b) (at level 70).
   Notation "a < b < c" := (and (P.lt a b) (P.lt b c)).

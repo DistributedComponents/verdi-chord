@@ -63,53 +63,6 @@ Proof.
     auto || discriminate.
 Qed.
 
-(* between_bool from Chord.v but in Prop *)
-Inductive between : id -> id -> id -> Prop :=
-| BetweenMono :
-    forall a x b, a < b -> a < x -> x < b -> between a x b
-| BetweenWrapL :
-    forall a x b, a >= b -> a < x -> between a x b
-| BetweenWrapR :
-    forall a x b, a >= b -> x < b -> between a x b.
-
-Ltac inv_between :=
-  match goal with
-  | [H: between _ _ _ |- _] => inv H
-  end.
-
-Lemma between_between_bool_equiv :
-  forall a x b,
-    between a x b <-> between_bool a x b = true.
-Proof.
-  unfold between_bool.
-  intros.
-  split; intros.
-  - inv_between;
-      repeat break_if;
-      omega || reflexivity.
-  - repeat break_if;
-      constructor;
-      congruence || omega.
-Qed.
-
-Lemma between_bool_true_between :
-  forall a x b,
-    between_bool a x b = true ->
-    between a x b.
-Proof.
-  intros.
-  now rewrite between_between_bool_equiv.
-Qed.
-
-Lemma between_bool_false_not_between :
-  forall a x b,
-    between_bool a x b = false ->
-    ~ between a x b.
-Proof.
-  intros.
-  rewrite between_between_bool_equiv; congruence.
-Qed.
-
 Lemma unsafe_msgs_not_safe_ones :
   forall msg,
     is_safe msg = false ->

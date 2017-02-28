@@ -67,7 +67,7 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
     exists st xs ys,
       live_node gst h /\
       sigma gst h = Some st /\
-      map addr_of (succ_list st) = xs ++ s :: ys /\
+      map ChordIDSpace.addr_of (succ_list st) = xs ++ s :: ys /\
       (forall o, In o xs -> dead_node gst o) /\
       live_node gst s.
 
@@ -81,22 +81,26 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
   (* This is a way of dealing with succ lists missing entries
      mid-stabilization that doesn't involve putting artificial entries
      into the actual successor list. *)
-  Definition ext_succ_list_span_includes (h : id) (succs : list id) (n : id) :=
+  Definition ext_succ_list_span_includes (h : id) (succs : list id) (n : id) : Prop.
+  Admitted.
+  (* fix this definition to work with bitvectors.
     forall n l e,
       length (h :: succs) = n ->
       l = last succs h ->
       e = l + (Chord.SUCC_LIST_LEN - n) ->
-      between h n e.
+      ChordIDSpace.between h n e.
+   *)
 
   (* "A principal node is a member that is not skipped by any member's
      extended successor list" *)
   Definition principal (gst : global_state) (p : addr) : Prop :=
-    forall h st succs,
+    forall h st succs pid,
       live_node gst h ->
       sigma gst h = Some st ->
-      map id_of (succ_list st) = succs ->
-      ext_succ_list_span_includes h succs p ->
-      In p succs.
+      succs = map ChordIDSpace.id_of (succ_list st) ->
+      pid = hash p ->
+      ext_succ_list_span_includes (hash h) succs pid ->
+      In pid succs.
 
   Definition principals (gst : global_state) (ps : list addr) : Prop :=
     NoDup ps /\

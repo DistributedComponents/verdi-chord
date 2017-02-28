@@ -1,24 +1,28 @@
+Require Import Arith.
+Require FunctionalExtensionality.
+Require Import List.
+Import List.ListNotations.
+
+Require Import mathcomp.ssreflect.ssreflect.
+
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
+Require Verdi.Coqlib.
 Require Import Verdi.DynamicNet.
+
 Require Chord.Chord.
 Import Chord.Chord.Chord.
-Require Import Arith.
+Import Chord.ChordIDSpace.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordDefinitionLemmas.
-Require Verdi.Coqlib.
-Import FunctionalExtensionality.
-Require Import List.
-Import ListNotations.
-Require Import mathcomp.ssreflect.ssreflect.
+Require Chord.ChordSemantics.
+Import Chord.ChordSemantics.ConstrainedChord.
+Import Chord.ChordSemantics.ChordSemantics.
 
 Set Bullet Behavior "Strict Subproofs".
 
 Close Scope boolean_if_scope.
 Open Scope general_if_scope.
-Require Chord.ChordSemantics.
-Import Chord.ChordSemantics.ConstrainedChord.
-Import Chord.ChordSemantics.ChordSemantics.
 
 Definition timeouts_detect_failure (gst : global_state) : Prop :=
   forall xs t ys h dead req,
@@ -315,15 +319,14 @@ Definition at_most_one_ring (gst : global_state) : Prop :=
 
 Definition ordered_ring (gst : global_state) : Prop :=
   forall h s x,
-    ring_member gst h ->
-    best_succ gst h s ->
-    ring_member gst x ->
-    ~ between h x s.
-(* or between h x s -> s = x *)
+    ring_member gst (addr_of h) ->
+    best_succ gst (addr_of h) (addr_of s) ->
+    ring_member gst (addr_of x) ->
+    ~ between (id_of h) (id_of x) (id_of s).
 
 Definition connected_appendages (gst : global_state) : Prop :=
   forall a, live_node gst a ->
-            exists r, ring_member gst r /\ reachable gst a r.
+       exists r, ring_member gst r /\ reachable gst a r.
 
 Definition state_invariant (gst : global_state) : Prop :=
   sufficient_principals gst /\
@@ -359,15 +362,17 @@ Definition response_for_query (gst : global_state) (src dst : addr) (q : query) 
 Definition query_delayed_at (dst : addr) (st : data) (src : addr) (msg : payload) : Prop :=
   In (src, msg) (delayed_queries st).
 
-Definition addr_eqb : addr -> addr -> bool :=
-  Nat.eqb.
+Definition addr_eqb (a b : addr) : bool :=
+  Coqlib.proj_sumbool (addr_eq_dec a b).
 
 Lemma addr_eqb_true :
   forall a b,
     addr_eqb a b = true ->
     a = b.
 Proof using.
-  exact beq_nat_true.
+  unfold addr_eqb.
+  intros.
+  now find_eapply_lem_hyp Coqlib.proj_sumbool_true.
 Qed.
 
 Lemma addr_eqb_false :
@@ -375,15 +380,21 @@ Lemma addr_eqb_false :
     addr_eqb a b = false ->
     a <> b.
 Proof using.
-  exact beq_nat_false.
+  intros.
+  intuition.
+  find_apply_lem_hyp (Coqlib.proj_sumbool_is_true (addr_eq_dec a b)).
+  unfold addr_eqb in *.
+  destruct (addr_eqb a b);
+    congruence.
 Qed.
 
 Lemma addr_eqb_refl :
   forall a,
     addr_eqb a a = true.
 Proof using.
-  symmetry.
-  apply beq_nat_refl.
+  unfold addr_eqb.
+  intros.
+  now apply (Coqlib.proj_sumbool_is_true (addr_eq_dec a a)).
 Qed.
 
 Definition on_channel (src dst : addr) (t : addr * (addr * payload)) :=
@@ -1601,7 +1612,7 @@ Proof using.
               rewrite (remove_all_del_comm _ _ l).
               f_equal.
               now rewrite remove_all_del_comm.*) }
-          apply functional_extensionality => x.
+          apply FunctionalExtensionality.functional_extensionality => x.
           destruct (addr_eq_dec x (fst (snd m))).
           -- now subst.
           -- repeat rewrite update_diff; auto.
@@ -1619,6 +1630,9 @@ Proof using.
           repeat (break_let; simpl).
           now do 2 rewrite app_nil_r. }
 
-      (* and we're done *)
       now repeat find_rewrite.
+    + (* Input case *)
+      admit.
+    + (* Deliver_client case *)
+      admit.
 Abort.

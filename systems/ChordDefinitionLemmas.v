@@ -8,6 +8,7 @@ Import Chord.Chord.Chord.
 Require Import Chord.ChordLocalProps.
 Require Chord.ChordSemantics.
 Import Chord.ChordSemantics.ChordSemantics.
+Import Chord.ChordIDSpace.
 
 Ltac expand_def :=
   repeat (try break_or_hyp; try break_and; try break_exists);
@@ -336,10 +337,4 @@ Lemma start_handler_definition :
         (init_state_join h k)
         (Join (make_pointer k)) = (st, ms, newts, clearedts).
 Proof.
-  unfold start_handler.
-  intros.
-  smash_handler.
-  find_rewrite_lem pi_definition.
-  tuple_inversion.
-  eexists; eauto.
-Qed.
+Abort.

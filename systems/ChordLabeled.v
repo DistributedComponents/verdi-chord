@@ -3,6 +3,7 @@ Require Import StructTact.Util.
 Require Import Verdi.DynamicNet.
 Require Chord.Chord.
 Import Chord.Chord.Chord.
+Import Chord.ChordIDSpace.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordProof.
 Require Import List.
@@ -21,7 +22,7 @@ Import Chord.ChordSemantics.ConstrainedChord.
 
 (* assuming sigma gst h = Some st *)
 Definition failed_successors (gst : global_state) (st : data) : list pointer :=
-  filter (fun p : pointer => In_dec addr_eq_dec (snd p) (failed_nodes gst)) (succ_list st).
+  filter (fun p : pointer => In_dec addr_eq_dec (addr_of p) (failed_nodes gst)) (succ_list st).
 
 Lemma l_enabled_RecvMsg_In_msgs :
   forall e src dst m d,

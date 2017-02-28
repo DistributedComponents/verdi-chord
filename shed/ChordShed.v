@@ -5,6 +5,7 @@ Require Import StructTact.Before.
 
 Require Import Chord.Chord.
 Import Chord.
+Import Chord.ChordIDSpace.
 Require Import Chord.ChordSemantics.
 Import ConstrainedChord.
 Require Import Chord.ChordLocalProps.

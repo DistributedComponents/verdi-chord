@@ -68,20 +68,58 @@ Proof using.
   apply Zdigits.binary_to_Z_to_binary.
 Qed.
 
-Definition id_lt (x y : id) : bool :=
+Definition id_ltb (x y : id) : bool :=
   BinInt.Z.ltb (z_of_id x) (z_of_id y).
 
 Definition addr_eq_dec := String.string_dec.
 
 Module ChordIDParams <: IDSpaceParams.
-  Definition bits := N.
   Definition name := addr.
   Definition id := id.
+  Definition hash := hash.
+  Definition ltb := id_ltb.
+  Definition lt := fun a b => id_ltb a b = true.
+
+  Definition hash_inj := hash_inj.
+
   Definition name_eq_dec := addr_eq_dec.
   Definition id_eq_dec := id_eq_dec.
-  Definition lt := id_lt.
-  Definition hash := hash.
-  Definition hash_inj := hash_inj.
+
+  (* useful notations for lt and ltb *)
+  Notation "a < b" := (lt a b) (at level 70).
+  Notation "a < b < c" := (and (lt a b) (lt b c)).
+  Notation "a <? b <? c" := (andb (ltb a b) (ltb b c)) (at level 70).
+  Notation "a <? b" := (ltb a b) (at level 70).
+
+  (* ltb is a decision procedure for the lt relation *)
+  Definition ltb_correct :
+    forall a b,
+      a <? b = true <-> a < b.
+  Admitted.
+
+  (* The lt relation is a strict total order *)
+  Definition lt_asymm :
+    forall a b,
+      a < b ->
+      ~ b < a.
+  Admitted.
+
+  Definition lt_trans :
+    forall a b c,
+      a < b ->
+      b < c ->
+      a < c.
+  Admitted.
+
+  Definition lt_irrefl :
+    forall a,
+      ~ a < a.
+  Admitted.
+
+  Definition lt_total :
+    forall a b,
+      a < b \/ b < a \/ a = b.
+  Admitted.
 End ChordIDParams.
 
 Module ChordIDSpace := IDSpace(ChordIDParams).
