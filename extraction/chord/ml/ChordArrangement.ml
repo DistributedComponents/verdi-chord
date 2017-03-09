@@ -56,7 +56,7 @@ let log_info_from st msg =
 
 let log_dbg_from st msg =
   let prefix = Printf.sprintf "node(%s):" (show_st_ptr st) in
-  Util.dbg (prefix ^ msg)
+  Util.debug (prefix ^ msg)
 
 let log_st st =
   let log = log_info_from st in
