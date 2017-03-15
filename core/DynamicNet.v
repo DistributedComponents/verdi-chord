@@ -480,4 +480,17 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
     | [ H : step_dynamic _ _ |- _ ] =>
       induction H
     end; subst.
+
+  (* Predicates on global states *)
+  Definition gpred : Type := global_state -> Prop.
+
+  Definition gpred_and (P Q : global_state -> Prop) (gst : global_state) : Prop :=
+    P gst /\ Q gst.
+
+  Definition lift_gpred_to_occ (P : global_state -> Prop) (o : occurrence) : Prop :=
+    P (occ_gst o).
+
+  Definition lift_gpred_to_ex (P : global_state -> Prop) : infseq.infseq occurrence -> Prop :=
+    infseq.now (lift_gpred_to_occ P).
+
 End DynamicSemantics.

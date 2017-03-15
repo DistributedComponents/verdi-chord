@@ -158,12 +158,6 @@ Definition all_first_succs_best (gst : global_state) :=
     live gst h ->
     first_succ_is_best_succ gst (addr_of h).
 
-Definition gpred_and (P Q : global_state -> Prop) (gst : global_state) : Prop :=
-  P gst /\ Q gst.
-
-Definition lift_gpred_to_ex (P : global_state -> Prop) (ex : infseq.infseq occurrence) :=
-  P (occ_gst (infseq.hd ex)).
-
 Definition phase_one (ex : infseq.infseq occurrence) :=
   lb_execution ex ->
   reachable_st (occ_gst (infseq.hd ex)) ->
