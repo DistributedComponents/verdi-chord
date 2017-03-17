@@ -1539,7 +1539,9 @@ Proof using.
   | [H : reachable_st net |- _] => induction H
   end.
   - eapply_prop chord_init_invariant.
-  - break_step; eauto.
+  - break_step.
+    + eapply_prop chord_start_invariant; eauto.
+    + eapply_prop chord_fail_invariant; eauto.
     + destruct t.
       * eapply_prop chord_tick_invariant; eauto.
       * eapply_prop chord_keepalive_invariant; eauto.
@@ -1597,26 +1599,21 @@ Proof using.
           now repeat find_reverse_rewrite.
         * repeat find_rewrite.
           tuple_inversion.
-          simpl.
-          match goal with
-          | [ |- update ?eq ?f ?x ?t = ?f' ] => assert (update eq f x t x = f' x)
-          end.
-          { admit.
-          (*unfold clear_timeouts.
-              repeat rewrite update_same.
-              repeat rewrite <- app_assoc.
-              apply app_eq_l.
-              repeat (rewrite remove_all_app_l || rewrite remove_all_app_to_delete).
-              rewrite app_assoc.
-              apply app_eq_l.
-              rewrite (remove_all_del_comm _ _ l2).
-              rewrite (remove_all_del_comm _ _ l).
-              f_equal.
-              now rewrite remove_all_del_comm.*) }
           apply FunctionalExtensionality.functional_extensionality => x.
-          destruct (addr_eq_dec x (fst (snd m))).
-          -- now subst.
-          -- repeat rewrite update_diff; auto.
+          destruct (addr_eq_dec (fst (snd m)) x); subst; simpl.
+          -- repeat rewrite update_same.
+             repeat rewrite <- app_assoc.
+             apply app_eq_l.
+             repeat rewrite remove_all_app_r.
+             repeat rewrite remove_all_app_l.
+             repeat rewrite app_assoc.
+             rewrite remove_all_del_comm.
+             apply app_eq_l.
+             rewrite (remove_all_del_comm _ _ l5).
+             rewrite (remove_all_del_comm _ _ l).
+             rewrite (remove_all_del_comm _ _ l).
+             reflexivity.
+          -- now repeat rewrite update_diff.
         * repeat find_rewrite.
           simpl.
           repeat rewrite update_overwrite.
@@ -1630,7 +1627,6 @@ Proof using.
           unfold apply_handler_result; simpl.
           repeat (break_let; simpl).
           now do 2 rewrite app_nil_r. }
-
       now repeat find_rewrite.
     + (* Input case *)
       admit.
