@@ -1632,4 +1632,5 @@ Proof using.
       admit.
     + (* Deliver_client case *)
       admit.
-Abort.
+Admitted.
+

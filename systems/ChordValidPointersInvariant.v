@@ -16,6 +16,28 @@ Notation hash := Chord.hash.
 Set Bullet Behavior "Strict Subproofs".
 
 (** Valid pointers *)
+Definition wf_ptr (p : pointer) : Prop :=
+  id_of p = hash (addr_of p).
+
+Definition wf_ptr_dec :
+  forall p,
+    {wf_ptr p} + {~ wf_ptr p}.
+Proof.
+  unfold wf_ptr; intros.
+  exact (id_eq_dec (id_of p) (hash (addr_of p))).
+Defined.
+
+Lemma wf_ptr_eq :
+  forall p,
+    wf_ptr p ->
+    p = make_pointer (addr_of p).
+Proof.
+  unfold wf_ptr, make_pointer, id_of, addr_of.
+  intros; destruct p.
+  simpl in *; subst.
+  reflexivity.
+Qed.
+
 Definition valid_ptr (gst : global_state) (p : pointer) : Prop :=
   id_of p = hash (addr_of p) /\
   In (addr_of p) (nodes gst).

@@ -4,6 +4,7 @@ Require Import Omega.
 
 Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
+Require Import InfSeqExt.infseq.
 
 Require Import Chord.Chord.
 Import Chord.Chord.Chord.
@@ -12,6 +13,7 @@ Require Import Chord.ChordProof.
 Require Import Chord.ChordSemantics.
 Import ChordSemantics.
 Import ConstrainedChord.
+Require Import Chord.ChordValidPointersInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
@@ -26,6 +28,11 @@ Definition live_addr (gst : global_state) (a : addr) :=
   In a (nodes gst) /\
   ~ In a (failed_nodes gst) /\
   exists st, sigma gst a = Some st.
+
+Definition live_addr_dec :
+  forall gst a,
+    {live_addr gst a} + {~ live_addr gst a}.
+Admitted.
 
 Lemma live_node_is_live_addr :
   forall gst h,
@@ -42,10 +49,23 @@ Proof.
 Qed.
 
 Definition live (gst : global_state) (p : pointer) :=
-  live_addr gst (addr_of p).
+  live_addr gst (addr_of p) /\
+  wf_ptr p.
+
+Definition live_dec :
+  forall gst p,
+    {live gst p} + {~ live gst p}.
+Proof.
+  unfold live.
+  intros.
+  destruct (live_addr_dec gst (addr_of p));
+    destruct (wf_ptr_dec p);
+    tauto.
+Defined.
 
 Lemma live_live_addr :
   forall gst p,
+    wf_ptr p ->
     live gst p <-> live_addr gst (addr_of p).
 Proof.
   now unfold live.
@@ -64,6 +84,7 @@ Qed.
 
 Lemma live_intro :
   forall gst p st,
+    wf_ptr p ->
     In (addr_of p) (nodes gst) ->
     ~ In (addr_of p) (failed_nodes gst) ->
     sigma gst (addr_of p) = Some st ->
@@ -86,11 +107,15 @@ Qed.
 Lemma live_inv :
   forall gst p,
     live gst p ->
+    wf_ptr p /\
     In (addr_of p) (nodes gst) /\
     ~ In (addr_of p) (failed_nodes gst) /\
     exists st, sigma gst (addr_of p) = Some st.
 Proof.
-  easy.
+  unfold live.
+  intros.
+  break_and.
+  auto using live_addr_inv.
 Qed.
 
 Ltac live_addr_inv :=
@@ -108,30 +133,27 @@ Ltac live_inv :=
   match goal with
   | [ H_live : live ?gst ?p |- _ ] =>
     apply live_inv in H_live;
-      destruct H_live as [?H [?H ?H]];
+      destruct H_live as [?H [?H [?H ?H]]];
       match goal with
       | [ H_st : exists st, sigma gst (addr_of p) = Some st |- _ ] =>
         destruct H_st as [?st]
       end
   end.
 
-Definition live_addr_dec :
-  forall gst a,
-    {live_addr gst a} + {~ live_addr gst a}.
-Admitted.
-
-Definition live_nodes (gst : global_state) : list addr :=
-  filter (fun a => Coqlib.proj_sumbool
-                  (live_addr_dec gst a))
+Definition live_addrs (gst : global_state) : list addr :=
+  filter (fun a => Coqlib.proj_sumbool (live_addr_dec gst a))
          (nodes gst).
 
-Definition live_nodes_with_states (gst : global_state) : list (addr * data) :=
-  FilterMap.filterMap (fun a =>
-         match sigma gst a with
-         | Some st => Some (a, st)
-         | None => None
-         end)
-      (live_nodes gst).
+Definition live_ptrs (gst : global_state) : list pointer :=
+  map make_pointer (live_addrs gst).
+
+Definition live_ptrs_with_states (gst : global_state) : list (pointer * data) :=
+  FilterMap.filterMap (fun p =>
+                         match sigma gst (addr_of p) with
+                         | Some st => Some (p, st)
+                         | None => None
+                         end)
+                      (live_ptrs gst).
 
 Definition correct_succs
            (gst : global_state)
@@ -196,7 +218,7 @@ Proof.
 Qed.
 
 Definition total_leading_failed_nodes (gst : global_state) : nat :=
-  sum (FilterMap.filterMap (maybe_count_failed_nodes gst) (live_nodes gst)).
+  sum (FilterMap.filterMap (maybe_count_failed_nodes gst) (live_addrs gst)).
 
 Definition nonempty_succ_lists (gst : global_state) : Prop :=
   forall h st,
@@ -356,6 +378,7 @@ Lemma zero_leading_failed_nodes_leading_node_live :
     reachable_after_churn gst ->
     sigma gst h = Some st ->
     succ_list st = s :: rest ->
+    wf_ptr s ->
     live gst s.
 Proof.
   intros.
@@ -379,6 +402,7 @@ Lemma zero_leading_failed_nodes_best_succ :
     reachable_after_churn gst ->
     sigma gst h = Some st ->
     succ_list st = s :: rest ->
+    wf_ptr s ->
     live_node gst h ->
     best_succ gst h (addr_of s).
 Proof.
@@ -409,9 +433,9 @@ Proof.
   unfold total_leading_failed_nodes in *.
   intros.
 
-  assert (In h (live_nodes gst)).
+  assert (In h (live_addrs gst)).
   {
-    unfold live_nodes.
+    unfold live_addrs.
     apply filter_In.
     split.
     - live_addr_inv; easy.
@@ -455,14 +479,16 @@ Proof.
   exists p. exists rest.
   repeat split; auto.
 
+  (* need an (easy) invariant *)
+  assert (wf_ptr p) by admit.
+
   assert (live gst h) by eauto using live_intro.
-  find_copy_apply_lem_hyp live_live_addr.
-  find_rewrite_lem live_live_addr.
+  find_copy_apply_lem_hyp live_live_addr; auto.
   find_copy_apply_lem_hyp zero_failed_nodes_total_implies_zero_locally; auto.
   eapply zero_leading_failed_nodes_best_succ; eauto.
   eapply live_node_characterization; eauto.
   eapply nonempty_succ_lists_always_belong_to_joined_nodes; eauto.
-Qed.
+Admitted.
 
 Lemma always_reachable_after_churn :
   forall ex,
@@ -487,51 +513,247 @@ Qed.
 
 Theorem continuously_zero_total_leading_failed_nodes_implies_phase_one :
   forall ex,
+    lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
-    infseq.continuously (infseq.and_tl
-                           (lift_gpred_to_ex zero_total_leading_failed_nodes)
-                           (lift_gpred_to_ex nonempty_succ_lists))
-                        ex ->
+    infseq.continuously
+      ((lift_gpred_to_ex zero_total_leading_failed_nodes) /\_
+       (lift_gpred_to_ex nonempty_succ_lists))
+      ex ->
     phase_one ex.
 Proof.
 Admitted.
 
-(* Partial order on successor lists for proving phase two *)
-Inductive succ_list_improved (failed : list addr) : list pointer -> list pointer -> Prop :=
-| succ_list_improved_refl :
-    forall succs,
-      succ_list_improved failed succs succs
-| succ_list_improved_drop_dead :
-    forall h rest,
-      In (addr_of h) failed ->
-      succ_list_improved failed (h :: rest) rest.
+(** In phase two we want to talk about the existence and number of better
+    predecessors and better first successors to a node. We do this with the
+    following functions.
+    - better_* : Prop, which holds if a node is closer to h
+    - better_*_bool : bool, which is true if some live node is a better pointer for h
+    - *_correct : Prop, which holds if the pointer is globally correct
+    - *_error : nat, which counts the number of better options for the pointer.
+    We prove that error = 0 <-> correct so we can use an argument about the
+    metric to prove eventual correctness.
+ *)
 
-(* Lifting succ_list_improved to be a sensible order on global states *)
-Definition succ_lists_some_improved (gst gst' : global_state) :=
-  nodes gst = nodes gst' /\
-  failed_nodes gst = failed_nodes gst' /\
-  exists h st st',
-    sigma gst h = Some st ->
-    sigma gst' h = Some st' ->
-    succ_list_improved (failed_nodes gst) (succ_list st) (succ_list st').
+Definition counting_opt_error (gst : global_state) (p : option pointer) (better_bool : pointer -> pointer -> bool) : nat :=
+  match p with
+  | Some p0 =>
+    if live_dec gst p0
+    then length (filter (better_bool p0) (live_ptrs gst))
+    else length (live_ptrs gst) + 1
+  | None => length (live_ptrs gst) + 1
+  end.
 
-Definition correct_pred (gst : global_state) (h : pointer) (p : option pointer) : Prop :=
+Lemma counting_opt_error_zero_implies_correct :
+  forall gst p better_bool,
+    counting_opt_error gst p better_bool = 0 ->
+    exists p0,
+      p = Some p0 /\
+      forall p',
+        live gst p' ->
+        better_bool p0 p' = false.
+Proof.
+  unfold counting_opt_error.
+  intros.
+  repeat break_match.
+Admitted.
+
+(** Predecessor phase two definitions *)
+Definition better_pred (gst : global_state) (h p p' : pointer) : Prop :=
+  live gst p' /\ ptr_between p p' h.
+
+Definition better_pred_bool (h p p' : pointer) : bool :=
+  ptr_between_bool p p' h.
+
+Definition pred_correct (gst : global_state) (h : pointer) (p : option pointer) : Prop :=
   exists p0,
     p = Some p0 /\
     forall p',
-      live gst p' ->
-      ~ ptr_between p0 p' h.
+      ~ better_pred gst h p0 p'.
 
-Definition correct_pointers gst :=
+Definition pred_error (gst : global_state) (h : pointer) (p : option pointer) : nat :=
+  counting_opt_error gst p (better_pred_bool h).
+
+(** First successor phase two definitions *)
+Definition better_first_succ (gst : global_state) (h s s' : pointer) : Prop :=
+  live gst s' /\ ptr_between h s' s.
+
+Definition better_first_succ_bool (h s s' : pointer) : bool :=
+  ptr_between_bool h s' s.
+
+Definition first_succ_correct (gst : global_state) (h : pointer) (p : option pointer) : Prop :=
+  exists p0,
+    p = Some p0 /\
+    forall p', ~ better_first_succ gst h p0 p'.
+
+Definition first_succ_error (gst : global_state) (h : pointer) (s : option pointer) : nat :=
+  counting_opt_error gst s (better_first_succ_bool h).
+
+(** First successor and predecessor combined phase two definitions *)
+Definition pred_and_first_succ_correct (gst : global_state) (h : pointer) (st : data) : Prop :=
+  pred_correct gst h (pred st) /\
+  first_succ_correct gst h (hd_error (succ_list st)).
+
+Definition pred_and_first_succ_error (gst : global_state) (h : pointer) (st : data) : nat :=
+  pred_error gst h (pred st) + first_succ_error gst h (hd_error (succ_list st)).
+
+Definition preds_and_first_succs_correct (gst : global_state) : Prop :=
   forall h st,
-    correct_pred gst h (pred st) /\
-    full_succs gst h (succ_list st) /\
-    correct_succs gst h (succ_list st).
- 
-Definition phase_two (ex : infseq.infseq occurrence) :=
-  lb_execution ex ->
-  reachable_st (occ_gst (infseq.hd ex)) ->
-  infseq.continuously (lift_gpred_to_ex correct_pointers) ex.
+    live gst h ->
+    sigma gst (addr_of h) = Some st ->
+    pred_and_first_succ_correct gst h st.
+
+Definition total_pred_and_first_succ_error (gst : global_state) : nat :=
+  sum (map (fun pair =>
+              let '(h, st) := pair in
+              pred_and_first_succ_error gst h st)
+           (live_ptrs_with_states gst)).
+
+Lemma phase_two_zero_error_locally_correct :
+  forall gst h st,
+    live gst h ->
+    sigma gst (addr_of h) = Some st ->
+    pred_and_first_succ_error gst h st = 0 ->
+    pred_and_first_succ_correct gst h st.
+Proof.
+Admitted.
+Lemma live_addr_In_live_addrs :
+  forall gst h,
+    live_addr gst h ->
+    In h (live_addrs gst).
+Proof.
+  unfold live_addrs.
+  intros.
+  apply filter_In; split.
+  - unfold live_addr in *; break_and; auto.
+  - auto using Coqlib.proj_sumbool_is_true.
+Qed.
+
+Lemma live_In_live_ptrs :
+  forall gst h,
+    live gst h ->
+    wf_ptr h ->
+    In h (live_ptrs gst).
+Proof.
+  unfold live_ptrs, live.
+  intros.
+  rewrite (wf_ptr_eq h); auto.
+  apply in_map.
+  now apply live_addr_In_live_addrs.
+Qed.
+
+Lemma live_In_live_ptrs_with_states :
+  forall gst h st,
+    wf_ptr h ->
+    live gst h ->
+    sigma gst (addr_of h) = Some st ->
+    In (h, st) (live_ptrs_with_states gst).
+Proof.
+  unfold live_ptrs_with_states.
+  intros.
+  apply FilterMap.filterMap_In with (a:=h).
+  - by find_rewrite.
+  - by apply live_In_live_ptrs.
+Qed.
+
+Lemma phase_two_zero_error_correct :
+  forall gst,
+    total_pred_and_first_succ_error gst = 0 ->
+    preds_and_first_succs_correct gst.
+Proof.
+  unfold total_pred_and_first_succ_error, preds_and_first_succs_correct.
+  intros.
+  apply phase_two_zero_error_locally_correct; eauto.
+  eapply sum_of_nats_zero_means_all_zero; eauto.
+  eapply in_map_iff; exists (h, st); split.
+  - auto.
+  - apply live_In_live_ptrs_with_states; auto.
+    now live_inv.
+Qed.
+
+(** Generic reasoning about measures. *)
+Definition measure_doesnt_increase (measure : global_state -> nat) (o o' : occurrence) : Prop :=
+  measure (occ_gst o') <= measure (occ_gst o).
+
+Definition measure_drops (measure : global_state -> nat) (o o' : occurrence) : Prop :=
+  measure (occ_gst o') < measure (occ_gst o).
+
+Definition measure_zero (measure : global_state -> nat) (o : occurrence) : Prop :=
+  measure (occ_gst o) = 0.
+
+Lemma measure_zero_elim :
+  forall measure o,
+    measure_zero measure o ->
+    measure (occ_gst o) = 0.
+Proof.
+  easy.
+Qed.
+
+Lemma measure_decreasing_to_zero :
+  forall measure ex,
+    continuously (consecutive (measure_doesnt_increase measure)) ex ->
+    weak_until (consecutive (measure_drops measure))
+               (now (measure_zero measure))
+               ex ->
+    continuously (now (measure_zero measure)) ex.
+Proof.
+Admitted.
+
+(* This is really an invariant. *)
+Lemma phase_two_error_stable :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    continuously
+      (consecutive
+         (measure_doesnt_increase total_pred_and_first_succ_error))
+      ex.
+Proof.
+Admitted.
+
+(* This is the hard part. *)
+Lemma phase_two_error_decreasing :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    weak_until
+      (consecutive
+         (measure_drops total_pred_and_first_succ_error))
+      (now
+         (measure_zero total_pred_and_first_succ_error))
+      ex.
+Proof.
+Admitted.
+
+Lemma continuously_frame_monotonic :
+  forall T (P Q J : infseq T -> Prop),
+    (forall x s, J (Cons x s) -> J s) ->
+    (forall s, J s -> always P s -> always Q s) ->
+    forall s,
+      J s ->
+      continuously P s ->
+      continuously Q s.
+Proof.
+  intros.
+  apply eventually_monotonic with (P := always P) (J := J); auto.
+Qed.
+
+Lemma phase_two :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    continuously (lift_gpred_to_ex preds_and_first_succs_correct) ex.
+Proof.
+  intros.
+  find_copy_apply_lem_hyp phase_two_error_stable; auto.
+  find_copy_apply_lem_hyp phase_two_error_decreasing; auto.
+  find_copy_apply_lem_hyp measure_decreasing_to_zero; auto.
+  unfold lift_gpred_to_ex.
+  eapply continuously_monotonic.
+  - eapply now_monotonic; intros.
+    apply phase_two_zero_error_correct.
+    eauto using measure_zero_elim.
+  - assumption.
+Qed.
 
 Definition ideal (gst : global_state) : Prop :=
   forall h st,
@@ -539,7 +761,7 @@ Definition ideal (gst : global_state) : Prop :=
     sigma gst (addr_of h) = Some st ->
     correct_succs gst h (succ_list st) /\
     full_succs gst h (succ_list st) /\
-    correct_pred gst h (pred st).
+    pred_correct gst h (pred st).
 
 Definition deadlock_free : infseq.infseq occurrence -> Prop.
 Admitted.
