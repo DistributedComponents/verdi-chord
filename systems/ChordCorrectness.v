@@ -155,16 +155,6 @@ Definition live_ptrs_with_states (gst : global_state) : list (pointer * data) :=
                          end)
                       (live_ptrs gst).
 
-Definition correct_succs
-           (gst : global_state)
-           (h : pointer)
-           (succs : list pointer) : Prop :=
-  forall s xs ys s',
-    succs = xs ++ s :: ys ->
-    ptr_between h s' s ->
-    live gst s' ->
-    In s' xs.
-
 Definition full_succs (gst : global_state) (h : pointer) (succs : list pointer) : Prop :=
   length succs = Chord.SUCC_LIST_LEN.
 
@@ -526,9 +516,9 @@ Admitted.
 (** In phase two we want to talk about the existence and number of better
     predecessors and better first successors to a node. We do this with the
     following functions.
-    - better_* : Prop, which holds if a node is closer to h
-    - better_*_bool : bool, which is true if some live node is a better pointer for h
-    - *_correct : Prop, which holds if the pointer is globally correct
+    - better_* : Prop, which holds if a node is closer to h.
+    - better_*_bool : bool, which is true if some live node is a better pointer for h.
+    - *_correct : Prop, which holds if the pointer is globally correct.
     - *_error : nat, which counts the number of better options for the pointer.
     We prove that error = 0 <-> correct so we can use an argument about the
     metric to prove eventual correctness.
@@ -574,19 +564,19 @@ Definition pred_error (gst : global_state) (h : pointer) (p : option pointer) : 
   counting_opt_error gst p (better_pred_bool h).
 
 (** First successor phase two definitions *)
-Definition better_first_succ (gst : global_state) (h s s' : pointer) : Prop :=
+Definition better_succ (gst : global_state) (h s s' : pointer) : Prop :=
   live gst s' /\ ptr_between h s' s.
 
-Definition better_first_succ_bool (h s s' : pointer) : bool :=
+Definition better_succ_bool (h s s' : pointer) : bool :=
   ptr_between_bool h s' s.
 
 Definition first_succ_correct (gst : global_state) (h : pointer) (p : option pointer) : Prop :=
   exists p0,
     p = Some p0 /\
-    forall p', ~ better_first_succ gst h p0 p'.
+    forall p', ~ better_succ gst h p0 p'.
 
 Definition first_succ_error (gst : global_state) (h : pointer) (s : option pointer) : nat :=
-  counting_opt_error gst s (better_first_succ_bool h).
+  counting_opt_error gst s (better_succ_bool h).
 
 (** First successor and predecessor combined phase two definitions *)
 Definition pred_and_first_succ_correct (gst : global_state) (h : pointer) (st : data) : Prop :=
@@ -602,11 +592,13 @@ Definition preds_and_first_succs_correct (gst : global_state) : Prop :=
     sigma gst (addr_of h) = Some st ->
     pred_and_first_succ_correct gst h st.
 
-Definition total_pred_and_first_succ_error (gst : global_state) : nat :=
-  sum (map (fun pair =>
-              let '(h, st) := pair in
-              pred_and_first_succ_error gst h st)
+Definition total_measure (local_measure : pointer -> data -> nat) (gst : global_state) :=
+  sum (map (fun pair => let '(h, st) := pair in
+                     local_measure h st)
            (live_ptrs_with_states gst)).
+
+Definition total_pred_and_first_succ_error (gst : global_state) : nat :=
+  total_measure (pred_and_first_succ_error gst) gst.
 
 Lemma phase_two_zero_error_locally_correct :
   forall gst h st,
@@ -671,6 +663,7 @@ Proof.
 Qed.
 
 (** Generic reasoning about measures. *)
+
 Definition measure_doesnt_increase (measure : global_state -> nat) (o o' : occurrence) : Prop :=
   measure (occ_gst o') <= measure (occ_gst o).
 
@@ -724,19 +717,6 @@ Lemma phase_two_error_decreasing :
 Proof.
 Admitted.
 
-Lemma continuously_frame_monotonic :
-  forall T (P Q J : infseq T -> Prop),
-    (forall x s, J (Cons x s) -> J s) ->
-    (forall s, J s -> always P s -> always Q s) ->
-    forall s,
-      J s ->
-      continuously P s ->
-      continuously Q s.
-Proof.
-  intros.
-  apply eventually_monotonic with (P := always P) (J := J); auto.
-Qed.
-
 Lemma phase_two :
   forall ex,
     lb_execution ex ->
@@ -755,16 +735,114 @@ Proof.
   - assumption.
 Qed.
 
+(** Phase three: all successors become correct. *)
+Definition all_in_dec
+           {A : Type}
+           (A_eq_dec : forall x y : A, {x = y} + {x <> y})
+           (l1 l2 : list A) :=
+  Forall_dec _ (fun a => In_dec A_eq_dec a l2) l1.
+
+(* doesn't deal with possiblity of length of the successor list being longer
+   than SUCC_LIST_LEN *)
+Fixpoint succs_error_helper (gst : global_state) (h : pointer) (xs ys : list pointer) (suffix_len : nat) :=
+  match ys with
+  | [] => suffix_len
+  | s :: ys' =>
+    let xs' := filter (better_succ_bool h s) (live_ptrs gst) in
+    if all_in_dec pointer_eq_dec xs' xs
+    then succs_error_helper gst h (s :: xs) ys' (suffix_len - 1)
+    else suffix_len
+  end.
+
+Definition succs_error (gst : global_state) (h : pointer) (st : data) :=
+  succs_error_helper gst h [] (succ_list st) Chord.SUCC_LIST_LEN.
+
+Definition total_succs_error (gst : global_state) :=
+  total_measure (succs_error gst) gst.
+
+Definition correct_succs (gst : global_state) (h : pointer) (st : data) : Prop :=
+  forall s xs ys s',
+    succ_list st = xs ++ s :: ys ->
+    ptr_between h s' s ->
+    live gst s' ->
+    In s' xs.
+
+Definition all_succs_correct (gst : global_state) : Prop :=
+  forall h st,
+    sigma gst (addr_of h) = Some st ->
+    live gst h ->
+    correct_succs gst h st /\
+    length (succ_list st) = Chord.SUCC_LIST_LEN.
+
+Lemma succs_error_zero_locally_correct :
+  forall gst h st,
+    succs_error gst h st = 0 ->
+    correct_succs gst h st.
+Proof.
+Admitted.
+
+Theorem phase_three :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    continuously (lift_gpred_to_ex all_succs_correct) ex.
+Proof.
+Admitted.
+
 Definition ideal (gst : global_state) : Prop :=
   forall h st,
     live gst h ->
     sigma gst (addr_of h) = Some st ->
-    correct_succs gst h (succ_list st) /\
-    full_succs gst h (succ_list st) /\
+    correct_succs gst h st /\
+    length (succ_list st) = Chord.SUCC_LIST_LEN /\
     pred_correct gst h (pred st).
 
 Definition deadlock_free : infseq.infseq occurrence -> Prop.
 Admitted.
+
+Theorem phases_locally_sufficient :
+  forall gst,
+    preds_and_first_succs_correct gst ->
+    all_succs_correct gst ->
+    ideal gst.
+Proof.
+  intros gst H_preds H_succs.
+  unfold ideal; intros h st.
+  specialize (H_preds h st).
+  specialize (H_succs h st).
+  unfold pred_and_first_succ_correct in *.
+  intuition.
+Qed.
+
+Definition gpred_and (P Q : global_state -> Prop) (gst : global_state) : Prop :=
+  P gst /\ Q gst.
+
+Lemma and_tl_gpred_and_comm :
+  forall (P Q : global_state -> Prop) ex,
+    lift_gpred_to_ex (gpred_and P Q) ex <->
+    (and_tl (lift_gpred_to_ex P) (lift_gpred_to_ex Q)) ex.
+Proof.
+  unfold lift_gpred_to_ex, lift_gpred_to_occ, gpred_and, and_tl.
+  split; intros; destruct ex; simpl in *; tauto.
+Qed.
+
+Theorem phases_sufficient :
+  forall ex,
+    lift_gpred_to_ex
+      (gpred_and preds_and_first_succs_correct
+                 all_succs_correct)
+      ex ->
+    lift_gpred_to_ex ideal ex.
+Proof.
+  unfold lift_gpred_to_ex, lift_gpred_to_occ.
+  eapply now_monotonic.
+  intros.
+  match goal with
+  | [ H : gpred_and _ _ _ |- _ ] =>
+    destruct H
+  end.
+  now auto using phases_locally_sufficient.
+Qed.
 
 Theorem chord_stabilization :
   forall ex : infseq.infseq occurrence,
@@ -772,8 +850,18 @@ Theorem chord_stabilization :
     lb_execution ex ->
     weak_local_fairness ex ->
     deadlock_free ex ->
-    infseq.eventually
-      (infseq.always
-         (fun ex' => (ideal (occ_gst (infseq.hd ex')))))
+    continuously
+      (lift_gpred_to_ex ideal)
       ex.
-Admitted.
+Proof.
+  intros.
+  find_copy_eapply_lem_hyp phase_two; eauto.
+  find_copy_eapply_lem_hyp phase_three; eauto.
+  eapply continuously_monotonic.
+  eapply phases_sufficient.
+  eapply continuously_monotonic.
+  - intros.
+    rewrite and_tl_gpred_and_comm.
+    eauto.
+  - now apply continuously_and_tl.
+Qed.
