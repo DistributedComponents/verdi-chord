@@ -39,7 +39,7 @@ Makefile.coq: _CoqProject
 
 clean:
 	if [ -f Makefile.coq ]; then \
-	  $(MAKE) -f Makefile.coq distclean; fi
+	  $(MAKE) -f Makefile.coq cleanall; fi
 	rm -f Makefile.coq
 	$(MAKE) -C extraction/chord clean
 
