@@ -17,8 +17,7 @@ $(warning checkpath reported an error)
 endif
 
 CHORDMLFILES = extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli
-SHEDMLFILES = extraction/chord/coq/ExtractedChordShed.ml extraction/chord/coq/ExtractedChordShed.mli
-MLFILES = $(CHORDMLFILES) $(SHEDMLFILES)
+MLFILES = $(CHORDMLFILES)
 
 default: Makefile.coq
 	$(MAKE) -f Makefile.coq
@@ -31,9 +30,6 @@ Makefile.coq: _CoqProject
 	  -extra '$(CHORDMLFILES)' \
 	    'extraction/chord/coq/ExtractChord.v systems/Chord.vo' \
 	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v' \
-	  -extra '$(SHEDMLFILES)' \
-            'extraction/chord/coq/ExtractChordShed.v systems/Chord.vo shed/ChordShed.vo' \
-	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChordShed.v' \
 	  -extra-phony 'distclean' 'clean' \
 	    'rm -f $$(join $$(dir $$(VFILES)),$$(addprefix .,$$(notdir $$(patsubst %.v,%.aux,$$(VFILES)))))'
 
@@ -46,9 +42,6 @@ clean:
 chord:
 	+$(MAKE) -C extraction/chord chord.native client.native
 
-chordshed:
-	+$(MAKE) -C extraction/chord chordshed.native
-
 $(MLFILES): Makefile.coq
 	$(MAKE) -f Makefile.coq $@
 
@@ -59,4 +52,4 @@ lint:
 distclean: clean
 	rm -f _CoqProject
 
-.PHONY: default quick clean lint distclean chord chordshed $(MLFILES)
+.PHONY: default quick clean lint distclean chord $(MLFILES)
