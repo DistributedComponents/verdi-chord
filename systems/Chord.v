@@ -626,6 +626,8 @@ Module Chord <: DynamicSystem.
     end.
 
   Inductive _label :=
+  | Input : addr -> addr -> payload -> _label
+  | Output : addr -> addr -> payload -> _label
   | RecvMsg : addr -> addr -> payload -> _label
   | Timeout : addr -> timeout -> _label.
   Definition label := _label.
@@ -660,8 +662,8 @@ Module Chord <: DynamicSystem.
     - now tuple_inversion.
   Qed.
 
-  Definition label_input : addr -> addr -> payload -> label := RecvMsg.
-  Definition label_output : addr -> addr -> payload -> label := RecvMsg.
+  Definition label_input : addr -> addr -> payload -> label := Input.
+  Definition label_output : addr -> addr -> payload -> label := Output.
 
   Lemma timeout_handler_labeling :
     forall h st t r,

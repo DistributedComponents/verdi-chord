@@ -501,6 +501,44 @@ Proof.
   auto using zero_leading_failed_nodes_implies_all_first_succs_best.
 Qed.
 
+(*
+if head of succ list is dead
+then we set
+cur_request
+Request dst (message?)
+with cur_request = (make_pointer dst, q, _)
+with q = Stabilize
+with q = Stabilize2
+*)
+
+Definition open_stabilize_request (gst : global_state) (h : addr) (st : data) : Prop :=
+  exists p,
+    cur_request st = Some (p, Stabilize, GetPredAndSuccs) /\
+    In (Request (addr_of p) GetPredAndSuccs) (timeouts gst h) /\
+    In (h, ((addr_of p), GetPredAndSuccs)) (msgs gst).
+
+Lemma stabilize_with_dead_successor_inf_often :
+  forall ex h st,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    live_node (occ_gst (hd ex)) h ->
+    sigma (occ_gst (hd ex)) h = Some st ->
+    until (inf_often
+             (fun e =>
+                match sigma e.(hd).(occ_gst) h with
+                | Some st => open_stabilize_request e.(hd).(occ_gst) h st
+                | None => False
+                end))
+          (now (fun occ =>
+             forall st s rest,
+               sigma occ.(occ_gst) h = Some st ->
+               succ_list st = s :: rest /\
+               live_node occ.(occ_gst) (addr_of s))) ex.
+Proof.
+  intros.
+
+Admitted.
+
 Theorem continuously_zero_total_leading_failed_nodes_implies_phase_one :
   forall ex,
     lb_execution ex ->
