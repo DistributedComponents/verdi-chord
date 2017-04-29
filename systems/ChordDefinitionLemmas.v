@@ -122,9 +122,10 @@ Proof using.
     eexists. intuition eauto.
 Qed.
 
-Lemma recv_handler_definition :
+Lemma handle_msg_definition :
   forall src dst st p st' ms newts clearedts,
-    recv_handler src dst st p = (st', ms, newts, clearedts) ->
+    handle_msg src dst st p = (st', ms, newts, clearedts) ->
+
     p = Ping /\
     st' = st /\
     ms = [(src, Pong)] /\
@@ -137,78 +138,35 @@ Lemma recv_handler_definition :
     newts = [] /\
     clearedts = [] \/
 
-    (exists qd q qm,
-        cur_request st = Some (qd, q, qm) /\
-        (request_payload p /\
-         st' = delay_query st src p /\
-         clearedts = [] /\
-         (delayed_queries st = [] /\
-          newts = [KeepaliveTick]) \/
-         (delayed_queries st <> [] /\
-          newts = [])) \/
-        (p = Busy /\
-         st' = st /\
-         newts = timeouts_in st /\
-         clearedts = timeouts_in st) \/
-        (exists n,
-            q = Rectify n /\
-            p = Pong /\
-            (exists pr,
-                pred st = Some pr /\
-                end_query (handle_rectify st pr n) = (st', ms, newts, clearedts)) \/
-            (pred st = None /\
-             end_query (update_pred st n, [], [], []) = (st', ms, newts, clearedts))) \/
-        (q = Stabilize /\
-         (exists new_succ succs,
-             p = GotPredAndSuccs (Some new_succ) succs /\
-             handle_stabilize dst (make_pointer src) st q new_succ succs = (st', ms, newts, clearedts)) \/
-         (exists succs,
-             p = GotPredAndSuccs None succs /\
-             end_query (st, [], [], []) = (st', ms, newts, clearedts))) \/
-        (exists new_succ,
-            q = Stabilize2 new_succ /\
-            exists succs,
-              p = GotSuccList succs /\
-              end_query (update_succ_list st (make_succs new_succ succs),
-                         [(addr_of new_succ, Notify)], [], []) = (st', ms, newts, clearedts)) \/
-        (exists k,
-            q = Join k /\
-            (exists bestpred,
-                p = GotBestPredecessor bestpred /\
-                clearedts = [Request src (GetBestPredecessor (make_pointer dst))] /\
-                st' = st /\
-                (addr_of bestpred = src /\
-                 ms = [(src, GetSuccList)] /\
-                 newts = [Request src GetSuccList]) \/
-                (addr_of bestpred <> src /\
-                 ms = [(addr_of bestpred, (GetBestPredecessor (make_pointer dst)))] /\
-                 newts = [Request (addr_of bestpred) (GetBestPredecessor (make_pointer dst))])) \/
-            (p = GotSuccList [] /\
-             end_query (st, [], [], []) = (st', ms, newts, clearedts)) \/
-            (exists new_succ rest,
-                p = GotSuccList (new_succ :: rest) /\
-                start_query (addr_of new_succ) st (Join2 new_succ) = (st', ms, newts, clearedts))) \/
-        (exists new_succ succs,
-            q = Join2 new_succ /\
-            p = GotSuccList succs /\
-            add_tick (end_query (update_for_join st (make_succs new_succ succs), [], [], [])) = (st', ms, newts, clearedts)) \/
-        st' = st /\ ms = [] /\ newts = [] /\ clearedts = []
-    ) \/
+    p <> Notify /\
+    p <> Ping /\
+    ((exists query_dst query query_msg,
+         cur_request st = Some (query_dst, query, query_msg) /\
+         (is_request p = true /\
+          handle_query_req_busy src st p = (st', ms, newts, clearedts) \/
+          is_request p = false /\
+          handle_query_res src dst st query p = (st', ms, newts, clearedts))) \/
 
-    (cur_request st = None /\
+     cur_request st = None /\
      st' = st /\
      clearedts = [] /\
      newts = [] /\
-     ((exists h,
-          p = GetBestPredecessor h /\
-          ms = [(src, GotBestPredecessor (best_predecessor (ptr st) (succ_list st) h))]) \/
-      (p = GetSuccList /\
-       ms = [(src, GotSuccList (succ_list st))]) \/
-      (p = GetPredAndSuccs /\
-       ms = [(src, GotPredAndSuccs (pred st) (succ_list st))]))) \/
-
-    st = st' /\ ms = [] /\ newts = [] /\ clearedts = [].
-Admitted.
+     ms = handle_query_req st src p).
+Proof.
+  unfold handle_msg.
+  intros.
+  destruct (payload_eq_dec p Notify), (payload_eq_dec p Ping);
+    subst_max; try congruence.
+  - tuple_inversion; tauto.
+  - tuple_inversion; tauto.
+  - do 2 right.
+    repeat split; try auto.
+    destruct (cur_request st) as [[[query_dst query] query_msg]|] eqn:H_cur.
+    + left; repeat eexists; eauto.
+      destruct (is_request p) eqn:H_isreq;
+        repeat break_match; simpl in *; congruence || tauto.
+    + repeat break_match; tuple_inversion; tauto.
+Qed.
 
 Lemma do_rectify_definition :
   forall h st st' ms' nts' cts',
