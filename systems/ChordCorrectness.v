@@ -4,6 +4,7 @@ Require Import Omega.
 
 Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
+Require Import StructTact.Update.
 Require Import InfSeqExt.infseq.
 
 Require Import Chord.Chord.
@@ -14,6 +15,8 @@ Require Import Chord.ChordSemantics.
 Import ChordSemantics.
 Import ConstrainedChord.
 Require Import Chord.ChordValidPointersInvariant.
+Require Import Chord.ChordLabeled.
+Require Import Chord.ChordInvariants.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
@@ -511,33 +514,224 @@ with q = Stabilize
 with q = Stabilize2
 *)
 
+Definition open_stabilize_request_to (gst : global_state) (h : addr) (st : data) (dst : addr) : Prop :=
+  cur_request st = Some (make_pointer dst, Stabilize, GetPredAndSuccs) /\
+  In (Request dst GetPredAndSuccs) (timeouts gst h) /\
+  In (h, (dst, GetPredAndSuccs)) (msgs gst).
+
 Definition open_stabilize_request (gst : global_state) (h : addr) (st : data) : Prop :=
   exists p,
-    cur_request st = Some (p, Stabilize, GetPredAndSuccs) /\
-    In (Request (addr_of p) GetPredAndSuccs) (timeouts gst h) /\
-    In (h, ((addr_of p), GetPredAndSuccs)) (msgs gst).
+    open_stabilize_request_to gst h st (addr_of p) /\
+    wf_ptr p.
 
-Lemma stabilize_with_dead_successor_inf_often :
-  forall ex h st,
+Lemma loaded_Tick_inf_often :
+  forall ex h,
     lb_execution ex ->
-    reachable_st (occ_gst (infseq.hd ex)) ->
+    reachable_st (occ_gst (hd ex)) ->
+    weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
-    sigma (occ_gst (hd ex)) h = Some st ->
-    until (inf_often
-             (fun e =>
-                match sigma e.(hd).(occ_gst) h with
-                | Some st => open_stabilize_request e.(hd).(occ_gst) h st
-                | None => False
-                end))
-          (now (fun occ =>
-             forall st s rest,
-               sigma occ.(occ_gst) h = Some st ->
-               succ_list st = s :: rest /\
-               live_node occ.(occ_gst) (addr_of s))) ex.
+    inf_occurred (Timeout h Tick) ex.
+Proof.
+Admitted.
+
+Lemma stabilize_Request_timeout_removes_succ :
+  forall ex h st s rest dst p,
+    lb_execution ex ->
+    sigma ex.(hd).(occ_gst) h = Some st ->
+    succ_list st = s :: rest ->
+    open_stabilize_request_to ex.(hd).(occ_gst) h st dst ->
+    now (occurred (Timeout h (Request dst p))) ex ->
+    next
+      (now
+         (fun occ =>
+            exists st, sigma occ.(occ_gst) h = Some st /\
+                  succ_list st = rest))
+      ex.
 Proof.
   intros.
+  unfold open_stabilize_request, open_stabilize_request_to in *; break_exists; break_and.
+  do 2 destruct ex.
+  match goal with
+  | [ H : lb_execution _ |- _ ] =>
+    inv H; simpl in *
+  end.
+  unfold occurred in *.
+  repeat find_reverse_rewrite.
+  invc_labeled_step; simpl in *.
 
+  (* This should be a lemma about timeout_handler_l. *)
+  assert (h0 = h).
+  {
+    unfold timeout_handler_l in *.
+    now tuple_inversion.
+  }
+  subst_max.
+  repeat find_rewrite; simpl.
+  rewrite update_same.
+  eexists; split; eauto.
+  find_injection.
+
+  (* This should be a lemma about timeout_handler_l *)
+  unfold timeout_handler_l in *.
+  tuple_inversion.
+  repeat find_reverse_rewrite.
+  find_injection.
+
+  simpl in *.
+  unfold request_timeout_handler in *.
+  repeat find_rewrite.
+  simpl in *.
+  break_if; [|congruence].
+  repeat find_rewrite.
+  (* Should use a definition lemma about start_query here. *)
+  unfold start_query, update_query in *.
+  repeat break_match;
+    simpl in *;
+    tuple_inversion;
+    reflexivity.
+Qed.
+
+Lemma start_stabilize_with_dead_successor_eventually :
+  forall ex h st s rest,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    weak_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    sigma (occ_gst (hd ex)) h = Some st ->
+    succ_list st = s :: rest ->
+    In (addr_of s) (failed_nodes (occ_gst (hd ex))) ->
+    eventually
+      (fun ex' =>
+         forall st',
+           sigma ex'.(hd).(occ_gst) h = Some st' ->
+           open_stabilize_request_to ex.(hd).(occ_gst) h st (addr_of s))
+      ex.
+Proof.
 Admitted.
+
+(* This belongs in ChordLabeled.v *)
+Lemma Timeout_enabled_when_open_stabilize_request_to_dead_node :
+  forall occ h st dst,
+    live_node (occ_gst occ) h ->
+    sigma (occ_gst occ) h = Some st ->
+    open_stabilize_request_to (occ_gst occ) h st dst ->
+    In dst (failed_nodes (occ_gst occ)) ->
+    (forall m, ~ In (dst, (h, m)) (msgs (occ_gst occ))) ->
+    l_enabled (Timeout h (Request dst GetPredAndSuccs)) occ.
+Proof.
+  intros.
+  break_live_node.
+  unfold open_stabilize_request_to in *; break_and.
+  destruct (timeout_handler h st (Request dst GetPredAndSuccs))
+    as [[[st' ms] nts] cts] eqn:H_th.
+  eexists; eapply LTimeout; eauto.
+  - unfold timeout_handler_l.
+    rewrite H_th.
+    eauto.
+  - eapply Request_needs_dst_dead_and_no_msgs; eauto.
+Qed.
+
+Lemma timeout_Request_to_dead_node_eventually_fires :
+  forall ex h dst,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    weak_local_fairness ex ->
+    In dst (failed_nodes (occ_gst (hd ex))) ->
+    now (fun occ =>
+           exists st,
+             sigma (occ_gst occ) h = Some st /\
+             open_stabilize_request_to (occ_gst occ) h st dst)
+        ex ->
+    exists p,
+      until (next (now (fun occ => forall st,
+                      In dst (failed_nodes (occ_gst occ)) ->
+                      sigma (occ_gst occ) h = Some st ->
+                      open_stabilize_request_to (occ_gst occ) h st dst)))
+            (now (occurred (Timeout h (Request dst p))))
+            ex.
+Proof.
+  intros.
+  destruct ex; simpl in *; break_exists; break_and.
+  unfold open_stabilize_request_to in *; break_and.
+  exists GetPredAndSuccs.
+  match goal with
+  | [ |- until ?P ?Q ?ex ] =>
+    cut (weak_until P Q ex)
+  end.
+  - intros.
+    find_apply_lem_hyp classical.weak_until_until_or_always.
+    break_or_hyp; [assumption|].
+    exfalso.
+    cut ((cont_enabled (Timeout h (Request dst GetPredAndSuccs))) ex).
+    + intros.
+      find_apply_lem_hyp weak_local_fairness_invar.
+      unfold weak_local_fairness in *.
+      find_apply_hyp_hyp.
+      unfold inf_occurred, inf_often in *.
+      destruct ex.
+      find_apply_lem_hyp always_now.
+      specialize (H1 (Timeout h (Request dst GetPredAndSuccs))).
+      find_eapply_lem_hyp lb_execution_invar.
+      find_eapply_lem_hyp always_Cons; break_and.
+      induction H7.
+      * do 2 destruct s.
+        find_copy_apply_lem_hyp always_Cons.
+        break_and.
+        find_copy_apply_lem_hyp always_now.
+        simpl in *.
+        do 2 match goal with
+        | [ H : (lb_execution _) |- _ ] =>
+          inv H
+        end.
+        match goal with
+        | [ H : occurred ?t ?occ |- _ ] =>
+          unfold occurred in H
+        end.
+        repeat find_reverse_rewrite.
+        match goal with
+        | [ H : labeled_step_dynamic _ (Timeout _ _) _ |- _ ] =>
+          invc H; clean_up_labeled_step_cases
+        end.
+        admit.
+      * apply IHeventually; eauto using lb_execution_invar.
+        -- admit.
+        -- find_apply_lem_hyp always_Cons; tauto.
+        -- find_apply_lem_hyp always_Cons; tauto.
+    + admit.
+      (* can get this by showing that eventually all messages from a dead node
+      are delivered and that we can then use
+      Timeout_enabled_when_open_stabilize_request_to_dead_node. *)
+  - admit.
+Admitted.
+
+Lemma dead_successor_eventually_removed :
+  forall ex h st s rest,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    weak_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    sigma (occ_gst (hd ex)) h = Some st ->
+    succ_list st = s :: rest ->
+    In (addr_of s) (failed_nodes (occ_gst (hd ex))) ->
+    eventually
+      (now
+         (fun occ =>
+            forall st', sigma (occ_gst occ) h = Some st' ->
+                   succ_list st' = rest))
+      ex.
+Proof.
+  intros.
+  find_copy_eapply_lem_hyp start_stabilize_with_dead_successor_eventually; eauto.
+Admitted.
+
+Lemma recv_handler_label_is_RecvMsg :
+  forall h st src m res l,
+    recv_handler_l h src st m = (res, l) ->
+    l = RecvMsg h src m.
+Proof.
+  unfold recv_handler_l.
+  congruence.
+Qed.
 
 Theorem continuously_zero_total_leading_failed_nodes_implies_phase_one :
   forall ex,
