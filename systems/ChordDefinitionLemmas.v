@@ -76,21 +76,21 @@ Lemma handle_query_res_definition :
                      [(addr_of new_succ, Notify)], [], []) = (st', ms, newts, clearedts)) \/
     (exists k,
         q = Join k /\
-        (exists bestpred,
+        ((exists bestpred,
             p = GotBestPredecessor bestpred /\
-            clearedts = [Request src (GetBestPredecessor (make_pointer dst))] /\
+            clearedts = [Request src (GetBestPredecessor (ptr st))] /\
             st' = st /\
-            (addr_of bestpred = src /\
-             ms = [(src, GetSuccList)] /\
-             newts = [Request src GetSuccList]) \/
-            (addr_of bestpred <> src /\
-             ms = [(addr_of bestpred, (GetBestPredecessor (make_pointer dst)))] /\
-             newts = [Request (addr_of bestpred) (GetBestPredecessor (make_pointer dst))])) \/
-        (p = GotSuccList [] /\
-         end_query (st, [], [], []) = (st', ms, newts, clearedts)) \/
-        (exists new_succ rest,
-            p = GotSuccList (new_succ :: rest) /\
-            start_query (addr_of new_succ) st (Join2 new_succ) = (st', ms, newts, clearedts))) \/
+            ((addr_of bestpred = src /\
+              ms = [(src, GetSuccList)] /\
+              newts = [Request src GetSuccList]) \/
+             (addr_of bestpred <> src /\
+              ms = [(addr_of bestpred, (GetBestPredecessor (ptr st')))] /\
+              newts = [Request (addr_of bestpred) (GetBestPredecessor (ptr st'))]))) \/
+         (p = GotSuccList [] /\
+          end_query (st, [], [], []) = (st', ms, newts, clearedts)) \/
+         (exists new_succ rest,
+             p = GotSuccList (new_succ :: rest) /\
+             start_query (addr_of new_succ) st (Join2 new_succ) = (st', ms, newts, clearedts)))) \/
     (exists new_succ succs,
         q = Join2 new_succ /\
         p = GotSuccList succs /\
@@ -99,28 +99,28 @@ Lemma handle_query_res_definition :
 Proof using.
   unfold handle_query_res.
   intros.
-  repeat break_match; try tuple_inversion; try tauto.
+  repeat break_match; try (tuple_inversion; tauto).
   - right. right. left. eexists. intuition eauto.
   - intuition eauto.
   - intuition eauto.
   - intuition eauto.
   - intuition eauto.
   - do 5 right. left.
-    exists p0. left. firstorder.
-    eexists; intuition eauto.
-    admit.
+    eexists; split; eauto.
+    left.
+    tuple_inversion.
+    exists p1.
+    unfold next_msg_for_join; break_if; subst_max.
+    + intuition eauto.
+    + intuition eauto.
   - do 5 right. left.
-    exists p0. intuition eauto.
+    eexists. intuition eauto.
   - repeat find_rewrite.
     do 5 right. left.
-    exists p0. right.
-    intuition.
-    admit.
-  - do 5 right. left.
-    exists p0.
-    intuition eauto.
-    admit.
-Admitted.
+    eexists. intuition eauto.
+  - do 6 right. left.
+    eexists. intuition eauto.
+Qed.
 
 Lemma recv_handler_definition :
   forall src dst st p st' ms newts clearedts,
