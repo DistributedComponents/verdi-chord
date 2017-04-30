@@ -38,7 +38,7 @@ Module Type DynamicSystem.
       (forall l,
           recv_handler_l src dst st p = (r, l) ->
           recv_handler src dst st p = r).
-  
+
   Variable timeout_handler_labeling :
     forall h st t r,
       (timeout_handler h st t = r ->

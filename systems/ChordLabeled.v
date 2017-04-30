@@ -708,7 +708,7 @@ Lemma handle_msg_never_clears_Tick :
     ~ In Tick cts.
 Proof using.
   intros.
-  find_apply_lem_hyp handle_msg_definition; 
+  find_apply_lem_hyp handle_msg_definition;
     expand_def;
     try find_apply_lem_hyp handle_query_req_busy_never_clears;
     subst_max;

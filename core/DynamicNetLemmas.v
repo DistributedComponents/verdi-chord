@@ -127,7 +127,7 @@ end; rewrite /=.
   exact: IHrefl_trans_1n_trace1.
 Qed.
 
-Lemma ordered_dynamic_state_not_initialized_not_failed : 
+Lemma ordered_dynamic_state_not_initialized_not_failed :
 forall net failed tr,
  step_ordered_dynamic_failure_star step_ordered_dynamic_failure_init (failed, net) tr ->
  forall n, ~ In n (odnwNodes net) ->
@@ -161,7 +161,7 @@ Qed.
 
 Lemma ordered_dynamic_no_outgoing_uninitialized :
 forall onet failed tr,
-  step_ordered_dynamic_failure_star step_ordered_dynamic_failure_init (failed, onet) tr -> 
+  step_ordered_dynamic_failure_star step_ordered_dynamic_failure_init (failed, onet) tr ->
   forall n, ~ In n (odnwNodes onet) ->
   forall n', onet.(odnwPackets) n n' = [].
 Proof using.
@@ -174,7 +174,7 @@ concludes => {H_init}.
 match goal with
 | [ H : step_ordered_dynamic_failure _ _ _ |- _ ] => invc H
 end; rewrite /=.
-- move => n H_a n'. 
+- move => n H_a n'.
   have H_neq: h <> n by eauto.
   have H_not_in: ~ In n (odnwNodes net0) by eauto.
   rewrite collate_ls_not_in; first by rewrite collate_neq //; eauto.
@@ -204,7 +204,7 @@ Qed.
 
 Lemma ordered_dynamic_nodes_no_dup :
 forall onet failed tr,
-  step_ordered_dynamic_failure_star step_ordered_dynamic_failure_init (failed, onet) tr -> 
+  step_ordered_dynamic_failure_star step_ordered_dynamic_failure_init (failed, onet) tr ->
   NoDup (odnwNodes onet).
 Proof using.
 move => net failed tr H.

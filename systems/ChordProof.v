@@ -1550,7 +1550,7 @@ Proof using.
       repeat break_let; subst_max.
       (* formulating intermediate states and proving they satisfy P *)
       match goal with
-      | [ _ : context[handle_msg ?from ?to ?d ?p] |- _ ] => 
+      | [ _ : context[handle_msg ?from ?to ?d ?p] |- _ ] =>
         remember (apply_handler_result
                     to
                     (handle_msg from to d p)
