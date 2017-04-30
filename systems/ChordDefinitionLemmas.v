@@ -3,6 +3,8 @@ Import ListNotations.
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
+Require Import StructTact.RemoveAll.
+
 Require Chord.Chord.
 Import Chord.Chord.Chord.
 Require Import Chord.ChordLocalProps.
@@ -171,6 +173,7 @@ Qed.
 Lemma do_rectify_definition :
   forall h st st' ms' nts' cts',
     do_rectify h st = (st', ms', nts', cts') ->
+
     (cur_request st = None /\
      joined st = true /\
      (exists new,
@@ -217,7 +220,7 @@ Proof using.
   left; repeat eexists.
 Qed.
 
-Lemma handle_delayed_queries_definition :
+Lemma do_delayed_queries_definition :
   forall h st st' ms nts cts,
     do_delayed_queries h st = (st', ms, nts, cts) ->
     (exists r, cur_request st = Some r /\
@@ -261,7 +264,27 @@ Proof using.
   unfold handle_rectify.
   intros.
   rewrite between_between_bool_equiv.
-Admitted.
+  rewrite Bool.not_true_iff_false.
+  break_match; tuple_inversion; tauto.
+Qed.
+
+Lemma recv_handler_definition :
+  forall src dst st msg st' ms nts cts st1 ms1 nts1 cts1 st2 ms2 nts2 cts2 st3 ms3 nts3 cts3,
+    recv_handler src dst st msg = (st', ms, nts, cts) ->
+    handle_msg src dst st msg = (st1, ms1, nts1, cts1) ->
+    do_delayed_queries dst st1 = (st2, ms2, nts2, cts2) ->
+    do_rectify dst st2 = (st3, ms3, nts3, cts3) ->
+
+    st' = st3 /\
+    ms = ms3 ++ ms2 ++ ms1 /\
+    nts = nts3 ++ remove_all timeout_eq_dec cts3 (nts2 ++ remove_all timeout_eq_dec cts2 nts1) /\
+    cts = cts1 ++ cts2 ++ cts3.
+Proof using.
+  unfold recv_handler.
+  intros.
+  repeat find_rewrite.
+  tuple_inversion; tauto.
+Qed.
 
 Lemma update_for_start_definition :
   forall gst gst' h st ms newts,
@@ -295,4 +318,9 @@ Lemma start_handler_definition :
         (init_state_join h k)
         (Join (make_pointer k)) = (st, ms, newts, clearedts).
 Proof.
-Abort.
+  unfold start_handler, start_query.
+  intros.
+  simpl in *.
+  tuple_inversion.
+  eexists; eauto.
+Qed.
