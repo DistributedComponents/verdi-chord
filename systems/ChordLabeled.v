@@ -6,6 +6,7 @@ Import Chord.Chord.Chord.
 Import Chord.ChordIDSpace.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordProof.
+Require Import Chord.ChordDefinitionLemmas.
 Require Import List.
 Import ListNotations.
 (*Require Import Wf_nat.*)
@@ -655,49 +656,109 @@ Lemma handle_query_res_never_clears_Tick :
     handle_query_res src dst st q p = (st', ms, nts, cts) ->
     ~ In Tick cts.
 Proof using.
-  unfold handle_query_res.
   intros.
-  (* takes care of nil cases *)
-  repeat break_match;
-    try tuple_inversion;
-    try apply timeouts_in_never_has_Tick;
-    try apply in_nil.
-  - (* end_query (handle_rectify ...) clears no Ticks *)
-    admit.
-  - (* end_query (update_pred ...) clears no Ticks *)
-    admit.
-  - (* handle_stabilize ... clears no Ticks *)
-    admit.
-  - (* handle_stabilize ...  clears no Ticks *)
-    simpl in *; tuple_inversion.
-    rewrite app_nil_r.
+  find_eapply_lem_hyp handle_query_res_definition;
+    repeat (break_or_hyp || break_and || break_exists); subst; try by apply in_nil.
+  - apply timeouts_in_never_has_Tick.
+  - destruct (handle_rectify _ _ _) as [[[?st ?ms] ?nts] ?cts] eqn:H_hr.
+    find_apply_lem_hyp end_query_definition.
+    find_apply_lem_hyp handle_rectify_definition.
+    break_and; subst_max.
+    autorewrite with list.
     apply timeouts_in_never_has_Tick.
-  - (* end_query (update_succ_list ...) clears no Ticks *)
-    admit.
-  - apply not_in_cons; firstorder using in_nil; congruence.
-  - (* end_query ... clears no Ticks *)
-    simpl in *; tuple_inversion.
-    rewrite app_nil_r.
+  - find_apply_lem_hyp end_query_definition; break_and; subst_max.
+    autorewrite with list.
     apply timeouts_in_never_has_Tick.
-  - (* start_query ... clears no Ticks *)
-    admit.
-  - (* add_tick ... clears no Ticks *)
-    unfold add_tick in *.
+  - (* need handle_stabilize_definition *)
+    unfold handle_stabilize in *; break_if.
+    + find_apply_lem_hyp start_query_definition;
+        break_or_hyp; break_exists; break_and; subst_max;
+          auto using timeouts_in_never_has_Tick.
+    + find_apply_lem_hyp end_query_definition;
+        break_and; subst_max;
+          autorewrite with list;
+          auto using timeouts_in_never_has_Tick.
+  - find_apply_lem_hyp end_query_definition;
+      break_and; subst_max;
+        autorewrite with list;
+        auto using timeouts_in_never_has_Tick.
+  - find_apply_lem_hyp end_query_definition;
+      break_and; subst_max;
+        autorewrite with list;
+        auto using timeouts_in_never_has_Tick.
+  - apply not_in_cons; split; [congruence | by apply in_nil].
+  - apply not_in_cons; split; [congruence | by apply in_nil].
+  - find_apply_lem_hyp end_query_definition;
+      break_and; subst_max;
+        autorewrite with list;
+        auto using timeouts_in_never_has_Tick.
+  - find_apply_lem_hyp start_query_definition;
+      break_or_hyp; break_exists; break_and; subst_max;
+        auto using timeouts_in_never_has_Tick.
+  - unfold add_tick in *.
     simpl in *.
     tuple_inversion.
-    rewrite app_nil_r.
-    apply timeouts_in_never_has_Tick.
-Admitted.
+    autorewrite with list.
+    auto using timeouts_in_never_has_Tick.
+Qed.
+
+Lemma handle_msg_never_clears_Tick :
+  forall src dst st p st' ms nts cts,
+    handle_msg src dst st p = (st', ms, nts, cts) ->
+    ~ In Tick cts.
+Proof using.
+  intros.
+  find_apply_lem_hyp handle_msg_definition; 
+    expand_def;
+    try find_apply_lem_hyp handle_query_req_busy_never_clears;
+    subst_max;
+    eauto using in_nil, handle_query_res_never_clears_Tick.
+Qed.
+
+Lemma do_rectify_never_clears_Tick :
+  forall h st st' ms nts cts,
+    do_rectify h st = (st', ms, nts, cts) ->
+    ~ In Tick cts.
+Proof using.
+  intros.
+  find_apply_lem_hyp do_rectify_definition; expand_def; try apply in_nil.
+  find_apply_lem_hyp start_query_definition; expand_def;
+    auto using in_nil, timeouts_in_never_has_Tick.
+Qed.
+
+Lemma do_delayed_queries_never_clears_Tick :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    ~ In Tick cts.
+Proof.
+  intros.
+  find_apply_lem_hyp do_delayed_queries_definition; expand_def.
+  - apply in_nil.
+  - eapply not_in_cons; split.
+    + congruence.
+    + apply in_nil.
+Qed.
 
 Lemma recv_handler_never_clears_Tick :
   forall src dst st p ms st' nts cts,
     recv_handler src dst st p = (st', ms, nts, cts) ->
     ~ In Tick cts.
 Proof using.
-  unfold recv_handler.
   intros.
-  repeat break_match.
-Admitted.
+  destruct (handle_msg src dst st p) as [[[st_hm ?ms] ?nts] ?cts] eqn:?H.
+
+  find_copy_apply_lem_hyp handle_msg_never_clears_Tick.
+  destruct (do_delayed_queries dst st_hm) as [[[st_dq ?ms] ?nts] ?cts] eqn:?H.
+  find_copy_apply_lem_hyp do_delayed_queries_never_clears_Tick.
+  destruct (do_rectify dst st_dq) as [[[?st ?ms] ?nts] ?cts] eqn:?H.
+  find_copy_apply_lem_hyp do_rectify_never_clears_Tick.
+
+  find_eapply_lem_hyp recv_handler_definition; eauto; expand_def.
+
+  unfold not; intros.
+  repeat (find_apply_lem_hyp in_app_or; break_or_hyp);
+    tauto.
+Qed.
 
 Lemma timeouts_in_Request :
   forall st dst q m a,
