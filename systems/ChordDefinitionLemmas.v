@@ -47,10 +47,10 @@ Lemma handle_query_res_definition :
     (request_payload p /\
      st' = delay_query st src p /\
      clearedts = [] /\
-     (delayed_queries st = [] /\
+     ((delayed_queries st = [] /\
       newts = [KeepaliveTick]) \/
      (delayed_queries st <> [] /\
-      newts = [])) \/
+      newts = []))) \/
     (p = Busy /\
      st' = st /\
      newts = timeouts_in st /\
@@ -58,18 +58,18 @@ Lemma handle_query_res_definition :
     (exists n,
         q = Rectify n /\
         p = Pong /\
-        (exists pr,
+        ((exists pr,
             pred st = Some pr /\
             end_query (handle_rectify st pr n) = (st', ms, newts, clearedts)) \/
-        (pred st = None /\
-         end_query (update_pred st n, [], [], []) = (st', ms, newts, clearedts))) \/
+         (pred st = None /\
+         end_query (update_pred st n, [], [], []) = (st', ms, newts, clearedts)))) \/
     (q = Stabilize /\
-     (exists new_succ succs,
+     ((exists new_succ succs,
          p = GotPredAndSuccs (Some new_succ) succs /\
          handle_stabilize dst (make_pointer src) st q new_succ succs = (st', ms, newts, clearedts)) \/
      (exists succs,
          p = GotPredAndSuccs None succs /\
-         end_query (st, [], [], []) = (st', ms, newts, clearedts))) \/
+         end_query (st, [], [], []) = (st', ms, newts, clearedts)))) \/
     (exists new_succ,
         q = Stabilize2 new_succ /\
         exists succs,
@@ -101,17 +101,17 @@ Lemma handle_query_res_definition :
 Proof using.
   unfold handle_query_res.
   intros.
-  repeat break_match; try (tuple_inversion; tauto).
-  - right. right. left. eexists. intuition eauto.
-  - intuition eauto.
+  repeat break_match; try tuple_inversion; try tauto.
+  - do 2 right. left. eexists; intuition eauto.
+  - do 2 right. left. eexists; intuition eauto.
   - intuition eauto.
   - intuition eauto.
   - intuition eauto.
   - do 5 right. left.
     eexists; split; eauto.
     left.
-    tuple_inversion.
-    exists p1.
+    eexists; split; eauto.
+    repeat split; auto.
     unfold next_msg_for_join; break_if; subst_max.
     + intuition eauto.
     + intuition eauto.
