@@ -535,6 +535,23 @@ Proof using.
   now invc_labeled_step.
 Qed.
 
+Lemma if_Timeout_enabled :
+  forall h t gst,
+    enabled (Timeout h t) gst ->
+    timeout_constraint gst h t /\
+    In h (nodes gst) /\
+    ~ In h (failed_nodes gst) /\
+    In t (timeouts gst h) /\
+    exists st, sigma gst h = Some st.
+Proof.
+  unfold enabled.
+  intros; break_exists; break_and.
+  inv_labeled_step.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+  find_injection.
+  intuition eauto.
+Qed.
+
 Lemma when_Timeout_enabled :
   forall h t st gst,
     In h (nodes gst) ->
@@ -758,6 +775,46 @@ Proof using.
   unfold not; intros.
   repeat (find_apply_lem_hyp in_app_or; break_or_hyp);
     tauto.
+Qed.
+
+Definition timeout_handler_Tick_adds_Tick :
+  forall h st st' ms nts cts,
+    timeout_handler h st Tick = (st', ms, nts, cts) ->
+    In Tick nts.
+Proof.
+  intros.
+  find_apply_lem_hyp timeout_handler_definition; expand_def;
+    try congruence.
+  find_apply_lem_hyp tick_handler_definition; expand_def;
+    try auto with datatypes.
+  destruct (start_query _ _ _) as [[[?st ?ms] ?nts] ?cts].
+  find_apply_lem_hyp add_tick_definition; expand_def.
+  auto with datatypes.
+Qed.
+
+Lemma timeout_handler_never_removes_Tick :
+  forall h st t st' ms nts cts,
+    timeout_handler h st t = (st', ms, nts, cts) ->
+    ~ In Tick cts.
+Proof.
+  intros.
+  find_apply_lem_hyp timeout_handler_definition; expand_def.
+  - find_apply_lem_hyp tick_handler_definition; expand_def;
+      try auto with datatypes.
+    destruct (start_query _ _ _) as [[[?st ?ms] ?nts] ?cts] eqn:H_sq.
+    find_apply_lem_hyp add_tick_definition; expand_def.
+    find_apply_lem_hyp start_query_definition; expand_def;
+      auto using timeouts_in_never_has_Tick with datatypes.
+  - find_apply_lem_hyp keepalive_handler_definition; expand_def.
+    auto with datatypes.
+  - find_apply_lem_hyp request_timeout_handler_definition; expand_def;
+      try auto with datatypes.
+    find_apply_lem_hyp handle_query_timeout_definition; expand_def;
+      try find_apply_lem_hyp end_query_definition;
+      try find_apply_lem_hyp start_query_definition;
+      expand_def;
+      autorewrite with list;
+      auto using timeouts_in_never_has_Tick.
 Qed.
 
 Lemma timeouts_in_Request :
@@ -1010,6 +1067,58 @@ Proof using.
   intros.
   find_eapply_lem_hyp always_now.
   now find_eapply_lem_hyp satisfies_invariant_inv.
+Qed.
+
+
+Lemma enabled_Tick_invariant :
+  forall gst l gst' h,
+    labeled_step_dynamic gst l gst' ->
+    enabled (Timeout h Tick) gst ->
+    enabled (Timeout h Tick) gst'.
+Proof.
+  intros.
+  find_copy_apply_lem_hyp if_Timeout_enabled; expand_def.
+  invc_labeled_step.
+  - find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+    find_copy_apply_lem_hyp timeout_handler_never_removes_Tick.
+    destruct (addr_eq_dec (ltac:(eauto)) h);
+      destruct (timeout_eq_dec (ltac:(eauto)) Tick); subst_max.
+    + find_copy_apply_lem_hyp timeout_handler_Tick_adds_Tick.
+      eapply when_Timeout_enabled; eauto.
+      * erewrite apply_handler_result_updates_sigma; eauto.
+      * simpl; rewrite_update.
+        auto with datatypes.
+      * constructor.
+    + eapply when_Timeout_enabled; eauto.
+      * erewrite apply_handler_result_updates_sigma; eauto.
+      * simpl; rewrite_update.
+        intuition auto using in_or_app, in_remove_all_preserve, remove_preserve.
+      * constructor.
+    + eapply when_Timeout_enabled; eauto.
+      * simpl; rewrite_update; find_rewrite; auto.
+      * simpl; rewrite_update; auto.
+      * constructor.
+    + eapply when_Timeout_enabled; eauto.
+      * simpl; rewrite_update; find_rewrite; auto.
+      * simpl; rewrite_update; auto.
+      * constructor.
+  - unfold recv_handler_l in *.
+    tuple_inversion.
+    find_rewrite.
+    find_copy_apply_lem_hyp recv_handler_never_clears_Tick.
+    destruct (addr_eq_dec (fst (snd (ltac:(eauto)))) h); subst.
+    + eapply when_Timeout_enabled; eauto.
+      * simpl; rewrite_update; auto.
+      * simpl; rewrite_update.
+        intuition auto using in_or_app, in_remove_all_preserve, remove_preserve.
+      * constructor.
+    + eapply when_Timeout_enabled; eauto.
+      * simpl; rewrite_update; find_rewrite; auto.
+      * simpl; rewrite_update.
+        intuition auto using in_or_app, in_remove_all_preserve, remove_preserve.
+      * constructor.
+  - eapply when_Timeout_enabled; solve [eauto | constructor].
+  - eapply when_Timeout_enabled; solve [eauto | constructor].
 Qed.
 
 Lemma Timeout_enabled_until_occurred :
