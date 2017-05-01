@@ -74,6 +74,18 @@ Ltac invc_labeled_step :=
     invc H; clean_up_labeled_step_cases
   end.
 
+Ltac inv_lb_execution :=
+  match goal with
+  | H : lb_execution _ |- _ =>
+    inv H
+  end.
+
+Ltac invc_lb_execution :=
+  match goal with
+  | H : lb_execution _ |- _ =>
+    invc H
+  end.
+
 Ltac inv_timeout_constraint :=
   match goal with
   | H : timeout_constraint _ _ _ |- _ =>
@@ -1069,6 +1081,34 @@ Proof using.
   now find_eapply_lem_hyp satisfies_invariant_inv.
 Qed.
 
+(* This is true because when nodes set joined = true they also set a Tick
+   timeout, and Tick is preserved by all steps except failures (see
+   enabled_Tick_invariant). *)
+Lemma active_node_eventually_joins :
+  forall ex h,
+    reachable_st (hd ex).(occ_gst) ->
+    weak_local_fairness ex ->
+    lb_execution ex ->
+    In h (nodes (hd ex).(occ_gst)) ->
+    ~ In h (failed_nodes (hd ex).(occ_gst)) ->
+    eventually
+      (consecutive
+         (fun occ occ' =>
+            ~ live_node occ.(occ_gst) h /\
+            ~ enabled (Timeout h Tick) occ.(occ_gst) /\
+            live_node occ'.(occ_gst) h /\
+            enabled (Timeout h Tick) occ'.(occ_gst)))
+      ex.
+Proof.
+Admitted.
+
+Lemma live_node_invariant :
+  forall gst l gst' h,
+    labeled_step_dynamic gst l gst' ->
+    live_node gst h ->
+    live_node gst' h.
+Proof.
+Admitted.
 
 Lemma enabled_Tick_invariant :
   forall gst l gst' h,
@@ -1119,6 +1159,61 @@ Proof.
       * constructor.
   - eapply when_Timeout_enabled; solve [eauto | constructor].
   - eapply when_Timeout_enabled; solve [eauto | constructor].
+Qed.
+
+Lemma eventual_invariant_always_true :
+  forall ex P,
+    lb_execution ex ->
+    eventually (now (fun o => P (occ_gst o))) ex ->
+    (forall gst l gst',
+        P gst ->
+        labeled_step_dynamic gst l gst' ->
+        P gst') ->
+    continuously (now (fun o => P (occ_gst o))) ex. 
+Proof.
+  intros.
+  match goal with
+  | [ H : eventually _ ex |- _ ] =>
+    induction H
+  end.
+  - constructor.
+    generalize dependent s.
+    cofix CIH.
+    intros.
+    constructor; [assumption|].
+    destruct s as [o [o' s]].
+    specialize (CIH (Cons o' s)).
+    inv_lb_execution.
+    simpl in *.
+    eauto.
+  - constructor 2.
+    apply IHeventually.
+    eapply lb_execution_invar; eauto.
+Qed.
+
+Lemma Tick_continuously_enabled :
+  forall ex h,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    live_node (occ_gst (hd ex)) h ->
+    continuously (now (l_enabled (Timeout h Tick))) ex.
+Proof.
+Admitted.
+
+Lemma live_node_ticks_inf_often :
+  forall ex h,
+    weak_local_fairness ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    live_node (occ_gst (hd ex)) h ->
+    inf_occurred (Timeout h Tick) ex.
+Proof.
+  intros until 0.
+  intro H_fair.
+  intros.
+  eapply H_fair.
+  apply E0.
+  eapply Tick_always_enabled; eauto.
 Qed.
 
 Lemma Timeout_enabled_until_occurred :
