@@ -324,3 +324,119 @@ Proof.
   tuple_inversion.
   eexists; eauto.
 Qed.
+
+Lemma add_tick_definition :
+  forall st ms nts cts st' ms' nts' cts',
+    add_tick (st, ms, nts, cts) = (st', ms', nts', cts') ->
+
+    st' = st /\ ms = ms' /\ cts = cts' /\
+    nts' = Tick :: nts.
+Proof.
+  unfold add_tick.
+  intros.
+  now tuple_inversion.
+Qed.
+
+Lemma tick_handler_definition :
+  forall h st st' ms nts cts,
+    tick_handler h st = (st', ms, nts, cts) ->
+
+    cur_request st = None /\ joined st = true /\
+    add_tick (start_query h st Stabilize) = (st', ms, nts, cts) \/
+
+    ((exists req, cur_request st = Some req) \/
+     joined st = false) /\
+    st' = st /\ ms = [] /\ nts = [Tick] /\ cts = [].
+Proof.
+  unfold tick_handler.
+  intros.
+  repeat break_match; try tuple_inversion;
+    intuition (eexists; eauto).
+Qed.
+
+Lemma keepalive_handler_definition :
+  forall st st' ms nts cts,
+    keepalive_handler st = (st', ms, nts, cts) ->
+
+    st' = st /\
+    ms = send_keepalives st /\
+    nts = [KeepaliveTick] /\
+    cts = [].
+Proof.
+  unfold keepalive_handler.
+  intros.
+  now tuple_inversion.
+Qed.
+
+Lemma handle_query_timeout_definition :
+  forall h st dst query st' ms nts cts,
+    handle_query_timeout h st dst query = (st', ms, nts, cts) ->
+
+    (exists notifier,
+        query = Rectify notifier /\
+        end_query (update_pred st notifier, [], [], []) = (st', ms, nts, cts)) \/
+    (query = Stabilize /\
+     exists dead rest,
+       succ_list st = dead :: rest /\
+       start_query h (update_succ_list st rest) Stabilize = (st', ms, nts, cts)) \/
+    (exists s, query = Stabilize2 s /\
+          exists next rest,
+            succ_list st = next :: rest /\
+            end_query (st, [(addr_of next, Notify)], [], []) = (st', ms, nts, cts)) \/
+    end_query (st, [], [], []) = (st', ms, nts, cts) /\
+    ((exists k, query = Join k) \/
+     (exists k, query = Join2 k) \/
+     (query = Stabilize /\
+      succ_list st = []) \/
+     (exists s, query = Stabilize2 s /\
+           succ_list st = [])).
+Proof.
+  unfold handle_query_timeout.
+  intros.
+  repeat break_match; intuition (eexists; eauto).
+Qed.
+
+Lemma request_timeout_handler_definition :
+  forall h st dst msg st' ms nts cts,
+    request_timeout_handler h st dst msg = (st', ms, nts, cts) ->
+
+    (exists dst_ptr query m,
+        cur_request st = Some (dst_ptr, query, m) /\
+        ((addr_of dst_ptr = dst /\
+         handle_query_timeout h st dst_ptr query = (st', ms, nts, cts)) \/
+        (addr_of dst_ptr <> dst /\
+         st' = st /\ ms = [] /\ nts = [] /\ cts = []))) \/
+    cur_request st = None /\
+    st' = st /\ ms = [] /\ nts = [] /\ cts = [].
+Proof.
+  unfold request_timeout_handler.
+  intros; repeat break_match; try tuple_inversion;
+    tauto || left; repeat eexists; eauto; tauto.
+Qed.
+
+Lemma timeout_handler_definition :
+  forall h st t res,
+    timeout_handler h st t = res ->
+    t = Tick /\
+    tick_handler h st = res \/
+    t = KeepaliveTick /\
+    keepalive_handler st = res \/
+    exists dst msg,
+      t = Request dst msg /\
+      request_timeout_handler h st dst msg = res.
+Proof.
+  unfold timeout_handler.
+  intros.
+  break_match; intuition eauto.
+Qed.
+
+Lemma timeout_handler_l_definition :
+  forall h st t st' ms nts cts l,
+    timeout_handler_l h st t = (st', ms, nts, cts, l) ->
+
+    timeout_handler h st t = (st', ms, nts, cts) /\
+    l = Chord.Chord.Timeout h t.
+Proof.
+  unfold timeout_handler_l;
+    intros; tuple_inversion; tauto.
+Qed.
