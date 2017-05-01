@@ -1212,8 +1212,7 @@ Proof.
   intro H_fair.
   intros.
   eapply H_fair.
-  apply E0.
-  eapply Tick_always_enabled; eauto.
+  eapply Tick_continuously_enabled; eauto.
 Qed.
 
 Lemma Timeout_enabled_until_occurred :
