@@ -180,6 +180,7 @@ Module Chord <: DynamicSystem.
 
   Inductive _timeout :=
   | Tick : _timeout
+  | RectifyTick : _timeout
   | KeepaliveTick : _timeout
   | Request : addr -> payload -> _timeout.
   Definition timeout := _timeout.
@@ -346,19 +347,22 @@ Module Chord <: DynamicSystem.
      []).
 
   Definition set_rectify_with (st : data) (rw : pointer) : data :=
+    {| ptr := ptr st;
+       pred := pred st;
+       succ_list := succ_list st;
+       known := known st;
+       joined := joined st;
+       rectify_with := Some rw;
+       cur_request := cur_request st;
+       delayed_queries := delayed_queries st |}.
+
+  Definition schedule_rectify_with (st : data) (rw : pointer) : res :=
     match rectify_with st with
     | Some rw0 =>
       if ptr_between_bool rw0 rw (ptr st)
-      then {| ptr := ptr st;
-              pred := pred st;
-              succ_list := succ_list st;
-              known := known st;
-              joined := joined st;
-              rectify_with := Some rw;
-              cur_request := cur_request st;
-              delayed_queries := delayed_queries st |}
-      else st
-    | None => st
+      then (set_rectify_with st rw, [], [], [])
+      else (st, [], [], [])
+    | None => (st, [], [RectifyTick], [])
     end.
 
   Definition send_eq_dec :
@@ -526,7 +530,7 @@ Module Chord <: DynamicSystem.
 
   Definition handle_msg (src : addr) (dst : addr) (st : data) (msg : payload) : res :=
     match msg, cur_request st, is_request msg with
-    | Notify, _, _ => (set_rectify_with st (make_pointer src), [], [], [])
+    | Notify, _, _ => schedule_rectify_with st (make_pointer src)
     | Ping, _, _ => (st, [(src, Pong)], [], [])
     | _, Some (query_dst, q, _), true => handle_query_req_busy src st msg
     | _, Some (query_dst, q, _), false => handle_query_res src dst st q msg
@@ -536,10 +540,8 @@ Module Chord <: DynamicSystem.
   Definition recv_handler (src : addr) (dst : addr) (st : data) (msg : payload) : res :=
     let '(st, ms1, nts1, cts1) := handle_msg src dst st msg in
     let '(st, ms2, nts2, cts2) := do_delayed_queries dst st in
-    let '(st, ms3, nts3, cts3) := do_rectify dst st in
-    let nts := nts3 ++ remove_all timeout_eq_dec cts3
-                    (nts2 ++ remove_all timeout_eq_dec cts2 nts1) in
-    (st, ms3 ++ ms2 ++ ms1, nts, cts1 ++ cts2 ++ cts3).
+    let nts := nts2 ++ remove_all timeout_eq_dec cts2 nts1 in
+    (st, ms2 ++ ms1, nts, cts1 ++ cts2).
 
   Definition pi {A B C D : Type} (t : A * B * C * D) : A * B * C :=
     let '(a, b, c, d) := t in (a, b, c).
@@ -623,6 +625,7 @@ Module Chord <: DynamicSystem.
     | Request dst msg => request_timeout_handler h st dst msg
     | Tick => tick_handler h st
     | KeepaliveTick => keepalive_handler st
+    | RectifyTick => do_rectify h st
     end.
 
   Inductive _label :=
