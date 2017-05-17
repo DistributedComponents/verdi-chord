@@ -1544,6 +1544,7 @@ Proof using.
     + eapply_prop chord_fail_invariant; eauto.
     + destruct t.
       * eapply_prop chord_tick_invariant; eauto.
+      * admit.
       * eapply_prop chord_keepalive_invariant; eauto.
       * eapply_prop chord_request_invariant; eauto.
     + unfold recv_handler in *.
@@ -1575,22 +1576,10 @@ Proof using.
           now repeat find_reverse_rewrite.
         * repeat find_eapply_lem_hyp apply_handler_result_preserves_failed_nodes.
           now repeat find_reverse_rewrite. }
-      match goal with
-      | [ _ : context[do_rectify ?h ?st] |- _ ] =>
-        remember (apply_handler_result h (do_rectify h st) [] gst1) as gst2;
-          assert (P gst2)
-      end.
-      { eapply_prop chord_do_rectify_invariant; eauto.
-        * repeat find_rewrite.
-          eapply apply_handler_result_updates_sigma; eauto.
-        * repeat find_eapply_lem_hyp apply_handler_result_preserves_nodes.
-          now repeat find_reverse_rewrite.
-        * repeat find_eapply_lem_hyp apply_handler_result_preserves_failed_nodes.
-          now repeat find_reverse_rewrite. }
 
       (* proving the final intermediate state is gst *)
       match goal with
-      | [ |- P ?gst ] => assert (gst = gst2)
+      | [ |- P ?gst ] => assert (gst = gst1)
       end.
       { apply global_state_eq_ext.
         * repeat find_eapply_lem_hyp apply_handler_result_preserves_nodes.
@@ -1609,9 +1598,6 @@ Proof using.
              repeat rewrite app_assoc.
              rewrite remove_all_del_comm.
              apply app_eq_l.
-             rewrite (remove_all_del_comm _ _ l5).
-             rewrite (remove_all_del_comm _ _ l).
-             rewrite (remove_all_del_comm _ _ l).
              reflexivity.
           -- now repeat rewrite update_diff.
         * repeat find_rewrite.
@@ -1626,7 +1612,7 @@ Proof using.
         * repeat find_rewrite.
           unfold apply_handler_result; simpl.
           repeat (break_let; simpl).
-          now do 2 rewrite app_nil_r. }
+          now rewrite app_nil_r. }
       now repeat find_rewrite.
     + (* Input case *)
       admit.

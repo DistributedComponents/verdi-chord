@@ -135,10 +135,7 @@ Lemma handle_msg_definition :
     clearedts = [] \/
 
     p = Notify /\
-    st' = set_rectify_with st (make_pointer src) /\
-    ms = [] /\
-    newts = [] /\
-    clearedts = [] \/
+    schedule_rectify_with st (make_pointer src) = (st', ms, newts, clearedts) \/
 
     p <> Notify /\
     p <> Ping /\
@@ -159,7 +156,7 @@ Proof.
   intros.
   destruct (payload_eq_dec p Notify), (payload_eq_dec p Ping);
     subst_max; try congruence.
-  - tuple_inversion; tauto.
+  - tauto.
   - tuple_inversion; tauto.
   - do 2 right.
     repeat split; try auto.
@@ -167,7 +164,7 @@ Proof.
     + left; repeat eexists; eauto.
       destruct (is_request p) eqn:H_isreq;
         repeat break_match; simpl in *; congruence || tauto.
-    + repeat break_match; tuple_inversion; tauto.
+    + repeat break_match; try tuple_inversion; tauto.
 Qed.
 
 Lemma do_rectify_definition :
@@ -269,16 +266,15 @@ Proof using.
 Qed.
 
 Lemma recv_handler_definition :
-  forall src dst st msg st' ms nts cts st1 ms1 nts1 cts1 st2 ms2 nts2 cts2 st3 ms3 nts3 cts3,
+  forall src dst st msg st' ms nts cts st1 ms1 nts1 cts1 st2 ms2 nts2 cts2,
     recv_handler src dst st msg = (st', ms, nts, cts) ->
     handle_msg src dst st msg = (st1, ms1, nts1, cts1) ->
     do_delayed_queries dst st1 = (st2, ms2, nts2, cts2) ->
-    do_rectify dst st2 = (st3, ms3, nts3, cts3) ->
 
-    st' = st3 /\
-    ms = ms3 ++ ms2 ++ ms1 /\
-    nts = nts3 ++ remove_all timeout_eq_dec cts3 (nts2 ++ remove_all timeout_eq_dec cts2 nts1) /\
-    cts = cts1 ++ cts2 ++ cts3.
+    st' = st2 /\
+    ms = ms2 ++ ms1 /\
+    nts = nts2 ++ remove_all timeout_eq_dec cts2 nts1 /\
+    cts = cts1 ++ cts2.
 Proof using.
   unfold recv_handler.
   intros.
@@ -421,6 +417,8 @@ Lemma timeout_handler_definition :
     tick_handler h st = res \/
     t = KeepaliveTick /\
     keepalive_handler st = res \/
+    t = RectifyTick /\
+    do_rectify h st = res \/
     exists dst msg,
       t = Request dst msg /\
       request_timeout_handler h st dst msg = res.
