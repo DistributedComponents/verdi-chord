@@ -28,6 +28,8 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       _timeout_constraint gst h Tick
   | KeepaliveTick_unconstrained : forall gst h,
       _timeout_constraint gst h KeepaliveTick
+  | RectifyTick_unconstrained : forall gst h,
+      _timeout_constraint gst h RectifyTick
   | Request_needs_dst_dead_and_no_msgs : forall gst dst h p,
       In dst (failed_nodes gst) ->
       (forall m, request_response_pair p m -> ~ In (dst, (h, m)) (msgs gst)) ->
