@@ -731,6 +731,16 @@ Proof using.
     auto using timeouts_in_never_has_Tick.
 Qed.
 
+Lemma schedule_rectify_with_never_clears :
+  forall h st st' ms nts cts,
+    schedule_rectify_with h st = (st', ms, nts, cts) ->
+    cts = [].
+Proof.
+  unfold schedule_rectify_with.
+  intros.
+  repeat break_match; tuple_inversion; tauto.
+Qed.
+
 Lemma handle_msg_never_clears_Tick :
   forall src dst st p st' ms nts cts,
     handle_msg src dst st p = (st', ms, nts, cts) ->
@@ -740,6 +750,7 @@ Proof using.
   find_apply_lem_hyp handle_msg_definition;
     expand_def;
     try find_apply_lem_hyp handle_query_req_busy_never_clears;
+    try find_apply_lem_hyp schedule_rectify_with_never_clears;
     subst_max;
     eauto using in_nil, handle_query_res_never_clears_Tick.
 Qed.
@@ -789,11 +800,18 @@ Proof using.
     tauto.
 Qed.
 
+Lemma recv_handler_never_clears_RectifyTick :
+  forall src dst st p ms st' nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    ~ In RectifyTick cts.
+Proof using.
+Admitted.
+
 Definition timeout_handler_Tick_adds_Tick :
   forall h st st' ms nts cts,
     timeout_handler h st Tick = (st', ms, nts, cts) ->
     In Tick nts.
-Proof.
+Proof using.
   intros.
   find_apply_lem_hyp timeout_handler_definition; expand_def;
     try congruence.
@@ -819,6 +837,7 @@ Proof.
       auto using timeouts_in_never_has_Tick with datatypes.
   - find_apply_lem_hyp keepalive_handler_definition; expand_def.
     auto with datatypes.
+  - eapply do_rectify_never_clears_Tick; eauto.
   - find_apply_lem_hyp request_timeout_handler_definition; expand_def;
       try auto with datatypes.
     find_apply_lem_hyp handle_query_timeout_definition; expand_def;
@@ -982,6 +1001,11 @@ Proof using.
       now apply in_remove_all_preserve.
     * apply in_or_app.
       right.
+      find_apply_lem_hyp recv_handler_labeling.
+      find_apply_lem_hyp recv_handler_never_clears_RectifyTick.
+      now apply in_remove_all_preserve.
+    * apply in_or_app.
+      right.
       congruence.
     * find_apply_lem_hyp recv_handler_labeling.
       find_eapply_lem_hyp constrained_Request_not_cleared_by_recv_handler;
@@ -989,6 +1013,7 @@ Proof using.
         try rewrite -> reassembled_msg_still_eq;
         eauto using in_or_app, in_eq.
       apply in_or_app.
+      inv_labeled_step.
       intuition auto using in_remove_all_preserve.
   - by rewrite update_diff.
 Qed.
@@ -1032,10 +1057,7 @@ Proof using.
     (* TODO make this a lemma/tactic like recover_msg_from_... *)
     unfold timeout_handler_l in *.
     now tuple_inversion.
-  - inv_timeout_constraint.
-    * apply Tick_unconstrained.
-    * apply KeepaliveTick_unconstrained.
-    * apply Request_needs_dst_dead_and_no_msgs.
+  - inv_timeout_constraint; constructor.
     + eapply failed_nodes_never_removed; eauto.
     + move => q H_pair.
       now eapply request_constraint_prevents_recv_adding_msgs; eauto.
@@ -1166,8 +1188,8 @@ Lemma eventual_invariant_always_true :
     lb_execution ex ->
     eventually (now (fun o => P (occ_gst o))) ex ->
     (forall gst l gst',
-        P gst ->
         labeled_step_dynamic gst l gst' ->
+        P gst ->
         P gst') ->
     continuously (now (fun o => P (occ_gst o))) ex. 
 Proof.
@@ -1191,6 +1213,17 @@ Proof.
     eapply lb_execution_invar; eauto.
 Qed.
 
+(* This might need additional hypotheses or changes to `label` before it becomes
+   provable. *)
+Lemma Tick_eventually_enabled :
+  forall ex h,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    live_node (occ_gst (hd ex)) h ->
+    eventually (now (l_enabled (Timeout h Tick))) ex.
+Proof.
+Admitted.
+
 Lemma Tick_continuously_enabled :
   forall ex h,
     reachable_st (occ_gst (hd ex)) ->
@@ -1198,7 +1231,8 @@ Lemma Tick_continuously_enabled :
     live_node (occ_gst (hd ex)) h ->
     continuously (now (l_enabled (Timeout h Tick))) ex.
 Proof.
-Admitted.
+  eauto using eventual_invariant_always_true, Tick_eventually_enabled, enabled_Tick_invariant.
+Qed.
 
 Lemma live_node_ticks_inf_often :
   forall ex h,
@@ -1337,7 +1371,7 @@ Proof using.
   destruct s as [x s].
     by apply always_now in H_al.
 Qed.
-
+Print Assumptions unconstrained_timeout_eventually_occurred.
 Definition res_clears_timeout (r : res) (t : timeout) : Prop :=
   match r with
   | (_, _, _, cts) => In t cts
@@ -1615,10 +1649,13 @@ Proof using.
   - (* Tick case is.. impossible *)
     exfalso.
     apply: H_constraint.
-    exact: Tick_unconstrained.
+    constructor.
   - exfalso.
     apply: H_constraint.
-    exact: KeepaliveTick_unconstrained.
+    constructor.
+  - exfalso.
+    apply: H_constraint.
+    constructor.
   - find_copy_eapply_lem_hyp not_timeout_constraint_inv.
     break_or_hyp.
     * copy_apply H_reqnode H_t.
