@@ -931,7 +931,7 @@ Qed.
 
 Lemma responses_come_from_dst_of_timeout :
   forall gst dst req h src p,
-    inductive_invariant gst ->
+    reachable_st gst ->
     In (Request dst req) (timeouts gst h) ->
     In (src, (h, p)) (msgs gst) ->
     response_payload p ->
@@ -940,7 +940,7 @@ Admitted.
 
 Lemma responses_are_paired_to_requests :
   forall gst req dst h p,
-    inductive_invariant gst ->
+    reachable_st gst ->
     In (Request dst req) (timeouts gst h) ->
     In (dst, (h, p)) (msgs gst) ->
     response_payload p ->
@@ -949,13 +949,13 @@ Admitted.
 
 Lemma invariant_implies_timeouts_match_query :
   forall gst,
-    inductive_invariant gst ->
+    reachable_st gst ->
     timeouts_match_query gst.
 Admitted.
 
 Lemma constrained_Request_not_cleared_by_recv_handler :
   forall gst h dst req p src st st' ms nts cts,
-    inductive_invariant gst ->
+    reachable_st gst ->
     timeout_constraint gst h (Request dst req) ->
     In h (nodes gst) ->
     sigma gst h = Some st ->
@@ -980,7 +980,7 @@ Qed.
 
 Lemma recv_handler_keeps_timeouts_satisfying_constraint :
   forall gst src dst p gst' t h,
-    inductive_invariant gst ->
+    reachable_st gst ->
     labeled_step_dynamic gst (RecvMsg src dst p) gst' ->
     In t (timeouts gst h) ->
     timeout_constraint gst h t ->
@@ -1031,7 +1031,7 @@ Admitted.
 
 Lemma labeled_step_dynamic_recv_timeout_enabled :
   forall gst gst' gst'' a b m h t,
-    inductive_invariant gst ->
+    reachable_st gst ->
     t <> KeepaliveTick ->
     labeled_step_dynamic gst (RecvMsg a b m) gst' ->
     labeled_step_dynamic gst (Timeout h t) gst'' ->
@@ -1078,30 +1078,6 @@ Lemma labeled_step_dynamic_timeout_neq_timeout_enabled :
     t <> t' ->
     enabled (Timeout h' t') gst'.
 Admitted.
-
-Definition satisfies_invariant (s : infseq occurrence) :=
-  match s with
-  | Cons o s => inductive_invariant (occ_gst o)
-  end.
-
-Lemma satisfies_invariant_inv :
-  forall s,
-    satisfies_invariant s ->
-    inductive_invariant (occ_gst (hd s)).
-Proof using.
-  intros.
-  now destruct s.
-Qed.
-
-Lemma always_satisfies_inv_means_hd_satisfies_inv :
-  forall o s,
-    always satisfies_invariant (Cons o s) ->
-    inductive_invariant (occ_gst o).
-Proof using.
-  intros.
-  find_eapply_lem_hyp always_now.
-  now find_eapply_lem_hyp satisfies_invariant_inv.
-Qed.
 
 (* This is true because when nodes set joined = true they also set a Tick
    timeout, and Tick is preserved by all steps except failures (see
@@ -1514,7 +1490,7 @@ Admitted.
 
 Lemma queries_are_closed_by_recvmsg_occ :
   forall o src dst m p,
-    inductive_invariant (occ_gst o) ->
+    reachable_st (occ_gst o) ->
     request_response_pair m p ->
     In (Request dst m) (timeouts (occ_gst o) src) ->
     occ_label o = RecvMsg dst src p ->
@@ -1523,20 +1499,20 @@ Admitted.
 
 Lemma inv_responses_are_unique :
   forall gst,
-    inductive_invariant gst ->
+    reachable_st gst ->
     responses_are_unique gst.
 Admitted.
 
 Lemma inv_Request_payload_has_response :
   forall gst,
-    inductive_invariant gst ->
+    reachable_st gst ->
     Request_payload_has_response gst.
 Admitted.
 
 Lemma now_recvmsg_now_clears_timeout :
   forall s p m dst src,
     lb_execution s ->
-    always satisfies_invariant s ->
+    reachable_st (occ_gst (hd s)) ->
     request_response_pair p m ->
     In (Request dst p) (timeouts (occ_gst (hd s)) src) ->
     ~ timeout_constraint (occ_gst (hd s)) src (Request dst p) ->
@@ -1544,10 +1520,22 @@ Lemma now_recvmsg_now_clears_timeout :
     (now (clears_timeout src (Request dst p))) s.
 Admitted.
 
+Lemma reachable_st_lb_execution_cons :
+  forall o o' ex,
+    lb_execution (Cons o (Cons o' ex)) ->
+    reachable_st (occ_gst o) ->
+    reachable_st (occ_gst o').
+Proof using.
+  intros.
+  inv_lb_execution.
+  find_apply_lem_hyp labeled_step_is_unlabeled_step.
+  eauto using reachableStep.
+Qed.
+
 Lemma queries_now_closed :
   forall s p m dst src,
     lb_execution s ->
-    always satisfies_invariant s ->
+    reachable_st (occ_gst (hd s)) ->
     request_response_pair p m ->
     In (Request dst p) (timeouts (occ_gst (hd s)) src) ->
     ~ timeout_constraint (occ_gst (hd s)) src (Request dst p) ->
@@ -1560,17 +1548,15 @@ Proof using.
     unfold now in *.
     break_match.
     eapply queries_are_closed_by_recvmsg_occ; eauto.
-      by find_eapply_lem_hyp always_satisfies_inv_means_hd_satisfies_inv.
   - destruct s' as [o' s']. simpl in *.
     inv H_exec.
-    copy_apply always_satisfies_inv_means_hd_satisfies_inv H_inv.
+    find_copy_apply_lem_hyp reachable_st_lb_execution_cons; eauto.
     find_eapply_lem_hyp timeout_constraint_lifted_by_clearing;
       eauto using inv_Request_payload_has_response, inv_responses_are_unique.
     break_or_hyp; [| by apply E0].
     copy_eapply request_stays_in H_exec; eauto.
     break_or_hyp; [| by apply E0].
     apply E_next.
-    apply always_invar in H_inv.
     now apply IHH_recv.
 Qed.
 
@@ -1594,7 +1580,7 @@ Lemma requests_eventually_get_responses :
   forall s,
     lb_execution s ->
     weak_local_fairness s ->
-    always satisfies_invariant s ->
+    reachable_st (occ_gst (hd s)) ->
     forall src dst p,
       In src (nodes (occ_gst (hd s))) ->
       ~ In src (failed_nodes (occ_gst (hd s))) ->
@@ -1610,7 +1596,7 @@ Lemma requests_eventually_complete :
   forall s,
     lb_execution s ->
     weak_local_fairness s ->
-    always satisfies_invariant s ->
+    reachable_st (occ_gst (hd s)) ->
     forall src dst p m,
       In src (nodes (occ_gst (hd s))) ->
       ~ In src (failed_nodes (occ_gst (hd s))) ->
@@ -1625,12 +1611,13 @@ Proof using.
   break_exists_name m'.
   now eapply queries_now_closed with (m:=m').
 Qed.
+Print Assumptions requests_eventually_complete.
 
 Lemma constrained_timeout_eventually_cleared :
   forall s,
     lb_execution s ->
     weak_local_fairness s ->
-    always satisfies_invariant s ->
+    reachable_st (occ_gst (hd s)) ->
     (* these should all follow from satisfies_invariant. *)
     timeouts_match_msg (occ_gst (hd s)) ->
     Request_goes_to_real_node (occ_gst (hd s)) ->
