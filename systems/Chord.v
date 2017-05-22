@@ -566,11 +566,11 @@ Module Chord <: DynamicSystem.
 
   Inductive timeout_effect :=
   | Ineffective : timeout_effect
-  | StartStabilizeWith : addr -> timeout_effect
+  | StartStabilize : timeout_effect
   | DetectFailureOf : pointer -> timeout_effect
-  | StartRectifyWith : addr -> timeout_effect
-  | SetPred : pointer -> timeout_effect
-  | SendKeepalives : list addr -> timeout_effect.
+  | StartRectify : timeout_effect
+  | SetPred : timeout_effect
+  | SendKeepalives : timeout_effect.
 
   Definition timeout_effect_eq_dec :
     forall x y : timeout_effect,
@@ -581,7 +581,7 @@ Module Chord <: DynamicSystem.
 
   Definition tick_handler (h : addr) (st : data) : res * timeout_effect :=
     match cur_request st, joined st with
-    | None, true => (add_tick (start_query h st Stabilize), StartStabilizeWith h)
+    | None, true => (add_tick (start_query h st Stabilize), StartStabilize)
     | _, _ => ((st, [], [Tick], []), Ineffective)
     end.
 
@@ -614,7 +614,7 @@ Module Chord <: DynamicSystem.
 
   Definition keepalive_handler (st : data) : res * timeout_effect :=
     let ms := send_keepalives st in
-    ((st, ms, [KeepaliveTick], []), SendKeepalives (map fst ms)).
+    ((st, ms, [KeepaliveTick], []), SendKeepalives).
 
   Definition request_timeout_handler (h : addr) (st : data) (dst : addr) (msg : payload) : res * timeout_effect :=
     match cur_request st with
@@ -630,8 +630,8 @@ Module Chord <: DynamicSystem.
     | true, None, Some new =>
       let st := clear_rectify_with st in
       match pred st with
-      | Some _ => (start_query h st (Rectify new), StartRectifyWith h)
-      | None => ((update_pred st new, [], [], []), SetPred new)
+      | Some _ => (start_query h st (Rectify new), StartRectify)
+      | None => ((update_pred st new, [], [], []), SetPred)
       end
     | _, _, _ => ((st, [], [], []), Ineffective)
     end.
