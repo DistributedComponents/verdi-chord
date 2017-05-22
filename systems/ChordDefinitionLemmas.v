@@ -178,10 +178,10 @@ Lemma do_rectify_definition :
          rectify_with st = Some new /\
          (exists x,
              pred st = Some x /\
-             eff = StartRectifyWith h /\
+             eff = StartRectify /\
              start_query h (clear_rectify_with st) (Rectify new) = (st', ms', nts', cts')) \/
          (pred st = None /\
-          eff = SetPred new /\
+          eff = SetPred /\
           st' = clear_rectify_with (update_pred st new) /\
           ms' = [] /\
           nts' = [] /\
@@ -362,7 +362,7 @@ Lemma tick_handler_definition :
 
     cur_request st = None /\ joined st = true /\
     add_tick (start_query h st Stabilize) = (st', ms, nts, cts) /\
-    eff = StartStabilizeWith h \/
+    eff = StartStabilize \/
 
     ((exists req, cur_request st = Some req) \/
      joined st = false) /\
@@ -382,7 +382,7 @@ Lemma keepalive_handler_definition :
     ms = send_keepalives st /\
     nts = [KeepaliveTick] /\
     cts = [] /\
-    eff = SendKeepalives (map fst ms).
+    eff = SendKeepalives.
 Proof.
   unfold keepalive_handler.
   intros.
