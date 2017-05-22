@@ -500,7 +500,7 @@ Module Chord <: DynamicSystem.
     | Join known, GotBestPredecessor best_pred =>
       let a := addr_of best_pred in
       let req := next_msg_for_join (ptr st) src a in
-      (st,
+      (update_query st best_pred (Join known) req,
        [(a, req)],
        [Request a req],
        [Request src (GetBestPredecessor (ptr st))])

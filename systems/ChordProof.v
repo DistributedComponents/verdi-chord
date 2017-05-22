@@ -95,12 +95,127 @@ Proof using.
     eauto || congruence.
 Qed.
 
-Lemma requests_are_always_responded_to :
-  forall src dst msg st sends nts cts,
+Lemma real_requests_get_busy_response :
+  forall src dst msg st st' sends nts cts,
     request_payload msg ->
-    (st, sends, nts, cts) = recv_handler src dst st msg ->
-    exists res, In (src, res) sends.
-Admitted.
+    cur_request st <> None ->
+    msg <> Ping ->
+    recv_handler src dst st msg = (st', sends, nts, cts) ->
+    In (src, Busy) sends.
+Proof.
+  intros.
+  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
+  apply in_or_app; right.
+  find_apply_lem_hyp handle_msg_definition; expand_def.
+  - match goal with
+    | [H: request_payload _ |- _] => inv H
+    end.
+  - eapply handle_query_req_busy_sends_busy; eauto.
+  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
+Qed.
+
+Lemma real_requests_get_response_handle_query_req :
+  forall st src req sends,
+    request_payload req ->
+    req <> Ping ->
+    handle_query_req st src req = sends ->
+    exists res,
+      In (src, res) sends /\
+      request_response_pair req res.
+Proof.
+  intros.
+  match goal with
+  | [H: request_payload _ |- _] =>
+    inv H; congruence || simpl
+  end;
+    eexists; intuition eauto; constructor.
+Qed.
+
+Lemma pings_always_get_pongs_handle_msg :
+  forall src dst st st' sends nts cts,
+    handle_msg src dst st Ping = (st', sends, nts, cts) ->
+    In (src, Pong) sends.
+Proof.
+  intros.
+  find_apply_lem_hyp handle_msg_definition; expand_def;
+    solve [auto with datatypes | congruence].
+Qed.
+
+Lemma pings_always_get_pongs_recv_handler :
+  forall src dst st st' sends nts cts,
+    recv_handler src dst st Ping = (st', sends, nts, cts) ->
+    In (src, Pong) sends.
+Proof.
+  intros.
+  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
+  apply in_or_app; right.
+  eapply pings_always_get_pongs_handle_msg; eauto.
+Qed.
+
+Ltac inv_prop P :=
+  match goal with
+  | [ H : context[P] |- _] =>
+    inv H
+  end.
+
+Lemma real_requests_get_responses_handle_msg :
+  forall src dst st req st' sends nts cts,
+    handle_msg src dst st req = (st', sends, nts, cts) ->
+    request_payload req ->
+    req <> Ping ->
+    cur_request st = None ->
+    exists res,
+      In (src, res) sends /\
+      request_response_pair req res.
+Proof.
+  intros.
+  find_apply_lem_hyp handle_msg_definition; expand_def.
+  - solve_by_inversion.
+  - congruence.
+  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
+  - eapply real_requests_get_response_handle_query_req; eauto.
+Qed.
+
+Lemma real_requests_get_responses_recv_handler :
+  forall src dst st req st' sends nts cts,
+    recv_handler src dst st req = (st', sends, nts, cts) ->
+    request_payload req ->
+    req <> Ping ->
+    cur_request st = None ->
+    exists res,
+      In (src, res) sends /\
+      request_response_pair req res.
+Proof.
+  intros.
+  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
+  find_apply_lem_hyp real_requests_get_responses_handle_msg; eauto.
+  break_exists_exists; break_and.
+  eauto with datatypes.
+Qed.
+
+Lemma requests_are_always_responded_to :
+  forall src dst req st st' sends nts cts,
+    request_payload req ->
+    recv_handler src dst st req = (st', sends, nts, cts) ->
+
+    cur_request st <> None /\
+    req <> Ping /\
+    In (src, Busy) sends \/
+
+    exists res,
+      In (src, res) sends /\
+      request_response_pair req res.
+Proof.
+  intros.
+  destruct (payload_eq_dec req Ping); subst.
+  - right.
+    eexists; eauto using pings_always_get_pongs_recv_handler, pair_Ping.
+  - destruct (cur_request st) eqn:?H.
+    + find_copy_eapply_lem_hyp real_requests_get_busy_response; eauto.
+      * left; repeat split; assumption || congruence.
+      * congruence.
+    + find_apply_lem_hyp real_requests_get_responses_recv_handler; auto.
+Qed.
 
 Definition init_sigma (h : addr) : option data.
 Admitted. (* TODO should map base addresses to data for an ideal ring of just the base nodes *)

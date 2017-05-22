@@ -81,11 +81,12 @@ Lemma handle_query_res_definition :
         ((exists bestpred,
             p = GotBestPredecessor bestpred /\
             clearedts = [Request src (GetBestPredecessor (ptr st))] /\
-            st' = st /\
-            ((addr_of bestpred = src /\
+            ((st' = update_query st bestpred (Join k) GetSuccList /\
+              addr_of bestpred = src /\
               ms = [(src, GetSuccList)] /\
               newts = [Request src GetSuccList]) \/
-             (addr_of bestpred <> src /\
+             (st' = update_query st bestpred (Join k) (GetBestPredecessor (ptr st')) /\
+              addr_of bestpred <> src /\
               ms = [(addr_of bestpred, (GetBestPredecessor (ptr st')))] /\
               newts = [Request (addr_of bestpred) (GetBestPredecessor (ptr st'))]))) \/
          (p = GotSuccList [] /\
@@ -280,6 +281,25 @@ Proof using.
   intros.
   repeat find_rewrite.
   tuple_inversion; tauto.
+Qed.
+
+Lemma recv_handler_definition_existential :
+  forall src dst st p st' ms nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    exists st1 ms1 nts1 cts1 st2 ms2 nts2 cts2,
+      handle_msg src dst st p = (st1, ms1, nts1, cts1) /\
+      do_delayed_queries dst st1 = (st2, ms2, nts2, cts2) /\
+
+      st' = st2 /\
+      ms = ms2 ++ ms1 /\
+      nts = nts2 ++ remove_all timeout_eq_dec cts2 nts1 /\
+      cts = cts1 ++ cts2.
+Proof.
+  intros.
+  destruct (handle_msg src dst st p) as [[[st1 ms1] nts1] cts1] eqn:H_hm.
+  destruct (do_delayed_queries dst st1) as [[[st2 ms2] nts2] cts2] eqn:H_dq.
+  find_copy_eapply_lem_hyp recv_handler_definition; eauto; expand_def.
+  repeat eexists; intuition eauto.
 Qed.
 
 Lemma update_for_start_definition :

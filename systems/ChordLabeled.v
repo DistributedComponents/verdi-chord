@@ -20,6 +20,7 @@ Set Bullet Behavior "Strict Subproofs".
 Require Chord.ChordSemantics.
 Import Chord.ChordSemantics.ChordSemantics.
 Import Chord.ChordSemantics.ConstrainedChord.
+Require Import Chord.ChordDefinitionLemmas.
 
 (* assuming sigma gst h = Some st *)
 Definition failed_successors (gst : global_state) (st : data) : list pointer :=
@@ -687,7 +688,7 @@ Lemma handle_query_res_never_clears_Tick :
 Proof using.
   intros.
   find_eapply_lem_hyp handle_query_res_definition;
-    repeat (break_or_hyp || break_and || break_exists); subst; try by apply in_nil.
+    repeat (break_or_hyp || break_and || break_exists); subst_max; try by apply in_nil.
   - apply timeouts_in_never_has_Tick.
   - destruct (handle_rectify _ _ _) as [[[?st ?ms] ?nts] ?cts] eqn:H_hr.
     find_apply_lem_hyp end_query_definition.
@@ -1416,6 +1417,16 @@ Definition responses_are_unique (gst : global_state) : Prop :=
     request_response_pair p m' ->
     m = m'.
 
+Lemma handle_rectify_preserves_timeouts_in :
+  forall st my_pred notifier st' ms nts cts,
+    handle_rectify st my_pred notifier = (st', ms, nts, cts) ->
+    timeouts_in st = timeouts_in st'.
+Proof.
+  intros.
+  unfold timeouts_in.
+  find_apply_lem_hyp handle_rectify_definition; expand_def; reflexivity.
+Qed.
+
 Lemma timeout_constraint_lifted_by_clearing :
   forall o o' src dst p,
     responses_are_unique (occ_gst o) ->
@@ -1478,13 +1489,59 @@ Proof using.
       subst_max.
       simpl in *.
       unfold recv_handler_l in *; tuple_inversion.
-      admit.
+      eapply ct_RecvMsg; eauto.
+      destruct (handle_msg dst src d m') as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
+      destruct (do_delayed_queries dst st') as [[[?st ?ms] ?nts] ?cts] eqn:?H.
+      find_copy_eapply_lem_hyp recv_handler_definition; eauto; break_and.
+      repeat find_rewrite. simpl.
+      find_apply_lem_hyp handle_msg_definition; expand_def.
+      + inversion H0.
+      + inversion H0.
+      + find_apply_lem_hyp is_request_same_as_request_payload.
+        inversion H11; inversion H0; congruence.
+      + find_apply_lem_hyp handle_query_res_definition; expand_def; simpl;
+        try (find_apply_lem_hyp is_request_same_as_request_payload; find_contradiction).
+        -- find_copy_eapply_lem_hyp timeouts_in_Request; eauto.
+           apply in_or_app; left.
+           admit.
+        -- destruct (handle_rectify _ _ _) as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
+           find_eapply_lem_hyp end_query_definition; expand_def.
+           apply in_or_app; left.
+           apply in_or_app; left.
+           find_copy_eapply_lem_hyp timeouts_in_Request; eauto.
+           find_erewrite_lem handle_rectify_preserves_timeouts_in.
+           admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+      + admit.
     * left.
       move => H_t.
       inv H_t.
       find_eapply_lem_hyp not_timeout_constraint_inv.
       break_or_hyp.
-    + by find_eapply_lem_hyp failed_nodes_not_new; eauto.
+      + by find_eapply_lem_hyp failed_nodes_not_new; eauto.
+      + admit.
+  - left.
+    intuition.
+    inv_timeout_constraint.
+    apply H_nt.
+    constructor.
+    + admit.
+    + admit.
+  - left.
+    intuition.
+    inv_timeout_constraint.
+    apply H_nt.
+    constructor.
+    + admit.
     + admit.
 Admitted.
 
