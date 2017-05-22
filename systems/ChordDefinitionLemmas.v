@@ -424,7 +424,7 @@ Lemma request_timeout_handler_definition :
     (exists dst_ptr query m,
         cur_request st = Some (dst_ptr, query, m) /\
         ((addr_of dst_ptr = dst /\
-          eff = DetectFailureOf dst /\
+          eff = DetectFailure /\
           handle_query_timeout h st dst_ptr query = (st', ms, nts, cts)) \/
         (addr_of dst_ptr <> dst /\
          eff = Ineffective /\

@@ -567,7 +567,7 @@ Module Chord <: DynamicSystem.
   Inductive timeout_effect :=
   | Ineffective : timeout_effect
   | StartStabilize : timeout_effect
-  | DetectFailureOf : addr -> timeout_effect
+  | DetectFailure : timeout_effect
   | StartRectify : timeout_effect
   | SetPred : timeout_effect
   | SendKeepalives : timeout_effect.
@@ -620,7 +620,7 @@ Module Chord <: DynamicSystem.
     match cur_request st with
     | Some (ptr, q, _) =>
       if addr_eq_dec (addr_of ptr) dst
-      then (handle_query_timeout h st ptr q, DetectFailureOf dst)
+      then (handle_query_timeout h st ptr q, DetectFailure)
       else ((st, [], [], []), Ineffective) (* shouldn't happen *)
     | None => ((st, [], [], []), Ineffective) (* shouldn't happen *)
     end.

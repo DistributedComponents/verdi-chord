@@ -541,7 +541,7 @@ Lemma stabilize_Request_timeout_removes_succ :
     sigma ex.(hd).(occ_gst) h = Some st ->
     succ_list st = s :: rest ->
     open_stabilize_request_to ex.(hd).(occ_gst) h st dst ->
-    now (occurred (Timeout h (Request dst p) (DetectFailureOf (addr_of s)))) ex ->
+    now (occurred (Timeout h (Request dst p) DetectFailure)) ex ->
     next
       (now
          (fun occ =>
@@ -617,7 +617,7 @@ Lemma Timeout_enabled_when_open_stabilize_request_to_dead_node :
     open_stabilize_request_to (occ_gst occ) h st dst ->
     In dst (failed_nodes (occ_gst occ)) ->
     (forall m, ~ In (dst, (h, m)) (msgs (occ_gst occ))) ->
-    l_enabled (Timeout h (Request dst GetPredAndSuccs) (DetectFailureOf dst)) occ.
+    l_enabled (Timeout h (Request dst GetPredAndSuccs) DetectFailure) occ.
 Proof.
   intros.
   break_live_node.
@@ -625,7 +625,7 @@ Proof.
   destruct (timeout_handler_l h st (Request dst GetPredAndSuccs))
     as [[[[st' ms] nts] cts] l] eqn:H_thl.
   copy_apply timeout_handler_l_definition H_thl; expand_def.
-  assert (x0 = (DetectFailureOf dst)).
+  assert (x0 = DetectFailure).
   {
     find_copy_apply_lem_hyp timeout_handler_definition; expand_def; try congruence.
     find_apply_lem_hyp request_timeout_handler_definition; expand_def.
@@ -658,7 +658,7 @@ Lemma timeout_Request_to_dead_node_eventually_fires :
                       In dst (failed_nodes (occ_gst occ)) ->
                       sigma (occ_gst occ) h = Some st ->
                       open_stabilize_request_to (occ_gst occ) h st dst)))
-            (now (occurred (Timeout h (Request dst p) (DetectFailureOf dst))))
+            (now (occurred (Timeout h (Request dst p) DetectFailure)))
             ex.
 Proof.
   intros.
@@ -673,7 +673,7 @@ Proof.
     find_apply_lem_hyp classical.weak_until_until_or_always.
     break_or_hyp; [assumption|].
     exfalso.
-    cut ((cont_enabled (Timeout h (Request dst GetPredAndSuccs) (DetectFailureOf dst))) ex).
+    cut ((cont_enabled (Timeout h (Request dst GetPredAndSuccs) DetectFailure)) ex).
     + intros.
       find_apply_lem_hyp weak_local_fairness_invar.
       unfold weak_local_fairness in *.
@@ -681,7 +681,7 @@ Proof.
       unfold inf_occurred, inf_often in *.
       destruct ex.
       find_apply_lem_hyp always_now.
-      specialize (H1 (Timeout h (Request dst GetPredAndSuccs) (DetectFailureOf dst))).
+      specialize (H1 (Timeout h (Request dst GetPredAndSuccs) DetectFailure)).
       find_eapply_lem_hyp lb_execution_invar.
       find_eapply_lem_hyp always_Cons; break_and.
       induction H7.
