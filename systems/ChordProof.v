@@ -241,11 +241,11 @@ Inductive intermediate_reachable_st : global_state -> Prop :=
     intermediate_reachable_st gst ->
     step_dynamic gst gst' ->
     intermediate_reachable_st gst'
-| intReachableRectify : forall gst h d res,
+| intReachableRectify : forall gst h d res eff,
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
     sigma gst h = Some d ->
-    do_rectify h d = res ->
+    do_rectify h d = (res, eff) ->
     intermediate_reachable_st (apply_handler_result h res [] gst)
 | intReachableDelayedQueries : forall gst h d res,
     In h (nodes gst) ->
@@ -918,22 +918,25 @@ Proof using.
 Qed.
 
 Lemma joined_preserved_by_do_rectify :
-  forall h st st' ms' cts' nts',
-    do_rectify h st = (st', ms', cts', nts') ->
+  forall h st st' ms' cts' nts' eff,
+    do_rectify h st = (st', ms', cts', nts', eff) ->
     joined st = joined st'.
 Proof using.
-  unfold do_rectify.
   intros.
-  repeat break_match;
+  find_eapply_lem_hyp do_rectify_definition; expand_def;
     try find_eapply_lem_hyp joined_preserved_by_start_query;
-    find_inversion; eauto.
+    simpl in *; eauto.
 Qed.
 
 Lemma joined_preserved_by_do_delayed_queries :
   forall h st st' ms nts cts,
     do_delayed_queries h st = (st', ms, nts, cts) ->
     joined st = joined st'.
-Admitted.
+Proof.
+  intros.
+  find_eapply_lem_hyp do_delayed_queries_definition; expand_def;
+    simpl in *; eauto.
+Qed.
 
 Lemma joined_preserved_by_end_query :
   forall st st' ms ms' cts cts' nts nts',
@@ -977,7 +980,50 @@ Lemma joined_preserved_by_handle_query :
     handle_query_res src h st q m = (st', ms, nts, cts) ->
     joined st = true ->
     joined st' = true.
-Admitted.
+Proof.
+  intros.
+  find_eapply_lem_hyp handle_query_res_definition; expand_def; auto;
+    try (find_eapply_lem_hyp joined_preserved_by_end_query; simpl in *; congruence).
+  - find_eapply_lem_hyp joined_preserved_by_end_query_handle_rectify; congruence.
+  - find_eapply_lem_hyp joined_preserved_by_handle_stabilize; congruence.
+  - find_rewrite; simpl; congruence.
+  - find_eapply_lem_hyp joined_preserved_by_start_query; simpl in *; congruence.
+Qed.
+
+Lemma schedule_rectify_with_definition :
+  forall st rw st' ms nts cts,
+    schedule_rectify_with st rw = (st', ms, nts, cts) ->
+
+    ms = [] /\
+    cts = [] /\
+
+    ((exists rw0,
+        rectify_with st = Some rw0 /\
+        nts = [] /\
+        (ptr_between_bool rw0 rw (ptr st) = true /\
+         st' = set_rectify_with st rw \/
+         ptr_between_bool rw0 rw (ptr st) = false /\
+         st' = st)) \/
+     
+     rectify_with st = None /\
+     st' = st /\
+     nts = [RectifyTick]).
+Proof.
+  unfold schedule_rectify_with.
+  intros.
+  repeat break_match; tuple_inversion; firstorder eauto.
+Qed.
+
+Lemma joined_preserved_by_schedule_rectify_with :
+  forall st rw st' ms nts cts,
+    schedule_rectify_with st rw = (st', ms, nts, cts) ->
+    joined st = joined st'.
+Proof.
+  intros.
+  simpl in *.
+  find_apply_lem_hyp schedule_rectify_with_definition; expand_def;
+    simpl; auto.
+Qed.
 
 Lemma joined_preserved_by_recv_handler :
   forall src h st msg st' ms nts cts,
@@ -985,20 +1031,26 @@ Lemma joined_preserved_by_recv_handler :
     joined st = true ->
     joined st' = true.
 Proof using.
-  unfold recv_handler.
-  intuition.
-Admitted.
+  intros.
+  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
+  find_apply_lem_hyp joined_preserved_by_do_delayed_queries.
+  find_apply_lem_hyp handle_msg_definition; expand_def; try congruence.
+  - find_apply_lem_hyp joined_preserved_by_schedule_rectify_with; congruence.
+  - find_apply_lem_hyp handle_query_req_busy_definition; expand_def; simpl in *; congruence.
+  - find_apply_lem_hyp joined_preserved_by_handle_query; congruence.
+Qed.
 
 Lemma joined_preserved_by_tick_handler :
-  forall h st st' ms nts cts,
-    tick_handler h st = (st', ms, nts, cts) ->
+  forall h st st' ms nts cts eff,
+    tick_handler h st = (st', ms, nts, cts, eff) ->
     joined st = joined st'.
 Proof using.
-  unfold tick_handler, add_tick.
-  intuition.
-  - repeat break_match; repeat tuple_inversion; auto.
-    * repeat tuple_inversion.
-      find_apply_lem_hyp joined_preserved_by_start_query; eauto.
+  intros.
+  find_apply_lem_hyp tick_handler_definition; expand_def; auto.
+  destruct (start_query _ _ _) as [[[[?st ?ms] ?nts] ?cts] ?eff] eqn:?H.
+  find_eapply_lem_hyp add_tick_definition; expand_def.
+  find_eapply_lem_hyp joined_preserved_by_start_query.
+  congruence.
 Qed.
 
 Lemma joined_preserved_by_update_pred :
@@ -1024,16 +1076,16 @@ Proof using.
     eauto.
 Qed.
 
-Lemma joined_preserved_by_timeout_handler :
-  forall h st t st' ms nts cts,
-    timeout_handler h st t = (st', ms, nts, cts) ->
+Lemma joined_preserved_by_timeout_handler_eff :
+  forall h st t st' ms nts cts eff,
+    timeout_handler_eff h st t = (st', ms, nts, cts, eff) ->
     joined st = joined st'.
 Proof using.
-  unfold timeout_handler.
+  unfold timeout_handler_eff.
   intuition.
   repeat break_match;
     try tuple_inversion;
-    eauto using joined_preserved_by_tick_handler, joined_preserved_by_handle_query_timeout.
+    eauto using joined_preserved_by_tick_handler, joined_preserved_by_handle_query_timeout, joined_preserved_by_do_rectify.
 Admitted.
 
 Lemma update_determined_by_f :
@@ -1092,7 +1144,9 @@ Proof using.
   eapply when_apply_handler_result_preserves_live_node; eauto.
   - eauto using apply_handler_result_updates_sigma.
   - break_live_node.
-    find_apply_lem_hyp joined_preserved_by_timeout_handler.
+    unfold timeout_handler, fst in *; break_let.
+    repeat find_rewrite.
+    find_apply_lem_hyp joined_preserved_by_timeout_handler_eff.
     repeat find_rewrite.
     find_injection.
     eauto.
@@ -1509,9 +1563,9 @@ Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
     P gst'.
 
 Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
-  forall gst gst' h st st' ms newts clearedts,
+  forall gst gst' h st st' ms newts clearedts eff,
     In Tick (timeouts gst h) ->
-    tick_handler h st = (st', ms, newts, clearedts) ->
+    tick_handler h st = (st', ms, newts, clearedts, eff) ->
     P gst ->
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
@@ -1537,15 +1591,15 @@ Definition chord_do_rectify_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' h st,
     P gst ->
     sigma gst h = Some st ->
-    gst' = apply_handler_result h (do_rectify h st) [] gst ->
+    gst' = apply_handler_result h (fst (do_rectify h st)) [] gst ->
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
     P gst'.
 
 Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
-  forall gst gst' h st st' ms newts clearedts,
+  forall gst gst' h st st' ms newts clearedts eff,
     In KeepaliveTick (timeouts gst h) ->
-    keepalive_handler st = (st', ms, newts, clearedts) ->
+    keepalive_handler st = (st', ms, newts, clearedts, eff) ->
     P gst ->
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
@@ -1575,8 +1629,8 @@ Definition chord_handle_msg_invariant (P : global_state -> Prop) : Prop :=
     P gst'.
 
 Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
-  forall gst gst' h req dst t d st ms newts clearedts,
-    request_timeout_handler h d dst req = (st, ms, newts, clearedts) ->
+  forall gst gst' h req dst t d st ms newts clearedts eff,
+    request_timeout_handler h d dst req = (st, ms, newts, clearedts, eff) ->
     t = Request dst req ->
     sigma gst h = Some d ->
     gst' = apply_handler_result
@@ -1657,10 +1711,11 @@ Proof using.
   - break_step.
     + eapply_prop chord_start_invariant; eauto.
     + eapply_prop chord_fail_invariant; eauto.
-    + destruct t.
+    + unfold timeout_handler, fst in *; break_let.
+      find_eapply_lem_hyp timeout_handler_definition; expand_def.
       * eapply_prop chord_tick_invariant; eauto.
-      * admit.
       * eapply_prop chord_keepalive_invariant; eauto.
+      * admit. (* TODO eapply_prop chord_rectify_invariant; eauto. *)
       * eapply_prop chord_request_invariant; eauto.
     + unfold recv_handler in *.
       repeat break_let; subst_max.
@@ -1734,4 +1789,3 @@ Proof using.
     + (* Deliver_client case *)
       admit.
 Admitted.
-
