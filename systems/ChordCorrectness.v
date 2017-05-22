@@ -17,6 +17,7 @@ Import ConstrainedChord.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordInvariants.
+Require Import Chord.ChordDefinitionLemmas.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
@@ -530,7 +531,7 @@ Lemma loaded_Tick_inf_often :
     reachable_st (occ_gst (hd ex)) ->
     weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
-    inf_occurred (Timeout h Tick) ex.
+    inf_occurred (Timeout h Tick StartStabilize) ex.
 Proof.
 Admitted.
 
@@ -540,7 +541,7 @@ Lemma stabilize_Request_timeout_removes_succ :
     sigma ex.(hd).(occ_gst) h = Some st ->
     succ_list st = s :: rest ->
     open_stabilize_request_to ex.(hd).(occ_gst) h st dst ->
-    now (occurred (Timeout h (Request dst p))) ex ->
+    now (occurred (Timeout h (Request dst p) (DetectFailureOf (addr_of s)))) ex ->
     next
       (now
          (fun occ =>
@@ -562,8 +563,8 @@ Proof.
   (* This should be a lemma about timeout_handler_l. *)
   assert (h0 = h).
   {
-    unfold timeout_handler_l in *.
-    now tuple_inversion.
+    find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+    now find_injection.
   }
   subst_max.
   repeat find_rewrite; simpl.
@@ -572,8 +573,7 @@ Proof.
   find_injection.
 
   (* This should be a lemma about timeout_handler_l *)
-  unfold timeout_handler_l in *.
-  tuple_inversion.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
   repeat find_reverse_rewrite.
   find_injection.
 
@@ -617,18 +617,29 @@ Lemma Timeout_enabled_when_open_stabilize_request_to_dead_node :
     open_stabilize_request_to (occ_gst occ) h st dst ->
     In dst (failed_nodes (occ_gst occ)) ->
     (forall m, ~ In (dst, (h, m)) (msgs (occ_gst occ))) ->
-    l_enabled (Timeout h (Request dst GetPredAndSuccs)) occ.
+    l_enabled (Timeout h (Request dst GetPredAndSuccs) (DetectFailureOf dst)) occ.
 Proof.
   intros.
   break_live_node.
   unfold open_stabilize_request_to in *; break_and.
-  destruct (timeout_handler h st (Request dst GetPredAndSuccs))
-    as [[[st' ms] nts] cts] eqn:H_th.
+  destruct (timeout_handler_l h st (Request dst GetPredAndSuccs))
+    as [[[[st' ms] nts] cts] l] eqn:H_thl.
+  copy_apply timeout_handler_l_definition H_thl; expand_def.
+  assert (x0 = (DetectFailureOf dst)).
+  {
+    find_copy_apply_lem_hyp timeout_handler_definition; expand_def; try congruence.
+    find_apply_lem_hyp request_timeout_handler_definition; expand_def.
+    - now find_injection.
+    - repeat find_rewrite.
+      repeat find_injection.
+      simpl in *.
+      congruence.
+    - congruence.
+  }
+  subst.
+
   eexists; eapply LTimeout; eauto.
-  - unfold timeout_handler_l.
-    rewrite H_th.
-    eauto.
-  - eapply Request_needs_dst_dead_and_no_msgs; eauto.
+  eapply Request_needs_dst_dead_and_no_msgs; eauto.
 Qed.
 
 Lemma timeout_Request_to_dead_node_eventually_fires :
@@ -647,7 +658,7 @@ Lemma timeout_Request_to_dead_node_eventually_fires :
                       In dst (failed_nodes (occ_gst occ)) ->
                       sigma (occ_gst occ) h = Some st ->
                       open_stabilize_request_to (occ_gst occ) h st dst)))
-            (now (occurred (Timeout h (Request dst p))))
+            (now (occurred (Timeout h (Request dst p) (DetectFailureOf dst))))
             ex.
 Proof.
   intros.
@@ -662,7 +673,7 @@ Proof.
     find_apply_lem_hyp classical.weak_until_until_or_always.
     break_or_hyp; [assumption|].
     exfalso.
-    cut ((cont_enabled (Timeout h (Request dst GetPredAndSuccs))) ex).
+    cut ((cont_enabled (Timeout h (Request dst GetPredAndSuccs) (DetectFailureOf dst))) ex).
     + intros.
       find_apply_lem_hyp weak_local_fairness_invar.
       unfold weak_local_fairness in *.
@@ -670,7 +681,7 @@ Proof.
       unfold inf_occurred, inf_often in *.
       destruct ex.
       find_apply_lem_hyp always_now.
-      specialize (H1 (Timeout h (Request dst GetPredAndSuccs))).
+      specialize (H1 (Timeout h (Request dst GetPredAndSuccs) (DetectFailureOf dst))).
       find_eapply_lem_hyp lb_execution_invar.
       find_eapply_lem_hyp always_Cons; break_and.
       induction H7.
@@ -689,7 +700,7 @@ Proof.
         end.
         repeat find_reverse_rewrite.
         match goal with
-        | [ H : labeled_step_dynamic _ (Timeout _ _) _ |- _ ] =>
+        | [ H : labeled_step_dynamic _ (Timeout _ _ _) _ |- _ ] =>
           invc H; clean_up_labeled_step_cases
         end.
         admit.
