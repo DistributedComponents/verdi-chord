@@ -30,16 +30,12 @@ Definition handleNet : addr -> addr -> data -> payload -> res :=
 Definition init : addr -> list addr -> data * list (addr * payload) * list timeout :=
   start_handler.
 
-Definition handleTick : addr -> data -> res :=
-  tick_handler.
-
 Definition handleTimeout : addr -> data -> timeout -> res :=
   timeout_handler.
 
 Extraction "extraction/chord/coq/ExtractedChord.ml"
            init
            handleNet
-           handleTick
            handleTimeout
            is_request
            closes_request

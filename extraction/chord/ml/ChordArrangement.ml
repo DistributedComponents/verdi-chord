@@ -77,6 +77,7 @@ let log_send st dst msg =
 
 let log_timeout st = function
   | Tick -> log_dbg_from st "ticked"
+  | RectifyTick -> log_dbg_from st "ticked for rectify"
   | KeepaliveTick -> log_dbg_from st "ticked for keepalive"
   | Request (dead, msg) ->
     log_dbg_from st ("request " ^ show_msg msg
@@ -134,6 +135,7 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
 
   let set_timeout = function
     | Tick -> fuzzy_timeout C.tick_timeout
+    | RectifyTick -> fuzzy_timeout C.tick_timeout
     (* must be less than the request timeout *)
     | KeepaliveTick -> C.keepalive_timeout
     | Request (a, b) -> C.request_timeout
@@ -146,6 +148,7 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
   let show_timeout = function
     | Tick -> "Tick"
     | KeepaliveTick -> "KeepaliveTick"
+    | RectifyTick -> "RectifyTick"
     | Request (dead, msg) ->
        sprintf "Request(%s, %s)" (show_addr dead) (show_msg msg)
 end
