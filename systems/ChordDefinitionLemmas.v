@@ -169,8 +169,8 @@ Proof.
 Qed.
 
 Lemma do_rectify_definition :
-  forall h st st' ms' nts' cts',
-    do_rectify h st = (st', ms', nts', cts') ->
+  forall h st st' ms' nts' cts' eff,
+    do_rectify h st = (st', ms', nts', cts', eff) ->
 
     (cur_request st = None /\
      joined st = true /\
@@ -178,20 +178,23 @@ Lemma do_rectify_definition :
          rectify_with st = Some new /\
          (exists x,
              pred st = Some x /\
+             eff = StartRectifyWith h /\
              start_query h (clear_rectify_with st) (Rectify new) = (st', ms', nts', cts')) \/
          (pred st = None /\
+          eff = SetPred new /\
           st' = clear_rectify_with (update_pred st new) /\
           ms' = [] /\
           nts' = [] /\
           cts' = []))) \/
     ((joined st = false \/ rectify_with st = None \/ exists r, cur_request st = Some r) /\
-     st' = st /\ ms' = [] /\ nts' = [] /\ cts' = []).
+     st' = st /\ ms' = [] /\ nts' = [] /\ cts' = [] /\ eff = Ineffective).
 Proof using.
   unfold do_rectify.
   intros.
   repeat break_match; try tuple_inversion; try tauto.
   - firstorder eauto.
-  - firstorder eauto.
+  - left.
+    repeat (eexists; firstorder eauto).
   - left.
     repeat (eexists; firstorder).
 Qed.
@@ -354,15 +357,16 @@ Proof.
 Qed.
 
 Lemma tick_handler_definition :
-  forall h st st' ms nts cts,
-    tick_handler h st = (st', ms, nts, cts) ->
+  forall h st st' ms nts cts eff,
+    tick_handler h st = (st', ms, nts, cts, eff) ->
 
     cur_request st = None /\ joined st = true /\
-    add_tick (start_query h st Stabilize) = (st', ms, nts, cts) \/
+    add_tick (start_query h st Stabilize) = (st', ms, nts, cts) /\
+    eff = StartStabilizeWith h \/
 
     ((exists req, cur_request st = Some req) \/
      joined st = false) /\
-    st' = st /\ ms = [] /\ nts = [Tick] /\ cts = [].
+    st' = st /\ ms = [] /\ nts = [Tick] /\ cts = [] /\ eff = Ineffective.
 Proof.
   unfold tick_handler.
   intros.
@@ -371,13 +375,14 @@ Proof.
 Qed.
 
 Lemma keepalive_handler_definition :
-  forall st st' ms nts cts,
-    keepalive_handler st = (st', ms, nts, cts) ->
+  forall st st' ms nts cts eff,
+    keepalive_handler st = (st', ms, nts, cts, eff) ->
 
     st' = st /\
     ms = send_keepalives st /\
     nts = [KeepaliveTick] /\
-    cts = [].
+    cts = [] /\
+    eff = SendKeepalives (map fst ms).
 Proof.
   unfold keepalive_handler.
   intros.
@@ -413,16 +418,19 @@ Proof.
 Qed.
 
 Lemma request_timeout_handler_definition :
-  forall h st dst msg st' ms nts cts,
-    request_timeout_handler h st dst msg = (st', ms, nts, cts) ->
+  forall h st dst msg st' ms nts cts eff,
+    request_timeout_handler h st dst msg = (st', ms, nts, cts, eff) ->
 
     (exists dst_ptr query m,
         cur_request st = Some (dst_ptr, query, m) /\
         ((addr_of dst_ptr = dst /\
-         handle_query_timeout h st dst_ptr query = (st', ms, nts, cts)) \/
+          eff = DetectFailureOf dst_ptr /\
+          handle_query_timeout h st dst_ptr query = (st', ms, nts, cts)) \/
         (addr_of dst_ptr <> dst /\
+         eff = Ineffective /\
          st' = st /\ ms = [] /\ nts = [] /\ cts = []))) \/
     cur_request st = None /\
+    eff = Ineffective /\
     st' = st /\ ms = [] /\ nts = [] /\ cts = [].
 Proof.
   unfold request_timeout_handler.
@@ -432,7 +440,7 @@ Qed.
 
 Lemma timeout_handler_definition :
   forall h st t res,
-    timeout_handler h st t = res ->
+    timeout_handler_eff h st t = res ->
     t = Tick /\
     tick_handler h st = res \/
     t = KeepaliveTick /\
@@ -443,7 +451,7 @@ Lemma timeout_handler_definition :
       t = Request dst msg /\
       request_timeout_handler h st dst msg = res.
 Proof.
-  unfold timeout_handler.
+  unfold timeout_handler_eff.
   intros.
   break_match; intuition eauto.
 Qed.
@@ -452,9 +460,13 @@ Lemma timeout_handler_l_definition :
   forall h st t st' ms nts cts l,
     timeout_handler_l h st t = (st', ms, nts, cts, l) ->
 
-    timeout_handler h st t = (st', ms, nts, cts) /\
-    l = Chord.Chord.Timeout h t.
+    exists eff,
+      timeout_handler_eff h st t = (st', ms, nts, cts, eff) /\
+      l = Chord.Chord.Timeout h t eff.
 Proof.
-  unfold timeout_handler_l;
-    intros; tuple_inversion; tauto.
+  unfold timeout_handler_l.
+  intros.
+  break_let.
+  tuple_inversion.
+  eauto.
 Qed.
