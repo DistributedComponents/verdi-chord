@@ -416,17 +416,6 @@ Module Chord <: DynamicSystem.
       (st, [], [], [])
     end.
 
-  Definition do_rectify (h : addr) (st : data) : res :=
-    match joined st, cur_request st, rectify_with st with
-    | true, None, Some new =>
-      let st := clear_rectify_with st in
-      match pred st with
-      | Some _ => start_query h st (Rectify new)
-      | None => (update_pred st new, [], [], [])
-      end
-    | _, _, _ => (st, [], [], [])
-    end.
-
   Definition best_predecessor (h : pointer) (succs : list pointer) (them : pointer) : pointer :=
     hd h (filter (fun s => ptr_between_bool h s them)
                  (rev succs)).
@@ -575,10 +564,25 @@ Module Chord <: DynamicSystem.
       (init_state_preset h pred succs, [], [Tick])
     end.
 
-  Definition tick_handler (h : addr) (st : data) : res :=
+  Inductive timeout_effect :=
+  | Ineffective : timeout_effect
+  | StartStabilizeWith : addr -> timeout_effect
+  | DetectFailureOf : pointer -> timeout_effect
+  | StartRectifyWith : addr -> timeout_effect
+  | SetPred : pointer -> timeout_effect
+  | SendKeepalives : list addr -> timeout_effect.
+
+  Definition timeout_effect_eq_dec :
+    forall x y : timeout_effect,
+      {x = y} + {x <> y}.
+  Proof using.
+    decide equality; auto using addr_eq_dec, list_eq_dec, pointer_eq_dec.
+  Defined.
+
+  Definition tick_handler (h : addr) (st : data) : res * timeout_effect :=
     match cur_request st, joined st with
-    | None, true => add_tick (start_query h st Stabilize)
-    | _, _ => (st, [], [Tick], [])
+    | None, true => (add_tick (start_query h st Stabilize), StartStabilizeWith h)
+    | _, _ => ((st, [], [Tick], []), Ineffective)
     end.
 
   Definition handle_query_timeout (h : addr) (st : data) (dead : pointer) (q : query) : res :=
@@ -608,19 +612,31 @@ Module Chord <: DynamicSystem.
   Definition send_keepalives (st : data) : list (addr * payload) :=
     map (fun q => (fst q, Busy)) (delayed_queries st).
 
-  Definition keepalive_handler (st : data) : res :=
-    (st, send_keepalives st, [KeepaliveTick], []).
+  Definition keepalive_handler (st : data) : res * timeout_effect :=
+    let ms := send_keepalives st in
+    ((st, ms, [KeepaliveTick], []), SendKeepalives (map fst ms)).
 
-  Definition request_timeout_handler (h : addr) (st : data) (dst : addr) (msg : payload) : res :=
+  Definition request_timeout_handler (h : addr) (st : data) (dst : addr) (msg : payload) : res * timeout_effect :=
     match cur_request st with
     | Some (ptr, q, _) =>
       if addr_eq_dec (addr_of ptr) dst
-      then handle_query_timeout h st ptr q
-      else (st, [], [], []) (* shouldn't happen *)
-    | None => (st, [], [], []) (* shouldn't happen *)
+      then (handle_query_timeout h st ptr q, DetectFailureOf ptr)
+      else ((st, [], [], []), Ineffective) (* shouldn't happen *)
+    | None => ((st, [], [], []), Ineffective) (* shouldn't happen *)
     end.
 
-  Definition timeout_handler (h : addr) (st : data) (t : timeout) : res :=
+  Definition do_rectify (h : addr) (st : data) : res * timeout_effect :=
+    match joined st, cur_request st, rectify_with st with
+    | true, None, Some new =>
+      let st := clear_rectify_with st in
+      match pred st with
+      | Some _ => (start_query h st (Rectify new), StartRectifyWith h)
+      | None => ((update_pred st new, [], [], []), SetPred new)
+      end
+    | _, _, _ => ((st, [], [], []), Ineffective)
+    end.
+
+  Definition timeout_handler_eff (h : addr) (st : data) (t : timeout) : res * timeout_effect :=
     match t with
     | Request dst msg => request_timeout_handler h st dst msg
     | Tick => tick_handler h st
@@ -628,11 +644,14 @@ Module Chord <: DynamicSystem.
     | RectifyTick => do_rectify h st
     end.
 
+  Definition timeout_handler (h : addr) (st : data) (t : timeout) : res :=
+    fst (timeout_handler_eff h st t).
+
   Inductive _label :=
   | Input : addr -> addr -> payload -> _label
   | Output : addr -> addr -> payload -> _label
   | RecvMsg : addr -> addr -> payload -> _label
-  | Timeout : addr -> timeout -> _label.
+  | Timeout : addr -> timeout -> timeout_effect -> _label.
   Definition label := _label.
 
   Definition label_eq_dec :
@@ -640,11 +659,19 @@ Module Chord <: DynamicSystem.
       {x = y} + {x <> y}.
   Proof using.
     decide equality;
-      auto using addr_eq_dec, payload_eq_dec, timeout_eq_dec.
+      auto using addr_eq_dec, payload_eq_dec, timeout_eq_dec, timeout_effect_eq_dec.
+  Defined.
+
+  Definition data_eq_dec :
+    forall st st' : data,
+      {st = st'} + {st <> st'}.
+  Proof using.
+    repeat (decide equality; auto using list_eq_dec, pointer_eq_dec, addr_eq_dec, id_eq_dec).
   Defined.
 
   Definition timeout_handler_l (h : addr) (st : data) (t : timeout) :=
-    (timeout_handler h st t, Timeout h t).
+    let '(res, effect) := timeout_handler_eff h st t in
+    (res, Timeout h t effect).
 
   Definition recv_handler_l (src : addr) (dst : addr) (st : data) (msg : payload) :=
     (recv_handler src dst st msg, RecvMsg src dst msg).
@@ -677,7 +704,15 @@ Module Chord <: DynamicSystem.
           timeout_handler_l h st t = (r, l) ->
           timeout_handler h st t = r).
   Proof using.
-    unfold timeout_handler_l.
-  Admitted.
+    unfold timeout_handler_l, timeout_handler.
+    intuition.
+    - destruct (timeout_handler_eff h st t) as [r' l].
+      simpl in *.
+      subst_max.
+      eexists; eauto.
+    - break_let.
+      tuple_inversion.
+      reflexivity.
+  Qed.
 
 End Chord.
