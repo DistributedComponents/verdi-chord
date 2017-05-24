@@ -174,9 +174,13 @@ Definition all_first_succs_best (gst : global_state) :=
     live gst h ->
     first_succ_is_best_succ gst (addr_of h).
 
+Definition circular_wait : occurrence -> Prop.
+Admitted.
+
 Definition phase_one (ex : infseq.infseq occurrence) :=
   lb_execution ex ->
   reachable_st (occ_gst (infseq.hd ex)) ->
+  always (~_ (now circular_wait)) ex ->
   infseq.continuously (lift_gpred_to_ex all_first_succs_best) ex.
 
 (* Defining the error for phase one: the norm approach *)
@@ -593,6 +597,7 @@ Theorem queries_eventually_stop :
     strong_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     busy_if_live h (hd ex) ->
+    always (~_ (now circular_wait)) ex ->
     eventually (now (not_busy_if_live h)) ex.
 Proof.
   (*         -____-   *)
@@ -615,6 +620,7 @@ Lemma not_busy_inf_often :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
+    always (~_ (now circular_wait)) ex ->
     inf_often (now (not_busy_if_live h)) ex.
 Proof.
   intro.
@@ -637,6 +643,7 @@ Proof.
     + eapply strong_local_fairness_invar; eauto.
     + inv_lb_execution.
       eapply live_node_invariant; eauto.
+    + eapply always_invar; eauto.
 Qed.
 
 Lemma live_node_has_Tick_in_timeouts :
@@ -720,6 +727,7 @@ Lemma loaded_Tick_inf_enabled :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
+    always (~_ (now circular_wait)) ex ->
     inf_enabled (Timeout h Tick StartStabilize) ex.
 Proof.
   intros ex h.
@@ -758,6 +766,7 @@ Lemma loaded_Tick_inf_often :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
+    always (~_ (now circular_wait)) ex ->
     inf_occurred (Timeout h Tick StartStabilize) ex.
 Proof.
   auto using loaded_Tick_inf_enabled.
@@ -1179,6 +1188,8 @@ Lemma phase_two_error_decreasing :
   forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
     weak_until
       (consecutive
          (measure_drops total_pred_and_first_succ_error))
@@ -1192,6 +1203,8 @@ Lemma phase_two :
   forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
     continuously (lift_gpred_to_ex preds_and_first_succs_correct) ex.
 Proof.
   intros.
@@ -1256,6 +1269,8 @@ Theorem phase_three :
   forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
     continuously (lift_gpred_to_ex all_succs_correct) ex.
 Proof.
 Admitted.
@@ -1267,9 +1282,6 @@ Definition ideal (gst : global_state) : Prop :=
     correct_succs gst h st /\
     length (succ_list st) = Chord.SUCC_LIST_LEN /\
     pred_correct gst h (pred st).
-
-Definition deadlock_free : infseq.infseq occurrence -> Prop.
-Admitted.
 
 Theorem phases_locally_sufficient :
   forall gst,
@@ -1319,8 +1331,8 @@ Theorem chord_stabilization :
   forall ex : infseq.infseq occurrence,
     reachable_st (occ_gst (infseq.hd ex)) ->
     lb_execution ex ->
-    weak_local_fairness ex ->
-    deadlock_free ex ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
     continuously
       (lift_gpred_to_ex ideal)
       ex.
