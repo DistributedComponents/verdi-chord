@@ -525,15 +525,243 @@ Definition open_stabilize_request (gst : global_state) (h : addr) (st : data) : 
     open_stabilize_request_to gst h st (addr_of p) /\
     wf_ptr p.
 
+Lemma timeout_handler_eff_StartStabilize :
+  forall h st r eff,
+    timeout_handler_eff h st Tick = (r, eff) ->
+    joined st = true /\ cur_request st = None <->
+    eff = StartStabilize.
+Proof.
+  intros.
+  destruct (timeout_handler_eff _ _ _) as [[[[?st' ?ms] ?nts] ?cts] ?eff] eqn:?H.
+  find_apply_lem_hyp timeout_handler_definition; expand_def;
+    repeat find_rewrite; try congruence.
+  find_eapply_lem_hyp tick_handler_definition; expand_def;
+    repeat find_rewrite; firstorder congruence.
+Qed.
+
+Lemma timeout_handler_eff_is_timeout_handler_l :
+  forall h st t res eff,
+    timeout_handler_eff h st t = (res, eff) <->
+    timeout_handler_l h st t = (res, Timeout h t eff).
+Proof.
+  intros.
+  unfold timeout_handler_l.
+  break_let.
+  split; intros; solve_by_inversion.
+Qed.
+
+Lemma loaded_Tick_enabled_when_cur_request_None :
+  forall gst h st,
+    reachable_st gst ->
+    live_node gst h ->
+    sigma gst h = Some st ->
+    cur_request st = None ->
+    In Tick (timeouts gst h) ->
+    enabled (Timeout h Tick StartStabilize) gst.
+Proof.
+  intros.
+  break_live_node.
+  (* replace x from live_node with st *)
+  repeat find_rewrite; find_injection.
+  destruct (timeout_handler_eff h st Tick) as [[[[st' ms] nts] cts] eff] eqn:?H.
+  assert (eff = StartStabilize)
+    by (eapply timeout_handler_eff_StartStabilize; eauto).
+  subst.
+  exists (apply_handler_result h (st', ms, nts, Tick :: cts) [e_timeout h Tick] gst).
+  eapply LTimeout; eauto.
+  - now apply timeout_handler_eff_is_timeout_handler_l.
+  - now constructor.
+Qed.
+
+Definition busy_if_live (h : addr) (occ : occurrence) :=
+  forall st,
+    live_node (occ_gst occ) h ->
+    sigma (occ_gst occ) h = Some st ->
+    cur_request st <> None.
+
+Definition not_busy_if_live (h : addr) (occ : occurrence) :=
+  forall st,
+    live_node (occ_gst occ) h ->
+    sigma (occ_gst occ) h = Some st ->
+    cur_request st = None.
+
+(** the big assumption for inf_often stabilization *)
+Theorem queries_eventually_stop :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    busy_if_live h (hd ex) ->
+    eventually (now (not_busy_if_live h)) ex.
+Proof.
+  (*         -____-   *)
+Admitted.
+
+Lemma always_busy_or_not_busy :
+  forall h occ,
+    not_busy_if_live h occ \/ busy_if_live h occ.
+Proof.
+  intros.
+  unfold not_busy_if_live, busy_if_live.
+  destruct (sigma (occ_gst occ) h) as [d|];
+   [destruct (cur_request d) eqn:?H|];
+   firstorder congruence.
+Qed.
+
+Lemma not_busy_inf_often :
+  forall h ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    inf_often (now (not_busy_if_live h)) ex.
+Proof.
+  intro.
+  pose proof (always_busy_or_not_busy h) as H_bnb.
+  cofix c.
+  intros.
+  constructor.
+  - pose proof (H_bnb (hd ex)).
+    destruct ex.
+    break_or_hyp.
+    + constructor.
+      assumption.
+    + apply queries_eventually_stop; auto.
+  - destruct ex.
+    simpl.
+    eapply c.
+    + eapply lb_execution_invar; eauto.
+    + destruct ex.
+      eapply reachable_st_lb_execution_cons; eauto.
+    + eapply strong_local_fairness_invar; eauto.
+    + inv_lb_execution.
+      eapply live_node_invariant; eauto.
+Qed.
+
+Lemma live_node_has_Tick_in_timeouts :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    live_node (occ_gst (hd ex)) h ->
+    In Tick (timeouts (occ_gst (hd ex)) h).
+Admitted.
+
+Lemma loaded_Tick_enabled_if_now_not_busy_if_live :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    now (not_busy_if_live h) ex ->
+    now (l_enabled (Timeout h Tick StartStabilize)) ex.
+Proof.
+  intros.
+  destruct ex.
+  find_copy_apply_lem_hyp live_node_has_Tick_in_timeouts; eauto.
+  simpl in *.
+  find_copy_apply_lem_hyp live_node_joined; break_exists; break_and.
+  unfold not_busy_if_live in *; find_copy_apply_hyp_hyp.
+  eapply loaded_Tick_enabled_when_cur_request_None; eauto.
+Qed.
+
+Theorem always_monotonic_invar :
+  forall T (invariant P Q : infseq T -> Prop),
+    (forall s,
+        invariant s ->
+        P s ->
+        Q s) ->
+    forall ex,
+      always invariant ex ->
+      always P ex ->
+      always Q ex.
+Proof.
+  intros until 1.
+  cofix c.
+  intros.
+  constructor.
+  - apply H; solve_by_inversion.
+  - destruct ex as [o ex'].
+    simpl.
+    apply c.
+    + eapply always_invar; eauto.
+    + eapply always_invar; eauto.
+Qed.
+
+Theorem inf_often_monotonic_invar :
+  forall T (invariant P Q : infseq T -> Prop),
+    (forall s,
+        invariant s ->
+        P s ->
+        Q s) ->
+    forall ex,
+      always invariant ex ->
+      inf_often P ex ->
+      inf_often Q ex.
+Proof.
+  intros until 1.
+  cofix c.
+  intros.
+  constructor.
+  - inv_prop inf_often.
+    eapply eventually_monotonic with (J:=always invariant) (P:=P); eauto.
+    + eauto using always_invar.
+    + intros.
+      forwards; solve_by_inversion.
+  - destruct ex as [o ex'].
+    simpl.
+    apply c;
+      eauto using always_invar, inf_often_invar.
+Qed.
+
+Lemma loaded_Tick_inf_enabled :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    inf_enabled (Timeout h Tick StartStabilize) ex.
+Proof.
+  intros ex h.
+  generalize dependent ex.
+  pose proof (always_busy_or_not_busy h) as H_bnb.
+  intros.
+  set (invar :=
+         lb_execution /\_
+         strong_local_fairness /\_
+         (fun ex => live_node (occ_gst (hd ex)) h) /\_
+         (fun ex => reachable_st (occ_gst (hd ex)))).
+  set (P := now (not_busy_if_live h)).
+  set (Q := now (l_enabled (Timeout h Tick StartStabilize))).
+  assert (forall ex, invar ex -> P ex -> Q ex)
+    by firstorder using loaded_Tick_enabled_if_now_not_busy_if_live.
+  eapply inf_often_monotonic_invar; eauto.
+  - unfold invar.
+    apply always_inv.
+    + destruct ex.
+      intros.
+      unfold and_tl in *; break_and.
+      break_and_goal.
+      * eauto using lb_execution_invar.
+      * eauto using strong_local_fairness_invar.
+      * inv_lb_execution.
+        eauto using live_node_invariant.
+      * inv_lb_execution.
+        eauto using reachable_st_lb_execution_cons.
+    + unfold and_tl; tauto.
+  - eauto using not_busy_inf_often.
+Qed.
+
 Lemma loaded_Tick_inf_often :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
-    weak_local_fairness ex ->
+    strong_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     inf_occurred (Timeout h Tick StartStabilize) ex.
 Proof.
-Admitted.
+  auto using loaded_Tick_inf_enabled.
+Qed.
 
 Lemma stabilize_Request_timeout_removes_succ :
   forall ex h st s rest dst p,
