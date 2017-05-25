@@ -688,11 +688,51 @@ Proof.
   intros.
   constructor.
   - apply H; solve_by_inversion.
-  - destruct ex as [o ex'].
-    simpl.
-    apply c.
-    + eapply always_invar; eauto.
-    + eapply always_invar; eauto.
+  - destruct ex.
+    apply c; eauto using always_invar.
+Qed.
+
+Lemma cumul_eventually_always :
+  forall T (P Q : infseq T -> Prop) s,
+    always P s ->
+    eventually Q s ->
+    eventually (P /\_ Q) s.
+Proof.
+  intros until 1.
+  intro H_eventually.
+  induction H_eventually.
+  - inv_prop always.
+    now constructor.
+  - eauto using E_next, always_invar.
+Qed.
+
+Lemma always_always :
+  forall T (P : infseq T -> Prop) s,
+    always P s ->
+    always (always P) s.
+Proof.
+  intros.
+  generalize dependent s.
+  cofix c.
+  constructor.
+  - auto.
+  - do 2 destruct s.
+    constructor; eauto using always_invar.
+Qed.
+
+Lemma cumul_inf_often_always :
+  forall T (P Q : infseq T -> Prop) s,
+    always P s ->
+    inf_often Q s ->
+    inf_often (P /\_ Q) s.
+Proof.
+  intros.
+  eapply always_monotonic with (P := always P /\_ eventually Q) (Q := eventually (P /\_ Q)).
+  - intros.
+    unfold and_tl in * |-.
+    break_and.
+    eapply cumul_eventually_always; eauto.
+  - eapply always_and_tl; eauto using always_always.
 Qed.
 
 Theorem inf_often_monotonic_invar :
@@ -706,19 +746,11 @@ Theorem inf_often_monotonic_invar :
       inf_often P ex ->
       inf_often Q ex.
 Proof.
-  intros until 1.
-  cofix c.
   intros.
-  constructor.
-  - inv_prop inf_often.
-    eapply eventually_monotonic with (J:=always invariant) (P:=P); eauto.
-    + eauto using always_invar.
-    + intros.
-      forwards; solve_by_inversion.
-  - destruct ex as [o ex'].
-    simpl.
-    apply c;
-      eauto using always_invar, inf_often_invar.
+  eapply inf_often_monotonic with (P:=invariant /\_ P).
+  - intros.
+    unfold and_tl in *; firstorder.
+  - eapply cumul_inf_often_always; eauto.
 Qed.
 
 Lemma loaded_Tick_inf_enabled :
