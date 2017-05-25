@@ -1,0 +1,2 @@
+bin: [ "extraction/chord/_build/ml/chord.native" {"chord-server"}
+       "extraction/chord/_build/ml/client.native" {"chord-client"} ]
