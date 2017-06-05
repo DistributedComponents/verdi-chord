@@ -16,7 +16,7 @@ Import ChordSemantics.
 Import ConstrainedChord.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
-Require Import Chord.ChordInvariants.
+Require Import Chord.ChordPromises.
 Require Import Chord.ChordDefinitionLemmas.
 
 Set Bullet Behavior "Strict Subproofs".
