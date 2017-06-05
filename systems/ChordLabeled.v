@@ -1229,96 +1229,6 @@ Proof.
   eauto using enabled_Tick_invariant.
 Qed.
 
-(*
-Lemma live_node_ticks_inf_often :
-  forall ex h,
-    weak_local_fairness ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    lb_execution ex ->
-    live_node (occ_gst (hd ex)) h ->
-    inf_occurred (Timeout h Tick) ex.
-Proof.
-  intros until 0.
-  intro H_fair.
-  intros.
-  eapply H_fair.
-  eapply Tick_continuously_enabled; eauto.
-Qed.
-
-Lemma Timeout_enabled_until_occurred :
-  forall s h t,
-    t <> KeepaliveTick ->
-    reachable_st (hd s).(occ_gst) ->
-    lb_execution s ->
-    l_enabled (Timeout h t) (hd s) ->
-    weak_until (now (l_enabled (Timeout h t eff)))
-               (now (occurred (Timeout h t eff')))
-               s.
-Proof using.
-Abort.
-
-  cofix c.
-  case => /=.
-  case => /= gst.
-  case => [from to p|h t||].
-  - case.
-    case => /= gst' lb' s h t H_notkt H_inv H_exec H_en.
-    inversion H_exec as [o o' s' H_step_recv H_exec' H_oeq]; subst_max.
-    simpl in *.
-    case (addr_eq_dec h to) => H_dec_h.
-    * admit.
-      (*
-      subst_max.
-      apply: W_tl => //.
-      apply c; auto using always_tl.
-      unfold l_enabled in *.
-      unfold enabled in H_en.
-      break_exists_name gst''.
-      move: H_step_recv H_en.
-      find_copy_apply_lem_hyp always_satisfies_inv_means_hd_satisfies_inv.
-      exact: labeled_step_dynamic_recv_timeout_enabled.
-       *)
-    * admit.
-      (*
-      apply: W_tl => //.
-      apply c; auto using always_tl.
-      unfold l_enabled in *.
-      unfold enabled in H_en.
-      break_exists_name gst''.
-      move: H_step_recv H_en.
-      find_copy_apply_lem_hyp always_satisfies_inv_means_hd_satisfies_inv.
-      exact: labeled_step_dynamic_recv_timeout_enabled.
-       *)
-  - admit.
-    (*
-    case.
-    case => /= gst' l s h' t' H_notkt H_inv H_exec H_en.
-    inversion H_exec as [o o' s' H_step_timeout H_exec' H_oeq]; subst_max.
-    simpl in *.
-    case (addr_eq_dec h h') => H_dec_h.
-    * subst_max.
-      case (timeout_eq_dec t t') => H_dec_t.
-    + subst_max.
-      exact: W0.
-    + apply W_tl; first by [].
-      apply c; auto using always_tl.
-      unfold l_enabled in *.
-      unfold enabled in H_en.
-      break_exists_name gst''.
-      simpl in *.
-      move: H_step_timeout H_en H_dec_t.
-      exact: labeled_step_dynamic_timeout_neq_timeout_enabled.
-      * apply W_tl; first by [].
-        apply c; auto using always_tl.
-        unfold l_enabled in *.
-        unfold enabled in H_en.
-        break_exists_name gst''.
-        move: H_step_timeout H_en H_dec_h.
-        exact: labeled_step_dynamic_timeout_neq_h_timeout_enabled.
-     *)
-  - admit.
-Admitted.
-
 Lemma l_enabled_Timeout_In_timeouts :
   forall h t e st,
     In h (nodes (occ_gst e)) ->
@@ -1326,22 +1236,23 @@ Lemma l_enabled_Timeout_In_timeouts :
     In t (timeouts (occ_gst e) h) ->
     sigma (occ_gst e) h = Some st ->
     timeout_constraint (occ_gst e) h t ->
-    l_enabled (Timeout h t) e.
+    exists eff,
+      l_enabled (Timeout h t eff) e.
 Proof using.
   move => h t e st H_node H_live H_t H_st.
   unfold l_enabled, enabled.
   set (gst := occ_gst e) in *.
   case H_r: (timeout_handler_l h st t) => [[[[st' ms] newts] clearedts] lb].
-  rewrite /timeout_handler_l /= in H_r.
-  have H_lb: lb = Timeout h t by tuple_inversion.
-  rewrite H_lb {H_lb} in H_r.
+  find_copy_apply_lem_hyp timeout_handler_l_definition; expand_def.
   pose gst' := apply_handler_result
                  h
                  (st', ms, newts, t :: clearedts)
                  [e_timeout h t]
                  gst.
+  intros.
+  exists x.
   exists gst'.
-    by eapply LTimeout; eauto.
+  eapply LTimeout; eauto.
 Qed.
 
 Lemma unconstrained_timeout_eventually_occurred :
@@ -1356,20 +1267,23 @@ Lemma unconstrained_timeout_eventually_occurred :
       ~ In h (failed_nodes (occ_gst (hd s))) ->
       sigma (occ_gst (hd s)) h = Some st ->
       timeout_constraint (occ_gst (hd s)) h t ->
-      eventually (now (occurred (Timeout h t))) s.
+      exists eff,
+        eventually (now (occurred (Timeout h t eff))) s.
 Proof using.
-  move => s H_exec H_fair H_inv h st t H_nkt H_in_n H_in_f H_in_m H_s H_constraint.
-  have H_un := Timeout_enabled_until_occurred _ h t H_nkt H_inv H_exec.
-  apply weak_until_until_or_always in H_un;
-    last by eapply l_enabled_Timeout_In_timeouts; eauto.
-  case: H_un; first exact: until_eventually.
-  move => H_al.
-  apply always_continuously in H_al.
-  apply H_fair in H_al.
-  destruct s as [x s].
-    by apply always_now in H_al.
-Qed.
-*)
+  (* Old proof of this used a lemma Timeout_enabled_until_occurred of the form
+
+      forall s h t,
+        t <> KeepaliveTick ->
+        reachable_st (hd s).(occ_gst) ->
+        lb_execution s ->
+        l_enabled (Timeout h t) (hd s) ->
+        weak_until (now (l_enabled (Timeout h t)))
+                  (now (occurred (Timeout h t)))
+                  s
+
+    which is not true (or even false) now because of the introduction of
+    timeout_effect in the Timeout label. *)
+Admitted.
 
 Definition res_clears_timeout (r : res) (t : timeout) : Prop :=
   match r with
