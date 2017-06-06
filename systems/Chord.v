@@ -95,31 +95,112 @@ Module ChordIDParams <: IDSpaceParams.
   Definition ltb_correct :
     forall a b,
       a <? b = true <-> a < b.
-  Admitted.
+  Proof.
+    intuition.
+  Qed.
+
+  Lemma ltb_leb :
+    forall x y,
+      BinInt.Z.ltb x y = true ->
+      BinInt.Z.leb x y = true.
+  Proof.
+    intros.
+    unfold BinInt.Z.ltb, BinInt.Z.leb in *.
+    repeat break_match; congruence.
+  Qed.
 
   (* The lt relation is a strict total order *)
   Definition lt_asymm :
     forall a b,
       a < b ->
       ~ b < a.
-  Admitted.
+  Proof.
+    intuition.
+    unfold lt, id_ltb in *.
+    find_rewrite_lem BinInt.Z.ltb_antisym.
+    find_apply_lem_hyp ltb_leb.
+    find_rewrite. simpl in *. congruence.
+  Qed.
 
   Definition lt_trans :
     forall a b c,
       a < b ->
       b < c ->
       a < c.
-  Admitted.
-
+  Proof.
+    intros.
+    unfold lt, id_ltb in *.
+    apply BinInt.Z.ltb_lt.
+    find_apply_lem_hyp BinInt.Z.ltb_lt.
+    eapply BinInt.Z.lt_trans; [|eauto].
+    now apply BinInt.Z.ltb_lt.
+  Qed.
+  
   Definition lt_irrefl :
     forall a,
       ~ a < a.
-  Admitted.
+  Proof.
+    intros.
+    unfold lt, id_ltb in *.
+    rewrite BinInt.Z.ltb_irrefl.
+    congruence.
+  Qed.
+
+  Require Import Omega.
+  
+  Lemma plus_2x_inj :
+    forall b x y,
+      BinInt.Z.add b (2 * x) = BinInt.Z.add b (2 * y) ->
+      x = y.
+  Proof. intros. omega.
+  Qed.
+
+  Lemma bit_adds_equal :
+    forall b1 b2  x y,
+      ((Zdigits.bit_value b1) + (2 * x))%Z = ((Zdigits.bit_value b2) + (2 * y))%Z ->
+      b1 = b2.
+  Proof.
+    intros. destruct b1; destruct b2; auto.
+    - exfalso. unfold Zdigits.bit_value in *. omega.
+    - exfalso. unfold Zdigits.bit_value in *. omega.
+  Qed.
+
+  Lemma binary_value_inj :
+    forall n (a : Bvector.Bvector n) b,
+      Zdigits.binary_value n a = Zdigits.binary_value n b ->
+      a = b.
+  Proof.
+    induction n; intros.
+    - destruct a using Vector.case0.
+      destruct b using Vector.case0.
+      auto.
+    - destruct a using Vector.caseS'.
+      destruct b using Vector.caseS'.
+      repeat rewrite Zdigits.binary_value_Sn in H.
+      find_copy_apply_lem_hyp bit_adds_equal.
+      subst.
+      find_copy_apply_lem_hyp plus_2x_inj.
+      find_apply_hyp_hyp. congruence.
+  Qed.
 
   Definition lt_total :
     forall a b,
       a < b \/ b < a \/ a = b.
-  Admitted.
+  Proof.
+    intros.
+    unfold lt, id_ltb, z_of_id.
+    match goal with
+    | |- context [(?x <? ?y)%Z] =>
+      destruct ( Z_lt_le_dec x y)
+    end; auto.
+    - left. apply Z.ltb_lt. auto.
+    - find_apply_lem_hyp Z_le_lt_eq_dec.
+      intuition.
+      + right. left.
+        apply Z.ltb_lt. auto.
+      + find_apply_lem_hyp binary_value_inj.
+        auto.
+  Qed.
 End ChordIDParams.
 
 Module ChordIDSpace := IDSpace(ChordIDParams).
