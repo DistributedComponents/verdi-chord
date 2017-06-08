@@ -1255,6 +1255,75 @@ Proof using.
   eapply LTimeout; eauto.
 Qed.
 
+Lemma step_preserves_timeout_constraint :
+  forall st l st' h t,
+    labeled_step_dynamic st l st' ->
+    timeout_constraint st h t ->
+    timeout_constraint st' h t.
+Proof.
+  intros.
+  invc_labeled_step;
+    match goal with
+    | H : timeout_constraint _ _ ?t |- timeout_constraint _ _ ?t =>
+      invcs H
+    end; try solve [constructor];
+      repeat find_rewrite; constructor; simpl in *; auto;
+        intros; intro.
+  - in_crush; eauto.
+    unfold send in *. solve_by_inversion.
+  - in_crush; eauto.
+    + unfold send in *. solve_by_inversion.
+    + find_apply_hyp_hyp. in_crush.
+    + find_apply_hyp_hyp. in_crush.
+  - intuition eauto.
+    unfold send in *. find_inversion.
+    (* failed nodes can't do client things, right? *)
+    admit.
+  - in_crush; find_apply_hyp_hyp; in_crush.
+Admitted.
+  
+Lemma timeout_constraint_invar :
+  forall s,
+    lb_execution s ->
+    forall h t,
+      timeout_constraint (occ_gst (hd s)) h t ->
+      timeout_constraint (occ_gst (hd (tl s))) h t.
+Proof.
+  intros. inv_lb_execution.
+  simpl in *. eauto using step_preserves_timeout_constraint.
+Qed.
+
+Lemma weak_until_timeout :
+  forall s,
+    lb_execution s ->
+    reachable_st (hd s).(occ_gst) ->
+    forall h st t,
+      t <> KeepaliveTick ->
+      In t (timeouts (occ_gst (hd s)) h) ->
+      In h (nodes (occ_gst (hd s))) ->
+      ~ In h (failed_nodes (occ_gst (hd s))) ->
+      sigma (occ_gst (hd s)) h = Some st ->
+      timeout_constraint (occ_gst (hd s)) h t ->
+      weak_until
+        (fun s => exists eff, l_enabled (Timeout h t eff) (hd s))
+        (fun s => exists eff, occurred (Timeout h t eff) (hd s))
+        s.
+Proof.
+  cofix c. destruct s. destruct o.
+  simpl. intros.
+  inv_lb_execution.
+  simpl in *. find_copy_eapply_lem_hyp step_preserves_timeout_constraint; [|eauto].
+  inv_labeled_step.
+  - admit.
+  - apply W_tl.
+    + simpl.
+      eapply l_enabled_Timeout_In_timeouts; eauto.
+    + simpl in *. 
+      eapply c; clear c; simpl in *; eauto.
+Admitted.      
+  
+
+
 Lemma unconstrained_timeout_eventually_occurred :
   forall s,
     lb_execution s ->
@@ -1270,6 +1339,8 @@ Lemma unconstrained_timeout_eventually_occurred :
       exists eff,
         eventually (now (occurred (Timeout h t eff))) s.
 Proof using.
+  intros.
+  
   (* Old proof of this used a lemma Timeout_enabled_until_occurred of the form
 
       forall s h t,
