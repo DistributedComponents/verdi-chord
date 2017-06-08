@@ -104,7 +104,7 @@ Lemma make_pointer_valid :
   forall a,
     id_of (make_pointer a) = hash (addr_of (make_pointer a)).
 Proof using.
-    by unfold make_pointer.
+  now unfold make_pointer.
 Qed.
 
 Definition valid_ptr_list (gst : global_state) (ps : list pointer) :=

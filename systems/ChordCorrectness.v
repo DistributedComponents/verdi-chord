@@ -1155,8 +1155,8 @@ Proof.
   unfold live_ptrs_with_states.
   intros.
   apply FilterMap.filterMap_In with (a:=h).
-  - by find_rewrite.
-  - by apply live_In_live_ptrs.
+  - now find_rewrite.
+  - now apply live_In_live_ptrs.
 Qed.
 
 Lemma phase_two_zero_error_correct :
