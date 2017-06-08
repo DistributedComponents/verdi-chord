@@ -737,8 +737,8 @@ Proof.
       * repeat find_rewrite.
         find_rewrite_lem update_same.
         find_injection.
-        find_eapply_lem_hyp start_handler_valid_ptrs_state; eauto;
-          repeat find_rewrite; auto with datatypes.
+        eapply start_handler_valid_ptrs_state; eauto;
+        repeat find_rewrite; intuition.
     + repeat find_rewrite.
       rewrite update_diff; auto.
       match goal with
