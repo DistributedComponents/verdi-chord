@@ -9,7 +9,7 @@ addons:
       - aspcud
 env:
   global:
-    - COQ_VERSION=8.5.3
+    - COQ_VERSION=8.6
   matrix:
   - MODE=build
   - MODE=chord
