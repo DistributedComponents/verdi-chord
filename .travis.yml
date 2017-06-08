@@ -13,6 +13,7 @@ env:
   matrix:
   - MODE=build
   - MODE=chord
+  - MODE=proofalytics
 script: bash -ex .travis-ci.sh
 sudo: false
 notifications:

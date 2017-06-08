@@ -9,6 +9,15 @@ opam repo add distributedcomponents-dev http://opam-dev.distributedcomponents.ne
 opam pin add coq $COQ_VERSION --yes --verbose
 
 case $MODE in
+  proofalytics)
+    opam pin add verdi-chord-proofalytics . --yes --verbose &
+    # Output to the screen every 9 minutes to prevent a travis timeout
+    export PID=$!
+    while [[ `ps -p $PID | tail -n +2` ]]; do
+	echo 'proofalyzing...'
+	sleep 540
+    done
+    ;;
   chord)
     opam pin add chord . --yes --verbose
     ;;
