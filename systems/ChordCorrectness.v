@@ -520,9 +520,11 @@ with q = Stabilize2
 *)
 
 Definition open_stabilize_request_to (gst : global_state) (h : addr) (st : data) (dst : addr) : Prop :=
-  cur_request st = Some (make_pointer dst, Stabilize, GetPredAndSuccs) /\
   In (Request dst GetPredAndSuccs) (timeouts gst h) /\
-  In (h, (dst, GetPredAndSuccs)) (msgs gst).
+  In (h, (dst, GetPredAndSuccs)) (msgs gst) /\
+  exists dstp,
+    addr_of dstp = dst /\
+    cur_request st = Some (dstp, Stabilize, GetPredAndSuccs).
 
 Definition open_stabilize_request (gst : global_state) (h : addr) (st : data) : Prop :=
   exists p,
@@ -804,6 +806,46 @@ Proof.
   auto using loaded_Tick_inf_enabled.
 Qed.
 
+Lemma effective_Tick_sends_request :
+  forall gst gst' h st s1 rest st',
+    sigma gst h = Some st ->
+    sigma gst' h = Some st' ->
+    succ_list st = s1 :: rest ->
+    labeled_step_dynamic gst (Timeout h Tick StartStabilize) gst' ->
+    open_stabilize_request_to gst' h st' (addr_of s1).
+Proof.
+  intros.
+  inv_labeled_step; clean_up_labeled_step_cases.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+  find_apply_lem_hyp timeout_handler_definition; expand_def;
+    try congruence.
+  find_injection.
+  find_apply_lem_hyp tick_handler_definition; expand_def;
+    try congruence.
+  unfold add_tick in *; repeat break_let;
+    find_apply_lem_hyp start_query_definition; expand_def.
+  - simpl in *.
+    repeat find_rewrite.
+    find_injection.
+    repeat find_rewrite.
+    simpl in *.
+    find_injection.
+    repeat split; simpl in *.
+    + rewrite update_same.
+      auto with datatypes.
+    + auto.
+    + rewrite update_same in *.
+      find_injection.
+      unfold update_query; simpl.
+      eexists; eauto.
+  - simpl in *.
+    find_rewrite.
+    find_injection.
+    repeat find_rewrite.
+    simpl in *.
+    congruence.
+Qed.
+
 Lemma stabilize_Request_timeout_removes_succ :
   forall ex h st s rest dst p,
     lb_execution ex ->
@@ -864,11 +906,12 @@ Lemma start_stabilize_with_dead_successor_eventually :
   forall ex h st s rest,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
-    weak_local_fairness ex ->
+    strong_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     sigma (occ_gst (hd ex)) h = Some st ->
     succ_list st = s :: rest ->
     In (addr_of s) (failed_nodes (occ_gst (hd ex))) ->
+    always (~_ (now circular_wait)) ex ->
     eventually
       (fun ex' =>
          forall st',
@@ -876,6 +919,8 @@ Lemma start_stabilize_with_dead_successor_eventually :
            open_stabilize_request_to ex.(hd).(occ_gst) h st (addr_of s))
       ex.
 Proof.
+  intros.
+  find_copy_apply_lem_hyp loaded_Tick_inf_often; eauto.
 Admitted.
 
 (* This belongs in ChordLabeled.v *)
