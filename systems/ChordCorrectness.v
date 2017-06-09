@@ -519,16 +519,17 @@ with q = Stabilize
 with q = Stabilize2
 *)
 
-Definition open_stabilize_request_to (gst : global_state) (h : addr) (st : data) (dst : addr) : Prop :=
+Definition open_stabilize_request_to (gst : global_state) (h : addr) (dst : addr) : Prop :=
   In (Request dst GetPredAndSuccs) (timeouts gst h) /\
   In (h, (dst, GetPredAndSuccs)) (msgs gst) /\
-  exists dstp,
+  exists st dstp,
+    sigma gst h = Some st /\
     addr_of dstp = dst /\
     cur_request st = Some (dstp, Stabilize, GetPredAndSuccs).
 
-Definition open_stabilize_request (gst : global_state) (h : addr) (st : data) : Prop :=
+Definition open_stabilize_request (gst : global_state) (h : addr) : Prop :=
   exists p,
-    open_stabilize_request_to gst h st (addr_of p) /\
+    open_stabilize_request_to gst h (addr_of p) /\
     wf_ptr p.
 
 Lemma timeout_handler_eff_StartStabilize :
@@ -807,12 +808,11 @@ Proof.
 Qed.
 
 Lemma effective_Tick_sends_request :
-  forall gst gst' h st s1 rest st',
+  forall gst gst' h st s1 rest,
     sigma gst h = Some st ->
-    sigma gst' h = Some st' ->
     succ_list st = s1 :: rest ->
     labeled_step_dynamic gst (Timeout h Tick StartStabilize) gst' ->
-    open_stabilize_request_to gst' h st' (addr_of s1).
+    open_stabilize_request_to gst' h (addr_of s1).
 Proof.
   intros.
   inv_labeled_step; clean_up_labeled_step_cases.
@@ -830,20 +830,14 @@ Proof.
     repeat find_rewrite.
     simpl in *.
     find_injection.
-    repeat split; simpl in *.
-    + rewrite update_same.
-      auto with datatypes.
-    + auto.
-    + rewrite update_same in *.
-      find_injection.
-      unfold update_query; simpl.
-      eexists; eauto.
+    repeat split; simpl in *;
+      try rewrite update_same in *;
+      eauto with datatypes.
   - simpl in *.
     find_rewrite.
     find_injection.
     repeat find_rewrite.
-    simpl in *.
-    congruence.
+    discriminate.
 Qed.
 
 Lemma stabilize_Request_timeout_removes_succ :
@@ -851,7 +845,7 @@ Lemma stabilize_Request_timeout_removes_succ :
     lb_execution ex ->
     sigma ex.(hd).(occ_gst) h = Some st ->
     succ_list st = s :: rest ->
-    open_stabilize_request_to ex.(hd).(occ_gst) h st dst ->
+    open_stabilize_request_to ex.(hd).(occ_gst) h dst ->
     now (occurred (Timeout h (Request dst p) DetectFailure)) ex ->
     next
       (now
@@ -888,8 +882,13 @@ Proof.
   repeat find_reverse_rewrite.
   find_injection.
 
+  assert (st0 = x0)
+    by (repeat find_rewrite; now find_injection);
+    subst.
+
   simpl in *.
   unfold request_timeout_handler in *.
+  repeat find_rewrite.
   repeat find_rewrite.
   simpl in *.
   break_if; [|congruence].
@@ -913,10 +912,7 @@ Lemma start_stabilize_with_dead_successor_eventually :
     In (addr_of s) (failed_nodes (occ_gst (hd ex))) ->
     always (~_ (now circular_wait)) ex ->
     eventually
-      (fun ex' =>
-         forall st',
-           sigma ex'.(hd).(occ_gst) h = Some st' ->
-           open_stabilize_request_to ex.(hd).(occ_gst) h st (addr_of s))
+      (fun ex' => open_stabilize_request_to ex'.(hd).(occ_gst) h (addr_of s))
       ex.
 Proof.
   intros.
@@ -928,18 +924,18 @@ Lemma Timeout_enabled_when_open_stabilize_request_to_dead_node :
   forall occ h st dst,
     live_node (occ_gst occ) h ->
     sigma (occ_gst occ) h = Some st ->
-    open_stabilize_request_to (occ_gst occ) h st dst ->
+    open_stabilize_request_to (occ_gst occ) h dst ->
     In dst (failed_nodes (occ_gst occ)) ->
     (forall m, ~ In (dst, (h, m)) (msgs (occ_gst occ))) ->
     l_enabled (Timeout h (Request dst GetPredAndSuccs) DetectFailure) occ.
 Proof.
   intros.
   break_live_node.
-  unfold open_stabilize_request_to in *; break_and.
+  unfold open_stabilize_request_to in *; break_and; repeat break_exists.
   destruct (timeout_handler_l h st (Request dst GetPredAndSuccs))
     as [[[[st' ms] nts] cts] l] eqn:H_thl.
   copy_apply timeout_handler_l_definition H_thl; expand_def.
-  assert (x0 = DetectFailure).
+  assert (x2 = DetectFailure).
   {
     find_copy_apply_lem_hyp timeout_handler_definition; expand_def; try congruence.
     find_apply_lem_hyp request_timeout_handler_definition; expand_def.
@@ -951,8 +947,9 @@ Proof.
     - congruence.
   }
   subst.
+  repeat find_rewrite.
 
-  eexists; eapply LTimeout; eauto.
+  eexists; repeat find_reverse_rewrite; eapply LTimeout; eauto.
   eapply Request_needs_dst_dead_and_no_msgs; eauto.
 Qed.
 
@@ -965,13 +962,13 @@ Lemma timeout_Request_to_dead_node_eventually_fires :
     now (fun occ =>
            exists st,
              sigma (occ_gst occ) h = Some st /\
-             open_stabilize_request_to (occ_gst occ) h st dst)
+             open_stabilize_request_to (occ_gst occ) h dst)
         ex ->
     exists p,
       until (next (now (fun occ => forall st,
                       In dst (failed_nodes (occ_gst occ)) ->
                       sigma (occ_gst occ) h = Some st ->
-                      open_stabilize_request_to (occ_gst occ) h st dst)))
+                      open_stabilize_request_to (occ_gst occ) h dst)))
             (now (occurred (Timeout h (Request dst p) DetectFailure)))
             ex.
 Proof.
