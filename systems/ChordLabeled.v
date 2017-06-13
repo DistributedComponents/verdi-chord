@@ -1589,8 +1589,7 @@ Lemma reachable_st_lb_execution_cons :
 Proof using.
   intros.
   inv_lb_execution.
-  find_apply_lem_hyp labeled_step_is_unlabeled_step.
-  eauto using reachableStep.
+  eauto using reachableStep, labeled_step_is_unlabeled_step.
 Qed.
 
 Lemma queries_now_closed :
