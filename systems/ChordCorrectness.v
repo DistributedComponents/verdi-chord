@@ -658,7 +658,7 @@ Lemma live_node_has_Tick_in_timeouts :
 Admitted.
 
 Lemma loaded_Tick_enabled_if_now_not_busy_if_live :
-  forall ex h,
+  forall h ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
@@ -756,8 +756,70 @@ Proof.
   - eapply cumul_inf_often_always; eauto.
 Qed.
 
+Lemma lb_execution_step_structural :
+  forall o o' ex,
+    lb_execution (Cons o (Cons o' ex)) ->
+    labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst o').
+Proof.
+  intros.
+  now inv_lb_execution.
+Qed.
+
+Lemma lb_execution_step_one_cons :
+  forall o ex,
+    lb_execution (Cons o ex) ->
+    labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst (hd ex)).
+Proof.
+  intros.
+  destruct ex.
+  eauto using lb_execution_step_structural.
+Qed.
+
+Lemma lb_execution_two_cons :
+  forall ex,
+    lb_execution ex ->
+    labeled_step_dynamic (occ_gst (hd ex)) (occ_label (hd ex)) (occ_gst (hd (tl ex))).
+Proof.
+  intros.
+  do 2 destruct ex.
+  eauto using lb_execution_step_structural.
+Qed.
+
+
+Ltac pair_and_tl H fst snd tl ex :=
+  assert (forall ex, (and_tl snd fst) ex -> tl)
+  by firstorder;
+  clear H.
+
+(* would be nice to be able to tell which possible invariant things are actually
+   going to be invariants before we apply inf_often_monotonic_invar, maybe a
+   typeclass would help? *)
+Ltac prep_inf_often_monotonic_invar :=
+  repeat lazymatch goal with
+         | [H: forall ex, ?fst ex -> ?P ex -> @?conclusion ex,
+              H_P : inf_often ?P ?s |- inf_often ?conclusion ?s] =>
+           fail
+         | H: forall ex, ?fst ex -> ?snd ex -> ?tl |- _ =>
+           pair_and_tl H fst snd tl ex
+         | H: forall ex, ?fst ex -> @?snd ex -> ?tl |- _ =>
+           pair_and_tl H fst snd tl ex
+         | H: forall ex, @?fst ex -> ?snd ex -> ?tl |- _ =>
+           pair_and_tl H fst snd tl ex
+         | H: forall ex, @?fst ex -> @?snd ex -> ?tl |- _ =>
+           pair_and_tl H fst snd tl ex
+         end.
+
+Ltac invar_eauto :=
+  eauto using
+        lb_execution_invar,
+  strong_local_fairness_invar,
+  live_node_invariant,
+  labeled_step_is_unlabeled_step,
+  reachableStep,
+  lb_execution_step_one_cons.
+
 Lemma loaded_Tick_inf_enabled :
-  forall ex h,
+  forall h ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
@@ -765,34 +827,16 @@ Lemma loaded_Tick_inf_enabled :
     always (~_ (now circular_wait)) ex ->
     inf_enabled (Timeout h Tick StartStabilize) ex.
 Proof.
-  intros ex h.
-  generalize dependent ex.
+  intros h.
   pose proof (always_busy_or_not_busy h) as H_bnb.
   intros.
-  set (invar :=
-         lb_execution /\_
-         strong_local_fairness /\_
-         (fun ex => live_node (occ_gst (hd ex)) h) /\_
-         (fun ex => reachable_st (occ_gst (hd ex)))).
-  set (P := now (not_busy_if_live h)).
-  set (Q := now (l_enabled (Timeout h Tick StartStabilize))).
-  assert (forall ex, invar ex -> P ex -> Q ex)
-    by firstorder using loaded_Tick_enabled_if_now_not_busy_if_live.
-  eapply inf_often_monotonic_invar; eauto.
-  - unfold invar.
-    apply always_inv.
-    + destruct ex.
-      intros.
-      unfold and_tl in *; break_and.
-      break_and_goal.
-      * eauto using lb_execution_invar.
-      * eauto using strong_local_fairness_invar.
-      * inv_lb_execution.
-        eauto using live_node_invariant.
-      * inv_lb_execution.
-        eauto using reachable_st_lb_execution_cons.
-    + unfold and_tl; tauto.
-  - eauto using not_busy_inf_often.
+  unfold inf_enabled.
+  find_copy_apply_lem_hyp not_busy_inf_often; eauto.
+  pose proof (fun s => loaded_Tick_enabled_if_now_not_busy_if_live h s).
+  prep_inf_often_monotonic_invar.
+  find_eapply_lem_hyp inf_often_monotonic_invar; eauto.
+  apply always_inv; unfold and_tl in *; [|now eauto].
+  intros; repeat break_and; break_and_goal; invar_eauto.
 Qed.
 
 Lemma loaded_Tick_inf_often :
