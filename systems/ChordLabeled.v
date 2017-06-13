@@ -623,6 +623,20 @@ Proof using.
     solve_by_inversion' eauto.
 Qed.
 
+Lemma timeout_implies_state_exists_after :
+  forall gst h t eff gst',
+    labeled_step_dynamic gst (Timeout h t eff) gst' ->
+    exists st,
+      sigma gst' h = Some st.
+Proof using.
+  intros.
+  invc_labeled_step.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+  find_injection.
+  rewrite sigma_ahr_updates.
+  eexists; eauto.
+Qed.
+
 Lemma states_not_removed_by_recv_step :
   forall gst gst' h st src dst p,
     labeled_step_dynamic gst (RecvMsg src dst p) gst' ->

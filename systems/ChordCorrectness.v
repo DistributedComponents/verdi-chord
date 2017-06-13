@@ -532,6 +532,14 @@ Definition open_stabilize_request (gst : global_state) (h : addr) : Prop :=
     open_stabilize_request_to gst h (addr_of p) /\
     wf_ptr p.
 
+(** If h is a valid node with a first successor s in gst, then h has an open
+    stabilize request to s in gst. *)
+Definition open_stabilize_request_to_first_succ (gst : global_state) (h : addr) : Prop :=
+  forall st dst rest,
+    sigma gst h = Some st ->
+    succ_list st = dst :: rest ->
+    open_stabilize_request_to gst h (addr_of dst).
+
 Lemma timeout_handler_eff_StartStabilize :
   forall h st r eff,
     timeout_handler_eff h st Tick = (r, eff) ->
@@ -824,6 +832,21 @@ Ltac prep_inf_often_monotonic_invar :=
            accum_and_tl H fst snd tl ex
          end.
 
+Ltac prep_eventually_monotonic :=
+  repeat lazymatch goal with
+         | [H: forall ex, ?fst ex -> ?P ex -> @?conclusion ex,
+              H_P : eventually ?P ?s |- eventually ?conclusion ?s] =>
+           fail
+         | H: forall ex, ?fst ex -> ?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, ?fst ex -> @?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, @?fst ex -> ?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, @?fst ex -> @?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         end.
+
 Ltac invar_eauto :=
   eauto using
         lb_execution_invar,
@@ -842,7 +865,13 @@ Ltac lift_inf_often lem :=
   pose proof lem;
   prep_inf_often_monotonic_invar;
   eapply inf_often_monotonic_invar; eauto;
-  prep_always_inv.
+  try prep_always_inv.
+
+Ltac lift_eventually lem :=
+  pose proof lem;
+  prep_eventually_monotonic;
+  eapply eventually_monotonic; eauto;
+  try prep_always_inv.
 
 Lemma loaded_Tick_inf_enabled :
   forall h ex,
@@ -907,6 +936,138 @@ Proof.
     discriminate.
 Qed.
 
+Lemma option_map_Some :
+  forall A B (f : A -> B) a b,
+    option_map f a = Some b ->
+    exists a', a = Some a' /\
+          f a' = b.
+Proof.
+  intros.
+  destruct a; simpl in *; try congruence.
+  find_injection.
+  eexists; eauto.
+Qed.
+
+Lemma option_map_None :
+  forall A B (f : A -> B) a,
+    option_map f a = None ->
+    a = None.
+Proof.
+  intros.
+  destruct a; simpl in *; congruence.
+Qed.
+
+Lemma make_request_Stabilize_needs_succ_list :
+  forall h st dst m,
+    make_request h st Stabilize = Some (dst, m) ->
+    exists rest,
+      succ_list st = dst :: rest.
+Proof.
+  intros.
+  unfold make_request in *; simpl in *.
+  find_apply_lem_hyp option_map_Some; break_exists; break_and.
+  find_copy_apply_lem_hyp hd_error_some_nil.
+  destruct (succ_list st) eqn:?H; [discriminate|].
+  simpl in *.
+  tuple_inversion.
+  find_injection.
+  eexists; eauto.
+Qed.
+
+Lemma make_request_Stabilize_None :
+  forall h st,
+    make_request h st Stabilize = None ->
+    succ_list st = [].
+Proof.
+  intros.
+  unfold make_request in *; simpl in *.
+  simpl in *.
+  find_eapply_lem_hyp option_map_None.
+  destruct (succ_list st) eqn:?H; simpl in *; congruence.
+Qed.
+
+Lemma succ_list_preserved_by_Tick :
+  forall gst gst' h st st',
+    labeled_step_dynamic gst (Timeout h Tick StartStabilize) gst' ->
+    sigma gst h = Some st ->
+    sigma gst' h = Some st' ->
+    succ_list st' = succ_list st.
+Proof.
+  intros.
+  inv_labeled_step; clean_up_labeled_step_cases.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+  find_apply_lem_hyp timeout_handler_definition; expand_def;
+    try congruence.
+  find_injection.
+  find_apply_lem_hyp tick_handler_definition; expand_def;
+    try congruence.
+  rewrite sigma_ahr_updates in *; find_injection.
+  destruct (start_query _ _ _) as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
+  find_eapply_lem_hyp add_tick_definition; expand_def.
+  find_apply_lem_hyp start_query_definition; expand_def;
+    repeat find_rewrite; solve_by_inversion.
+Qed.
+
+Lemma effective_Tick_sends_request' :
+  forall gst gst' h st s1 rest,
+    sigma gst' h = Some st ->
+    succ_list st = s1 :: rest ->
+    labeled_step_dynamic gst (Timeout h Tick StartStabilize) gst' ->
+    open_stabilize_request_to gst' h (addr_of s1).
+Proof.
+  intros.
+  inv_labeled_step; clean_up_labeled_step_cases.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+  find_apply_lem_hyp timeout_handler_definition; expand_def;
+    try congruence.
+  find_injection.
+  find_apply_lem_hyp tick_handler_definition; expand_def;
+    try congruence.
+  destruct (start_query _ _ _) as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
+  find_copy_eapply_lem_hyp succ_list_preserved_by_Tick; eauto.
+  repeat find_rewrite.
+  find_eapply_lem_hyp start_query_definition; expand_def.
+  - find_copy_apply_lem_hyp make_request_Stabilize_needs_succ_list; break_exists.
+    repeat find_rewrite.
+    find_injection.
+    eauto using effective_Tick_sends_request.
+  - find_eapply_lem_hyp make_request_Stabilize_None.
+    repeat find_rewrite.
+    congruence.
+Qed.
+
+Lemma get_open_stabilize_request_to_first_succ_from_req_to :
+  forall gst h st dst rest,
+    open_stabilize_request_to gst h (addr_of dst) ->
+    sigma gst h = Some st ->
+    succ_list st = dst :: rest ->
+    open_stabilize_request_to_first_succ gst h.
+Proof.
+  unfold open_stabilize_request_to_first_succ.
+  intros.
+  now repeat (find_injection || find_rewrite).
+Qed.
+
+Lemma effective_Tick_occurred_sent_request :
+  forall h ex,
+    lb_execution ex ->
+    now (occurred (Timeout h Tick StartStabilize)) ex ->
+    next (now (fun o => open_stabilize_request_to_first_succ (occ_gst o) h)) ex.
+Proof.
+  intros.
+  do 2 destruct ex.
+  simpl in *.
+  inv_lb_execution.
+  unfold occurred in *.
+  repeat find_reverse_rewrite.
+  find_copy_apply_lem_hyp timeout_implies_state_exists_after; break_exists_name st'.
+  find_copy_apply_lem_hyp timeout_implies_state_exists; break_exists_name st.
+  destruct (succ_list st') eqn:?H.
+  - congruence.
+  - eapply get_open_stabilize_request_to_first_succ_from_req_to; eauto.
+    eapply effective_Tick_sends_request'; eauto.
+Qed.
+
 Lemma stabilize_Request_timeout_removes_succ :
   forall ex h st s rest dst p,
     lb_execution ex ->
@@ -969,22 +1130,23 @@ Proof.
 Qed.
 
 Lemma start_stabilize_with_dead_successor_eventually :
-  forall ex h st s rest,
+  forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
     strong_local_fairness ex ->
-    live_node (occ_gst (hd ex)) h ->
-    sigma (occ_gst (hd ex)) h = Some st ->
-    succ_list st = s :: rest ->
-    In (addr_of s) (failed_nodes (occ_gst (hd ex))) ->
     always (~_ (now circular_wait)) ex ->
-    eventually
-      (fun ex' => open_stabilize_request_to ex'.(hd).(occ_gst) h (addr_of s))
-      ex.
+
+    live_node (occ_gst (hd ex)) h ->
+
+    eventually (now (fun o => open_stabilize_request_to_first_succ o.(occ_gst) h)) ex.
 Proof.
   intros.
-  find_copy_apply_lem_hyp loaded_Tick_inf_often; eauto.
-Admitted.
+  find_copy_apply_lem_hyp loaded_Tick_inf_often; auto.
+  inv_prop inf_occurred.
+  eapply eventually_next.
+  lift_eventually (effective_Tick_occurred_sent_request h).
+  invar_eauto.
+Qed.
 
 (* This belongs in ChordLabeled.v *)
 Lemma Timeout_enabled_when_open_stabilize_request_to_dead_node :
