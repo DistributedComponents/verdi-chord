@@ -785,11 +785,26 @@ Proof.
   eauto using lb_execution_step_structural.
 Qed.
 
+(**
+Given a hypothesis H of the form
 
-Ltac pair_and_tl H fst snd tl ex :=
-  assert (forall ex, (and_tl snd fst) ex -> tl)
-  by firstorder;
-  clear H.
+    H: forall ex,
+          P ex ->
+          Q ex ->
+          rest,
+
+replace H with
+
+    H: forall ex,
+          (Q /\_ P) ex ->
+          rest.
+*)
+Ltac accum_and_tl H P Q rest ex :=
+  let H' := fresh in
+  rename H into H';
+  assert (H: forall ex, (and_tl Q P) ex -> rest)
+    by firstorder;
+  clear H'.
 
 (* would be nice to be able to tell which possible invariant things are actually
    going to be invariants before we apply inf_often_monotonic_invar, maybe a
@@ -800,23 +815,34 @@ Ltac prep_inf_often_monotonic_invar :=
               H_P : inf_often ?P ?s |- inf_often ?conclusion ?s] =>
            fail
          | H: forall ex, ?fst ex -> ?snd ex -> ?tl |- _ =>
-           pair_and_tl H fst snd tl ex
+           accum_and_tl H fst snd tl ex
          | H: forall ex, ?fst ex -> @?snd ex -> ?tl |- _ =>
-           pair_and_tl H fst snd tl ex
+           accum_and_tl H fst snd tl ex
          | H: forall ex, @?fst ex -> ?snd ex -> ?tl |- _ =>
-           pair_and_tl H fst snd tl ex
+           accum_and_tl H fst snd tl ex
          | H: forall ex, @?fst ex -> @?snd ex -> ?tl |- _ =>
-           pair_and_tl H fst snd tl ex
+           accum_and_tl H fst snd tl ex
          end.
 
 Ltac invar_eauto :=
   eauto using
         lb_execution_invar,
-  strong_local_fairness_invar,
-  live_node_invariant,
-  labeled_step_is_unlabeled_step,
-  reachableStep,
-  lb_execution_step_one_cons.
+        strong_local_fairness_invar,
+        live_node_invariant,
+        labeled_step_is_unlabeled_step,
+        reachableStep,
+        lb_execution_step_one_cons.
+
+Ltac prep_always_inv :=
+  apply always_inv;
+  unfold and_tl in *;
+  [intros; repeat break_and; break_and_goal|tauto].
+
+Ltac lift_inf_often lem :=
+  pose proof lem;
+  prep_inf_often_monotonic_invar;
+  eapply inf_often_monotonic_invar; eauto;
+  prep_always_inv.
 
 Lemma loaded_Tick_inf_enabled :
   forall h ex,
@@ -832,11 +858,8 @@ Proof.
   intros.
   unfold inf_enabled.
   find_copy_apply_lem_hyp not_busy_inf_often; eauto.
-  pose proof (fun s => loaded_Tick_enabled_if_now_not_busy_if_live h s).
-  prep_inf_often_monotonic_invar.
-  find_eapply_lem_hyp inf_often_monotonic_invar; eauto.
-  apply always_inv; unfold and_tl in *; [|now eauto].
-  intros; repeat break_and; break_and_goal; invar_eauto.
+  lift_inf_often (loaded_Tick_enabled_if_now_not_busy_if_live h);
+    invar_eauto.
 Qed.
 
 Lemma loaded_Tick_inf_often :
