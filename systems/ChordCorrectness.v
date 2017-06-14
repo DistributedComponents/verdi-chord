@@ -6,6 +6,7 @@ Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 Require Import InfSeqExt.infseq.
+Require Import Chord.InfSeqTactics.
 Require Import Chord.Measure.
 
 Require Import Chord.Chord.

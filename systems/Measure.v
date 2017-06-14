@@ -2,6 +2,7 @@ Require Import Omega.
 
 Require Import StructTact.StructTactics.
 Require Import InfSeqExt.infseq.
+Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
 Import Chord.Chord.Chord.
@@ -183,55 +184,6 @@ Section Measure.
       measure_bounded n ex.
   Proof.
   Admitted.
-
-(**
-Given a hypothesis H of the form
-
-    H: forall ex,
-          P ex ->
-          Q ex ->
-          rest,
-
-replace H with
-
-    H: forall ex,
-          (Q /\_ P) ex ->
-          rest.
-*)
-Ltac accum_and_tl H P Q rest ex :=
-  let H' := fresh in
-  rename H into H';
-  assert (H: forall ex, (and_tl Q P) ex -> rest)
-    by firstorder;
-  clear H'.
-
-
-Ltac prep_eventually_monotonic :=
-  repeat lazymatch goal with
-         | [H: forall ex, ?fst ex -> ?P ex -> @?conclusion ex,
-              H_P : eventually ?P ?s |- _] =>
-           fail
-         | H: forall ex, ?fst ex -> ?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, ?fst ex -> @?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, @?fst ex -> ?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, @?fst ex -> @?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         end.
-
-Ltac prep_always_inv :=
-  apply always_inv;
-  unfold and_tl in *;
-  [intros; repeat break_and; break_and_goal|tauto].
-
-Ltac lift_eventually lem :=
-  pose proof lem;
-  unfold continuously in *;
-  prep_eventually_monotonic;
-  eapply eventually_monotonic; eauto;
-  try prep_always_inv.
 
   Lemma measure_bound_drops :
     forall n ex,
