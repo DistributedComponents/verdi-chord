@@ -1465,7 +1465,7 @@ Lemma phase_two_error_decreasing :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    decreasing_inf_often_or_zero total_pred_and_first_succ_error ex.
+    always (decreasing_inf_often_or_zero total_pred_and_first_succ_error) ex.
 Proof.
 Admitted.
 
@@ -1480,7 +1480,7 @@ Proof.
   intros.
   find_copy_apply_lem_hyp phase_two_error_stable; auto.
   find_copy_apply_lem_hyp phase_two_error_decreasing; auto.
-  find_copy_apply_lem_hyp measure_decreasing_to_zero; auto.
+  find_copy_apply_lem_hyp measure_decreasing_to_zero_continuously; auto.
   unfold lift_gpred_to_ex.
   eapply continuously_monotonic.
   - eapply now_monotonic; intros.
