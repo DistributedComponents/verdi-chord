@@ -49,3 +49,28 @@ Ltac lift_eventually lem :=
   prep_eventually_monotonic;
   eapply eventually_monotonic; eauto;
   try prep_always_inv.
+
+
+(* would be nice to be able to tell which possible invariant things are actually
+   going to be invariants before we apply inf_often_monotonic_invar, maybe a
+   typeclass would help? *)
+Ltac prep_inf_often_monotonic_invar :=
+  repeat lazymatch goal with
+         | [H: forall ex, ?fst ex -> ?P ex -> @?conclusion ex,
+              H_P : inf_often ?P ?s |- inf_often ?conclusion ?s] =>
+           fail
+         | H: forall ex, ?fst ex -> ?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, ?fst ex -> @?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, @?fst ex -> ?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, @?fst ex -> @?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         end.
+
+Ltac lift_inf_often lem :=
+  pose proof lem;
+  prep_inf_often_monotonic_invar;
+  eapply inf_often_monotonic_invar; eauto;
+  try prep_always_inv.

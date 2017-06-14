@@ -685,87 +685,6 @@ Proof.
   eapply loaded_Tick_enabled_when_cur_request_None; eauto.
 Qed.
 
-Theorem always_monotonic_invar :
-  forall T (invariant P Q : infseq T -> Prop),
-    (forall s,
-        invariant s ->
-        P s ->
-        Q s) ->
-    forall ex,
-      always invariant ex ->
-      always P ex ->
-      always Q ex.
-Proof.
-  intros until 1.
-  cofix c.
-  intros.
-  constructor.
-  - apply H; solve_by_inversion.
-  - destruct ex.
-    apply c; eauto using always_invar.
-Qed.
-
-Lemma cumul_eventually_always :
-  forall T (P Q : infseq T -> Prop) s,
-    always P s ->
-    eventually Q s ->
-    eventually (P /\_ Q) s.
-Proof.
-  intros until 1.
-  intro H_eventually.
-  induction H_eventually.
-  - inv_prop always.
-    now constructor.
-  - eauto using E_next, always_invar.
-Qed.
-
-Lemma always_always :
-  forall T (P : infseq T -> Prop) s,
-    always P s ->
-    always (always P) s.
-Proof.
-  intros.
-  generalize dependent s.
-  cofix c.
-  constructor.
-  - auto.
-  - do 2 destruct s.
-    constructor; eauto using always_invar.
-Qed.
-
-Lemma cumul_inf_often_always :
-  forall T (P Q : infseq T -> Prop) s,
-    always P s ->
-    inf_often Q s ->
-    inf_often (P /\_ Q) s.
-Proof.
-  intros.
-  eapply always_monotonic with (P := always P /\_ eventually Q) (Q := eventually (P /\_ Q)).
-  - intros.
-    unfold and_tl in * |-.
-    break_and.
-    eapply cumul_eventually_always; eauto.
-  - eapply always_and_tl; eauto using always_always.
-Qed.
-
-Theorem inf_often_monotonic_invar :
-  forall T (invariant P Q : infseq T -> Prop),
-    (forall s,
-        invariant s ->
-        P s ->
-        Q s) ->
-    forall ex,
-      always invariant ex ->
-      inf_often P ex ->
-      inf_often Q ex.
-Proof.
-  intros.
-  eapply inf_often_monotonic with (P:=invariant /\_ P).
-  - intros.
-    unfold and_tl in *; firstorder.
-  - eapply cumul_inf_often_always; eauto.
-Qed.
-
 Lemma lb_execution_step_structural :
   forall o o' ex,
     lb_execution (Cons o (Cons o' ex)) ->
@@ -795,60 +714,6 @@ Proof.
   eauto using lb_execution_step_structural.
 Qed.
 
-(**
-Given a hypothesis H of the form
-
-    H: forall ex,
-          P ex ->
-          Q ex ->
-          rest,
-
-replace H with
-
-    H: forall ex,
-          (Q /\_ P) ex ->
-          rest.
-*)
-Ltac accum_and_tl H P Q rest ex :=
-  let H' := fresh in
-  rename H into H';
-  assert (H: forall ex, (and_tl Q P) ex -> rest)
-    by firstorder;
-  clear H'.
-
-(* would be nice to be able to tell which possible invariant things are actually
-   going to be invariants before we apply inf_often_monotonic_invar, maybe a
-   typeclass would help? *)
-Ltac prep_inf_often_monotonic_invar :=
-  repeat lazymatch goal with
-         | [H: forall ex, ?fst ex -> ?P ex -> @?conclusion ex,
-              H_P : inf_often ?P ?s |- inf_often ?conclusion ?s] =>
-           fail
-         | H: forall ex, ?fst ex -> ?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, ?fst ex -> @?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, @?fst ex -> ?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, @?fst ex -> @?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         end.
-
-Ltac prep_eventually_monotonic :=
-  repeat lazymatch goal with
-         | [H: forall ex, ?fst ex -> ?P ex -> @?conclusion ex,
-              H_P : eventually ?P ?s |- eventually ?conclusion ?s] =>
-           fail
-         | H: forall ex, ?fst ex -> ?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, ?fst ex -> @?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, @?fst ex -> ?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         | H: forall ex, @?fst ex -> @?snd ex -> ?tl |- _ =>
-           accum_and_tl H fst snd tl ex
-         end.
-
 Ltac invar_eauto :=
   eauto using
         lb_execution_invar,
@@ -857,23 +722,6 @@ Ltac invar_eauto :=
         labeled_step_is_unlabeled_step,
         reachableStep,
         lb_execution_step_one_cons.
-
-Ltac prep_always_inv :=
-  apply always_inv;
-  unfold and_tl in *;
-  [intros; repeat break_and; break_and_goal|tauto].
-
-Ltac lift_inf_often lem :=
-  pose proof lem;
-  prep_inf_often_monotonic_invar;
-  eapply inf_often_monotonic_invar; eauto;
-  try prep_always_inv.
-
-Ltac lift_eventually lem :=
-  pose proof lem;
-  prep_eventually_monotonic;
-  eapply eventually_monotonic; eauto;
-  try prep_always_inv.
 
 Lemma loaded_Tick_inf_enabled :
   forall h ex,
