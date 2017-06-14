@@ -6,6 +6,7 @@ Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 Require Import InfSeqExt.infseq.
+Require Import Chord.Measure.
 
 Require Import Chord.Chord.
 Import Chord.Chord.Chord.
@@ -1445,35 +1446,6 @@ Proof.
     now live_inv.
 Qed.
 
-(** Generic reasoning about measures. *)
-
-Definition measure_doesnt_increase (measure : global_state -> nat) (o o' : occurrence) : Prop :=
-  measure (occ_gst o') <= measure (occ_gst o).
-
-Definition measure_drops (measure : global_state -> nat) (o o' : occurrence) : Prop :=
-  measure (occ_gst o') < measure (occ_gst o).
-
-Definition measure_zero (measure : global_state -> nat) (o : occurrence) : Prop :=
-  measure (occ_gst o) = 0.
-
-Lemma measure_zero_elim :
-  forall measure o,
-    measure_zero measure o ->
-    measure (occ_gst o) = 0.
-Proof.
-  easy.
-Qed.
-
-Lemma measure_decreasing_to_zero :
-  forall measure ex,
-    continuously (consecutive (measure_doesnt_increase measure)) ex ->
-    weak_until (consecutive (measure_drops measure))
-               (now (measure_zero measure))
-               ex ->
-    continuously (now (measure_zero measure)) ex.
-Proof.
-Admitted.
-
 (* This is really an invariant. *)
 Lemma phase_two_error_stable :
   forall ex,
@@ -1481,7 +1453,7 @@ Lemma phase_two_error_stable :
     reachable_st (occ_gst (hd ex)) ->
     continuously
       (consecutive
-         (measure_doesnt_increase total_pred_and_first_succ_error))
+         (measure_nonincreasing total_pred_and_first_succ_error))
       ex.
 Proof.
 Admitted.
@@ -1493,12 +1465,7 @@ Lemma phase_two_error_decreasing :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    weak_until
-      (consecutive
-         (measure_drops total_pred_and_first_succ_error))
-      (now
-         (measure_zero total_pred_and_first_succ_error))
-      ex.
+    decreasing_inf_often_or_zero total_pred_and_first_succ_error ex.
 Proof.
 Admitted.
 
