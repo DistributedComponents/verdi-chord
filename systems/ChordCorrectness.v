@@ -979,7 +979,7 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma start_stabilize_with_dead_successor_eventually :
+Lemma start_stabilize_with_first_successor_eventually :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
@@ -1122,7 +1122,7 @@ Lemma dead_successor_eventually_removed :
       ex.
 Proof.
   intros.
-  find_copy_eapply_lem_hyp start_stabilize_with_dead_successor_eventually; eauto.
+  find_copy_eapply_lem_hyp start_stabilize_with_first_successor_eventually; eauto.
 Admitted.
 
 Lemma recv_handler_label_is_RecvMsg :
