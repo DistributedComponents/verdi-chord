@@ -170,12 +170,20 @@ Section Measure.
             eapply always_invar; eauto.
   Qed.
 
-  Lemma nat_strong_ind : 
-    forall (P : nat -> Prop), 
-      (forall n, (forall m, m < n -> P m) -> P n) -> 
+  (** This shouldn't live here but I'm not sure where it should live *)
+  Lemma nat_strong_ind :
+    forall (P : nat -> Prop),
+      (forall n, (forall m, m < n -> P m) -> P n) ->
       forall n, P n.
   Proof.
-  Admitted.
+    intros P Himp.
+    intros.
+    (* generalize induction hypothesis *)
+    cut (forall m, m < n -> P m); [now auto|].
+    induction n.
+    - easy.
+    - firstorder.
+  Qed.
 
   Lemma less_than_Sn_bounded_n :
     forall n ex,
@@ -183,7 +191,12 @@ Section Measure.
       now (fun occ => |occ_gst occ| < S n) ex ->
       measure_bounded n ex.
   Proof.
-  Admitted.
+    intros.
+    remember (|occ_gst (hd ex)|) as m.
+    eapply measure_bounded_monotonic;
+      [|eauto using nonincreasing_global].
+    destruct ex; simpl in *; omega.
+  Qed.
 
   Lemma measure_bound_drops :
     forall n ex,
@@ -232,7 +245,11 @@ Section Measure.
       eventually (eventually P) ex ->
       eventually P ex.
   Proof.
-  Admitted.
+    intros T P ex H_ee.
+    induction H_ee.
+    - assumption.
+    - now apply E_next.
+  Qed.
 
   Lemma decreasing_inf_often_or_zero_invar_when_nonincreasing :
     forall o ex,
@@ -240,7 +257,15 @@ Section Measure.
       decreasing_inf_often_or_zero (Cons o ex) ->
       decreasing_inf_often_or_zero ex.
   Proof.
-  Admitted.
+    unfold decreasing_inf_often_or_zero.
+    intros.
+    inv_prop or_tl.
+    - left.
+      find_apply_lem_hyp measure_zero_stays_zero; auto.
+      find_apply_lem_hyp always_invar.
+      now inv_prop always.
+    - right; eapply inf_often_invar; eauto.
+  Qed.
 
   Lemma measure_decreasing_to_zero' :
     forall n ex,
