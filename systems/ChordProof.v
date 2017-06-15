@@ -1011,7 +1011,8 @@ Lemma schedule_rectify_with_definition :
 Proof.
   unfold schedule_rectify_with.
   intros.
-  repeat break_match; tuple_inversion; firstorder eauto.
+  repeat break_match; tuple_inversion;
+    intuition (eexists; eauto).
 Qed.
 
 Lemma joined_preserved_by_schedule_rectify_with :
