@@ -195,9 +195,6 @@ Fixpoint succ_list_leading_failed_nodes (failed : list addr) (succs : list point
   | [] => 0
   end.
 
-Definition sum (l : list nat) :=
-  fold_left Nat.add l 0.
-
 Definition maybe_count_failed_nodes (gst : global_state) (h : addr) :=
   match sigma gst h with
   | Some st =>
@@ -224,90 +221,6 @@ Definition nonempty_succ_lists (gst : global_state) : Prop :=
   forall h st,
     sigma gst h = Some st ->
     succ_list st <> [].
-
-Lemma equal_folds_means_equal_acc :
-  forall l a b,
-    fold_left Nat.add l a = fold_left Nat.add l b ->
-    a = b.
-Proof.
-  unfold sum.
-  induction l.
-  - easy.
-  - simpl.
-    intros.
-    find_apply_hyp_hyp.
-    omega.
-Qed.
-
-Lemma fold_left_acc_comm :
-  forall a l,
-    fold_left Nat.add l a = a + fold_left Nat.add l 0.
-Proof.
-  intros.
-  generalize a.
-  induction l.
-  - easy.
-  - simpl.
-    intros.
-    rewrite (IHl (_ + _)).
-    rewrite (IHl a0).
-    omega.
-Qed.
-
-(* TODO(ryan) move to structtact *)
-Theorem list_strong_ind :
-  forall A (P : list A -> Prop),
-    (forall l, (forall l', length l' < length l -> P l') ->
-        P l) ->
-    forall l0 : list A, P l0.
-Proof.
-  intros.
-  apply H.
-  induction l0; simpl.
-  - intros.
-    now find_apply_lem_hyp Nat.nlt_0_r.
-  - intros.
-    apply H; intros.
-    intuition eauto using lt_n_Sm_le, lt_le_trans.
-Qed.
-
-Lemma sum_of_nats_bounds_addends :
-  forall l n,
-    sum l = n ->
-    forall x,
-      In x l ->
-      x <= n.
-Proof.
-  unfold sum.
-  intro l.
-  induction l using list_strong_ind.
-  destruct l.
-  - easy.
-  - intros.
-    find_apply_lem_hyp in_inv. break_or_hyp.
-    + simpl.
-      rewrite fold_left_acc_comm.
-      omega.
-    + simpl. rewrite fold_left_acc_comm.
-      assert (x <= fold_left Nat.add l 0).
-      { assert (H_len: length l < length (n :: l)) by auto.
-        apply (H l H_len); auto.
-      }
-      omega.
-Qed.
-
-Lemma sum_of_nats_zero_means_all_zero :
-  forall l,
-    sum l = 0 ->
-    forall x,
-      In x l ->
-      x = 0.
-Proof.
-  intros.
-  symmetry.
-  apply le_n_0_eq.
-  eapply sum_of_nats_bounds_addends; eauto.
-Qed.
 
 Definition successor_nodes_valid (gst : global_state) : Prop :=
   forall h p st,
@@ -1314,7 +1227,7 @@ Lemma phase_two_error_decreasing :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    always (decreasing_inf_often_or_zero total_pred_and_first_succ_error) ex.
+    always (zero_or_eventually_decreasing total_pred_and_first_succ_error) ex.
 Proof.
 Admitted.
 

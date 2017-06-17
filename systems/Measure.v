@@ -1,6 +1,8 @@
 Require Import Omega.
+Require Import List.
 
 Require Import StructTact.StructTactics.
+Require Import StructTact.FilterMap.
 Require Import InfSeqExt.infseq.
 Require Import Chord.InfSeqTactics.
 
@@ -23,6 +25,9 @@ Section Measure.
   Definition measure_decreasing (o o' : occurrence) : Prop :=
     |occ_gst o'| < |occ_gst o|.
 
+  Definition measure_nonzero (o : occurrence) :=
+    |occ_gst o| > 0.
+
   Definition measure_zero (o : occurrence) : Prop :=
     |occ_gst o| = 0.
 
@@ -34,9 +39,9 @@ Section Measure.
     easy.
   Qed.
 
-  Definition decreasing_inf_often_or_zero : infseq occurrence -> Prop :=
+  Definition zero_or_eventually_decreasing : infseq occurrence -> Prop :=
     now measure_zero \/_
-    inf_often (consecutive measure_decreasing).
+    eventually (consecutive measure_decreasing).
 
   Lemma measure_nonincreasing_stays_zero :
     forall o o',
@@ -129,20 +134,20 @@ Section Measure.
   Lemma measure_drops :
     forall ex,
       always (consecutive measure_nonincreasing) ex ->
-      decreasing_inf_often_or_zero ex ->
+      always zero_or_eventually_decreasing ex ->
       forall n,
         |occ_gst (hd ex)| = S n ->
         eventually (now (fun o => |occ_gst o| < S n)) ex.
   Proof.
     intros.
-    unfold decreasing_inf_often_or_zero in *.
+    unfold zero_or_eventually_decreasing in *.
     find_copy_apply_lem_hyp nonincreasing_global; auto.
-    invc_prop or_tl.
+    invc H0.
+    inv H3.
     - destruct ex.
       simpl in *.
       congruence.
-    - inv_prop inf_often.
-      match goal with
+    - match goal with
       | H : eventually (consecutive measure_decreasing) _ |- _ =>
         induction H
       end.
@@ -167,7 +172,8 @@ Section Measure.
           simpl in *.
           repeat find_rewrite.
           eapply IHeventually; eauto;
-            eapply always_invar; eauto.
+            try eapply always_invar; eauto.
+          firstorder.
   Qed.
 
   (** This shouldn't live here but I'm not sure where it should live *)
@@ -202,7 +208,7 @@ Section Measure.
     forall n ex,
       measure_bounded (S n) ex ->
       always (consecutive measure_nonincreasing) ex ->
-      decreasing_inf_often_or_zero ex ->
+      always zero_or_eventually_decreasing ex ->
       eventually (measure_bounded n) ex.
   Proof.
     intros.
@@ -212,7 +218,8 @@ Section Measure.
       eapply measure_bounded_monotonic with (m:=0); [omega|].
       eapply nonincreasing_global; eauto.
     - find_copy_eapply_lem_hyp nonincreasing_global; eauto.
-      inv_prop decreasing_inf_often_or_zero; [congruence|].
+      inv_prop zero_or_eventually_decreasing.
+      firstorder; [congruence|].
       eapply eventually_monotonic_simple.
       {
         intros; eapply (measure_bounded_monotonic n0 n); eauto.
@@ -251,26 +258,26 @@ Section Measure.
     - now apply E_next.
   Qed.
 
-  Lemma decreasing_inf_often_or_zero_invar_when_nonincreasing :
-    forall o ex,
-      always (consecutive measure_nonincreasing) (Cons o ex) ->
-      decreasing_inf_often_or_zero (Cons o ex) ->
-      decreasing_inf_often_or_zero ex.
-  Proof.
-    unfold decreasing_inf_often_or_zero.
-    intros.
-    inv_prop or_tl.
-    - left.
-      find_apply_lem_hyp measure_zero_stays_zero; auto.
-      find_apply_lem_hyp always_invar.
-      now inv_prop always.
-    - right; eapply inf_often_invar; eauto.
-  Qed.
+  (* Lemma decreasing_inf_often_or_zero_invar_when_nonincreasing : *)
+    (* forall o ex, *)
+      (* always (consecutive measure_nonincreasing) (Cons o ex) -> *)
+      (* zero_or_eventually_decreasing (Cons o ex) -> *)
+      (* zero_or_eventually_decreasing ex. *)
+  (* Proof. *)
+    (* unfold zero_or_eventually_decreasing. *)
+    (* intros. *)
+    (* inv_prop or_tl. *)
+    (* - left. *)
+      (* find_apply_lem_hyp measure_zero_stays_zero; auto. *)
+      (* find_apply_lem_hyp always_invar. *)
+      (* now inv_prop always. *)
+    (* - right; eapply inf_often_invar; eauto. *)
+  (* Qed. *)
 
   Lemma measure_decreasing_to_zero' :
     forall n ex,
       always (consecutive measure_nonincreasing) ex ->
-      decreasing_inf_often_or_zero ex ->
+      always zero_or_eventually_decreasing ex ->
       measure_bounded n ex ->
       eventually (now measure_zero) ex.
   Proof.
@@ -290,15 +297,14 @@ Section Measure.
       specialize (H4 H5); clear H5.
       eapply eventually_idempotent.
       lift_eventually H4.
-      + unfold and_tl; intros; break_and_goal; break_and.
-        * eauto using decreasing_inf_often_or_zero_invar_when_nonincreasing.
-        * eauto using always_invar.
+      + unfold and_tl; intros; break_and_goal; break_and;
+          eauto using always_invar.
       + split; auto.
   Qed.
 
   Lemma measure_decreasing_to_zero :
     forall ex,
-      decreasing_inf_often_or_zero ex ->
+      always zero_or_eventually_decreasing ex ->
       always (consecutive measure_nonincreasing) ex ->
       continuously (now measure_zero) ex.
   Proof.
@@ -325,12 +331,12 @@ Section Measure.
   Lemma measure_decreasing_to_zero_continuously :
     forall ex,
       continuously (consecutive measure_nonincreasing) ex ->
-      always decreasing_inf_often_or_zero ex ->
+      always zero_or_eventually_decreasing ex ->
       continuously (now measure_zero) ex.
   Proof.
     intros.
     eapply eventually_idempotent.
-    eapply eventually_monotonic_simple with (P:=decreasing_inf_often_or_zero /\_ always (consecutive measure_nonincreasing)).
+    eapply eventually_monotonic_simple with (P:=always zero_or_eventually_decreasing /\_ always (consecutive measure_nonincreasing)).
     - intros.
       unfold and_tl in *; break_and.
       eapply measure_decreasing_to_zero; eauto.
@@ -345,3 +351,227 @@ Section Measure.
   Qed.
 
 End Measure.
+
+Section LocalMeasure.
+  Variable local_measure : addr -> global_state -> nat.
+  Notation "| h 'in' gst |" := (local_measure h gst) (at level 50).
+
+  Definition sum (l : list nat) :=
+    fold_left Nat.add l 0.
+
+  Lemma equal_folds_means_equal_acc :
+    forall l a b,
+      fold_left Nat.add l a = fold_left Nat.add l b ->
+      a = b.
+  Proof.
+    unfold sum.
+    induction l.
+    - easy.
+    - simpl.
+      intros.
+      find_apply_hyp_hyp.
+      omega.
+  Qed.
+
+  Lemma fold_left_acc_comm :
+    forall a l,
+      fold_left Nat.add l a = a + fold_left Nat.add l 0.
+  Proof.
+    intros.
+    generalize a.
+    induction l.
+    - easy.
+    - simpl.
+      intros.
+      rewrite (IHl (_ + _)).
+      rewrite (IHl a0).
+      omega.
+  Qed.
+
+  (* TODO(ryan) move to structtact *)
+  Theorem list_strong_ind :
+    forall A (P : list A -> Prop),
+      (forall l, (forall l', length l' < length l -> P l') ->
+            P l) ->
+      forall l0 : list A, P l0.
+  Proof.
+    intros.
+    apply H.
+    induction l0; simpl.
+    - intros.
+      now find_apply_lem_hyp Nat.nlt_0_r.
+    - intros.
+      apply H; intros.
+      intuition eauto using lt_n_Sm_le, lt_le_trans.
+  Qed.
+
+  Lemma sum_of_nats_bounds_addends :
+    forall l n,
+      sum l = n ->
+      forall x,
+        In x l ->
+        x <= n.
+  Proof.
+    unfold sum.
+    intro l.
+    induction l using list_strong_ind.
+    destruct l.
+    - easy.
+    - intros.
+      find_apply_lem_hyp in_inv. break_or_hyp.
+      + simpl.
+        rewrite fold_left_acc_comm.
+        omega.
+      + simpl. rewrite fold_left_acc_comm.
+        assert (x <= fold_left Nat.add l 0).
+        { assert (H_len: length l < length (n :: l)) by auto.
+          apply (H l H_len); auto.
+        }
+        omega.
+  Qed.
+
+  Lemma sum_of_nats_zero_means_all_zero :
+    forall l,
+      sum l = 0 ->
+      forall x,
+        In x l ->
+        x = 0.
+  Proof.
+    intros.
+    symmetry.
+    apply le_n_0_eq.
+    eapply sum_of_nats_bounds_addends; eauto.
+  Qed.
+
+  Lemma sum_of_zeros_is_zero :
+    forall l,
+      Forall (fun n => n = 0) l ->
+      sum l = 0.
+  Proof.
+    intros.
+    induction l; auto.
+    inv_prop Forall; auto.
+  Qed.
+
+  Definition global_measure (gst : global_state) :=
+    sum (map (fun h => |h in gst|) (nodes gst)).
+  Notation "| gst |" := (global_measure gst) (at level 50).
+
+  Definition some_local_measure_drops (ex : infseq occurrence) :=
+    exists h,
+      In h (nodes (occ_gst (hd ex))) /\
+      eventually (consecutive (measure_decreasing (local_measure h))) ex.
+
+  Definition local_measure_nonincreasing (h : addr) : infseq occurrence -> Prop :=
+    consecutive (measure_nonincreasing (local_measure h)).
+
+  Definition local_measures_nonincreasing (ex : infseq occurrence) : Prop :=
+    forall h,
+      In h (nodes (occ_gst (hd ex))) ->
+      local_measure_nonincreasing h ex.
+
+  Lemma map_Forall_comm :
+    forall (X Y : Type) (f : X -> Y) P l,
+      Forall P (map f l) <-> Forall (fun x => P (f x)) l.
+  Proof.
+    intros; split; intro;
+    induction l; constructor;
+      inv_prop Forall;
+      eauto.
+  Qed.
+
+  Lemma local_all_zero_global_zero :
+    forall gst,
+      Forall (fun h => |h in gst| = 0) (nodes gst) <-> |gst| = 0.
+  Proof.
+    intros; split; intro.
+    - apply sum_of_zeros_is_zero.
+      now apply map_Forall_comm.
+    - apply Forall_forall.
+      intros.
+      eapply sum_of_nats_zero_means_all_zero; eauto.
+      change (|x in gst|) with ((fun y => |y in gst|) x).
+      now apply in_map.
+  Qed.
+
+  Lemma sum_cons :
+    forall n l,
+      sum (n :: l) = n + sum l.
+  Proof.
+    unfold sum.
+    intros; simpl.
+    now rewrite fold_left_acc_comm.
+  Qed.
+
+  Lemma sum_app :
+    forall l l',
+      sum (l ++ l') = sum l + sum l'.
+  Proof.
+    unfold sum.
+    intros; simpl.
+    now rewrite fold_left_app, fold_left_acc_comm.
+  Qed.
+
+  Lemma sum_disjoint :
+    forall xs x ys,
+      sum (xs ++ x :: ys) = sum xs + x + sum ys.
+  Proof.
+    intros.
+    now rewrite sum_app, sum_cons, Nat.add_assoc.
+  Qed.
+
+  Lemma sum_map_mono :
+    forall X (f g : X -> nat) l,
+      (forall x, In x l -> f x <= g x) ->
+      sum (map f l) <= sum (map g l).
+  Proof.
+    intros.
+    induction l; [auto|].
+    rewrite !map_cons, !sum_cons.
+    apply Nat.add_le_mono; auto with datatypes.
+  Qed.
+
+  Lemma measure_mono :
+    forall gst gst',
+      nodes gst' = nodes gst ->
+      (forall h, In h (nodes gst) -> |h in gst| <= |h in gst'|) ->
+      |gst| <= |gst'|.
+  Proof.
+    intros.
+    unfold global_measure.
+    repeat find_rewrite.
+    now eapply sum_map_mono.
+  Qed.
+
+  Lemma local_dropping_makes_global_drop :
+    forall h o o',
+      nodes (occ_gst o') = nodes (occ_gst o) ->
+      (forall h', In h' (nodes (occ_gst o)) ->
+             measure_nonincreasing (local_measure h') o o') ->
+      In h (nodes (occ_gst o)) ->
+      measure_decreasing (local_measure h) o o' ->
+      measure_decreasing global_measure o o'.
+  Proof.
+    unfold measure_decreasing, measure_nonincreasing, global_measure.
+    intros.
+    find_apply_lem_hyp in_split; break_exists.
+    repeat find_rewrite.
+    rewrite !map_app, !map_cons, !sum_disjoint.
+    apply Nat.add_lt_le_mono;
+      try apply Nat.add_le_lt_mono;
+      assumption || apply sum_map_mono; auto with datatypes.
+  Qed.
+
+  Definition nonzero_error_causes_measure_drop (ex : infseq occurrence) :=
+     |occ_gst (hd ex)| > 0 ->
+     some_local_measure_drops ex.
+
+  Lemma local_measure_causes_drop :
+    forall ex,
+      always local_measures_nonincreasing ex ->
+      nonzero_error_causes_measure_drop ex ->
+      zero_or_eventually_decreasing global_measure ex.
+  Proof.
+  Abort.
+
+End LocalMeasure.
