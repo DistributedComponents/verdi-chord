@@ -203,6 +203,15 @@ Definition maybe_count_failed_nodes (gst : global_state) (h : addr) :=
     None
   end.
 
+(* The local error measure for phase one. *)
+Definition leading_failed_succs (h : addr) (gst : global_state) : nat :=
+  match sigma gst h with
+  | Some st =>
+    succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st)
+  | None =>
+    0
+  end.
+
 Lemma maybe_count_failed_nodes_Some :
   forall gst h st n,
     maybe_count_failed_nodes gst h = Some n ->
@@ -831,6 +840,16 @@ Proof.
     eapply effective_Tick_sends_request'; eauto.
 Qed.
 
+Lemma leading_failed_succs_st :
+  forall h gst st,
+    sigma gst h = Some st ->
+    leading_failed_succs h gst = succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st).
+Proof.
+  unfold leading_failed_succs.
+  intros.
+  break_match; congruence.
+Qed.
+
 Lemma stabilize_Request_timeout_removes_succ :
   forall ex h st s rest dst p,
     lb_execution ex ->
@@ -890,6 +909,42 @@ Proof.
     simpl in *;
     tuple_inversion;
     reflexivity.
+Qed.
+
+Lemma removing_head_decreases_failed_node_count :
+  forall gst l gst' s rest,
+    labeled_step_dynamic gst l gst' ->
+    In (addr_of s) (failed_nodes gst) ->
+    succ_list_leading_failed_nodes (failed_nodes gst') rest <
+    succ_list_leading_failed_nodes (failed_nodes gst) (s :: rest).
+Proof.
+  intros.
+  erewrite <- failed_nodes_eq; eauto.
+  simpl.
+  break_if;
+    [|exfalso];
+    auto with arith.
+Qed.
+
+Lemma stablize_Request_timeout_decreases_error :
+  forall ex h st s rest dst p,
+    lb_execution ex ->
+    In (addr_of s) (failed_nodes (occ_gst (hd ex))) ->
+    sigma ex.(hd).(occ_gst) h = Some st ->
+    succ_list st = s :: rest ->
+    open_stabilize_request_to ex.(hd).(occ_gst) h dst ->
+    now (occurred (Timeout h (Request dst p) DetectFailure)) ex ->
+    consecutive (measure_decreasing (leading_failed_succs h)) ex.
+Proof.
+  intros.
+  destruct ex as [o [o' ex]].
+  find_copy_eapply_lem_hyp stabilize_Request_timeout_removes_succ; eauto.
+  simpl in *; break_exists; break_and.
+  unfold measure_decreasing.
+  erewrite !leading_failed_succs_st; eauto.
+  repeat find_rewrite.
+  inv_prop lb_execution.
+  eapply removing_head_decreases_failed_node_count; eauto.
 Qed.
 
 Lemma start_stabilize_with_first_successor_eventually :

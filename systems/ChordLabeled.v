@@ -306,6 +306,15 @@ Proof using.
   now repeat find_reverse_rewrite.
 Qed.
 
+Lemma failed_nodes_eq :
+  forall gst gst' l,
+    labeled_step_dynamic gst l gst' ->
+    failed_nodes gst = failed_nodes gst'.
+Proof using.
+  intros.
+  now invc_labeled_step.
+Qed.
+
 Lemma failed_nodes_never_added :
   forall gst gst' l h,
     labeled_step_dynamic gst l gst' ->
@@ -1226,6 +1235,7 @@ Admitted.
 
 Definition enabled_Tick_with_effect (h : addr) (eff : timeout_effect) (gst : global_state) : Prop :=
   enabled (Timeout h Tick eff) gst.
+
 Hint Unfold enabled_Tick_with_effect.
 
 Lemma Tick_continuously_enabled :
