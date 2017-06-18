@@ -74,3 +74,25 @@ Ltac lift_inf_often lem :=
   prep_inf_often_monotonic_invar;
   eapply inf_often_monotonic_invar; eauto;
   try prep_always_inv.
+
+Ltac prep_always_monotonic :=
+  repeat lazymatch goal with
+         (* | [H: forall ex, ?fst ex -> ?P ex -> @?conclusion ex, *)
+         (*      H_P : always ?P ?s |- _] => *)
+         (*   accum_and_tl H fst P (conclusion ex) ex; fail *)
+         | H: forall ex, ?fst ex -> ?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, ?fst ex -> @?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, @?fst ex -> ?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         | H: forall ex, @?fst ex -> @?snd ex -> ?tl |- _ =>
+           accum_and_tl H fst snd tl ex
+         end.
+
+Ltac lift_always lem :=
+  pose proof lem;
+  unfold inf_often in *;
+  prep_always_monotonic;
+  eapply always_monotonic; eauto;
+  try prep_always_inv.

@@ -328,6 +328,18 @@ Section Measure.
     now rewrite and_tl_comm.
   Qed.
 
+  (* TODO(ryan) move to infseq *)
+  Lemma always_and_tl_comm :
+    forall T (P Q : infseq T -> Prop) s,
+      always (P /\_ Q) s ->
+      always (Q /\_ P) s.
+  Proof.
+    intros until 0.
+    apply always_monotonic.
+    intros.
+    now rewrite and_tl_comm.
+  Qed.
+
   Lemma measure_decreasing_to_zero_continuously :
     forall ex,
       continuously (consecutive measure_nonincreasing) ex ->
@@ -536,9 +548,23 @@ Section LocalMeasure.
     now eapply sum_map_mono.
   Qed.
 
+  Lemma local_nonincreasing_causes_global_nonincreasing :
+    forall ex,
+      lb_execution ex ->
+      local_measures_nonincreasing ex ->
+      consecutive (measure_nonincreasing global_measure) ex.
+  Proof.
+    unfold local_measures_nonincreasing, local_measure_nonincreasing, measure_nonincreasing.
+    intros.
+    destruct ex as [o [o' ex]]; simpl.
+    inv_prop lb_execution.
+    find_apply_lem_hyp labeled_step_dynamic_preserves_nodes.
+    eapply measure_mono; repeat find_reverse_rewrite; eauto.
+  Qed.
+
   Lemma local_dropping_makes_global_drop :
     forall h o o',
-      nodes (occ_gst o') = nodes (occ_gst o) ->
+      nodes (occ_gst o) = nodes (occ_gst o') ->
       (forall h', In h' (nodes (occ_gst o)) ->
              measure_nonincreasing (local_measure h') o o') ->
       In h (nodes (occ_gst o)) ->
@@ -555,16 +581,139 @@ Section LocalMeasure.
       assumption || apply sum_map_mono; auto with datatypes.
   Qed.
 
+  Lemma local_dropping_makes_global_drop_ex :
+    forall h ex,
+      lb_execution ex ->
+      always local_measures_nonincreasing ex ->
+      In h (nodes (occ_gst (hd ex))) ->
+      consecutive (measure_decreasing (local_measure h)) ex ->
+      consecutive (measure_decreasing global_measure) ex.
+  Proof.
+    intros.
+    destruct ex as [o [o' ex]].
+    inv_prop lb_execution.
+    inv_prop always.
+    eapply local_dropping_makes_global_drop;
+      eauto using labeled_step_dynamic_preserves_nodes.
+  Qed.
+
   Definition nonzero_error_causes_measure_drop (ex : infseq occurrence) :=
      |occ_gst (hd ex)| > 0 ->
      some_local_measure_drops ex.
 
-  Lemma local_measure_causes_drop :
+  Lemma local_measure_causes_eventual_drop :
     forall ex,
+      lb_execution ex ->
       always local_measures_nonincreasing ex ->
       nonzero_error_causes_measure_drop ex ->
       zero_or_eventually_decreasing global_measure ex.
   Proof.
-  Abort.
+    intros.
+    destruct (|occ_gst (hd ex)|) as [| err] eqn:?H;
+      [left|right].
+    - destruct ex; assumption.
+    - pose proof (gt_Sn_O err); repeat find_reverse_rewrite.
+      assert (some_local_measure_drops ex) by auto.
+      unfold some_local_measure_drops in *; break_exists_name h; break_and.
+      lift_eventually (local_dropping_makes_global_drop_ex h);
+        firstorder using lb_execution_invar, always_invar.
+      inv_prop lb_execution; simpl.
+      find_apply_lem_hyp labeled_step_dynamic_preserves_nodes.
+      now repeat find_reverse_rewrite.
+  Qed.
+
+  Lemma local_measure_always_causes_eventual_drop :
+    forall ex,
+      lb_execution ex ->
+      always local_measures_nonincreasing ex ->
+      always nonzero_error_causes_measure_drop ex ->
+      always (zero_or_eventually_decreasing global_measure) ex.
+  Proof.
+    intros.
+    lift_always local_measure_causes_eventual_drop.
+    repeat apply always_and_tl;
+      eauto using always_always, always_inv, lb_execution_invar.
+  Qed.
+
+  Lemma local_measure_causes_measure_zero :
+    forall ex,
+      lb_execution ex ->
+      always local_measures_nonincreasing ex ->
+      always nonzero_error_causes_measure_drop ex ->
+      continuously (now (measure_zero global_measure)) ex.
+  Proof.
+    intros.
+    eapply measure_decreasing_to_zero.
+    - now apply local_measure_always_causes_eventual_drop.
+    - lift_always local_nonincreasing_causes_global_nonincreasing.
+      apply always_and_tl; eauto using always_inv, lb_execution_invar.
+  Qed.
+
+  Lemma and_tl_always_P :
+    forall T (P Q : infseq T -> Prop) ex,
+      always (P /\_ Q) ex ->
+      always P ex.
+  Proof.
+    intros T P Q.
+    cofix c; intros.
+    constructor; destruct ex.
+    - invc_prop and_tl.
+      firstorder.
+    - simpl.
+      apply c.
+      eauto using always_invar.
+  Qed.
+
+  Lemma always_and_tl_eq :
+    forall T (P Q : infseq T -> Prop) ex,
+      always (P /\_ Q) ex <-> (always P /\_ always Q) ex.
+  Proof.
+    split; intros.
+    - split; eapply and_tl_always_P; eauto using always_and_tl_comm.
+    - inv_prop and_tl; eapply always_and_tl; eauto.
+  Qed.
+
+  Lemma always_continuously_and_tl :
+    forall T (P Q : infseq T -> Prop) s,
+      continuously (P /\_ Q) s ->
+      eventually (always P /\_ always Q) s.
+  Proof.
+    intros.
+    unfold continuously in *.
+    eapply eventually_monotonic_simple; [|eauto].
+    intros.
+    now apply always_and_tl_eq.
+  Qed.
+
+  Lemma local_measure_causes_measure_zero_continuosly :
+    forall ex,
+      lb_execution ex ->
+      continuously local_measures_nonincreasing ex ->
+      continuously nonzero_error_causes_measure_drop ex ->
+      continuously (now (measure_zero global_measure)) ex.
+  Proof.
+    intros.
+    pose proof local_measure_causes_measure_zero.
+    prep_always_monotonic.
+    apply eventually_idempotent.
+    eapply eventually_monotonic_simple; eauto.
+    match goal with
+    | |- eventually (always ?P /\_ always ?Q /\_ ?R) ex =>
+      cut (continuously (P /\_ Q /\_ R) ex)
+    end.
+    - intros.
+      find_apply_lem_hyp always_continuously_and_tl.
+      eapply eventually_monotonic_simple; [|eauto].
+      firstorder.
+      + eapply always_and_tl_eq.
+        apply always_and_tl_comm.
+        eauto.
+      + find_apply_lem_hyp always_and_tl_eq; inv_prop and_tl.
+        inv_prop lb_execution; auto.
+    - repeat apply continuously_and_tl; auto.
+      apply always_continuously.
+      apply always_inv;
+        eauto using lb_execution_invar.
+  Qed.
 
 End LocalMeasure.
