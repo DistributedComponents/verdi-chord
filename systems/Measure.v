@@ -379,13 +379,11 @@ Section LocalMeasure.
   Proof.
     intros.
     generalize a.
-    induction l.
-    - easy.
-    - simpl.
-      intros.
-      rewrite (IHl (_ + _)).
-      rewrite (IHl a0).
-      omega.
+    induction l; [auto|].
+    simpl.
+    intros.
+    rewrite IHl; symmetry; rewrite IHl.
+    auto with arith.
   Qed.
 
   (* TODO(ryan) move to structtact *)
@@ -397,12 +395,8 @@ Section LocalMeasure.
   Proof.
     intros.
     apply H.
-    induction l0; simpl.
-    - intros.
-      now find_apply_lem_hyp Nat.nlt_0_r.
-    - intros.
-      apply H; intros.
-      intuition eauto using lt_n_Sm_le, lt_le_trans.
+    induction l0; simpl;
+      firstorder using Nat.nlt_0_r, lt_n_Sm_le, lt_le_trans.
   Qed.
 
   Lemma sum_of_nats_bounds_addends :
@@ -414,11 +408,10 @@ Section LocalMeasure.
   Proof.
     unfold sum.
     intro l.
-    induction l using list_strong_ind.
-    destruct l.
+    induction l using list_strong_ind; destruct l.
     - easy.
     - intros.
-      find_apply_lem_hyp in_inv. break_or_hyp.
+      find_apply_lem_hyp in_inv; break_or_hyp.
       + simpl.
         rewrite fold_left_acc_comm.
         omega.
