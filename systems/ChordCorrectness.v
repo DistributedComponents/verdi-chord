@@ -195,14 +195,6 @@ Fixpoint succ_list_leading_failed_nodes (failed : list addr) (succs : list point
   | [] => 0
   end.
 
-Definition maybe_count_failed_nodes (gst : global_state) (h : addr) :=
-  match sigma gst h with
-  | Some st =>
-    Some (succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st))
-  | None =>
-    None
-  end.
-
 (* The local error measure for phase one. *)
 Definition leading_failed_succs (h : addr) (gst : global_state) : nat :=
   match sigma gst h with
@@ -212,19 +204,19 @@ Definition leading_failed_succs (h : addr) (gst : global_state) : nat :=
     0
   end.
 
+Definition phase_one_error : global_state -> nat :=
+  global_measure leading_failed_succs.
+
 Lemma maybe_count_failed_nodes_Some :
   forall gst h st n,
-    maybe_count_failed_nodes gst h = Some n ->
+    leading_failed_succs h gst = n ->
     sigma gst h = Some st ->
     succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st) = n.
 Proof.
-  unfold maybe_count_failed_nodes.
+  unfold leading_failed_succs.
   intros.
   break_match; congruence.
 Qed.
-
-Definition total_leading_failed_nodes (gst : global_state) : nat :=
-  sum (FilterMap.filterMap (maybe_count_failed_nodes gst) (live_addrs gst)).
 
 Definition nonempty_succ_lists (gst : global_state) : Prop :=
   forall h st,
@@ -347,52 +339,33 @@ Qed.
 
 Lemma zero_failed_nodes_total_implies_zero_locally :
   forall gst h st,
-    total_leading_failed_nodes gst = 0 ->
+    phase_one_error gst = 0 ->
     live_addr gst h ->
     sigma gst h = Some st ->
     succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st) = 0.
 Proof.
-  unfold total_leading_failed_nodes in *.
+  unfold phase_one_error in *.
   intros.
-
-  assert (In h (live_addrs gst)).
-  {
-    unfold live_addrs.
-    apply filter_In.
-    split.
-    - live_addr_inv; easy.
-    - now apply Coqlib.proj_sumbool_is_true.
-  }
-
-  assert (exists n, maybe_count_failed_nodes gst h = Some n).
-  {
-    unfold maybe_count_failed_nodes.
-    find_rewrite.
-    eexists; eauto.
-  }
-  break_exists_name failed_succs.
-
-  replace failed_succs with 0 in *.
-  - eapply maybe_count_failed_nodes_Some; eauto.
-  - symmetry.
-    eapply sum_of_nats_zero_means_all_zero; eauto.
-    eapply FilterMap.filterMap_In; eauto.
+  cut (leading_failed_succs h gst = 0);
+    eauto using maybe_count_failed_nodes_Some.
+  find_eapply_lem_hyp local_all_zero_global_zero.
+  find_eapply_lem_hyp Forall_forall; eauto.
+  now inv_prop live_addr.
 Qed.
-
-Definition zero_total_leading_failed_nodes (gst : global_state) : Prop :=
-  total_leading_failed_nodes gst = 0.
 
 Theorem zero_leading_failed_nodes_implies_all_first_succs_best :
   forall gst,
     reachable_after_churn gst ->
     (* total leading failed nodes says nothing about the length of successor lists *)
     nonempty_succ_lists gst ->
-    zero_total_leading_failed_nodes gst ->
+    phase_one_error gst = 0 ->
     all_first_succs_best gst.
 Proof.
-  unfold all_first_succs_best, first_succ_is_best_succ, zero_total_leading_failed_nodes.
+  unfold all_first_succs_best, first_succ_is_best_succ, phase_one_error.
   intros.
-  find_eapply_lem_hyp live_inv;
+  find_copy_apply_lem_hyp local_all_zero_global_zero;
+    rewrite Forall_forall in *.
+  find_apply_lem_hyp live_inv;
     break_and;
     break_exists_exists.
   unfold nonempty_succ_lists in *.
@@ -418,20 +391,6 @@ Lemma always_reachable_after_churn :
     infseq.always (lift_gpred_to_ex reachable_after_churn) ex.
 Proof.
 Admitted.
-
-Lemma zero_leading_failed_all_best :
-    forall gst,
-      reachable_after_churn gst ->
-      (gpred_and
-         nonempty_succ_lists
-         zero_total_leading_failed_nodes) gst ->
-      all_first_succs_best gst.
-Proof.
-  unfold gpred_and.
-  intros.
-  break_and.
-  auto using zero_leading_failed_nodes_implies_all_first_succs_best.
-Qed.
 
 (*
 if head of succ list is dead
@@ -1107,8 +1066,8 @@ Theorem continuously_zero_total_leading_failed_nodes_implies_phase_one :
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
     infseq.continuously
-      ((lift_gpred_to_ex zero_total_leading_failed_nodes) /\_
-       (lift_gpred_to_ex nonempty_succ_lists))
+      (now (measure_zero phase_one_error) /\_
+       lift_gpred_to_ex nonempty_succ_lists)
       ex ->
     phase_one ex.
 Proof.
