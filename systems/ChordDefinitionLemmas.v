@@ -438,7 +438,7 @@ Proof.
     tauto || left; repeat eexists; eauto; tauto.
 Qed.
 
-Lemma timeout_handler_definition :
+Lemma timeout_handler_eff_definition :
   forall h st t res,
     timeout_handler_eff h st t = res ->
     t = Tick /\
@@ -454,6 +454,19 @@ Proof.
   unfold timeout_handler_eff.
   intros.
   break_match; intuition eauto.
+Qed.
+
+Lemma timeout_handler_definition :
+  forall h st t st' ms nts cts,
+    timeout_handler h st t = (st', ms, nts, cts) ->
+    exists eff,
+      timeout_handler_eff h st t = (st', ms, nts, cts, eff).
+Proof.
+  intros.
+  unfold timeout_handler in *.
+  destruct (timeout_handler_eff _ _ _) as [[[[?a ?b] ?c] ?d] ?e].
+  simpl in *; tuple_inversion.
+  eexists; eauto.
 Qed.
 
 Lemma timeout_handler_l_definition :

@@ -628,7 +628,7 @@ Proof using.
   intros.
   invc_labeled_step.
   find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-  find_apply_lem_hyp timeout_handler_definition; expand_def;
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
     solve_by_inversion' eauto.
 Qed.
 
@@ -841,7 +841,7 @@ Definition timeout_handler_eff_Tick_adds_Tick :
     In Tick nts.
 Proof using.
   intros.
-  find_apply_lem_hyp timeout_handler_definition; expand_def;
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
     try congruence.
   find_apply_lem_hyp tick_handler_definition; expand_def;
     try auto with datatypes.
@@ -856,7 +856,7 @@ Lemma timeout_handler_eff_never_removes_Tick :
     ~ In Tick cts.
 Proof.
   intros.
-  find_apply_lem_hyp timeout_handler_definition; expand_def.
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def.
   - find_apply_lem_hyp tick_handler_definition; expand_def;
       try auto with datatypes.
     destruct (start_query _ _ _) as [[[?st ?ms] ?nts] ?cts] eqn:H_sq.

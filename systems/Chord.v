@@ -19,6 +19,8 @@ Require Import Chord.Bitvectors.
 
 (* number of successors each node has to track *)
 Variable SUCC_LIST_LEN : nat.
+Variable succ_list_len_lower_bound :
+  SUCC_LIST_LEN >= 2.
 (* byte-width of node identifiers *)
 Variable N : nat.
 (* bit-width of node identifiers *)
@@ -88,8 +90,6 @@ Module ChordIDParams <: IDSpaceParams.
 
   (* useful notations for lt and ltb *)
   Notation "a < b" := (lt a b) (at level 70).
-  Notation "a < b < c" := (and (lt a b) (lt b c)).
-  Notation "a <? b <? c" := (andb (ltb a b) (ltb b c)) (at level 70).
   Notation "a <? b" := (ltb a b) (at level 70).
 
   (* ltb is a decision procedure for the lt relation *)
@@ -615,9 +615,19 @@ Module Chord <: DynamicSystem.
   Definition pi {A B C D : Type} (t : A * B * C * D) : A * B * C :=
     let '(a, b, c, d) := t in (a, b, c).
 
-
   Definition sort_by_between (h : addr) : list pointer -> list pointer :=
     sort pointer (unroll_between_ptr h).
+
+  Lemma sort_by_between_permutes :
+    forall h l l',
+      l' = sort_by_between h l ->
+      Permutation.Permutation l l'.
+  Proof.
+    unfold sort_by_between, unroll_between_ptr.
+    intro.
+    apply sort_permutes;
+      eauto using unrolling_reflexive, unrolling_transitive, unrolling_total.
+  Qed.
 
   Fixpoint find_succs (h : addr) (sorted_ring : list pointer) : list pointer :=
     match sorted_ring with

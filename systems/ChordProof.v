@@ -1797,7 +1797,7 @@ Proof using.
     + eapply_prop chord_start_invariant; eauto.
     + eapply_prop chord_fail_invariant; eauto.
     + unfold timeout_handler, fst in *; break_let.
-      find_eapply_lem_hyp timeout_handler_definition; expand_def.
+      find_eapply_lem_hyp timeout_handler_eff_definition; expand_def.
       * eapply_prop chord_tick_invariant; eauto.
       * eapply_prop chord_keepalive_invariant; eauto.
       * admit. (* TODO eapply_prop chord_rectify_invariant; eauto. *)

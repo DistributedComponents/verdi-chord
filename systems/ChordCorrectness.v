@@ -370,7 +370,7 @@ Lemma timeout_handler_eff_StartStabilize :
 Proof.
   intros.
   destruct (timeout_handler_eff _ _ _) as [[[[?st' ?ms] ?nts] ?cts] ?eff] eqn:?H.
-  find_apply_lem_hyp timeout_handler_definition; expand_def;
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
     repeat find_rewrite; try congruence.
   find_eapply_lem_hyp tick_handler_definition; expand_def;
     repeat find_rewrite; firstorder congruence.
@@ -583,7 +583,7 @@ Proof.
   intros.
   inv_labeled_step; clean_up_labeled_step_cases.
   find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-  find_apply_lem_hyp timeout_handler_definition; expand_def;
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
     try congruence.
   find_injection.
   find_apply_lem_hyp tick_handler_definition; expand_def;
@@ -666,7 +666,7 @@ Proof.
   intros.
   inv_labeled_step; clean_up_labeled_step_cases.
   find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-  find_apply_lem_hyp timeout_handler_definition; expand_def;
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
     try congruence.
   find_injection.
   find_apply_lem_hyp tick_handler_definition; expand_def;
@@ -688,7 +688,7 @@ Proof.
   intros.
   inv_labeled_step; clean_up_labeled_step_cases.
   find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-  find_apply_lem_hyp timeout_handler_definition; expand_def;
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
     try congruence.
   find_injection.
   find_apply_lem_hyp tick_handler_definition; expand_def;
@@ -888,7 +888,7 @@ Proof.
   copy_apply timeout_handler_l_definition H_thl; expand_def.
   assert (x2 = DetectFailure).
   {
-    find_copy_apply_lem_hyp timeout_handler_definition; expand_def; try congruence.
+    find_copy_apply_lem_hyp timeout_handler_eff_definition; expand_def; try congruence.
     find_apply_lem_hyp request_timeout_handler_definition; expand_def.
     - now find_injection.
     - repeat find_rewrite.
