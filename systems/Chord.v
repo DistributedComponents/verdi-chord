@@ -4,6 +4,7 @@ Import List.ListNotations.
 Require Bvector.
 Require ZArith.
 Require Zdigits.
+Require Import Omega.
 
 Require Import StructTact.Dedup.
 Require Import StructTact.RemoveAll.
@@ -135,7 +136,7 @@ Module ChordIDParams <: IDSpaceParams.
     eapply BinInt.Z.lt_trans; [|eauto].
     now apply BinInt.Z.ltb_lt.
   Qed.
-  
+
   Definition lt_irrefl :
     forall a,
       ~ a < a.
@@ -146,8 +147,6 @@ Module ChordIDParams <: IDSpaceParams.
     congruence.
   Qed.
 
-  Require Import Omega.
-  
   Lemma plus_2x_inj :
     forall b x y,
       BinInt.Z.add b (2 * x) = BinInt.Z.add b (2 * y) ->

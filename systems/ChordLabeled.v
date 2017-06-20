@@ -1305,7 +1305,7 @@ Proof.
     admit.
   - in_crush; find_apply_hyp_hyp; in_crush.
 Admitted.
-  
+
 Lemma timeout_constraint_invar :
   forall s,
     lb_execution s ->
@@ -1342,10 +1342,10 @@ Proof.
   - apply W_tl.
     + simpl.
       eapply l_enabled_Timeout_In_timeouts; eauto.
-    + simpl in *. 
+    + simpl in *.
       eapply c; clear c; simpl in *; eauto.
-Admitted.      
-  
+Admitted.
+
 
 
 Lemma unconstrained_timeout_eventually_occurred :
@@ -1364,7 +1364,7 @@ Lemma unconstrained_timeout_eventually_occurred :
         eventually (now (occurred (Timeout h t eff))) s.
 Proof using.
   intros.
-  
+
   (* Old proof of this used a lemma Timeout_enabled_until_occurred of the form
 
       forall s h t,

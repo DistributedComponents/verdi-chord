@@ -272,7 +272,7 @@ Proof.
     solve_by_inversion.
 Qed.
 
-Lemma make_initial_nodes_length : 
+Lemma make_initial_nodes_length :
   forall k,
     length (make_initial_nodes k) = k.
 Proof.
@@ -299,8 +299,8 @@ Definition run_init_for (gst : global_state) (h : addr) : global_state :=
   apply_handler_result h (res, []) [] gst.
 
 Definition initial_st : global_state :=
-  fold_left run_init_for initial_nodes 
-            {| nodes := initial_nodes; 
+  fold_left run_init_for initial_nodes
+            {| nodes := initial_nodes;
                failed_nodes := [];
                timeouts := fun h => [];
                sigma := fun h => None;
@@ -1088,7 +1088,7 @@ Lemma schedule_rectify_with_definition :
          st' = set_rectify_with st rw \/
          ptr_between_bool rw0 rw (ptr st) = false /\
          st' = st)) \/
-     
+
      rectify_with st = None /\
      st' = st /\
      nts = [RectifyTick]).
