@@ -24,38 +24,8 @@ Require Import Chord.ChordDefinitionLemmas.
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
 
-Definition reachable_after_churn gst :=
-  exists ex,
-    reachable_st (occ_gst (infseq.hd ex)) /\
-    lb_execution ex /\
-    infseq.eventually (fun ex' => gst = (occ_gst (infseq.hd ex'))) ex.
-
-Definition live_addr (gst : global_state) (a : addr) :=
-  In a (nodes gst) /\
-  ~ In a (failed_nodes gst) /\
-  exists st, sigma gst a = Some st.
-
-Definition live_addr_dec :
-  forall gst a,
-    {live_addr gst a} + {~ live_addr gst a}.
-Admitted.
-
-Lemma live_node_is_live_addr :
-  forall gst h,
-    live_node gst h ->
-    live_addr gst h.
-Proof.
-  intros.
-  unfold live_addr.
-  repeat split;
-    eauto using live_node_joined,
-                live_node_in_nodes,
-                live_node_not_in_failed_nodes,
-                live_node_means_state_exists.
-Qed.
-
 Definition live (gst : global_state) (p : pointer) :=
-  live_addr gst (addr_of p) /\
+  live_node gst (addr_of p) /\
   wf_ptr p.
 
 Definition live_dec :
@@ -64,7 +34,7 @@ Definition live_dec :
 Proof.
   unfold live.
   intros.
-  destruct (live_addr_dec gst (addr_of p));
+  destruct (live_node_dec gst (addr_of p));
     destruct (wf_ptr_dec p);
     tauto.
 Defined.
@@ -72,20 +42,9 @@ Defined.
 Lemma live_live_addr :
   forall gst p,
     wf_ptr p ->
-    live gst p <-> live_addr gst (addr_of p).
+    live gst p <-> live_node gst (addr_of p).
 Proof.
   now unfold live.
-Qed.
-
-Lemma live_addr_intro :
-  forall gst a st,
-    In a (nodes gst) ->
-    ~ In a (failed_nodes gst) ->
-    sigma gst a = Some st ->
-    live_addr gst a.
-Proof.
-  unfold live_addr.
-  eauto.
 Qed.
 
 Lemma live_intro :
@@ -94,20 +53,12 @@ Lemma live_intro :
     In (addr_of p) (nodes gst) ->
     ~ In (addr_of p) (failed_nodes gst) ->
     sigma gst (addr_of p) = Some st ->
+    joined st = true ->
     live gst p.
 Proof.
   unfold live.
-  eauto using live_addr_intro.
-Qed.
-
-Lemma live_addr_inv :
-  forall gst a,
-    live_addr gst a ->
-    In a (nodes gst) /\
-    ~ In a (failed_nodes gst) /\
-    exists st, sigma gst a = Some st.
-Proof.
-  easy.
+  intros.
+  eauto using live_node_characterization.
 Qed.
 
 Lemma live_inv :
@@ -116,24 +67,13 @@ Lemma live_inv :
     wf_ptr p /\
     In (addr_of p) (nodes gst) /\
     ~ In (addr_of p) (failed_nodes gst) /\
-    exists st, sigma gst (addr_of p) = Some st.
+    exists st, sigma gst (addr_of p) = Some st /\
+          joined st = true.
 Proof.
   unfold live.
   intros.
-  break_and.
-  auto using live_addr_inv.
+  inv_prop live_node; auto.
 Qed.
-
-Ltac live_addr_inv :=
-  match goal with
-  | [ H_live : live_addr ?gst ?a |- _ ] =>
-    apply live_addr_inv in H_live;
-      destruct H_live as [?H [?H ?H]];
-      match goal with
-      | [ H_st : exists st, sigma gst a = Some st |- _ ] =>
-        destruct H_st as [?st]
-      end
-  end.
 
 Ltac live_inv :=
   match goal with
@@ -147,7 +87,7 @@ Ltac live_inv :=
   end.
 
 Definition live_addrs (gst : global_state) : list addr :=
-  filter (fun a => Coqlib.proj_sumbool (live_addr_dec gst a))
+  filter (fun a => Coqlib.proj_sumbool (live_node_dec gst a))
          (nodes gst).
 
 Definition live_ptrs (gst : global_state) : list pointer :=
@@ -173,17 +113,11 @@ Definition first_succ_is_best_succ (gst : global_state) (h : addr) :=
 
 Definition all_first_succs_best (gst : global_state) :=
   forall h,
-    live gst h ->
-    first_succ_is_best_succ gst (addr_of h).
+    live_node gst h ->
+    first_succ_is_best_succ gst h.
 
-Definition circular_wait : occurrence -> Prop.
-Admitted.
-
-Definition phase_one (ex : infseq.infseq occurrence) :=
-  lb_execution ex ->
-  reachable_st (occ_gst (infseq.hd ex)) ->
-  always (~_ (now circular_wait)) ex ->
-  infseq.continuously (lift_gpred_to_ex all_first_succs_best) ex.
+Definition phase_one (o : occurrence) : Prop :=
+  all_first_succs_best (occ_gst o).
 
 (* Defining the error for phase one: the norm approach *)
 Fixpoint succ_list_leading_failed_nodes (failed : list addr) (succs : list pointer) : nat :=
@@ -217,19 +151,6 @@ Proof.
   intros.
   break_match; congruence.
 Qed.
-
-Definition nonempty_succ_lists (gst : global_state) : Prop :=
-  forall h st,
-    sigma gst h = Some st ->
-    succ_list st <> [].
-
-Definition successor_nodes_valid (gst : global_state) : Prop :=
-  forall h p st,
-    In p (succ_list st) ->
-    sigma gst h = Some st ->
-    In (addr_of p) (nodes gst) /\
-    exists pst, sigma gst (addr_of p) = Some pst /\
-           joined pst = true.
 
 Lemma successor_nodes_valid_state :
   forall gst h p st,
@@ -265,31 +186,22 @@ Lemma successor_nodes_valid_live_are_joined :
     live_node gst (addr_of p).
 Proof.
   intros.
-  live_inv.
-  find_eapply_lem_hyp successor_nodes_valid_inv;
-    eauto; repeat (break_and; break_exists).
-  eapply live_node_characterization; eauto.
+  now inv_prop live.
 Qed.
-
-Lemma successor_nodes_always_valid :
-  forall gst,
-    reachable_after_churn gst ->
-    successor_nodes_valid gst.
-Proof.
-Admitted.
 
 Lemma nonempty_succ_lists_always_belong_to_joined_nodes :
   forall gst h st,
-    reachable_after_churn gst ->
+    reachable_st gst ->
     sigma gst h = Some st ->
     succ_list st <> [] ->
     joined st = true.
+Proof.
 Admitted.
 
 Lemma zero_leading_failed_nodes_leading_node_live :
   forall gst h st s rest,
     succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st) = 0 ->
-    reachable_after_churn gst ->
+    reachable_st gst ->
     sigma gst h = Some st ->
     succ_list st = s :: rest ->
     wf_ptr s ->
@@ -313,7 +225,7 @@ Qed.
 Lemma zero_leading_failed_nodes_best_succ :
   forall gst h st s rest,
     succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st) = 0 ->
-    reachable_after_churn gst ->
+    reachable_st gst ->
     sigma gst h = Some st ->
     succ_list st = s :: rest ->
     wf_ptr s ->
@@ -337,10 +249,37 @@ Proof.
       apply in_eq.
 Qed.
 
+Lemma in_active_in_nodes :
+  forall h gst,
+    In h (active_nodes gst) ->
+    In h (nodes gst).
+Proof.
+  unfold active_nodes.
+  eauto using RemoveAll.in_remove_all_was_in.
+Qed.
+
+Lemma in_active_not_failed :
+  forall h gst,
+    In h (active_nodes gst) ->
+    ~ In h (failed_nodes gst).
+Proof.
+  unfold active_nodes.
+  eauto using RemoveAll.in_remove_all_not_in.
+Qed.
+
+Lemma in_nodes_not_failed_in_active :
+  forall h gst,
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    In h (active_nodes gst).
+Proof.
+  eauto using RemoveAll.in_remove_all_preserve.
+Qed.
+
 Lemma zero_failed_nodes_total_implies_zero_locally :
   forall gst h st,
     phase_one_error gst = 0 ->
-    live_addr gst h ->
+    live_node gst h ->
     sigma gst h = Some st ->
     succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st) = 0.
 Proof.
@@ -350,12 +289,13 @@ Proof.
     eauto using maybe_count_failed_nodes_Some.
   find_eapply_lem_hyp local_all_zero_global_zero.
   find_eapply_lem_hyp Forall_forall; eauto.
-  now inv_prop live_addr.
+  inv_prop live_node; break_and.
+  eauto using in_nodes_not_failed_in_active.
 Qed.
 
 Theorem zero_leading_failed_nodes_implies_all_first_succs_best :
   forall gst,
-    reachable_after_churn gst ->
+    reachable_st gst ->
     (* total leading failed nodes says nothing about the length of successor lists *)
     nonempty_succ_lists gst ->
     phase_one_error gst = 0 ->
@@ -365,32 +305,21 @@ Proof.
   intros.
   find_copy_apply_lem_hyp local_all_zero_global_zero;
     rewrite Forall_forall in *.
-  find_apply_lem_hyp live_inv;
-    break_and;
-    break_exists_exists.
+  inv_prop live_node;
+    repeat (break_and; break_exists_exists).
   unfold nonempty_succ_lists in *.
   find_copy_apply_hyp_hyp.
-  destruct (succ_list _) as [| p rest] eqn:?H; [congruence|].
+  destruct (succ_list _) as [| p rest] eqn:?H; [firstorder congruence|].
   exists p. exists rest.
   repeat split; auto.
 
   (* need an (easy) invariant *)
-  assert (wf_ptr p) by admit.
+  assert (wf_ptr p) by eauto using wf_ptr_succ_list_invariant.
 
-  assert (live gst h) by eauto using live_intro.
-  find_copy_apply_lem_hyp live_live_addr; auto.
+  assert (live_node gst h) by eauto.
   find_copy_apply_lem_hyp zero_failed_nodes_total_implies_zero_locally; auto.
   eapply zero_leading_failed_nodes_best_succ; eauto.
-  eapply live_node_characterization; eauto.
-  eapply nonempty_succ_lists_always_belong_to_joined_nodes; eauto.
-Admitted.
-
-Lemma always_reachable_after_churn :
-  forall ex,
-    reachable_st (occ_gst (infseq.hd ex)) ->
-    infseq.always (lift_gpred_to_ex reachable_after_churn) ex.
-Proof.
-Admitted.
+Qed.
 
 (*
 if head of succ list is dead
@@ -422,6 +351,16 @@ Definition open_stabilize_request_to_first_succ (gst : global_state) (h : addr) 
     sigma gst h = Some st ->
     succ_list st = dst :: rest ->
     open_stabilize_request_to gst h (addr_of dst).
+
+Lemma open_stabilize_request_to_first_succ_elim :
+  forall gst h st hd rest,
+    open_stabilize_request_to_first_succ gst h ->
+    sigma gst h = Some st ->
+    succ_list st = hd :: rest ->
+    open_stabilize_request_to gst h (addr_of hd).
+Proof.
+  eauto.
+Qed.
 
 Lemma timeout_handler_eff_StartStabilize :
   forall h st r eff,
@@ -885,17 +824,23 @@ Proof.
     auto with arith.
 Qed.
 
-Lemma stablize_Request_timeout_decreases_error :
-  forall ex h st s rest dst p,
+Definition has_dead_first_succ (gst : global_state) (h : addr) (s : pointer) :=
+  exists st,
+    sigma gst h = Some st /\
+    exists rest,
+      succ_list st = s :: rest /\
+      In (addr_of s) (failed_nodes gst).
+
+Lemma stabilize_Request_timeout_decreases_error :
+  forall ex h s dst p,
     lb_execution ex ->
-    In (addr_of s) (failed_nodes (occ_gst (hd ex))) ->
-    sigma ex.(hd).(occ_gst) h = Some st ->
-    succ_list st = s :: rest ->
+    has_dead_first_succ ex.(hd).(occ_gst) h s ->
     open_stabilize_request_to ex.(hd).(occ_gst) h dst ->
     now (occurred (Timeout h (Request dst p) DetectFailure)) ex ->
     consecutive (measure_decreasing (leading_failed_succs h)) ex.
 Proof.
   intros.
+  inv_prop has_dead_first_succ; expand_def.
   destruct ex as [o [o' ex]].
   find_copy_eapply_lem_hyp stabilize_Request_timeout_removes_succ; eauto.
   simpl in *; break_exists; break_and.
@@ -1032,26 +977,6 @@ Proof.
   - admit.
 Admitted.
 
-Lemma dead_successor_eventually_removed :
-  forall ex h st s rest,
-    lb_execution ex ->
-    reachable_st (occ_gst (infseq.hd ex)) ->
-    weak_local_fairness ex ->
-    live_node (occ_gst (hd ex)) h ->
-    sigma (occ_gst (hd ex)) h = Some st ->
-    succ_list st = s :: rest ->
-    In (addr_of s) (failed_nodes (occ_gst (hd ex))) ->
-    eventually
-      (now
-         (fun occ =>
-            forall st', sigma (occ_gst occ) h = Some st' ->
-                   succ_list st' = rest))
-      ex.
-Proof.
-  intros.
-  find_copy_eapply_lem_hyp start_stabilize_with_first_successor_eventually; eauto.
-Admitted.
-
 Lemma recv_handler_label_is_RecvMsg :
   forall h st src m res l,
     recv_handler_l h src st m = (res, l) ->
@@ -1061,17 +986,171 @@ Proof.
   congruence.
 Qed.
 
+Lemma zero_error_implies_phase_one :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    now (measure_zero phase_one_error) ex ->
+    now phase_one ex.
+Proof.
+  intros.
+  destruct ex.
+  simpl in *.
+  eapply zero_leading_failed_nodes_implies_all_first_succs_best; eauto.
+  eapply nodes_have_nonempty_succ_lists; eauto.
+Qed.
+
 Theorem continuously_zero_total_leading_failed_nodes_implies_phase_one :
   forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
-    infseq.continuously
-      (now (measure_zero phase_one_error) /\_
-       lift_gpred_to_ex nonempty_succ_lists)
-      ex ->
-    phase_one ex.
+    infseq.continuously (now (measure_zero phase_one_error)) ex ->
+    continuously (now phase_one) ex.
+Proof.
+  intros.
+  pose proof zero_error_implies_phase_one.
+  unfold continuously in *.
+  prep_always_monotonic.
+  eapply eventually_monotonic_simple.
+  eapply always_monotonic; eauto.
+  eapply continuously_and_tl; eauto.
+  apply E0.
+  eapply reachable_st_always; eauto.
+Qed.
+
+Theorem phase_one_error_continuously_nonincreasing :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    continuously (local_measures_nonincreasing leading_failed_succs) ex.
 Proof.
 Admitted.
+
+(* TODO(ryan) move to Measure *)
+Lemma sum_nonzero_implies_addend_nonzero :
+  forall l,
+    sum l > 0 ->
+    exists x,
+      In x l /\
+      x > 0.
+Proof.
+  induction l as [|hd rest].
+  - cbn.
+    intros; omega.
+  - intros; rewrite sum_cons in *.
+    destruct hd eqn:?H.
+    + firstorder.
+    + exists hd; firstorder.
+Qed.
+
+Lemma succ_list_leading_failed_nodes_nonzero_means_dead_succ :
+  forall failed succs,
+    succ_list_leading_failed_nodes failed succs > 0 ->
+    exists p rest,
+      succs = p :: rest /\
+      In (addr_of p) failed.
+Proof.
+  unfold succ_list_leading_failed_nodes.
+  destruct succs; intros.
+  - omega.
+  - break_if.
+    + eexists; eauto.
+    + omega.
+Qed.
+
+Lemma leading_failed_succs_nonzero_means_dead_succ :
+  forall h gst,
+    leading_failed_succs h gst > 0 ->
+    exists st,
+      sigma gst h = Some st /\
+      exists p rest,
+        succ_list st = p :: rest /\
+        In (addr_of p) (failed_nodes gst).
+Proof.
+  unfold leading_failed_succs.
+  intros.
+  break_match; [|omega].
+  eexists; split; eauto.
+  now apply succ_list_leading_failed_nodes_nonzero_means_dead_succ.
+Qed.
+
+Lemma phase_one_error_nonzero_means_dead_succ :
+  forall gst,
+    phase_one_error gst > 0 ->
+    exists h,
+      In h (nodes gst) /\
+      ~ In h (failed_nodes gst) /\
+      exists st,
+        sigma gst h = Some st /\
+        exists p rest,
+          succ_list st = p :: rest /\
+          In (addr_of p) (failed_nodes gst).
+Proof.
+  intros.
+  find_apply_lem_hyp sum_nonzero_implies_addend_nonzero.
+  break_exists; break_and.
+  find_eapply_lem_hyp Coqlib.list_in_map_inv.
+  break_exists_exists.
+  firstorder using in_active_in_nodes, in_active_not_failed.
+  apply leading_failed_succs_nonzero_means_dead_succ; omega.
+Qed.
+
+Lemma open_stabilize_request_eventually_decreases_error :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+
+    live_node (occ_gst (hd ex)) h ->
+
+    leading_failed_succs h (occ_gst (hd ex)) > 0 ->
+    open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    until
+      (next (now (fun occ => open_stabilize_request_to_first_succ (occ_gst occ) h)))
+      (consecutive (measure_decreasing (leading_failed_succs h))) ex.
+Proof.
+  intros.
+  find_copy_eapply_lem_hyp leading_failed_succs_nonzero_means_dead_succ.
+  break_exists_name st; break_and; break_exists_name dead; break_exists; break_and.
+  find_copy_eapply_lem_hyp open_stabilize_request_to_first_succ_elim; eauto.
+  inv_prop open_stabilize_request_to; expand_def.
+  repeat find_rewrite.
+  find_inversion.
+  find_copy_eapply_lem_hyp timeout_Request_to_dead_node_eventually_fires; eauto using strong_local_fairness_weak;
+    [|destruct ex; simpl in *; eexists; firstorder eauto].
+  break_exists.
+  eapply until_monotonic; [| |eauto].
+Abort.
+
+Theorem phase_one_nonzero_error_causes_measure_drop :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    continuously (nonzero_error_causes_measure_drop leading_failed_succs) ex.
+Proof.
+  intros.
+  unfold nonzero_error_causes_measure_drop.
+Admitted.
+
+Theorem phase_one_continuously :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    continuously (now phase_one) ex.
+Proof.
+  intros.
+  eapply continuously_zero_total_leading_failed_nodes_implies_phase_one; eauto.
+  eapply local_measure_causes_measure_zero_continuosly; eauto.
+  - eapply phase_one_error_continuously_nonincreasing; eauto.
+  - eapply phase_one_nonzero_error_causes_measure_drop; eauto.
+Qed.
 
 (** In phase two we want to talk about the existence and number of better
     predecessors and better first successors to a node. We do this with the
@@ -1081,7 +1160,7 @@ Admitted.
     - *_correct : Prop, which holds if the pointer is globally correct.
     - *_error : nat, which counts the number of better options for the pointer.
     We prove that error = 0 <-> correct so we can use an argument about the
-    metric to prove eventual correctness.
+    measure to prove eventual correctness.
  *)
 
 Definition counting_opt_error (gst : global_state) (p : option pointer) (better_bool : pointer -> pointer -> bool) : nat :=
@@ -1168,15 +1247,16 @@ Lemma phase_two_zero_error_locally_correct :
     pred_and_first_succ_correct gst h st.
 Proof.
 Admitted.
+
 Lemma live_addr_In_live_addrs :
   forall gst h,
-    live_addr gst h ->
+    live_node gst h ->
     In h (live_addrs gst).
 Proof.
   unfold live_addrs.
   intros.
   apply filter_In; split.
-  - unfold live_addr in *; break_and; auto.
+  - unfold live_node in *; break_and; auto.
   - auto using Coqlib.proj_sumbool_is_true.
 Qed.
 
@@ -1219,7 +1299,7 @@ Proof.
   eapply in_map_iff; exists (h, st); split.
   - auto.
   - apply live_In_live_ptrs_with_states; auto.
-    now live_inv.
+    now inv_prop live.
 Qed.
 
 (* This is really an invariant. *)

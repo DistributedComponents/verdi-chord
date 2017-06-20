@@ -429,6 +429,16 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
       simpl; reflexivity.
   Qed.
 
+  Lemma labeled_step_dynamic_preserves_failed_nodes :
+    forall gst l gst',
+      labeled_step_dynamic gst l gst' ->
+      failed_nodes gst = failed_nodes gst'.
+  Proof.
+    intros.
+    inv_prop labeled_step_dynamic;
+      simpl; reflexivity.
+  Qed.
+
   Lemma labeled_step_dynamic_is_step_dynamic_without_churn :
     forall gst gst',
       step_dynamic gst gst' ->

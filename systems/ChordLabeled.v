@@ -1616,6 +1616,22 @@ Proof using.
   eauto using reachableStep, labeled_step_is_unlabeled_step.
 Qed.
 
+Lemma reachable_st_always :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always ((fun ex' => reachable_st (occ_gst (hd ex'))) /\_ lb_execution) ex.
+Proof.
+  intros.
+  eapply always_inv.
+  - intros.
+    destruct s.
+    inv_prop and_tl.
+    split;
+      eauto using lb_execution_invar, reachable_st_lb_execution_cons.
+  - firstorder.
+Qed.
+
 Lemma queries_now_closed :
   forall s p m dst src,
     lb_execution s ->
