@@ -23,6 +23,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 Close Scope boolean_if_scope.
 Open Scope general_if_scope.
+Open Scope string_scope.
 
 Definition timeouts_detect_failure (gst : global_state) : Prop :=
   forall xs t ys h dead req,
@@ -217,11 +218,94 @@ Proof.
     + find_apply_lem_hyp real_requests_get_responses_recv_handler; auto.
 Qed.
 
-Definition init_sigma (h : addr) : option data.
-Admitted. (* TODO should map base addresses to data for an ideal ring of just the base nodes *)
+Fixpoint fake_name (k : nat) :=
+  match k with
+  | 0 => ":^)"
+  | S k' => String.append ":^) " (fake_name k')
+  end.
 
-Definition initial_st : global_state.
-Admitted.
+Lemma fake_name_inj :
+  forall i j,
+    fake_name i = fake_name j ->
+    i = j.
+Proof.
+  intro i.
+  induction i; intros; destruct j;
+    simpl in *; try congruence.
+  find_injection; auto.
+Qed.
+
+Fixpoint make_initial_nodes (num_nodes : nat) : list addr :=
+  match num_nodes with
+  | 0 => []
+  | S k => fake_name k :: make_initial_nodes k
+  end.
+
+Lemma in_make_initial_nodes :
+  forall k nm,
+    In nm (make_initial_nodes k) ->
+    exists j,
+      Nat.lt j k /\
+      nm = fake_name j.
+Proof.
+  induction k.
+  - intros; solve_by_inversion.
+  - intros.
+    destruct (addr_eq_dec nm (fake_name k)).
+    + exists k; eauto.
+    + inv_prop In; try congruence.
+      find_apply_lem_hyp IHk; break_exists_exists; break_and.
+      auto with arith.
+Qed.
+
+Lemma make_initial_nodes_NoDup :
+  forall k,
+    NoDup (make_initial_nodes k).
+Proof.
+  induction k.
+  - constructor.
+  - simpl.
+    constructor; auto.
+    intro.
+    find_eapply_lem_hyp in_make_initial_nodes; break_exists; break_and.
+    find_apply_lem_hyp fake_name_inj.
+    solve_by_inversion.
+Qed.
+
+Lemma make_initial_nodes_length : 
+  forall k,
+    length (make_initial_nodes k) = k.
+Proof.
+  induction k.
+  - easy.
+  - simpl; now f_equal.
+Qed.
+
+Definition initial_nodes : list addr :=
+  make_initial_nodes (Chord.SUCC_LIST_LEN + 1).
+
+Lemma initial_nodes_NoDup : NoDup initial_nodes.
+Proof.
+  apply make_initial_nodes_NoDup.
+Qed.
+
+Lemma initial_nodes_length : length initial_nodes = Chord.SUCC_LIST_LEN + 1.
+Proof.
+  apply make_initial_nodes_length.
+Qed.
+
+Definition run_init_for (gst : global_state) (h : addr) : global_state :=
+  let res := start_handler h initial_nodes in
+  apply_handler_result h (res, []) [] gst.
+
+Definition initial_st : global_state :=
+  fold_left run_init_for initial_nodes 
+            {| nodes := initial_nodes; 
+               failed_nodes := [];
+               timeouts := fun h => [];
+               sigma := fun h => None;
+               msgs := [];
+               trace := [] |}.
 
 Inductive reachable_st : global_state -> Prop :=
 | reachableInit : reachable_st initial_st
