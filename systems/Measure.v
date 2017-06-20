@@ -458,13 +458,31 @@ Section LocalMeasure.
     inv_prop Forall; auto.
   Qed.
 
+  Definition active_node (gst : global_state) (h : addr) :=
+    In h (nodes gst) /\
+    ~ In h (failed_nodes gst).
+
+  Definition active_nodes (gst : global_state) :=
+    RemoveAll.remove_all addr_eq_dec (failed_nodes gst) (nodes gst).
+
+  Lemma labeled_step_dynamic_preserves_active_nodes :
+    forall gst l gst',
+      labeled_step_dynamic gst l gst' ->
+      active_nodes gst = active_nodes gst'.
+  Proof.
+    intros; unfold active_nodes.
+    erewrite labeled_step_dynamic_preserves_failed_nodes; eauto.
+    erewrite labeled_step_dynamic_preserves_nodes; eauto.
+  Qed.
+
   Definition global_measure (gst : global_state) :=
-    sum (map (fun h => |h in gst|) (nodes gst)).
+    sum (map (fun h => |h in gst|) (active_nodes gst)).
+
   Notation "| gst |" := (global_measure gst) (at level 50).
 
   Definition some_local_measure_drops (ex : infseq occurrence) :=
     exists h,
-      In h (nodes (occ_gst (hd ex))) /\
+      In h (active_nodes (occ_gst (hd ex))) /\
       eventually (consecutive (measure_decreasing (local_measure h))) ex.
 
   Definition local_measure_nonincreasing (h : addr) : infseq occurrence -> Prop :=
@@ -472,7 +490,7 @@ Section LocalMeasure.
 
   Definition local_measures_nonincreasing (ex : infseq occurrence) : Prop :=
     forall h,
-      In h (nodes (occ_gst (hd ex))) ->
+      In h (active_nodes (occ_gst (hd ex))) ->
       local_measure_nonincreasing h ex.
 
   Lemma map_Forall_comm :
@@ -487,7 +505,7 @@ Section LocalMeasure.
 
   Lemma local_all_zero_global_zero :
     forall gst,
-      Forall (fun h => |h in gst| = 0) (nodes gst) <-> |gst| = 0.
+      Forall (fun h => |h in gst| = 0) (active_nodes gst) <-> |gst| = 0.
   Proof.
     intros; split; intro.
     - apply sum_of_zeros_is_zero.
@@ -539,13 +557,14 @@ Section LocalMeasure.
   Lemma measure_mono :
     forall gst gst',
       nodes gst' = nodes gst ->
-      (forall h, In h (nodes gst) -> |h in gst| <= |h in gst'|) ->
+      failed_nodes gst' = failed_nodes gst ->
+      (forall h, In h (active_nodes gst) -> |h in gst| <= |h in gst'|) ->
       |gst| <= |gst'|.
   Proof.
     intros.
-    unfold global_measure.
+    unfold global_measure, active_nodes in *.
     repeat find_rewrite.
-    now eapply sum_map_mono.
+    now apply sum_map_mono.
   Qed.
 
   Lemma local_nonincreasing_causes_global_nonincreasing :
@@ -558,16 +577,19 @@ Section LocalMeasure.
     intros.
     destruct ex as [o [o' ex]]; simpl.
     inv_prop lb_execution.
-    find_apply_lem_hyp labeled_step_dynamic_preserves_nodes.
-    eapply measure_mono; repeat find_reverse_rewrite; eauto.
+    find_copy_apply_lem_hyp labeled_step_dynamic_preserves_active_nodes.
+    eapply measure_mono; repeat find_rewrite;
+      eauto using labeled_step_dynamic_preserves_nodes, labeled_step_dynamic_preserves_failed_nodes.
+    intros; unfold active_nodes in *.
+    repeat find_reverse_rewrite; simpl in *; eauto.
   Qed.
 
   Lemma local_dropping_makes_global_drop :
     forall h o o',
-      nodes (occ_gst o) = nodes (occ_gst o') ->
-      (forall h', In h' (nodes (occ_gst o)) ->
+      active_nodes (occ_gst o) = active_nodes (occ_gst o') ->
+      (forall h', In h' (active_nodes (occ_gst o)) ->
              measure_nonincreasing (local_measure h') o o') ->
-      In h (nodes (occ_gst o)) ->
+      In h (active_nodes (occ_gst o)) ->
       measure_decreasing (local_measure h) o o' ->
       measure_decreasing global_measure o o'.
   Proof.
@@ -585,7 +607,7 @@ Section LocalMeasure.
     forall h ex,
       lb_execution ex ->
       always local_measures_nonincreasing ex ->
-      In h (nodes (occ_gst (hd ex))) ->
+      In h (active_nodes (occ_gst (hd ex))) ->
       consecutive (measure_decreasing (local_measure h)) ex ->
       consecutive (measure_decreasing global_measure) ex.
   Proof.
@@ -594,7 +616,7 @@ Section LocalMeasure.
     inv_prop lb_execution.
     inv_prop always.
     eapply local_dropping_makes_global_drop;
-      eauto using labeled_step_dynamic_preserves_nodes.
+      eauto using labeled_step_dynamic_preserves_active_nodes.
   Qed.
 
   Definition nonzero_error_causes_measure_drop (ex : infseq occurrence) :=
@@ -618,7 +640,7 @@ Section LocalMeasure.
       lift_eventually (local_dropping_makes_global_drop_ex h);
         firstorder using lb_execution_invar, always_invar.
       inv_prop lb_execution; simpl.
-      find_apply_lem_hyp labeled_step_dynamic_preserves_nodes.
+      find_copy_apply_lem_hyp labeled_step_dynamic_preserves_active_nodes.
       now repeat find_reverse_rewrite.
   Qed.
 
