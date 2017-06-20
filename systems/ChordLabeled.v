@@ -1279,8 +1279,28 @@ Proof using.
   eapply LTimeout; eauto.
 Qed.
 
+Lemma clients_not_in_failed :
+  forall st h,
+    reachable_st st ->
+    client_addr h ->
+    ~ In h (nodes st) /\
+    ~ In h (failed_nodes st).
+Proof.
+  intros.
+  induct_reachable_st.
+  - intros. admit (* TODO no failed nodes in initial state *).
+  - intros. inv_prop step_dynamic; simpl; auto.
+    + intuition; try congruence; firstorder.
+    + intuition; try congruence.
+      * firstorder.
+      * subst. firstorder.
+      * firstorder.
+Admitted.
+   
+
 Lemma step_preserves_timeout_constraint :
   forall st l st' h t,
+    reachable_st st ->
     labeled_step_dynamic st l st' ->
     timeout_constraint st h t ->
     timeout_constraint st' h t.
@@ -1301,13 +1321,13 @@ Proof.
     + find_apply_hyp_hyp. in_crush.
   - intuition eauto.
     unfold send in *. find_inversion.
-    (* failed nodes can't do client things, right? *)
-    admit.
+    find_apply_lem_hyp clients_not_in_failed; auto.
   - in_crush; find_apply_hyp_hyp; in_crush.
-Admitted.
+Qed.
 
 Lemma timeout_constraint_invar :
   forall s,
+    reachable_st (hd s).(occ_gst) ->
     lb_execution s ->
     forall h t,
       timeout_constraint (occ_gst (hd s)) h t ->
@@ -1317,6 +1337,35 @@ Proof.
   simpl in *. eauto using step_preserves_timeout_constraint.
 Qed.
 
+Lemma other_timeouts_not_cleared:
+  forall (gst : global_state) (h : addr) (t : timeout) st gst' h' t' st' ms newts clearedts eff,
+    reachable_st gst ->
+    (h, t) <> (h', t') ->
+    In t (timeouts gst h) ->
+    gst' = apply_handler_result h' (st', ms, newts, t' :: clearedts) [e_timeout h' t'] gst ->
+    timeout_handler_eff h' st t' = (st', ms, newts, clearedts, eff) ->
+    In t (timeouts gst' h).
+Proof.
+  intros. subst. simpl in *.
+  assert (h <> h' \/ t <> t') by
+      (destruct (addr_eq_dec h h'); destruct (timeout_eq_dec t t'); intuition; congruence).
+  intuition; [rewrite_update; auto|].
+  update_destruct; subst; rewrite_update; auto.
+  in_crush. right.
+  assert (~ In t clearedts).
+  {
+    unfold timeout_handler_eff, tick_handler, keepalive_handler, request_timeout_handler, handle_query_timeout, do_rectify, add_tick, start_query, cur_request, clear_rectify_with, make_request
+      
+                                                                                   
+      in *.
+    repeat break_match; repeat tuple_inversion; simpl in *; in_crush; try congruence; admit.
+    }
+  unfold timeout_handler_eff, tick_handler, add_tick, start_query, timeouts_in in *.
+  find_apply_lem_hyp timeout_handler_definition. expand_def.
+  - find_apply_lem_hyp tick_handler_definition. expand_def.
+    +
+Admitted.
+  
 Lemma weak_until_timeout :
   forall s,
     lb_execution s ->
@@ -1336,17 +1385,69 @@ Proof.
   cofix c. destruct s. destruct o.
   simpl. intros.
   inv_lb_execution.
-  simpl in *. find_copy_eapply_lem_hyp step_preserves_timeout_constraint; [|eauto].
+  simpl in *.
+  find_copy_eapply_lem_hyp step_preserves_timeout_constraint; [| eauto |eauto].
+  find_copy_eapply_lem_hyp labeled_step_preserves_state_existing; [|eauto].
+  find_copy_eapply_lem_hyp nodes_never_removed; [|eauto].
+  find_copy_eapply_lem_hyp failed_nodes_never_added; [|eauto].
+  break_exists.
   inv_labeled_step.
-  - admit.
+  - destruct (prod_eq_dec addr_eq_dec timeout_eq_dec
+                          (h, t) (h0, t0)). (* TODO ewwwww *)
+    + clear c. apply W0. tuple_inversion. simpl in *.
+      find_apply_lem_hyp timeout_handler_l_definition.
+      break_exists.  intuition; subst.
+      unfold occurred. simpl.
+      eauto.
+    + apply W_tl.
+      * clear c.
+        simpl. eauto using l_enabled_Timeout_In_timeouts.
+      * simpl.
+        eapply c; clear c;
+          eauto using
+                lb_execution_invar,
+                strong_local_fairness_invar,
+                live_node_invariant,
+                labeled_step_is_unlabeled_step,
+                reachableStep. 
+        find_apply_lem_hyp timeout_handler_l_definition.
+        break_exists. intuition; subst.
+        eauto using other_timeouts_not_cleared.
   - apply W_tl.
     + simpl.
       eapply l_enabled_Timeout_In_timeouts; eauto.
-    + simpl in *.
-      eapply c; clear c; simpl in *; eauto.
-Admitted.
+    + simpl in *. 
+      eapply c; clear c; simpl in *; eauto using labeled_step_is_unlabeled_step,
+                                     reachableStep.
+      unfold recv_handler_l in *.
+      find_inversion.
+      eauto using recv_handler_keeps_timeouts_satisfying_constraint.
+  - apply W_tl.
+    + simpl.
+      eapply l_enabled_Timeout_In_timeouts; eauto.
+    + simpl in *. 
+      eapply c; clear c; simpl in *; eauto using labeled_step_is_unlabeled_step,
+                                     reachableStep.
+      now repeat find_rewrite.
+  - apply W_tl.
+    + simpl.
+      eapply l_enabled_Timeout_In_timeouts; eauto.
+    + simpl in *. 
+      eapply c; clear c; simpl in *; eauto using labeled_step_is_unlabeled_step,
+                                     reachableStep.
+      now repeat find_rewrite.
+Qed.
 
-
+Lemma eventually_exists :
+  forall T A P (s : infseq T),
+    eventually (fun y => exists (x : A), P x y) s ->
+    exists x,
+      eventually (fun y => P x y) s.
+Proof.
+  induction 1.
+  - break_exists_exists. now constructor.
+  - break_exists_exists. now constructor.
+Qed.
 
 Lemma unconstrained_timeout_eventually_occurred :
   forall s,
@@ -1364,21 +1465,18 @@ Lemma unconstrained_timeout_eventually_occurred :
         eventually (now (occurred (Timeout h t eff))) s.
 Proof using.
   intros.
-
-  (* Old proof of this used a lemma Timeout_enabled_until_occurred of the form
-
-      forall s h t,
-        t <> KeepaliveTick ->
-        reachable_st (hd s).(occ_gst) ->
-        lb_execution s ->
-        l_enabled (Timeout h t) (hd s) ->
-        weak_until (now (l_enabled (Timeout h t)))
-                  (now (occurred (Timeout h t)))
-                  s
-
-    which is not true (or even false) now because of the introduction of
-    timeout_effect in the Timeout label. *)
+  find_eapply_lem_hyp weak_until_timeout; eauto.
+  find_apply_lem_hyp weak_until_until_or_always.
+  intuition.
+  - find_apply_lem_hyp until_eventually.
+    find_apply_lem_hyp eventually_exists.
+    break_exists_exists.
+    eapply eventually_monotonic_simple; [|eauto]; eauto.
+    intros. now destruct s0.
+  - unfold weak_local_fairness in *.
+    (* this is going to be a problem. the "exists" is in the wrong place! *)
 Admitted.
+
 
 Definition res_clears_timeout (r : res) (t : timeout) : Prop :=
   match r with
