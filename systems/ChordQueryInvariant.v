@@ -13,7 +13,6 @@ Import ChordIDSpace.
 
 Set Bullet Behavior "Strict Subproofs".
 
-
 Definition at_most_one_request_timeout (gst : global_state) (h : addr) :=
   forall xs ys dst p,
     timeouts gst h = xs ++ Request dst p :: ys ->

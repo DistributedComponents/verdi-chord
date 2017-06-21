@@ -20,6 +20,7 @@ Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.ChordLocalProps.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
@@ -249,33 +250,6 @@ Proof.
       apply in_eq.
 Qed.
 
-Lemma in_active_in_nodes :
-  forall h gst,
-    In h (active_nodes gst) ->
-    In h (nodes gst).
-Proof.
-  unfold active_nodes.
-  eauto using RemoveAll.in_remove_all_was_in.
-Qed.
-
-Lemma in_active_not_failed :
-  forall h gst,
-    In h (active_nodes gst) ->
-    ~ In h (failed_nodes gst).
-Proof.
-  unfold active_nodes.
-  eauto using RemoveAll.in_remove_all_not_in.
-Qed.
-
-Lemma in_nodes_not_failed_in_active :
-  forall h gst,
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst) ->
-    In h (active_nodes gst).
-Proof.
-  eauto using RemoveAll.in_remove_all_preserve.
-Qed.
-
 Lemma zero_failed_nodes_total_implies_zero_locally :
   forall gst h st,
     phase_one_error gst = 0 ->
@@ -332,12 +306,7 @@ with q = Stabilize2
 *)
 
 Definition open_stabilize_request_to (gst : global_state) (h : addr) (dst : addr) : Prop :=
-  In (Request dst GetPredAndSuccs) (timeouts gst h) /\
-  In (h, (dst, GetPredAndSuccs)) (msgs gst) /\
-  exists st dstp,
-    sigma gst h = Some st /\
-    addr_of dstp = dst /\
-    cur_request st = Some (dstp, Stabilize, GetPredAndSuccs).
+  open_request_to gst h dst GetPredAndSuccs.
 
 Definition open_stabilize_request (gst : global_state) (h : addr) : Prop :=
   exists p,
@@ -505,35 +474,6 @@ Proof.
   eapply loaded_Tick_enabled_when_cur_request_None; eauto.
 Qed.
 
-Lemma lb_execution_step_structural :
-  forall o o' ex,
-    lb_execution (Cons o (Cons o' ex)) ->
-    labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst o').
-Proof.
-  intros.
-  now inv_lb_execution.
-Qed.
-
-Lemma lb_execution_step_one_cons :
-  forall o ex,
-    lb_execution (Cons o ex) ->
-    labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst (hd ex)).
-Proof.
-  intros.
-  destruct ex.
-  eauto using lb_execution_step_structural.
-Qed.
-
-Lemma lb_execution_two_cons :
-  forall ex,
-    lb_execution ex ->
-    labeled_step_dynamic (occ_gst (hd ex)) (occ_label (hd ex)) (occ_gst (hd (tl ex))).
-Proof.
-  intros.
-  do 2 destruct ex.
-  eauto using lb_execution_step_structural.
-Qed.
-
 Ltac invar_eauto :=
   eauto using
         lb_execution_invar,
@@ -598,7 +538,8 @@ Proof.
     find_injection.
     repeat split; simpl in *;
       try rewrite update_same in *;
-      eauto with datatypes.
+      repeat eexists;
+      eauto using StabilizeMsg with datatypes.
   - simpl in *.
     find_rewrite.
     find_injection.
@@ -785,24 +726,21 @@ Proof.
   eexists; split; eauto.
   find_injection.
 
-  (* This should be a lemma about timeout_handler_l *)
   find_apply_lem_hyp timeout_handler_l_definition; expand_def.
   repeat find_reverse_rewrite.
   find_injection.
 
-  assert (st0 = x0)
-    by (repeat find_rewrite; now find_injection);
-    subst.
+  clear H11.
+  inv_prop open_request_to; expand_def.
+  inv_prop request_msg_for_query.
+  simpl in *.
 
-  simpl in *.
-  unfold request_timeout_handler in *.
-  repeat find_rewrite.
-  repeat find_rewrite.
-  simpl in *.
-  break_if; [|congruence].
-  repeat find_rewrite.
+  find_apply_lem_hyp request_timeout_handler_definition; expand_def; try congruence.
+  find_eapply_lem_hyp handle_query_timeout_definition; expand_def; try congruence.
+  repeat find_rewrite; repeat find_injection.
   (* Should use a definition lemma about start_query here. *)
   unfold start_query, update_query in *.
+  simpl in *.
   repeat break_match;
     simpl in *;
     tuple_inversion;
@@ -870,112 +808,28 @@ Proof.
   invar_eauto.
 Qed.
 
-(* This belongs in ChordLabeled.v *)
-Lemma Timeout_enabled_when_open_stabilize_request_to_dead_node :
-  forall occ h st dst,
-    live_node (occ_gst occ) h ->
-    sigma (occ_gst occ) h = Some st ->
-    open_stabilize_request_to (occ_gst occ) h dst ->
-    In dst (failed_nodes (occ_gst occ)) ->
-    (forall m, ~ In (dst, (h, m)) (msgs (occ_gst occ))) ->
-    l_enabled (Timeout h (Request dst GetPredAndSuccs) DetectFailure) occ.
+Lemma request_always_effective :
+  forall s eff h dst dstp q msg msg' st,
+    lb_execution s ->
+    now (occurred (Timeout h (Request dst msg) eff)) s ->
+    sigma (occ_gst (hd s)) h = Some st ->
+    cur_request st = Some (dstp, q, msg') ->
+    addr_of dstp = dst ->
+    eff = DetectFailure.
 Proof.
   intros.
-  break_live_node.
-  unfold open_stabilize_request_to in *; break_and; repeat break_exists.
-  destruct (timeout_handler_l h st (Request dst GetPredAndSuccs))
-    as [[[[st' ms] nts] cts] l] eqn:H_thl.
-  copy_apply timeout_handler_l_definition H_thl; expand_def.
-  assert (x2 = DetectFailure).
-  {
-    find_copy_apply_lem_hyp timeout_handler_eff_definition; expand_def; try congruence.
-    find_apply_lem_hyp request_timeout_handler_definition; expand_def.
-    - now find_injection.
-    - repeat find_rewrite.
-      repeat find_injection.
-      simpl in *.
-      congruence.
-    - congruence.
-  }
-  subst.
-  repeat find_rewrite.
-
-  eexists; repeat find_reverse_rewrite; eapply LTimeout; eauto.
-  eapply Request_needs_dst_dead_and_no_msgs; eauto.
+  do 2 destruct s.
+  simpl in *.
+  inv_prop lb_execution.
+  inv_prop occurred.
+  repeat find_reverse_rewrite.
+  inv_labeled_step; clean_up_labeled_step_cases.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
+    try congruence.
+  find_apply_lem_hyp request_timeout_handler_definition; expand_def;
+    congruence.
 Qed.
-
-Lemma timeout_Request_to_dead_node_eventually_fires :
-  forall ex h dst,
-    lb_execution ex ->
-    reachable_st (occ_gst (infseq.hd ex)) ->
-    weak_local_fairness ex ->
-    In dst (failed_nodes (occ_gst (hd ex))) ->
-    now (fun occ =>
-           exists st,
-             sigma (occ_gst occ) h = Some st /\
-             open_stabilize_request_to (occ_gst occ) h dst)
-        ex ->
-    exists p,
-      until (next (now (fun occ => forall st,
-                      In dst (failed_nodes (occ_gst occ)) ->
-                      sigma (occ_gst occ) h = Some st ->
-                      open_stabilize_request_to (occ_gst occ) h dst)))
-            (now (occurred (Timeout h (Request dst p) DetectFailure)))
-            ex.
-Proof.
-  intros.
-  destruct ex; simpl in *; break_exists; break_and.
-  unfold open_stabilize_request_to in *; break_and.
-  exists GetPredAndSuccs.
-  match goal with
-  | [ |- until ?P ?Q ?ex ] =>
-    cut (weak_until P Q ex)
-  end.
-  - intros.
-    find_apply_lem_hyp classical.weak_until_until_or_always.
-    break_or_hyp; [assumption|].
-    exfalso.
-    cut ((cont_enabled (Timeout h (Request dst GetPredAndSuccs) DetectFailure)) ex).
-    + intros.
-      find_apply_lem_hyp weak_local_fairness_invar.
-      unfold weak_local_fairness in *.
-      find_apply_hyp_hyp.
-      unfold inf_occurred, inf_often in *.
-      destruct ex.
-      find_apply_lem_hyp always_now.
-      specialize (H1 (Timeout h (Request dst GetPredAndSuccs) DetectFailure)).
-      find_eapply_lem_hyp lb_execution_invar.
-      find_eapply_lem_hyp always_Cons; break_and.
-      induction H7.
-      * do 2 destruct s.
-        find_copy_apply_lem_hyp always_Cons.
-        break_and.
-        find_copy_apply_lem_hyp always_now.
-        simpl in *.
-        do 2 match goal with
-        | [ H : (lb_execution _) |- _ ] =>
-          inv H
-        end.
-        match goal with
-        | [ H : occurred ?t ?occ |- _ ] =>
-          unfold occurred in H
-        end.
-        repeat find_reverse_rewrite.
-        match goal with
-        | [ H : labeled_step_dynamic _ (Timeout _ _ _) _ |- _ ] =>
-          invc H; clean_up_labeled_step_cases
-        end.
-        admit.
-      * apply IHeventually; eauto using lb_execution_invar.
-        -- admit.
-        -- find_apply_lem_hyp always_Cons; tauto.
-        -- find_apply_lem_hyp always_Cons; tauto.
-    + admit.
-      (* can get this by showing that eventually all messages from a dead node
-      are delivered and that we can then use
-      Timeout_enabled_when_open_stabilize_request_to_dead_node. *)
-  - admit.
-Admitted.
 
 Lemma recv_handler_label_is_RecvMsg :
   forall h st src m res l,
@@ -1108,21 +962,8 @@ Lemma open_stabilize_request_eventually_decreases_error :
 
     leading_failed_succs h (occ_gst (hd ex)) > 0 ->
     open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
-    until
-      (next (now (fun occ => open_stabilize_request_to_first_succ (occ_gst occ) h)))
-      (consecutive (measure_decreasing (leading_failed_succs h))) ex.
+    eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
 Proof.
-  intros.
-  find_copy_eapply_lem_hyp leading_failed_succs_nonzero_means_dead_succ.
-  break_exists_name st; break_and; break_exists_name dead; break_exists; break_and.
-  find_copy_eapply_lem_hyp open_stabilize_request_to_first_succ_elim; eauto.
-  inv_prop open_stabilize_request_to; expand_def.
-  repeat find_rewrite.
-  find_inversion.
-  find_copy_eapply_lem_hyp timeout_Request_to_dead_node_eventually_fires; eauto using strong_local_fairness_weak;
-    [|destruct ex; simpl in *; eexists; firstorder eauto].
-  break_exists.
-  eapply until_monotonic; [| |eauto].
 Abort.
 
 Theorem phase_one_nonzero_error_causes_measure_drop :

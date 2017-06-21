@@ -21,6 +21,8 @@ Require Chord.ChordSemantics.
 Import Chord.ChordSemantics.ChordSemantics.
 Import Chord.ChordSemantics.ConstrainedChord.
 Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.Measure.
+Require Import Chord.InfSeqTactics.
 
 (* assuming sigma gst h = Some st *)
 Definition failed_successors (gst : global_state) (st : data) : list pointer :=
@@ -1360,8 +1362,7 @@ Proof.
       in *.
     repeat break_match; repeat tuple_inversion; simpl in *; in_crush; try congruence; admit.
     }
-  unfold timeout_handler_eff, tick_handler, add_tick, start_query, timeouts_in in *.
-  find_apply_lem_hyp timeout_handler_definition. expand_def.
+  find_apply_lem_hyp timeout_handler_eff_definition. expand_def.
   - find_apply_lem_hyp tick_handler_definition. expand_def.
     +
 Admitted.
@@ -1447,6 +1448,262 @@ Proof.
   induction 1.
   - break_exists_exists. now constructor.
   - break_exists_exists. now constructor.
+Qed.
+
+Inductive request_msg_for_query : query -> payload -> Prop :=
+| RectifyMsg : forall p, request_msg_for_query (Rectify p) Ping
+| StabilizeMsg : request_msg_for_query Stabilize GetPredAndSuccs
+| Stabilize2Msg : forall p, request_msg_for_query (Stabilize2 p) GetSuccList
+| JoinGetBestPredecessor : forall k p, request_msg_for_query (Join k) (GetBestPredecessor p)
+| JoinGetSuccList : forall k, request_msg_for_query (Join k) GetSuccList
+| Join2Msg : forall s, request_msg_for_query (Join2 s) GetSuccList.
+
+Definition open_request_to (gst : global_state) (h : addr) (dst : addr) (m : payload) : Prop :=
+  In (Request dst m) (timeouts gst h) /\
+  In (h, (dst, m)) (msgs gst) /\
+  exists q st dstp,
+    request_msg_for_query q m /\
+    sigma gst h = Some st /\
+    addr_of dstp = dst /\
+    cur_request st = Some (dstp, q, m).
+
+Lemma Timeout_enabled_when_open_request_to_dead_node :
+  forall occ h st dst req,
+    live_node (occ_gst occ) h ->
+    sigma (occ_gst occ) h = Some st ->
+    open_request_to (occ_gst occ) h dst req ->
+    In dst (failed_nodes (occ_gst occ)) ->
+    (forall res, request_response_pair req res -> ~ In (dst, (h, res)) (msgs (occ_gst occ))) ->
+    l_enabled (Timeout h (Request dst req) DetectFailure) occ.
+Proof.
+  intros.
+  break_live_node.
+  
+  destruct (timeout_handler_l h st (Request dst req))
+    as [[[[st' ms] nts] cts] l] eqn:H_thl.
+  copy_apply timeout_handler_l_definition H_thl; expand_def.
+  inv_prop open_request_to; expand_def.
+  find_copy_apply_lem_hyp timeout_handler_eff_definition; expand_def; try congruence.
+  find_copy_apply_lem_hyp request_timeout_handler_definition; expand_def; try congruence.
+  repeat find_rewrite.
+  repeat find_injection.
+  eexists; repeat find_rewrite; eapply LTimeout; eauto.
+  eapply Request_needs_dst_dead_and_no_msgs; eauto.
+Qed.
+
+Lemma open_request_to_preserved_state_msgs_timeouts :
+  forall gst gst' h dst req,
+    open_request_to gst h dst req ->
+    sigma gst h = sigma gst' h ->
+    timeouts gst h = timeouts gst' h ->
+    (forall m, In m (channel gst h dst) -> In m (channel gst' h dst)) ->
+    open_request_to gst' h dst req.
+Proof.
+  unfold open_request_to.
+  intros; break_and; break_exists; break_and.
+  repeat find_rewrite.
+  repeat split.
+  - auto.
+  - find_apply_lem_hyp channel_contents.
+    apply channel_contents.
+    auto.
+  - repeat eexists; eauto.
+Qed.
+
+Lemma open_request_to_dead_node_preserved_or_times_out :
+  forall gst l gst' h dst req,
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    In dst (failed_nodes gst) ->
+    open_request_to gst h dst req ->
+    open_request_to gst' h dst req \/
+    Timeout h (Request dst req) DetectFailure = l.
+Proof.
+Admitted.
+
+Lemma in_active_in_nodes :
+  forall h gst,
+    In h (active_nodes gst) ->
+    In h (nodes gst).
+Proof.
+  unfold active_nodes.
+  eauto using RemoveAll.in_remove_all_was_in.
+Qed.
+
+Lemma in_active_not_failed :
+  forall h gst,
+    In h (active_nodes gst) ->
+    ~ In h (failed_nodes gst).
+Proof.
+  unfold active_nodes.
+  eauto using RemoveAll.in_remove_all_not_in.
+Qed.
+
+Lemma in_nodes_not_failed_in_active :
+  forall h gst,
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    In h (active_nodes gst).
+Proof.
+  eauto using RemoveAll.in_remove_all_preserve.
+Qed.
+
+Lemma active_nodes_invar :
+  forall h gst l gst',
+    In h (active_nodes gst) ->
+    labeled_step_dynamic gst l gst' ->
+    In h (active_nodes gst').
+Proof.
+  intros.
+  apply in_nodes_not_failed_in_active;
+    eauto using nodes_never_removed, in_active_in_nodes, failed_nodes_never_added, in_active_not_failed.
+Qed.
+
+Lemma lb_execution_step_one_cons :
+  forall o ex,
+    lb_execution (Cons o ex) ->
+    labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst (hd ex)).
+Proof.
+  intros.
+  destruct ex.
+  now inv_lb_execution.
+Qed.
+
+Lemma lb_execution_two_cons :
+  forall ex,
+    lb_execution ex ->
+    labeled_step_dynamic (occ_gst (hd ex)) (occ_label (hd ex)) (occ_gst (hd (tl ex))).
+Proof.
+  intros.
+  do 2 destruct ex.
+  now inv_lb_execution.
+Qed.
+
+Ltac invar_eauto :=
+  eauto using
+        lb_execution_invar,
+        strong_local_fairness_invar,
+        live_node_invariant,
+        labeled_step_is_unlabeled_step,
+        reachableStep,
+        lb_execution_step_one_cons.
+
+Lemma open_request_until_timeout :
+  forall h dst req ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+
+    In h (active_nodes (occ_gst (hd ex))) ->
+    In dst (failed_nodes (occ_gst (hd ex))) ->
+    open_request_to (occ_gst (hd ex)) h dst req ->
+
+    weak_until (now (fun occ => open_request_to (occ_gst occ) h dst req))
+               (now (occurred (Timeout h (Request dst req) DetectFailure)))
+               ex.
+Proof.
+  intros h dst req.
+  cofix c.
+  destruct ex.
+  intros.
+  inv_prop lb_execution.
+  find_copy_eapply_lem_hyp open_request_to_dead_node_preserved_or_times_out;
+    (* eauto will grab the coinduction hypothesis if we don't do something like this *)
+    match goal with
+    | |- weak_until _ _ _ => idtac
+    | _ => eauto using in_active_in_nodes, in_active_not_failed
+    end.
+  break_or_hyp.
+  - apply W_tl; [assumption|].
+    apply c;
+      invar_eauto;
+      eauto using active_nodes_invar, failed_nodes_never_removed.
+  - now apply W0.
+Qed.
+
+Lemma dead_node_channel_empties_out :
+  forall ex dead h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    weak_local_fairness ex ->
+    continuously (now (fun occ => channel (occ_gst occ) dead h = [])) ex.
+Proof.
+Admitted.
+
+Lemma live_node_in_active :
+  forall h gst,
+    live_node gst h ->
+    In h (active_nodes gst).
+Proof.
+  intros.
+  inv_prop live_node; expand_def.
+  eapply in_nodes_not_failed_in_active; auto.
+Qed.
+
+Lemma request_eventually_fires :
+  forall h dst req ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    weak_local_fairness ex ->
+
+    live_node (occ_gst (hd ex)) h ->
+    In dst (failed_nodes (occ_gst (hd ex))) ->
+    open_request_to (occ_gst (hd ex)) h dst req ->
+
+    eventually (now (occurred (Timeout h (Request dst req) DetectFailure))) ex.
+Proof.
+  intros.
+  find_apply_lem_hyp open_request_until_timeout; auto using live_node_in_active.
+  find_apply_lem_hyp weak_until_until_or_always.
+  break_or_hyp; [eauto using until_eventually|].
+  find_copy_apply_lem_hyp (dead_node_channel_empties_out ex dst h); auto.
+  find_apply_lem_hyp always_continuously.
+  destruct ex. apply always_now.
+  match goal with
+  | H : weak_local_fairness _ |- _ => apply H
+  end.
+  assert (continuously
+            (now (fun occ => open_request_to (occ_gst occ) h dst req) /\_
+             now (fun occ => channel (occ_gst occ) dst h = []) /\_
+             (fun ex => lb_execution ex /\
+                     now (fun occ => live_node (occ_gst occ) h /\
+                                  In dst (failed_nodes (occ_gst occ))) ex))
+            (Cons o ex)).
+  {
+    apply continuously_and_tl; auto.
+    apply continuously_and_tl; auto.
+    apply E0.
+    apply always_inv; [|firstorder].
+    intros.
+    split; break_and; eauto using lb_execution_invar.
+    destruct s.
+    inv_prop lb_execution; simpl in *; break_and.
+    split.
+    - eapply live_node_invariant; eauto.
+    - eapply failed_nodes_never_removed; eauto.
+  }
+  eapply continuously_monotonic; [|eauto].
+  intros.
+  destruct s.
+  do 2 invcs_prop and_tl.
+  repeat break_and.
+  inv_prop live_node; expand_def.
+  eapply Timeout_enabled_when_open_request_to_dead_node; eauto.
+  intros.
+  rewrite channel_contents.
+  find_rewrite.
+  tauto.
+Qed.
+
+Lemma live_node_is_active :
+  forall gst h,
+    live_node gst h ->
+    In h (active_nodes gst).
+Proof.
+  intros.
+  inv_prop live_node; expand_def.
+  apply in_nodes_not_failed_in_active; auto.
 Qed.
 
 Lemma unconstrained_timeout_eventually_occurred :

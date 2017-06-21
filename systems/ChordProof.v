@@ -452,6 +452,23 @@ Proof using.
       congruence || eauto using live_node_characterization.
 Qed.
 
+Theorem having_st_means_node :
+  forall gst h st,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    In h (nodes gst).
+Proof.
+Admitted.
+
+Theorem nodes_have_st :
+  forall gst h,
+    reachable_st gst ->
+    In h (nodes gst) ->
+    exists st,
+      sigma gst h = Some st.
+Proof.
+Admitted.
+
 (* transitive closure of best_succ *)
 (* treat as opaque *)
 Inductive reachable (gst : global_state) : addr -> addr -> Prop :=
