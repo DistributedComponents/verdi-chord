@@ -1218,8 +1218,17 @@ Definition pred_and_first_succ_correct (gst : global_state) (h : pointer) (st : 
   pred_correct gst h (pred st) /\
   first_succ_correct gst h (hd_error (succ_list st)).
 
-Definition pred_and_first_succ_error (gst : global_state) (h : pointer) (st : data) : nat :=
-  pred_error gst h (pred st) + first_succ_error gst h (hd_error (succ_list st)).
+Definition pred_and_first_succ_error (h : addr) (gst : global_state) : nat :=
+  match sigma gst h with
+  | Some st =>
+    pred_error gst (make_pointer h) (pred st) +
+    first_succ_error gst (make_pointer h) (hd_error (succ_list st))
+  | None =>
+    length (active_nodes gst) + 1
+  end.
+
+Definition phase_two_error : global_state -> nat :=
+  global_measure pred_and_first_succ_error.
 
 Definition preds_and_first_succs_correct (gst : global_state) : Prop :=
   forall h st,
@@ -1227,19 +1236,11 @@ Definition preds_and_first_succs_correct (gst : global_state) : Prop :=
     sigma gst (addr_of h) = Some st ->
     pred_and_first_succ_correct gst h st.
 
-Definition total_measure (local_measure : pointer -> data -> nat) (gst : global_state) :=
-  sum (map (fun pair => let '(h, st) := pair in
-                     local_measure h st)
-           (live_ptrs_with_states gst)).
-
-Definition total_pred_and_first_succ_error (gst : global_state) : nat :=
-  total_measure (pred_and_first_succ_error gst) gst.
-
 Lemma phase_two_zero_error_locally_correct :
   forall gst h st,
     live gst h ->
     sigma gst (addr_of h) = Some st ->
-    pred_and_first_succ_error gst h st = 0 ->
+    pred_and_first_succ_error (addr_of h) gst = 0 ->
     pred_and_first_succ_correct gst h st.
 Proof.
 Admitted.
@@ -1285,18 +1286,10 @@ Qed.
 
 Lemma phase_two_zero_error_correct :
   forall gst,
-    total_pred_and_first_succ_error gst = 0 ->
+    phase_two_error gst = 0 ->
     preds_and_first_succs_correct gst.
 Proof.
-  unfold total_pred_and_first_succ_error, preds_and_first_succs_correct.
-  intros.
-  apply phase_two_zero_error_locally_correct; eauto.
-  eapply sum_of_nats_zero_means_all_zero; eauto.
-  eapply in_map_iff; exists (h, st); split.
-  - auto.
-  - apply live_In_live_ptrs_with_states; auto.
-    now inv_prop live.
-Qed.
+Admitted.
 
 (* This is really an invariant. *)
 Lemma phase_two_error_stable :
@@ -1305,7 +1298,7 @@ Lemma phase_two_error_stable :
     reachable_st (occ_gst (hd ex)) ->
     continuously
       (consecutive
-         (measure_nonincreasing total_pred_and_first_succ_error))
+         (measure_nonincreasing phase_two_error))
       ex.
 Proof.
 Admitted.
@@ -1317,7 +1310,7 @@ Lemma phase_two_error_decreasing :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    always (zero_or_eventually_decreasing total_pred_and_first_succ_error) ex.
+    always (zero_or_eventually_decreasing phase_two_error) ex.
 Proof.
 Admitted.
 
@@ -1360,14 +1353,20 @@ Fixpoint succs_error_helper (gst : global_state) (h : pointer) (xs ys : list poi
     else suffix_len
   end.
 
-Definition succs_error (gst : global_state) (h : pointer) (st : data) :=
-  succs_error_helper gst h [] (succ_list st) Chord.SUCC_LIST_LEN.
+Definition succs_error (h : addr) (gst : global_state) :=
+  match sigma gst h with
+  | Some st =>
+    succs_error_helper gst (make_pointer h) [] (succ_list st) Chord.SUCC_LIST_LEN
+  | None =>
+    Chord.SUCC_LIST_LEN + 1
+  end.
 
-Definition total_succs_error (gst : global_state) :=
-  total_measure (succs_error gst) gst.
+Definition phase_three_error : global_state -> nat :=
+  global_measure succs_error.
 
 Definition correct_succs (gst : global_state) (h : pointer) (st : data) : Prop :=
   forall s xs ys s',
+    wf_ptr h ->
     succ_list st = xs ++ s :: ys ->
     ptr_between h s' s ->
     live gst s' ->
@@ -1382,7 +1381,7 @@ Definition all_succs_correct (gst : global_state) : Prop :=
 
 Lemma succs_error_zero_locally_correct :
   forall gst h st,
-    succs_error gst h st = 0 ->
+    succs_error (addr_of h) gst = 0 ->
     correct_succs gst h st.
 Proof.
 Admitted.
