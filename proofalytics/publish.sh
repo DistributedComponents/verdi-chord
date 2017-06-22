@@ -45,7 +45,7 @@ function mkindex {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Verdi Aggregation Proofalytics</title>
+  <title>Verdi Chord Proofalytics</title>
   <style>
     html {
       font-family: sans-serif;
@@ -86,7 +86,7 @@ function mkindex {
   </style>
 </head>
 <body>
-  <h1>Verdi Proofalytics</h1>
+  <h1>Verdi Chord Proofalytics</h1>
   <ul>
 EOF
   for rep in $(ls -r | grep 'PA-*'); do

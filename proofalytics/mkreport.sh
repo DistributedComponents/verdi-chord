@@ -23,7 +23,7 @@ function mkindex {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Verdi Proofalytics</title>
+  <title>Verdi Chord Proofalytics</title>
   <style>
     html {
       font-family: sans-serif;
@@ -218,7 +218,7 @@ function mkindex {
   </script>
 </head>
 <body>
-  <h1>Verdi Proofalytics</h1>
+  <h1>Verdi Chord Proofalytics</h1>
   <ul id='nav'><li>
     <a href='#proof-times'>Proof Times</a>
   </li><li>
@@ -237,7 +237,7 @@ function mkindex {
   </tr><tr>
     <td class='cfg-fld'>Commit</td>
     <td>
-      <a href='https://github.com/uwplse/verdi/commit/$COMMIT'>
+      <a href='https://github.com/DistributedComponents/verdi-chord/commit/$COMMIT'>
       $COMMIT</a>
     </td>
   </tr><tr>
