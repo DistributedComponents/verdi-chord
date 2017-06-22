@@ -12,7 +12,7 @@ The predecessor relation remains a partial function.
 (-).pred : joined_node -> option joined_node
 ```
 
-We write `a --> s` for `a.succ = s` and `p <~~ a` for `a.pred = p`.
+We write `a --> s` for `a.succ = s` and `p <~~ a` for `a.pred = Some p`.
 
 The error measure for `a --> s` is the number of nodes between `a` and `s` in
 identifier order. Likewise, the error measure for `p <~~ a` is the number of
