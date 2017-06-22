@@ -68,3 +68,24 @@ Lemma nodes_have_nonempty_succ_lists :
     nonempty_succ_lists gst.
 Proof.
 Admitted.
+
+Theorem stabilize_only_with_first_succ :
+  forall gst h st dst,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    In (Request dst GetPredAndSuccs) (timeouts gst h) ->
+    exists s,
+      addr_of s = dst /\
+      cur_request st = Some (s, Stabilize, GetPredAndSuccs) /\
+      hd_error (succ_list st) = Some s.
+Proof.
+Admitted.
+
+Theorem nodes_not_joined_have_no_successors :
+  forall gst h st,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    joined st = false ->
+    succ_list st = [].
+Proof.
+Admitted.

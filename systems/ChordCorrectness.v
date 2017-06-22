@@ -476,6 +476,7 @@ Qed.
 
 Ltac invar_eauto :=
   eauto using
+        always_invar,
         lb_execution_invar,
         strong_local_fairness_invar,
         live_node_invariant,
@@ -769,15 +770,84 @@ Definition has_dead_first_succ (gst : global_state) (h : addr) (s : pointer) :=
       succ_list st = s :: rest /\
       In (addr_of s) (failed_nodes gst).
 
-Lemma stabilize_Request_timeout_decreases_error :
-  forall ex h s dst p,
+Lemma has_dead_first_succ_intro :
+  forall gst h s st rest,
+    sigma gst h = Some st ->
+    succ_list st = s :: rest ->
+    In (addr_of s) (failed_nodes gst) ->
+    has_dead_first_succ gst h s.
+Proof.
+  firstorder eauto.
+Qed.
+
+(* TODO(ryan) move to structtact *)
+Lemma hd_error_tl_exists :
+  forall A (l : list A) x,
+    hd_error l = Some x ->
+    exists tl,
+      l = x :: tl.
+Proof.
+  intros.
+  destruct l; simpl in *.
+  - congruence.
+  - eexists; solve_by_inversion.
+Qed.
+
+Lemma stabilize_timeout_means_successor_dead :
+  forall ex h dst,
     lb_execution ex ->
-    has_dead_first_succ ex.(hd).(occ_gst) h s ->
+    reachable_st (occ_gst (hd ex)) ->
+    now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)) ex ->
+    exists s,
+      addr_of s = dst /\
+      has_dead_first_succ ex.(hd).(occ_gst) h s.
+Proof.
+  intros.
+  destruct ex as [o [o' ex]].
+  simpl in *.
+  unfold occurred in *.
+  inv_prop lb_execution.
+  repeat find_reverse_rewrite.
+  inv_labeled_step; clean_up_labeled_step_cases.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def;
+    try congruence.
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
+    try congruence.
+  repeat find_rewrite; find_injection.
+  inv_prop timeout_constraint.
+  find_eapply_lem_hyp stabilize_only_with_first_succ; eauto; break_exists_exists.
+  firstorder.
+  eexists; firstorder eauto.
+  find_apply_lem_hyp hd_error_tl_exists; break_exists_exists; firstorder.
+  now find_rewrite.
+Qed.
+
+Lemma open_request_until_timeout :
+  forall ex h dst,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+
     open_stabilize_request_to ex.(hd).(occ_gst) h dst ->
-    now (occurred (Timeout h (Request dst p) DetectFailure)) ex ->
+    weak_until (now (fun occ => open_stabilize_request_to (occ_gst occ) h dst) /\_
+                ~_ now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
+               (now (fun occ => open_stabilize_request_to (occ_gst occ) h dst) /\_
+                now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
+               ex.
+Proof.
+Admitted.
+
+Lemma stabilize_Request_timeout_decreases_error :
+  forall ex h dst,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+
+    open_stabilize_request_to ex.(hd).(occ_gst) h dst ->
+    now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)) ex ->
     consecutive (measure_decreasing (leading_failed_succs h)) ex.
 Proof.
   intros.
+  find_copy_eapply_lem_hyp stabilize_timeout_means_successor_dead; eauto.
+  break_exists_name s; break_and.
   inv_prop has_dead_first_succ; expand_def.
   destruct ex as [o [o' ex]].
   find_copy_eapply_lem_hyp stabilize_Request_timeout_removes_succ; eauto.
@@ -882,23 +952,6 @@ Theorem phase_one_error_continuously_nonincreasing :
 Proof.
 Admitted.
 
-(* TODO(ryan) move to Measure *)
-Lemma sum_nonzero_implies_addend_nonzero :
-  forall l,
-    sum l > 0 ->
-    exists x,
-      In x l /\
-      x > 0.
-Proof.
-  induction l as [|hd rest].
-  - cbn.
-    intros; omega.
-  - intros; rewrite sum_cons in *.
-    destruct hd eqn:?H.
-    + firstorder.
-    + exists hd; firstorder.
-Qed.
-
 Lemma succ_list_leading_failed_nodes_nonzero_means_dead_succ :
   forall failed succs,
     succ_list_leading_failed_nodes failed succs > 0 ->
@@ -951,6 +1004,36 @@ Proof.
   apply leading_failed_succs_nonzero_means_dead_succ; omega.
 Qed.
 
+Lemma has_dead_first_succ_implies_error_nonzero :
+  forall gst h s,
+    has_dead_first_succ gst h s ->
+    leading_failed_succs h gst > 0.
+Proof.
+  unfold has_dead_first_succ.
+  intros.
+  expand_def.
+  unfold leading_failed_succs, succ_list_leading_failed_nodes.
+  repeat find_rewrite.
+  break_if; [|exfalso];
+    auto with arith.
+Qed.
+
+(* TODO(ryan) move to infseq *)
+Lemma weak_until_latch_eventually :
+  forall T (P Q : infseq T -> Prop) ex,
+    weak_until (P /\_ ~_ Q) (P /\_ Q) ex ->
+    eventually Q ex ->
+    eventually (P /\_ Q) ex.
+Proof.
+  induction 2.
+  - inv_prop weak_until.
+    + now apply E0.
+    + exfalso; firstorder.
+  - inv_prop weak_until.
+    + now apply E0.
+    + eauto using E_next.
+Qed.
+
 Lemma open_stabilize_request_eventually_decreases_error :
   forall ex h,
     lb_execution ex ->
@@ -964,7 +1047,67 @@ Lemma open_stabilize_request_eventually_decreases_error :
     open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
     eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
 Proof.
-Abort.
+  intros.
+  find_copy_apply_lem_hyp leading_failed_succs_nonzero_means_dead_succ; expand_def.
+  assert (exists s, has_dead_first_succ (occ_gst (hd ex)) h s)
+    by (repeat eexists; eauto); break_exists_name s.
+  unfold open_stabilize_request_to_first_succ in *.
+  find_copy_apply_hyp_hyp.
+  find_copy_eapply_lem_hyp open_request_until_timeout; eauto.
+  find_copy_apply_lem_hyp request_eventually_fires;
+    eauto using strong_local_fairness_weak.
+  find_copy_apply_lem_hyp eventually_weak_until_cumul; eauto.
+  find_copy_apply_lem_hyp reachable_st_always; auto.
+  eapply eventually_monotonic; [| | eauto | eauto]; intros.
+  - invar_eauto.
+  - invc_prop always.
+    unfold and_tl in *; break_and.
+    invcs_prop weak_until; break_and;
+      destruct s0;
+      eapply stabilize_Request_timeout_decreases_error; eauto.
+  - eapply weak_until_latch_eventually; eauto.
+Qed.
+
+Lemma nonzero_error_eventually_drops :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+
+    live_node (occ_gst (hd ex)) h ->
+    leading_failed_succs h (occ_gst (hd ex)) > 0 ->
+
+    eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
+Proof.
+  intros.
+  find_copy_eapply_lem_hyp start_stabilize_with_first_successor_eventually; eauto.
+  induction 0.
+  - destruct s.
+    eapply open_stabilize_request_eventually_decreases_error; eauto.
+  - destruct s as [o' s].
+    destruct (leading_failed_succs h (occ_gst o')) eqn:?H.
+    + apply E0.
+      simpl in *.
+      unfold measure_decreasing.
+      omega.
+    + apply E_next.
+      apply IHeventually; invar_eauto.
+      simpl; omega.
+Qed.
+
+Lemma nonempty_succ_list_implies_joined :
+  forall gst h st s rest,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    succ_list st = s :: rest ->
+    joined st = true.
+Proof.
+  intros.
+  destruct (joined st) eqn:?H;
+    [|find_apply_lem_hyp nodes_not_joined_have_no_successors; auto];
+    congruence.
+Qed.
 
 Theorem phase_one_nonzero_error_causes_measure_drop :
   forall ex,
@@ -972,11 +1115,23 @@ Theorem phase_one_nonzero_error_causes_measure_drop :
     reachable_st (occ_gst (infseq.hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    continuously (nonzero_error_causes_measure_drop leading_failed_succs) ex.
+    always (nonzero_error_causes_measure_drop leading_failed_succs) ex.
 Proof.
+  cofix c.
   intros.
-  unfold nonzero_error_causes_measure_drop.
-Admitted.
+  destruct ex.
+  constructor.
+  - intro.
+    find_copy_apply_lem_hyp phase_one_error_nonzero_means_dead_succ.
+    break_exists_exists; expand_def.
+    split; auto using in_nodes_not_failed_in_active.
+    eapply nonzero_error_eventually_drops; eauto.
+    + find_eapply_lem_hyp nonempty_succ_list_implies_joined;
+        eauto using live_node_characterization.
+    + eauto using has_dead_first_succ_intro, has_dead_first_succ_implies_error_nonzero.
+  - simpl.
+    apply c; invar_eauto.
+Qed.
 
 Theorem phase_one_continuously :
   forall ex,
@@ -990,7 +1145,7 @@ Proof.
   eapply continuously_zero_total_leading_failed_nodes_implies_phase_one; eauto.
   eapply local_measure_causes_measure_zero_continuosly; eauto.
   - eapply phase_one_error_continuously_nonincreasing; eauto.
-  - eapply phase_one_nonzero_error_causes_measure_drop; eauto.
+  - eauto using always_continuously, phase_one_nonzero_error_causes_measure_drop.
 Qed.
 
 (** In phase two we want to talk about the existence and number of better

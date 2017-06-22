@@ -398,6 +398,43 @@ Section LocalMeasure.
     auto with arith.
   Qed.
 
+  Lemma sum_cons :
+    forall n l,
+      sum (n :: l) = n + sum l.
+  Proof.
+    unfold sum.
+    intros; simpl.
+    now rewrite fold_left_acc_comm.
+  Qed.
+
+  Lemma sum_app :
+    forall l l',
+      sum (l ++ l') = sum l + sum l'.
+  Proof.
+    unfold sum.
+    intros; simpl.
+    now rewrite fold_left_app, fold_left_acc_comm.
+  Qed.
+
+  Lemma sum_disjoint :
+    forall xs x ys,
+      sum (xs ++ x :: ys) = sum xs + x + sum ys.
+  Proof.
+    intros.
+    now rewrite sum_app, sum_cons, Nat.add_assoc.
+  Qed.
+
+  Lemma sum_map_mono :
+    forall X (f g : X -> nat) l,
+      (forall x, In x l -> f x <= g x) ->
+      sum (map f l) <= sum (map g l).
+  Proof.
+    intros.
+    induction l; [auto|].
+    rewrite !map_cons, !sum_cons.
+    apply Nat.add_le_mono; auto with datatypes.
+  Qed.
+
   (* TODO(ryan) move to structtact *)
   Theorem list_strong_ind :
     forall A (P : list A -> Prop),
@@ -458,6 +495,22 @@ Section LocalMeasure.
     inv_prop Forall; auto.
   Qed.
 
+  Lemma sum_nonzero_implies_addend_nonzero :
+    forall l,
+      sum l > 0 ->
+      exists x,
+        In x l /\
+        x > 0.
+  Proof.
+    induction l as [|hd rest].
+    - cbn.
+      intros; omega.
+    - intros; rewrite sum_cons in *.
+      destruct hd eqn:?H.
+      + firstorder.
+      + exists hd; firstorder.
+  Qed.
+
   Definition active_node (gst : global_state) (h : addr) :=
     In h (nodes gst) /\
     ~ In h (failed_nodes gst).
@@ -515,43 +568,6 @@ Section LocalMeasure.
       eapply sum_of_nats_zero_means_all_zero; eauto.
       change (|x in gst|) with ((fun y => |y in gst|) x).
       now apply in_map.
-  Qed.
-
-  Lemma sum_cons :
-    forall n l,
-      sum (n :: l) = n + sum l.
-  Proof.
-    unfold sum.
-    intros; simpl.
-    now rewrite fold_left_acc_comm.
-  Qed.
-
-  Lemma sum_app :
-    forall l l',
-      sum (l ++ l') = sum l + sum l'.
-  Proof.
-    unfold sum.
-    intros; simpl.
-    now rewrite fold_left_app, fold_left_acc_comm.
-  Qed.
-
-  Lemma sum_disjoint :
-    forall xs x ys,
-      sum (xs ++ x :: ys) = sum xs + x + sum ys.
-  Proof.
-    intros.
-    now rewrite sum_app, sum_cons, Nat.add_assoc.
-  Qed.
-
-  Lemma sum_map_mono :
-    forall X (f g : X -> nat) l,
-      (forall x, In x l -> f x <= g x) ->
-      sum (map f l) <= sum (map g l).
-  Proof.
-    intros.
-    induction l; [auto|].
-    rewrite !map_cons, !sum_cons.
-    apply Nat.add_le_mono; auto with datatypes.
   Qed.
 
   Lemma measure_mono :

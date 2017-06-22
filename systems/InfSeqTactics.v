@@ -19,9 +19,8 @@ Ltac accum_and_tl H P Q rest ex :=
   let H' := fresh in
   rename H into H';
   assert (H: forall ex, (and_tl Q P) ex -> rest)
-    by firstorder;
+    by (intros; invcs_prop and_tl; auto);
   clear H'.
-
 
 Ltac prep_eventually_monotonic :=
   repeat lazymatch goal with
