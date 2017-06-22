@@ -1626,6 +1626,7 @@ Lemma dead_node_channel_empties_out :
   forall ex dead h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
+    In dead (failed_nodes (occ_gst (hd ex))) ->
     weak_local_fairness ex ->
     continuously (now (fun occ => channel (occ_gst occ) dead h = [])) ex.
 Proof.
