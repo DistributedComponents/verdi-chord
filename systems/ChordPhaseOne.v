@@ -39,7 +39,6 @@ Proof.
     + eauto using E_next.
 Qed.
 
-
 Definition has_dead_first_succ (gst : global_state) (h : addr) (s : pointer) :=
   exists st,
     sigma gst h = Some st /\
@@ -56,7 +55,6 @@ Lemma has_dead_first_succ_intro :
 Proof.
   firstorder eauto.
 Qed.
-
 
 (* cf. zave page 11 *)
 Definition first_succ_is_best_succ (gst : global_state) (h : addr) :=
@@ -528,7 +526,6 @@ Proof.
   destruct a; simpl in *; congruence.
 Qed.
 
-
 Lemma make_request_Stabilize_needs_succ_list :
   forall h st dst m,
     make_request h st Stabilize = Some (dst, m) ->
@@ -652,7 +649,6 @@ Proof.
     repeat find_rewrite.
     congruence.
 Qed.
-
 
 Lemma effective_Tick_occurred_sent_request :
   forall h ex,
