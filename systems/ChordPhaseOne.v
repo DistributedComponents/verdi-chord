@@ -19,6 +19,7 @@ Require Import Chord.ChordPromises.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.LiveNodesStayLive.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
