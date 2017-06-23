@@ -1577,6 +1577,7 @@ Qed.
 
 Ltac invar_eauto :=
   eauto using
+        always_invar,
         lb_execution_invar,
         strong_local_fairness_invar,
         live_node_invariant,

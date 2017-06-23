@@ -89,3 +89,29 @@ Theorem nodes_not_joined_have_no_successors :
     succ_list st = [].
 Proof.
 Admitted.
+
+Definition busy_if_live (h : addr) (occ : occurrence) :=
+  forall st,
+    live_node (occ_gst occ) h ->
+    sigma (occ_gst occ) h = Some st ->
+    cur_request st <> None.
+
+Definition not_busy_if_live (h : addr) (occ : occurrence) :=
+  forall st,
+    live_node (occ_gst occ) h ->
+    sigma (occ_gst occ) h = Some st ->
+    cur_request st = None.
+
+(** the big assumption for inf_often stabilization *)
+Theorem queries_eventually_stop :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    busy_if_live h (hd ex) ->
+    always (~_ (now circular_wait)) ex ->
+    eventually (now (not_busy_if_live h)) ex.
+Proof.
+  (*         -____-   *)
+Admitted.
