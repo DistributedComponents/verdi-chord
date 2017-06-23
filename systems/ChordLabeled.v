@@ -2062,7 +2062,6 @@ Proof using.
   break_exists_name m'.
   now eapply queries_now_closed with (m:=m').
 Qed.
-Print Assumptions requests_eventually_complete.
 
 Lemma constrained_timeout_eventually_cleared :
   forall s,
