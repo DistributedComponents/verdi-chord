@@ -1504,6 +1504,15 @@ Proof.
   - repeat eexists; eauto.
 Qed.
 
+Lemma remove_all_add_back :
+  forall A eq_dec (x : A) l' l,
+    In x l ->
+    In x (l' ++ remove_all eq_dec l' l).
+Proof.
+  induction l'; intros; simpl in *; auto.
+  destruct (eq_dec a x); eauto using remove_preserve.
+Qed.
+
 Lemma open_request_to_dead_node_preserved_or_times_out :
   forall gst l gst' h dst req,
     reachable_st gst ->
@@ -1515,6 +1524,29 @@ Lemma open_request_to_dead_node_preserved_or_times_out :
     open_request_to gst' h dst req \/
     Timeout h (Request dst req) DetectFailure = l.
 Proof.
+  intros.
+  inv_labeled_step.
+  - admit.
+  - left. repeat unfold recv_handler_l, recv_handler,
+    handle_msg, do_delayed_queries,
+    clear_delayed_queries, tick_handler, keepalive_handler, do_rectify, request_timeout_handler,
+    handle_rectify, handle_query_req,
+    handle_query_req_busy, handle_query_res, start_query, delay_query,
+    schedule_rectify_with,
+    handle_stabilize,
+    add_tick,
+    update_query, update_succ_list,
+    end_query, clear_query
+      in *. repeat break_match; simpl in *; try discriminate.
+    + repeat find_inversion. simpl. unfold open_request_to in *.
+      simpl in *.
+      update_destruct; subst; rewrite_update; repeat find_rewrite; intuition.
+      * rewrite app_nil_r.
+        eauto using remove_all_add_back.
+      * in_crush. intuition. remember (fst (snd m)) as from. 
+        subst_max. simpl in *. congruence.
+      * in_crush.
+    +
 Admitted.
 
 Lemma in_active_in_nodes :
