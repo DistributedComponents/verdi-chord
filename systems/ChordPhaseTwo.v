@@ -256,21 +256,114 @@ Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
 Definition pred_or_succ_improves (h : pointer) : infseq occurrence -> Prop :=
   consecutive (measure_decreasing (pred_and_first_succ_error (addr_of h))).
 
-Lemma error_decreases_at_merge_point :
-  forall ex,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    always (~_ (now circular_wait)) ex ->
-    always (now phase_one) ex ->
+Section MergePoint.
+  Parameters j a b : pointer.
 
-    forall a b j,
+  Notation "x <=? y" := (unroll_between_ptr (addr_of j) x y) (at level 70).
+  Notation "x >=? y" := (unroll_between_ptr (addr_of j) y x) (at level 70).
+  Notation "x <? y" := (negb (unroll_between_ptr (addr_of j) y x)) (at level 70).
+  Notation "x >? y" := (negb (unroll_between_ptr (addr_of j) x y)) (at level 70).
+
+  (* TODO(ryan): get these two proofs out of here *)
+  Lemma unrolling_symmetry_cases :
+    forall h x y,
+      unroll_between h x y = true ->
+      unroll_between h y x = false \/
+      unroll_between h y x = true /\ x = y.
+  Proof.
+    intros.
+    destruct (unroll_between h y x) eqn:?H;
+      eauto using unrolling_antisymmetric.
+  Qed.
+  Lemma order_cases_le_gt :
+    forall x y,
+      x <=? y = true \/ x >? y = true.
+  Proof.
+    intros.
+    unfold unroll_between_ptr in *.
+    pose proof unrolling_total (ChordIDParams.hash (addr_of j)) (ptrId x) (ptrId y).
+    break_or_hyp.
+    - tauto.
+    - find_copy_apply_lem_hyp unrolling_symmetry_cases.
+      break_or_hyp.
+      + right.
+        now apply Bool.negb_true_iff.
+      + tauto.
+  Qed.
+
+  Lemma no_pred_merge_point :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+      
+      forall st,
+        merge_point (occ_gst (hd ex)) a b j ->
+        sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
+        pred st = None ->
+        eventually (pred_or_succ_improves j) ex.
+  Proof.
+  Admitted.
+
+  Lemma a_before_pred_merge_point :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+
+      forall st p,
+        merge_point (occ_gst (hd ex)) a b j ->
+        sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
+        pred st = Some p ->
+        a <=? p = true ->
+        eventually (pred_or_succ_improves j) ex.
+  Proof.
+  Admitted.
+
+  Lemma a_after_pred_merge_point :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+
+      forall st p,
+        merge_point (occ_gst (hd ex)) a b j ->
+        sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
+        pred st = Some p ->
+        a >? p = true ->
+        eventually (pred_or_succ_improves j) ex.
+  Proof.
+  Admitted.
+
+  Lemma error_decreases_at_merge_point :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+
       merge_point (occ_gst (hd ex)) a b j ->
       eventually (pred_or_succ_improves a) ex \/
       eventually (pred_or_succ_improves b) ex \/
       eventually (pred_or_succ_improves j) ex.
-Proof.
-Admitted.
+  Proof.
+    intros.
+    inv_prop merge_point; break_and.
+    inv_prop (live_node (occ_gst (hd ex)) (addr_of j)); expand_def.
+    destruct (pred ltac:(auto)) as [p |] eqn:?H.
+    - pose proof (order_cases_le_gt a p); break_or_hyp;
+        eauto using a_before_pred_merge_point, a_after_pred_merge_point.
+    - eauto using no_pred_merge_point.
+  Qed.
+
+End MergePoint.
 
 Theorem phase_two_error_continuously_nonincreasing :
   forall ex,
