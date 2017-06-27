@@ -30,9 +30,9 @@ Module Type IDSpaceParams.
         {a = b} + {a <> b}.
 
   (* useful notations for lt and ltb *)
+  Notation "a < b < c" := (and (lt a b) (lt b c)) (at level 70, b at next level).
   Notation "a < b" := (lt a b) (at level 70).
-  Notation "a < b < c" := (and (lt a b) (lt b c)).
-  Notation "a <? b <? c" := (andb (ltb a b) (ltb b c)) (at level 70).
+  Notation "a <? b <? c" := (andb (ltb a b) (ltb b c)) (at level 70, b at next level).
   Notation "a <? b" := (ltb a b) (at level 70).
 
   (* ltb is a decision procedure for the lt relation *)
@@ -61,11 +61,6 @@ End IDSpaceParams.
 Module IDSpace(P : IDSpaceParams).
 
   Include P.
-
-  Notation "a < b" := (P.lt a b) (at level 70).
-  Notation "a < b < c" := (and (P.lt a b) (P.lt b c)).
-  Notation "a <? b <? c" := (andb (P.ltb a b) (P.ltb b c)) (at level 70).
-  Notation "a <? b" := (P.ltb a b) (at level 70).
 
   Record pointer :=
     mkPointer { ptrId : P.id;
@@ -120,7 +115,8 @@ Module IDSpace(P : IDSpaceParams).
   Inductive between : P.id -> P.id -> P.id -> Prop :=
   | BetweenMono :
       forall a x b,
-        a < x < b ->
+        a < x ->
+        x < b ->
         between a x b
   | BetweenWrapL :
       forall a x b,
@@ -217,6 +213,14 @@ Module IDSpace(P : IDSpaceParams).
         (constructor; tauto) || congruence.
   Qed.
 
+  Lemma between_bool_between :
+    forall a x b,
+      between_bool a x b = true ->
+      between a x b.
+  Proof.
+    apply between_between_bool_equiv.
+  Qed.
+
   Definition ptr_between (a x b : pointer) : Prop :=
     between (ptrId a) (ptrId x) (ptrId b).
 
@@ -256,6 +260,16 @@ Module IDSpace(P : IDSpaceParams).
       congruence.
   Qed.
 
+  Lemma between_bool_yz_total :
+    forall x y z,
+      between_bool x y z = true \/ between_bool x z y = true \/ y = z.
+  Proof.
+    unfold between_bool.
+    intros.
+    repeat break_if; ltb_to_lt;
+      tauto || firstorder using P.lt_total.
+  Qed.
+
   Lemma unrolling_antisymmetric :
     forall h x y,
       unroll_between h x y = true ->
@@ -274,21 +288,36 @@ Module IDSpace(P : IDSpaceParams).
       unroll_between h x y = true ->
       unroll_between h y z = true ->
       unroll_between h x z = true.
-  Admitted.
+  Proof.
+    unfold unroll_between.
+    intros.
+    repeat break_if; try congruence.
+    repeat find_apply_lem_hyp between_bool_between.
+    apply between_between_bool_equiv.
+    repeat invcs_prop between;
+      eauto using P.lt_trans, BetweenMono, BetweenWrapL, BetweenWrapR.
+    congruence.
+  Qed.
 
   Lemma unrolling_total :
     forall h x y,
       unroll_between h x y = true \/
       unroll_between h y x = true.
   Proof using.
-    unfold unroll_between, between_bool.
+    unfold unroll_between.
     intros.
-  Admitted.
+    repeat break_if;
+      congruence || firstorder using between_bool_yz_total.
+  Qed.
 
   Lemma unrolling_reflexive :
     forall h x,
       unroll_between h x x = true.
-  Admitted.
+  Proof.
+    intros.
+    unfold unroll_between.
+    repeat break_if; congruence.
+  Qed.
 
   Definition unroll_between_ptr (h : P.name) (a b : pointer) :=
     unroll_between (P.hash h) (ptrId a) (ptrId b).
