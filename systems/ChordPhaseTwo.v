@@ -41,9 +41,6 @@ Definition live_ptrs_with_states (gst : global_state) : list (pointer * data) :=
                          end)
                       (live_ptrs gst).
 
-Definition full_succs (gst : global_state) (h : pointer) (succs : list pointer) : Prop :=
-  length succs = Chord.SUCC_LIST_LEN.
-
 Lemma successor_nodes_valid_state :
   forall gst h p st,
     In p (succ_list st) ->
@@ -249,12 +246,36 @@ Definition pred_and_first_succ_error (h : addr) (gst : global_state) : nat :=
 Definition phase_two_error : global_state -> nat :=
   global_measure pred_and_first_succ_error.
 
-Definition preds_and_first_succs_correct (gst : global_state) : Prop :=
+Definition preds_correct (gst : global_state) : Prop :=
   forall h st,
     live_node gst (addr_of h) ->
     sigma gst (addr_of h) = Some st ->
     wf_ptr h ->
-    pred_and_first_succ_correct gst h st.
+    pred_correct gst h (pred st).
+
+Definition first_succs_correct (gst : global_state) : Prop :=
+  forall h st,
+    live_node gst (addr_of h) ->
+    sigma gst (addr_of h) = Some st ->
+    wf_ptr h ->
+    first_succ_correct gst h (hd_error (succ_list st)).
+
+Definition preds_and_first_succs_correct (gst : global_state) : Prop :=
+  preds_correct gst /\ first_succs_correct gst.
+
+Lemma preds_and_first_succs_correct_intro :
+  forall gst,
+    (forall h st,
+        live_node gst (addr_of h) ->
+        sigma gst (addr_of h) = Some st ->
+        wf_ptr h ->
+        pred_and_first_succ_correct gst h st) ->
+    preds_and_first_succs_correct gst.
+Proof.
+  unfold preds_and_first_succs_correct, preds_correct, first_succs_correct, pred_and_first_succ_correct.
+  intros; split;
+    intros; find_apply_hyp_hyp; tauto.
+Qed.
 
 Definition phase_two (o : occurrence) : Prop :=
   preds_and_first_succs_correct (occ_gst o).
@@ -426,8 +447,7 @@ Lemma phase_two_zero_error_correct :
     preds_and_first_succs_correct gst.
 Proof.
   intros.
-  unfold preds_and_first_succs_correct.
-  intros.
+  apply preds_and_first_succs_correct_intro; intros.
   apply phase_two_zero_error_locally_correct; eauto.
   eapply sum_of_nats_zero_means_all_zero; eauto.
   apply in_map_iff.
@@ -459,7 +479,7 @@ Definition pred_or_succ_improves (h : pointer) : infseq occurrence -> Prop :=
   consecutive (measure_decreasing (pred_and_first_succ_error (addr_of h))).
 
 Section MergePoint.
-  Parameters j a b : pointer.
+  Variables j a b : pointer.
 
   Notation "x <=? y" := (unroll_between_ptr (addr_of j) x y) (at level 70).
   Notation "x >=? y" := (unroll_between_ptr (addr_of j) y x) (at level 70).
@@ -567,6 +587,49 @@ Section MergePoint.
 
 End MergePoint.
 
+Lemma succ_error_means_merge_point :
+  forall gst,
+    reachable_st gst ->
+    ~ first_succs_correct gst ->
+    exists a b j,
+      merge_point gst a b j.
+Proof.
+Admitted.
+
+Definition wrong_pred (gst : global_state) (h : pointer) : Prop :=
+  exists st p p',
+    sigma gst (addr_of h) = Some st /\
+    pred st = Some p /\
+    better_pred gst h p p'.
+
+Lemma error_decreases_when_succs_right :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
+
+    first_succs_correct (occ_gst (hd ex)) ->
+    wrong_pred (occ_gst (hd ex)) h ->
+    eventually (pred_or_succ_improves h) ex.
+Proof.
+Admitted.
+
+Lemma error_means_merge_point_or_wrong_pred :
+  forall gst,
+    phase_two_error gst > 0 ->
+    reachable_st gst ->
+    all_first_succs_best gst ->
+
+    first_succs_correct gst /\
+    (exists h, live_node gst (addr_of h) /\
+          wrong_pred gst h) \/
+    exists a b j,
+      merge_point gst a b j.
+Proof.
+Admitted.
+
 Theorem phase_two_error_continuously_nonincreasing :
   forall ex,
     lb_execution ex ->
@@ -585,19 +648,52 @@ Lemma continuously_zero_phase_two_error_phase_two :
     continuously (now (measure_zero phase_two_error)) ex ->
     continuously (now phase_two) ex.
 Proof.
-Admitted.
+  intros until 2.
+  apply continuously_monotonic.
+  intros; destruct s; simpl in *.
+  apply phase_two_zero_error_correct; auto.
+Qed.
 
 Lemma phase_two_nonzero_error_causes_measure_drop :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ now circular_wait) ex ->
+    always (now phase_one) ex ->
+
+    nonzero_error_causes_measure_drop pred_and_first_succ_error ex.
+Proof.
+  intros; intro.
+  assert (all_first_succs_best (occ_gst (hd ex)))
+    by (inv_prop always; destruct ex; auto).
+  find_apply_lem_hyp error_means_merge_point_or_wrong_pred; auto.
+  expand_def.
+  - find_eapply_lem_hyp error_decreases_when_succs_right; eauto.
+    eexists; eauto using live_node_is_active.
+  - inv_prop merge_point; break_and.
+    find_apply_lem_hyp error_decreases_at_merge_point; eauto.
+    repeat break_or_hyp; eexists; eauto using live_node_is_active.
+Qed.
+
+Lemma phase_two_nonzero_error_continuous_drop :
   forall ex : infseq occurrence,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ now circular_wait) ex ->
     always (now phase_one) ex ->
-    continuously (nonzero_error_causes_measure_drop pred_and_first_succ_error) ex.
+    always (nonzero_error_causes_measure_drop pred_and_first_succ_error) ex.
 Proof.
-  (* Use some lemma about merge points *)
-Admitted.
+  cofix c.
+  intros.
+  intros.
+  destruct ex.
+  constructor.
+  - apply phase_two_nonzero_error_causes_measure_drop; auto.
+  - simpl.
+    apply c; invar_eauto.
+Qed.
 
 Lemma phase_two_continuously :
   forall ex,
@@ -612,5 +708,5 @@ Proof.
   eapply continuously_zero_phase_two_error_phase_two; eauto.
   eapply local_measure_causes_measure_zero_continuosly; eauto.
   - eapply phase_two_error_continuously_nonincreasing; eauto.
-  - eapply phase_two_nonzero_error_causes_measure_drop; eauto.
+  - apply E0; eapply phase_two_nonzero_error_continuous_drop; eauto.
 Qed.

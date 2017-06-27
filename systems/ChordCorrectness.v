@@ -154,10 +154,10 @@ Theorem phases_locally_sufficient :
 Proof.
   intros gst H_preds H_succs.
   unfold ideal; intros h st.
+  destruct H_preds as [H_preds _].
   specialize (H_preds h st).
   specialize (H_succs h st).
-  unfold pred_and_first_succ_correct in *.
-  intuition.
+  tauto.
 Qed.
 
 Definition gpred_and (P Q : global_state -> Prop) (gst : global_state) : Prop :=

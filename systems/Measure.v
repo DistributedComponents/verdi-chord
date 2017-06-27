@@ -570,6 +570,20 @@ Section LocalMeasure.
       now apply in_map.
   Qed.
 
+  Lemma global_nonzero_local_nonzero :
+    forall gst,
+      |gst| > 0 ->
+      exists h,
+        In h (active_nodes gst) /\
+        |h in gst| > 0.
+  Proof.
+    intros.
+    find_apply_lem_hyp sum_nonzero_implies_addend_nonzero; break_exists; break_and.
+    find_apply_lem_hyp in_map_iff.
+    break_exists_exists; break_and.
+    split; congruence.
+  Qed.
+
   Lemma measure_mono :
     forall gst gst',
       nodes gst' = nodes gst ->
