@@ -60,31 +60,6 @@ Proof.
   congruence.
 Qed.
 
-Lemma live_addr_In_live_addrs :
-  forall gst h,
-    live_node gst h ->
-    In h (live_addrs gst).
-Proof.
-  unfold live_addrs.
-  intros.
-  apply filter_In; split.
-  - unfold live_node in *; break_and; auto.
-  - auto using Coqlib.proj_sumbool_is_true.
-Qed.
-
-Lemma live_In_live_ptrs :
-  forall gst h,
-    live_node gst (addr_of h) ->
-    wf_ptr h ->
-    In h (live_ptrs gst).
-Proof.
-  unfold live_ptrs, live_node.
-  intros.
-  rewrite (wf_ptr_eq h); auto.
-  apply in_map.
-  now apply live_addr_In_live_addrs.
-Qed.
-
 Lemma live_In_live_ptrs_with_states :
   forall gst h st,
     live_node gst (addr_of h) ->

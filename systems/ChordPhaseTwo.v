@@ -136,6 +136,43 @@ Definition counting_opt_error (gst : global_state) (p : option pointer) (better_
   | None => length (live_ptrs gst) + 1
   end.
 
+Lemma live_addr_In_live_addrs :
+  forall gst h,
+    live_node gst h ->
+    In h (live_addrs gst).
+Proof.
+  unfold live_addrs.
+  intros.
+  apply filter_In; split.
+  - unfold live_node in *; break_and; auto.
+  - auto using Coqlib.proj_sumbool_is_true.
+Qed.
+
+Lemma live_In_live_ptrs :
+  forall gst h,
+    live_node gst (addr_of h) ->
+    wf_ptr h ->
+    In h (live_ptrs gst).
+Proof.
+  unfold live_ptrs, live_node.
+  intros.
+  rewrite (wf_ptr_eq h); auto.
+  apply in_map.
+  now apply live_addr_In_live_addrs.
+Qed.
+
+Lemma not_in_filter_false :
+  forall A (f : A -> bool) l x,
+    In x l ->
+    ~ In x (filter f l) ->
+    f x = false.
+Proof.
+  intros.
+  destruct (f x) eqn:?H; [|tauto].
+  unfold not in *; find_false.
+  now eapply filter_In.
+Qed.
+
 Lemma counting_opt_error_zero_implies_correct :
   forall gst p better_bool,
     counting_opt_error gst p better_bool = 0 ->
@@ -148,8 +185,15 @@ Lemma counting_opt_error_zero_implies_correct :
 Proof.
   unfold counting_opt_error.
   intros.
-  repeat break_match.
-Admitted.
+  repeat break_match; try omega.
+  eexists; split; eauto.
+  find_apply_lem_hyp length_zero_iff_nil.
+  intros.
+  find_apply_lem_hyp live_In_live_ptrs; eauto.
+  eapply not_in_filter_false; eauto.
+  find_rewrite.
+  apply in_nil.
+Qed.
 
 (** Predecessor phase two definitions *)
 Definition better_pred (gst : global_state) (h p p' : pointer) : Prop :=
@@ -215,6 +259,131 @@ Definition preds_and_first_succs_correct (gst : global_state) : Prop :=
 Definition phase_two (o : occurrence) : Prop :=
   preds_and_first_succs_correct (occ_gst o).
 
+Lemma phase_two_zero_error_has_pred :
+  forall gst h st,
+    live_node gst (addr_of h) ->
+    wf_ptr h ->
+    sigma gst (addr_of h) = Some st ->
+    pred_and_first_succ_error (addr_of h) gst = 0 ->
+    exists p, pred st = Some p /\
+         pred_error gst h (Some p) = 0.
+Proof.
+  intros.
+  rewrite (wf_ptr_eq h); auto.
+  unfold pred_and_first_succ_error in *.
+  break_match; try congruence.
+  find_injection.
+  destruct (pred ltac:(auto)) eqn:?H.
+  - eexists; split; [eauto | omega].
+  - simpl in *; omega.
+Qed.
+
+Lemma phase_two_zero_error_has_first_succ :
+  forall gst h st,
+    live_node gst (addr_of h) ->
+    wf_ptr h ->
+    sigma gst (addr_of h) = Some st ->
+    pred_and_first_succ_error (addr_of h) gst = 0 ->
+    exists s rest,
+      succ_list st = s :: rest /\
+      first_succ_error gst h (Some s) = 0.
+Proof.
+  intros.
+  rewrite (wf_ptr_eq h); auto.
+  unfold pred_and_first_succ_error in *.
+  break_match; try congruence.
+  find_injection.
+  destruct (succ_list ltac:(auto)) eqn:?H.
+  - simpl in *; omega.
+  - repeat eexists.
+    simpl in *.
+    omega.
+Qed.
+
+Lemma better_pred_intro :
+  forall gst h p p',
+    wf_ptr p ->
+    wf_ptr p' ->
+    live_node gst (addr_of p') ->
+    ptr_between p p' h ->
+    better_pred gst h p p'.
+Proof.
+  unfold better_pred.
+  tauto.
+Qed.
+
+Lemma better_pred_elim :
+  forall gst h p p',
+    better_pred gst h p p' ->
+    wf_ptr p /\
+    wf_ptr p' /\
+    live_node gst (addr_of p') /\
+    ptr_between p p' h.
+Proof.
+  unfold better_pred.
+  tauto.
+Qed.
+
+Lemma better_pred_bool_true_better_pred :
+  forall gst h p p',
+    wf_ptr p ->
+    wf_ptr p' ->
+    live_node gst (addr_of p') ->
+    better_pred_bool h p p' = true ->
+    better_pred gst h p p'.
+Proof.
+  unfold better_pred_bool.
+  intros.
+  apply better_pred_intro; auto.
+  now apply between_between_bool_equiv.
+Qed.
+
+Lemma better_pred_better_pred_bool_true :
+  forall gst h p p',
+    better_pred gst h p p' ->
+    wf_ptr p /\
+    wf_ptr p' /\
+    live_node gst (addr_of p') /\
+    better_pred_bool h p p' = true.
+Proof.
+  intros.
+  find_apply_lem_hyp better_pred_elim; intuition.
+  now apply between_between_bool_equiv.
+Qed.
+
+Lemma better_succ_better_succ_bool_true :
+  forall gst h s s',
+    better_succ gst h s s' ->
+    wf_ptr s /\
+    wf_ptr s' /\
+    live_node gst (addr_of s') /\
+    better_succ_bool h s s' = true.
+Proof.
+  intros.
+  inv_prop better_succ; intuition.
+  now apply between_between_bool_equiv.
+Qed.
+
+Lemma between_bool_false_not_between :
+  forall x y z,
+    between_bool x y z = false ->
+    ~ between x y z.
+Proof.
+  intuition.
+  find_apply_lem_hyp between_between_bool_equiv.
+  congruence.
+Qed.
+
+Lemma better_succ_bool_false_not_better_succ :
+  forall gst h s s',
+    better_succ_bool h s s' = false ->
+    ~ better_succ gst h s s'.
+Proof.
+  unfold better_succ_bool, better_succ.
+  intuition.
+  find_eapply_lem_hyp between_bool_false_not_between; eauto.
+Qed.
+
 Lemma phase_two_zero_error_locally_correct :
   forall gst h st,
     live_node gst (addr_of h) ->
@@ -223,14 +392,47 @@ Lemma phase_two_zero_error_locally_correct :
     pred_and_first_succ_error (addr_of h) gst = 0 ->
     pred_and_first_succ_correct gst h st.
 Proof.
-Admitted.
+  intros.
+  unfold pred_and_first_succ_correct; split.
+  - find_copy_apply_lem_hyp phase_two_zero_error_has_pred; auto.
+    break_exists_exists; break_and; split; auto.
+    unfold pred_error in *.
+    find_apply_lem_hyp counting_opt_error_zero_implies_correct; expand_def.
+    find_injection.
+    intuition.
+    find_eapply_lem_hyp better_pred_better_pred_bool_true; break_and.
+    repeat match goal with
+           | [ H : forall x : ?T, _, y : ?T |- _ ] =>
+             specialize (H y)
+           end.
+    congruence.
+  - find_copy_apply_lem_hyp phase_two_zero_error_has_first_succ; auto.
+    break_exists_exists; expand_def; split; try find_rewrite; auto.
+    unfold first_succ_error in *.
+    find_apply_lem_hyp counting_opt_error_zero_implies_correct; expand_def.
+    find_injection.
+    intuition.
+    find_eapply_lem_hyp better_succ_better_succ_bool_true; break_and.
+    repeat match goal with
+           | [ H : forall x : ?T, _, y : ?T |- _ ] =>
+             specialize (H y)
+           end.
+    congruence.
+Qed.
 
 Lemma phase_two_zero_error_correct :
   forall gst,
     phase_two_error gst = 0 ->
     preds_and_first_succs_correct gst.
 Proof.
-Admitted.
+  intros.
+  unfold preds_and_first_succs_correct.
+  intros.
+  apply phase_two_zero_error_locally_correct; eauto.
+  eapply sum_of_nats_zero_means_all_zero; eauto.
+  apply in_map_iff.
+  eexists; split; eauto using live_node_in_active.
+Qed.
 
 Definition has_pred (gst : global_state) (h : pointer) (p : option pointer) : Prop :=
   exists st,
