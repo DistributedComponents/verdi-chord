@@ -1520,6 +1520,7 @@ Lemma open_request_to_dead_node_preserved_or_times_out :
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
     In dst (failed_nodes gst) ->
+    channel gst dst h = [] ->
     open_request_to gst h dst req ->
     open_request_to gst' h dst req \/
     Timeout h (Request dst req) DetectFailure = l.
