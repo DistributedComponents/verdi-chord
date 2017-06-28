@@ -1618,11 +1618,21 @@ Ltac invar_eauto :=
         reachableStep,
         lb_execution_step_one_cons.
 
+Lemma channel_stays_empty :
+  forall ex src dst,
+    lb_execution ex ->
+    In src (failed_nodes (occ_gst (hd ex))) ->
+    channel (occ_gst (hd ex)) src dst = [] ->
+    channel (occ_gst (hd (tl ex))) src dst = [].
+Proof.
+Admitted.
+
 Lemma open_request_until_timeout :
   forall h dst req ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
 
+    channel (occ_gst (hd ex)) dst h = [] ->
     In h (active_nodes (occ_gst (hd ex))) ->
     In dst (failed_nodes (occ_gst (hd ex))) ->
     open_request_to (occ_gst (hd ex)) h dst req ->
@@ -1646,7 +1656,7 @@ Proof.
   - apply W_tl; [assumption|].
     apply c;
       invar_eauto;
-      eauto using active_nodes_invar, failed_nodes_never_removed.
+      eauto using active_nodes_invar, failed_nodes_never_removed, channel_stays_empty.
   - now apply W0.
 Qed.
 
@@ -1679,6 +1689,7 @@ Lemma request_eventually_fires :
     live_node (occ_gst (hd ex)) h ->
     In dst (failed_nodes (occ_gst (hd ex))) ->
     open_request_to (occ_gst (hd ex)) h dst req ->
+    channel (occ_gst (hd ex)) dst h = [] ->
 
     eventually (now (occurred (Timeout h (Request dst req) DetectFailure))) ex.
 Proof.

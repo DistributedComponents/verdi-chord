@@ -287,17 +287,15 @@ Qed.
 Lemma leading_failed_succs_nonzero_means_dead_succ :
   forall h gst,
     leading_failed_succs h gst > 0 ->
-    exists st,
-      sigma gst h = Some st /\
-      exists p rest,
-        succ_list st = p :: rest /\
-        In (addr_of p) (failed_nodes gst).
+    exists s,
+      has_dead_first_succ gst h s.
 Proof.
-  unfold leading_failed_succs.
+  unfold leading_failed_succs, has_dead_first_succ.
   intros.
   break_match; [|omega].
-  eexists; split; eauto.
-  now apply succ_list_leading_failed_nodes_nonzero_means_dead_succ.
+  find_apply_lem_hyp succ_list_leading_failed_nodes_nonzero_means_dead_succ.
+  expand_def.
+  eexists; eauto.
 Qed.
 
 Lemma phase_one_error_nonzero_means_dead_succ :
@@ -306,11 +304,8 @@ Lemma phase_one_error_nonzero_means_dead_succ :
     exists h,
       In h (nodes gst) /\
       ~ In h (failed_nodes gst) /\
-      exists st,
-        sigma gst h = Some st /\
-        exists p rest,
-          succ_list st = p :: rest /\
-          In (addr_of p) (failed_nodes gst).
+      exists s,
+        has_dead_first_succ gst h s.
 Proof.
   intros.
   find_apply_lem_hyp sum_nonzero_implies_addend_nonzero.
@@ -840,13 +835,16 @@ Lemma open_stabilize_request_eventually_decreases_error :
 
     leading_failed_succs h (occ_gst (hd ex)) > 0 ->
     open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
-    eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
+
+    forall dst,
+      has_dead_first_succ (occ_gst (hd ex)) h dst ->
+      channel (occ_gst (hd ex)) (addr_of dst) h = [] ->
+      eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
 Proof.
   intros.
   find_copy_apply_lem_hyp leading_failed_succs_nonzero_means_dead_succ; expand_def.
-  assert (exists s, has_dead_first_succ (occ_gst (hd ex)) h s)
-    by (repeat eexists; eauto); break_exists_name s.
   unfold open_stabilize_request_to_first_succ in *.
+  inv_prop has_dead_first_succ; expand_def.
   find_copy_apply_hyp_hyp.
   find_copy_eapply_lem_hyp open_stabilize_request_until_timeout; eauto.
   find_copy_apply_lem_hyp request_eventually_fires;
@@ -858,29 +856,34 @@ Proof.
   - invc_prop always.
     unfold and_tl in *; break_and.
     invcs_prop weak_until; break_and;
-      destruct s0;
+      destruct s;
       eapply stabilize_Request_timeout_decreases_error; eauto.
   - eapply weak_until_latch_eventually; eauto.
+  - invcs_prop has_dead_first_succ; expand_def.
+    invcs_prop has_dead_first_succ; expand_def.
+    congruence.
 Qed.
 
 Lemma nonzero_phase_one_error_eventually_drops :
-  forall ex h,
+  forall ex h s,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
 
     live_node (occ_gst (hd ex)) h ->
+    has_dead_first_succ (occ_gst (hd ex)) h s ->
+    channel (occ_gst (hd ex)) (addr_of s) h = [] ->
     leading_failed_succs h (occ_gst (hd ex)) > 0 ->
 
     eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
 Proof.
   intros.
   find_copy_eapply_lem_hyp start_stabilize_with_first_successor_eventually; eauto.
-  induction 0.
-  - destruct s.
-    eapply open_stabilize_request_eventually_decreases_error; eauto.
-  - destruct s as [o' s].
+  induction 0 as [ex|o ex].
+  - destruct ex.
+    eapply open_stabilize_request_eventually_decreases_error; simpl in *; eauto.
+  - destruct ex as [o' ex].
     destruct (leading_failed_succs h (occ_gst o')) eqn:?H.
     + apply E0.
       simpl in *.
@@ -888,8 +891,11 @@ Proof.
       omega.
     + apply E_next.
       apply IHeventually; invar_eauto.
-      simpl; omega.
-Qed.
+      * admit.
+      * find_eapply_lem_hyp channel_stays_empty; eauto.
+        inv_prop has_dead_first_succ; expand_def; tauto.
+      * simpl in *; omega.
+Admitted.
 
 Lemma nonzero_error_eventually_drops :
   forall ex h,
@@ -904,20 +910,29 @@ Lemma nonzero_error_eventually_drops :
     eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
 Proof.
   intros.
-  find_copy_eapply_lem_hyp start_stabilize_with_first_successor_eventually; eauto.
-  induction 0.
-  - destruct s.
-    eapply open_stabilize_request_eventually_decreases_error; eauto.
-  - destruct s as [o' s].
-    destruct (leading_failed_succs h (occ_gst o')) eqn:?H.
+  find_copy_apply_lem_hyp leading_failed_succs_nonzero_means_dead_succ; break_exists_name s.
+  inv_prop has_dead_first_succ; expand_def.
+  find_copy_apply_lem_hyp (dead_node_channel_empties_out ex (addr_of s) h);
+    auto using strong_local_fairness_weak.
+  clear dependent x.
+  clear dependent x0.
+  induction 0 as [ex|o ex].
+  - inv_prop always.
+    destruct ex.
+    eapply nonzero_phase_one_error_eventually_drops; eauto.
+  - destruct (leading_failed_succs h (occ_gst (hd ex))) eqn:?H.
     + apply E0.
-      simpl in *.
+      destruct ex; simpl in *.
       unfold measure_decreasing.
       omega.
     + apply E_next.
-      apply IHeventually; invar_eauto.
-      simpl; omega.
-Qed.
+      apply IHeventually; invar_eauto;
+        destruct ex as [o' ex]; simpl in *.
+      * omega.
+      * admit.
+      * inv_prop lb_execution.
+        eapply failed_nodes_never_removed; eauto.
+Admitted.
 
 Lemma nonempty_succ_list_implies_joined :
   forall gst h st s rest,
@@ -962,6 +977,7 @@ Proof.
     find_copy_apply_lem_hyp phase_one_error_nonzero_means_dead_succ.
     break_exists_exists; expand_def.
     split; auto using in_nodes_not_failed_in_active.
+    inv_prop has_dead_first_succ; expand_def.
     eapply nonzero_error_eventually_drops; eauto.
     + find_eapply_lem_hyp nonempty_succ_list_implies_joined;
         eauto using live_node_characterization.
