@@ -20,6 +20,7 @@ Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordDefinitionLemmas.
 Require Import Chord.LiveNodesStayLive.
+Require Import Chord.ChordDeadNodesGoQuiet.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
@@ -864,16 +865,15 @@ Proof.
     congruence.
 Qed.
 
-Lemma nonzero_phase_one_error_eventually_drops :
-  forall ex h s,
+Lemma nonzero_phase_one_error_eventually_drops_dead_quiet :
+  forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
+    always (now no_msgs_from_dead_nodes) ex ->
 
     live_node (occ_gst (hd ex)) h ->
-    has_dead_first_succ (occ_gst (hd ex)) h s ->
-    channel (occ_gst (hd ex)) (addr_of s) h = [] ->
     leading_failed_succs h (occ_gst (hd ex)) > 0 ->
 
     eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
@@ -881,8 +881,12 @@ Proof.
   intros.
   find_copy_eapply_lem_hyp start_stabilize_with_first_successor_eventually; eauto.
   induction 0 as [ex|o ex].
-  - destruct ex.
+  - find_copy_apply_lem_hyp leading_failed_succs_nonzero_means_dead_succ; expand_def.
+    destruct ex.
     eapply open_stabilize_request_eventually_decreases_error; simpl in *; eauto.
+    inv_prop has_dead_first_succ; expand_def.
+    inv_prop no_msgs_from_dead_nodes; simpl in *.
+    eapply no_msgs_from_dead_nodes_elim; eauto.
   - destruct ex as [o' ex].
     destruct (leading_failed_succs h (occ_gst o')) eqn:?H.
     + apply E0.
@@ -891,13 +895,10 @@ Proof.
       omega.
     + apply E_next.
       apply IHeventually; invar_eauto.
-      * admit.
-      * find_eapply_lem_hyp channel_stays_empty; eauto.
-        inv_prop has_dead_first_succ; expand_def; tauto.
-      * simpl in *; omega.
-Admitted.
+      simpl in *; omega.
+Qed.
 
-Lemma nonzero_error_eventually_drops :
+Lemma nonzero_phase_one_error_eventually_drops :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
@@ -910,29 +911,16 @@ Lemma nonzero_error_eventually_drops :
     eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
 Proof.
   intros.
-  find_copy_apply_lem_hyp leading_failed_succs_nonzero_means_dead_succ; break_exists_name s.
-  inv_prop has_dead_first_succ; expand_def.
-  find_copy_apply_lem_hyp (dead_node_channel_empties_out ex (addr_of s) h);
-    auto using strong_local_fairness_weak.
-  clear dependent x.
-  clear dependent x0.
-  induction 0 as [ex|o ex].
-  - inv_prop always.
-    destruct ex.
-    eapply nonzero_phase_one_error_eventually_drops; eauto.
-  - destruct (leading_failed_succs h (occ_gst (hd ex))) eqn:?H.
-    + apply E0.
-      destruct ex; simpl in *.
-      unfold measure_decreasing.
-      omega.
+  find_copy_eapply_lem_hyp dead_nodes_go_quiet; eauto.
+  induction 0 as [ex | o [o' ex]].
+  - eauto using nonzero_phase_one_error_eventually_drops_dead_quiet.
+  - destruct (leading_failed_succs h (occ_gst o')) eqn:?H.
+    + apply E0; simpl in *.
+      unfold measure_decreasing; omega.
     + apply E_next.
-      apply IHeventually; invar_eauto;
-        destruct ex as [o' ex]; simpl in *.
-      * omega.
-      * admit.
-      * inv_prop lb_execution.
-        eapply failed_nodes_never_removed; eauto.
-Admitted.
+      apply IHeventually; invar_eauto.
+      simpl in *; omega.
+Qed.
 
 Lemma nonempty_succ_list_implies_joined :
   forall gst h st s rest,
@@ -978,12 +966,11 @@ Proof.
     break_exists_exists; expand_def.
     split; auto using in_nodes_not_failed_in_active.
     inv_prop has_dead_first_succ; expand_def.
-    eapply nonzero_error_eventually_drops; eauto.
+    eapply nonzero_phase_one_error_eventually_drops; eauto.
     + find_eapply_lem_hyp nonempty_succ_list_implies_joined;
         eauto using live_node_characterization.
     + eauto using has_dead_first_succ_intro, has_dead_first_succ_implies_error_nonzero.
-  - simpl.
-    apply c; invar_eauto.
+  - apply c; invar_eauto.
 Qed.
 
 Theorem phase_one_error_continuously_nonincreasing :
