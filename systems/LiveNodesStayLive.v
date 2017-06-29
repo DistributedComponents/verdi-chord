@@ -9,11 +9,8 @@ Require Import Chord.ChordProof.
 Require Import Chord.ChordDefinitionLemmas.
 Require Import List.
 Import ListNotations.
-(*Require Import Wf_nat.*)
 Require Import InfSeqExt.infseq.
 Require Import InfSeqExt.classical.
-Require Import mathcomp.ssreflect.ssreflect.
-Require Import mathcomp.ssreflect.ssrbool.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -28,8 +25,6 @@ Ltac live_node_invariant_finish_goal :=
   unfold live_node in *; simpl in *; intuition;
   update_destruct; subst; rewrite_update; eauto;
   break_exists; repeat find_inversion; eexists; intuition; eauto; simpl in *; congruence.
-
-Print recv_handler.
 
 Lemma live_node_invariant :
   forall gst l gst' h,
