@@ -321,23 +321,20 @@ Ltac induct_reachable_st :=
   end.
 
 Inductive intermediate_reachable_st : global_state -> Prop :=
-| intReachableInit : intermediate_reachable_st initial_st
-| intReachableStep : forall gst gst',
-    intermediate_reachable_st gst ->
-    step_dynamic gst gst' ->
-    intermediate_reachable_st gst'
-| intReachableRectify : forall gst h d res eff,
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst) ->
-    sigma gst h = Some d ->
-    do_rectify h d = (res, eff) ->
-    intermediate_reachable_st (apply_handler_result h res [] gst)
-| intReachableDelayedQueries : forall gst h d res,
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst) ->
-    sigma gst h = Some d ->
-    do_delayed_queries h d = res ->
-    intermediate_reachable_st (apply_handler_result h res [] gst).
+| intReachableInit :
+    intermediate_reachable_st initial_st
+| intReachableStep :
+    forall gst gst',
+      intermediate_reachable_st gst ->
+      step_dynamic gst gst' ->
+      intermediate_reachable_st gst'
+| intReachableDelayedQueries :
+    forall gst h d res,
+      In h (nodes gst) ->
+      ~ In h (failed_nodes gst) ->
+      sigma gst h = Some d ->
+      do_delayed_queries h d = res ->
+      intermediate_reachable_st (apply_handler_result h res [] gst).
 
 Ltac induct_int_reachable_st :=
   match goal with
@@ -1733,6 +1730,8 @@ Definition chord_handle_msg_invariant (P : global_state -> Prop) : Prop :=
 
 Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' h req dst t d st ms newts clearedts eff,
+    reachable_st gst ->
+    P gst ->
     request_timeout_handler h d dst req = (st, ms, newts, clearedts, eff) ->
     t = Request dst req ->
     sigma gst h = Some d ->
@@ -1743,6 +1742,34 @@ Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
              gst ->
     timeout_constraint gst h t ->
     P gst'.
+
+Definition chord_rectify_invariant (P : global_state -> Prop) :=
+  forall gst h st st' ms newts clearedts eff,
+    reachable_st gst ->
+    P gst ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    sigma gst h = Some st ->
+    In RectifyTick (timeouts gst h) ->
+    do_rectify h st = (st', ms, newts, clearedts, eff) ->
+    P (apply_handler_result h (st', ms, newts, RectifyTick :: clearedts)
+                            [e_timeout h RectifyTick] gst).
+
+Definition chord_input_invariant (P : global_state -> Prop) :=
+  forall gst h i to m,
+    reachable_st gst ->
+    P gst ->
+    client_addr h ->
+    client_payload i ->
+    m = send h (to, i) ->
+    P (update_msgs_and_trace gst (m :: msgs gst) (e_send m)).
+
+Definition chord_output_invariant (P : global_state -> Prop) :=
+  forall gst h xs m ys,
+    client_addr h ->
+    msgs gst = xs ++ m :: ys ->
+    h = fst (snd m) ->
+    P (update_msgs_and_trace gst (xs ++ ys) (e_recv m)).
 
 Lemma update_msgs_definition :
   forall gst gst' ms,
@@ -1795,14 +1822,19 @@ Qed.
 Theorem chord_net_invariant :
   forall P net,
     chord_init_invariant P ->
+
     chord_start_invariant P ->
     chord_fail_invariant P ->
     chord_tick_invariant P ->
     chord_keepalive_invariant P ->
+    chord_rectify_invariant P ->
     chord_request_invariant P ->
     chord_handle_msg_invariant P ->
     chord_do_delayed_queries_invariant P ->
-    chord_do_rectify_invariant P ->
+
+    chord_input_invariant P ->
+    chord_output_invariant P ->
+
     reachable_st net ->
     P net.
 Proof using.
@@ -1818,7 +1850,7 @@ Proof using.
       find_eapply_lem_hyp timeout_handler_eff_definition; expand_def.
       * eapply_prop chord_tick_invariant; eauto.
       * eapply_prop chord_keepalive_invariant; eauto.
-      * admit. (* TODO eapply_prop chord_rectify_invariant; eauto. *)
+      * eapply_prop chord_rectify_invariant; eauto.
       * eapply_prop chord_request_invariant; eauto.
     + unfold recv_handler in *.
       repeat break_let; subst_max.
@@ -1887,8 +1919,29 @@ Proof using.
           repeat (break_let; simpl).
           now rewrite app_nil_r. }
       now repeat find_rewrite.
-    + (* Input case *)
-      admit.
-    + (* Deliver_client case *)
-      admit.
-Admitted.
+    + eapply_prop chord_input_invariant; eauto.
+    + eapply_prop chord_output_invariant; eauto.
+Qed.
+
+Lemma sigma_ahr_updates :
+  forall gst n st ms nts cts e,
+    sigma (apply_handler_result n (st, ms, nts, cts) e gst) n = Some st.
+Proof using.
+  unfold apply_handler_result.
+  simpl.
+  intros.
+  exact: update_eq.
+Qed.
+
+Lemma sigma_ahr_passthrough :
+  forall gst n st ms nts cts e h d,
+    n <> h ->
+    sigma gst h = Some d ->
+    sigma (apply_handler_result n (st, ms, nts, cts) e gst) h = Some d.
+Proof using.
+  unfold apply_handler_result.
+  simpl.
+  intros.
+  find_reverse_rewrite.
+  exact: update_diff.
+Qed.

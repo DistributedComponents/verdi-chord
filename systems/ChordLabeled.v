@@ -98,29 +98,6 @@ Ltac inv_timeout_constraint :=
     inv H
   end.
 
-Lemma sigma_ahr_updates :
-  forall gst n st ms nts cts e,
-    sigma (apply_handler_result n (st, ms, nts, cts) e gst) n = Some st.
-Proof using.
-  unfold apply_handler_result.
-  simpl.
-  intros.
-  exact: update_eq.
-Qed.
-
-Lemma sigma_ahr_passthrough :
-  forall gst n st ms nts cts e h d,
-    n <> h ->
-    sigma gst h = Some d ->
-    sigma (apply_handler_result n (st, ms, nts, cts) e gst) h = Some d.
-Proof using.
-  unfold apply_handler_result.
-  simpl.
-  intros.
-  find_reverse_rewrite.
-  exact: update_diff.
-Qed.
-
 Lemma labeled_step_preserves_state_existing :
   forall gst gst' l h d,
     sigma gst h = Some d ->

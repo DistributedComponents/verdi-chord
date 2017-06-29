@@ -24,11 +24,12 @@ Require Import Chord.ChordDefinitionLemmas.
 Require Import Chord.Measure.
 Require Import Chord.InfSeqTactics.
 
-
 Ltac live_node_invariant_finish_goal :=
   unfold live_node in *; simpl in *; intuition;
   update_destruct; subst; rewrite_update; eauto;
   break_exists; repeat find_inversion; eexists; intuition; eauto; simpl in *; congruence.
+
+Print recv_handler.
 
 Lemma live_node_invariant :
   forall gst l gst' h,
@@ -41,7 +42,10 @@ Proof.
   | H : labeled_step_dynamic _ _ _ |- _ =>
     inv H
   end.
-  - unfold timeout_handler_l, timeout_handler_eff,
+  - find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+    find_apply_lem_hyp timeout_handler_eff_definition; expand_def.
+    + eapply live_node_characterization; eauto using sigma_ahr_passthrough.
+    unfold timeout_handler_l, timeout_handler_eff,
     tick_handler, keepalive_handler, do_rectify, request_timeout_handler,
     add_tick, handle_query_timeout, clear_query, end_query, start_query,
     update_query, update_succ_list in *.
@@ -60,4 +64,3 @@ Proof.
   - live_node_invariant_finish_goal.
   - live_node_invariant_finish_goal.
 Qed.
-
