@@ -5,8 +5,8 @@ prefix. When a node *h* stabilizes with its correct first successor *s* and the
 error at *s* is *e*, the error at *h* becomes max(*e* - 1, 0).
 
 Since we're done with phase two and all first successors are correct, each node
-has error at most *L* - 1. Each node can stabilize to obtain error at most *L*
-- 2.
+has error at most *L* - 1. Each node can stabilize to obtain error *L* - 2 or
+less.
 
 Suppose that all nodes have error at most *L* - *k*, where *k* > 1. Each node
 can stabilize to obtain error at most max(*L* - *k* - 1, 0).
