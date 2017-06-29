@@ -1446,12 +1446,11 @@ Proof.
   eapply Request_needs_dst_dead_and_no_msgs; eauto.
 Qed.
 
-Lemma open_request_to_preserved_state_msgs_timeouts :
+Lemma open_request_to_preserved_state_timeouts :
   forall gst gst' h dst req,
     open_request_to gst h dst req ->
     sigma gst h = sigma gst' h ->
     timeouts gst h = timeouts gst' h ->
-    (forall m, In m (channel gst h dst) -> In m (channel gst' h dst)) ->
     open_request_to gst' h dst req.
 Proof.
   unfold open_request_to.
@@ -1459,9 +1458,6 @@ Proof.
   repeat find_rewrite.
   repeat split.
   - auto.
-  - find_apply_lem_hyp channel_contents.
-    apply channel_contents.
-    auto.
   - repeat eexists; eauto.
 Qed.
 
@@ -1505,9 +1501,6 @@ Proof.
       update_destruct; subst; rewrite_update; repeat find_rewrite; intuition.
       * rewrite app_nil_r.
         eauto using remove_all_add_back.
-      * in_crush. intuition. remember (fst (snd m)) as from. 
-        subst_max. simpl in *. congruence.
-      * in_crush.
     +
 Admitted.
 

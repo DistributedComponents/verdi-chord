@@ -182,7 +182,6 @@ Inductive request_msg_for_query : query -> payload -> Prop :=
 
 Definition open_request_to (gst : global_state) (h : addr) (dst : addr) (m : payload) : Prop :=
   In (Request dst m) (timeouts gst h) /\
-  In (h, (dst, m)) (msgs gst) /\
   exists q st dstp,
     request_msg_for_query q m /\
     sigma gst h = Some st /\

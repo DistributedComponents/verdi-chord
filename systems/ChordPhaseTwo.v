@@ -146,6 +146,17 @@ Proof.
   - auto using Coqlib.proj_sumbool_is_true.
 Qed.
 
+Lemma In_live_addrs_live :
+  forall gst h,
+    In h (live_addrs gst) ->
+    live_node gst h.
+Proof.
+  unfold live_addrs.
+  intros.
+  find_apply_lem_hyp filter_In; break_and.
+  eapply Coqlib.proj_sumbool_true; eauto.
+Qed.
+
 Lemma live_In_live_ptrs :
   forall gst h,
     live_node gst (addr_of h) ->
@@ -157,6 +168,17 @@ Proof.
   rewrite (wf_ptr_eq h); auto.
   apply in_map.
   now apply live_addr_In_live_addrs.
+Qed.
+
+Lemma In_live_ptrs_live :
+  forall gst h,
+    In h (live_ptrs gst) ->
+    live_node gst (addr_of h).
+Proof.
+  unfold live_ptrs.
+  intros.
+  apply In_live_addrs_live.
+  now find_apply_lem_hyp in_map_iff; expand_def.
 Qed.
 
 Lemma not_in_filter_false :
@@ -195,6 +217,7 @@ Qed.
 
 (** Predecessor phase two definitions *)
 Definition better_pred (gst : global_state) (h p p' : pointer) : Prop :=
+  wf_ptr h /\
   wf_ptr p /\
   wf_ptr p' /\
   live_node gst (addr_of p') /\
@@ -209,11 +232,17 @@ Definition pred_correct (gst : global_state) (h : pointer) (p : option pointer) 
     forall p',
       ~ better_pred gst h p0 p'.
 
-Definition pred_error (gst : global_state) (h : pointer) (p : option pointer) : nat :=
-  counting_opt_error gst p (better_pred_bool h).
+Definition pred_error (gst : global_state) (h : addr) : nat :=
+  match sigma gst h with
+  | Some st =>
+    counting_opt_error gst (pred st) (better_pred_bool (make_pointer h))
+  | None =>
+    length (active_nodes gst) + 1
+  end.
 
 (** First successor phase two definitions *)
 Definition better_succ (gst : global_state) (h s s' : pointer) : Prop :=
+  wf_ptr h /\
   wf_ptr s /\
   wf_ptr s' /\
   live_node gst (addr_of s') /\
@@ -227,8 +256,13 @@ Definition first_succ_correct (gst : global_state) (h : pointer) (p : option poi
     p = Some p0 /\
     forall p', ~ better_succ gst h p0 p'.
 
-Definition first_succ_error (gst : global_state) (h : pointer) (s : option pointer) : nat :=
-  counting_opt_error gst s (better_succ_bool h).
+Definition first_succ_error (gst : global_state) (h : addr) : nat :=
+  match sigma gst h with
+  | Some st =>
+    counting_opt_error gst (hd_error (succ_list st)) (better_succ_bool (make_pointer h))
+  | None =>
+    length (active_nodes gst) + 1
+  end.
 
 (** First successor and predecessor combined phase two definitions *)
 Definition pred_and_first_succ_correct (gst : global_state) (h : pointer) (st : data) : Prop :=
@@ -236,13 +270,7 @@ Definition pred_and_first_succ_correct (gst : global_state) (h : pointer) (st : 
   first_succ_correct gst h (hd_error (succ_list st)).
 
 Definition pred_and_first_succ_error (h : addr) (gst : global_state) : nat :=
-  match sigma gst h with
-  | Some st =>
-    pred_error gst (make_pointer h) (pred st) +
-    first_succ_error gst (make_pointer h) (hd_error (succ_list st))
-  | None =>
-    length (active_nodes gst) + 1
-  end.
+  pred_error gst h + first_succ_error gst h.
 
 Definition phase_two_error : global_state -> nat :=
   global_measure pred_and_first_succ_error.
@@ -288,16 +316,17 @@ Lemma phase_two_zero_error_has_pred :
     sigma gst (addr_of h) = Some st ->
     pred_and_first_succ_error (addr_of h) gst = 0 ->
     exists p, pred st = Some p /\
-         pred_error gst h (Some p) = 0.
+         pred_error gst (addr_of h) = 0.
 Proof.
   intros.
   rewrite (wf_ptr_eq h); auto.
   unfold pred_and_first_succ_error in *.
-  break_match; try congruence.
-  find_injection.
+  find_apply_lem_hyp plus_is_O; break_and.
   destruct (pred ltac:(auto)) eqn:?H.
-  - eexists; split; [eauto | omega].
-  - simpl in *; omega.
+  - eexists; intuition eauto.
+  - unfold pred_error in *.
+    repeat find_rewrite.
+    simpl in *; omega.
 Qed.
 
 Lemma phase_two_zero_error_has_first_succ :
@@ -308,22 +337,22 @@ Lemma phase_two_zero_error_has_first_succ :
     pred_and_first_succ_error (addr_of h) gst = 0 ->
     exists s rest,
       succ_list st = s :: rest /\
-      first_succ_error gst h (Some s) = 0.
+      first_succ_error gst (addr_of h) = 0.
 Proof.
   intros.
   rewrite (wf_ptr_eq h); auto.
   unfold pred_and_first_succ_error in *.
-  break_match; try congruence.
-  find_injection.
+  find_apply_lem_hyp plus_is_O; break_and.
   destruct (succ_list ltac:(auto)) eqn:?H.
-  - simpl in *; omega.
-  - repeat eexists.
-    simpl in *.
-    omega.
+  - unfold first_succ_error in *.
+    repeat find_rewrite.
+    simpl in *; omega.
+  - repeat eexists; intuition eauto.
 Qed.
 
 Lemma better_pred_intro :
   forall gst h p p',
+    wf_ptr h ->
     wf_ptr p ->
     wf_ptr p' ->
     live_node gst (addr_of p') ->
@@ -337,6 +366,7 @@ Qed.
 Lemma better_pred_elim :
   forall gst h p p',
     better_pred gst h p p' ->
+    wf_ptr h /\
     wf_ptr p /\
     wf_ptr p' /\
     live_node gst (addr_of p') /\
@@ -348,6 +378,7 @@ Qed.
 
 Lemma better_pred_bool_true_better_pred :
   forall gst h p p',
+    wf_ptr h ->
     wf_ptr p ->
     wf_ptr p' ->
     live_node gst (addr_of p') ->
@@ -363,6 +394,7 @@ Qed.
 Lemma better_pred_better_pred_bool_true :
   forall gst h p p',
     better_pred gst h p p' ->
+    wf_ptr h /\
     wf_ptr p /\
     wf_ptr p' /\
     live_node gst (addr_of p') /\
@@ -376,6 +408,7 @@ Qed.
 Lemma better_succ_better_succ_bool_true :
   forall gst h s s',
     better_succ gst h s s' ->
+    wf_ptr h /\
     wf_ptr s /\
     wf_ptr s' /\
     live_node gst (addr_of s') /\
@@ -418,7 +451,7 @@ Proof.
   unfold pred_and_first_succ_correct; split.
   - find_copy_apply_lem_hyp phase_two_zero_error_has_pred; auto.
     break_exists_exists; break_and; split; auto.
-    unfold pred_error in *.
+    unfold pred_error in *; break_match; try congruence.
     find_apply_lem_hyp counting_opt_error_zero_implies_correct; expand_def.
     find_injection.
     intuition.
@@ -427,18 +460,22 @@ Proof.
            | [ H : forall x : ?T, _, y : ?T |- _ ] =>
              specialize (H y)
            end.
+    rewrite <- wf_ptr_eq in *; auto.
     congruence.
   - find_copy_apply_lem_hyp phase_two_zero_error_has_first_succ; auto.
     break_exists_exists; expand_def; split; try find_rewrite; auto.
-    unfold first_succ_error in *.
+    unfold first_succ_error in *; break_match; try congruence.
     find_apply_lem_hyp counting_opt_error_zero_implies_correct; expand_def.
     find_injection.
+    repeat find_rewrite.
+    simpl in *; find_injection.
     intuition.
     find_eapply_lem_hyp better_succ_better_succ_bool_true; break_and.
     repeat match goal with
            | [ H : forall x : ?T, _, y : ?T |- _ ] =>
              specialize (H y)
            end.
+    rewrite <- wf_ptr_eq in *; auto.
     congruence.
 Qed.
 
@@ -465,6 +502,37 @@ Definition has_first_succ (gst : global_state) (h : addr) (s : pointer) : Prop :
     sigma gst h = Some st /\
     hd_error (succ_list st) = Some s.
 
+Lemma pred_error_bound :
+  forall ex h st n,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    sigma (occ_gst (hd ex)) h = Some st ->
+    pred_error (occ_gst (hd ex)) h = n ->
+    always (now (fun occ => pred_error (occ_gst occ) h <= n)) ex.
+Proof.
+Admitted.
+
+Lemma first_succ_error_bound :
+  forall ex h st n,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    sigma (occ_gst (hd ex)) h = Some st ->
+    first_succ_error (occ_gst (hd ex)) h = n ->
+    always (now (fun occ => first_succ_error (occ_gst occ) h <= n)) ex.
+Proof.
+Admitted.
+
+Theorem phase_two_error_continuously_nonincreasing :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (infseq.hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
+    continuously (local_measures_nonincreasing pred_and_first_succ_error) ex.
+Proof.
+Admitted.
+
 Lemma stabilize_with_better_pred_completes :
   forall ex h dst p succs,
     lb_execution ex ->
@@ -488,6 +556,29 @@ Lemma stabilize_with_better_pred_completes :
 Proof.
 Admitted.
 
+Lemma stabilize_with_better_pred_completes' :
+  forall ex h dst p succs,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always (~_ (now circular_wait)) ex ->
+
+    open_stabilize_request_to (occ_gst (hd ex)) h dst ->
+    live_node (occ_gst (hd ex)) h ->
+    live_node (occ_gst (hd ex)) dst ->
+
+    In (GotPredAndSuccs (Some p) succs) (channel (occ_gst (hd ex)) dst h) ->
+
+    live_node (occ_gst (hd ex)) (addr_of p) ->
+    ptr_between (make_pointer h) p (make_pointer dst) ->
+
+    eventually (now (fun occ => has_first_succ (occ_gst occ) h p)) ex.
+Proof.
+  intros.
+  find_apply_lem_hyp stabilize_with_better_pred_completes; auto.
+  eapply eventually_monotonic_simple; [|eauto].
+  destruct s; now simpl.
+Qed.
+
 Lemma stabilize_with_worse_pred_completes :
   forall ex h dst p succs,
     lb_execution ex ->
@@ -510,8 +601,8 @@ Lemma stabilize_with_worse_pred_completes :
 Proof.
 Admitted.
 
-Lemma notify_causes_rectify_or_sets_pred :
-  forall ex h dst st,
+Lemma notify_causes_rectify :
+  forall ex h dst st p,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     always (~_ (now circular_wait)) ex ->
@@ -519,22 +610,19 @@ Lemma notify_causes_rectify_or_sets_pred :
     live_node (occ_gst (hd ex)) h ->
     live_node (occ_gst (hd ex)) dst ->
     sigma (occ_gst (hd ex)) dst = Some st ->
+    pred st = Some p ->
 
-    pred_error (occ_gst (hd ex)) (make_pointer dst) (Some (make_pointer h)) <=
-    pred_error (occ_gst (hd ex)) (make_pointer dst) (pred st) ->
+    ptr_between p (make_pointer h) (make_pointer dst) ->
     In Notify (channel (occ_gst (hd ex)) h dst) ->
-    
+
     eventually
-      ((now
+      (now
          (fun occ =>
             exists h',
               wf_ptr h' /\
               live_node (occ_gst occ) (addr_of h') /\
               better_pred (occ_gst occ) (make_pointer dst) (make_pointer h) h' /\
-              open_request_to (occ_gst (hd ex)) dst (addr_of h') Ping)) \/_
-      (now
-         (fun occ =>
-            has_pred (occ_gst occ) dst (Some (make_pointer h)))))
+              open_request_to (occ_gst (hd ex)) dst (addr_of h') Ping))
       ex.
 Proof.
 Admitted.
@@ -549,11 +637,12 @@ Lemma rectify_with_live_pred_sets_pred :
     live_node (occ_gst (hd ex)) dst ->
     sigma (occ_gst (hd ex)) dst = Some st ->
 
-    pred_error (occ_gst (hd ex)) (make_pointer dst) (Some (make_pointer h)) <=
-    pred_error (occ_gst (hd ex)) (make_pointer dst) (pred st) ->
+    (forall p,
+        pred st = Some p ->
+        better_pred (occ_gst (hd ex)) (make_pointer dst) (make_pointer h) p) ->
     open_request_to (occ_gst (hd ex)) dst h Ping ->
     In Notify (channel (occ_gst (hd ex)) h dst) ->
-    
+
     eventually
       (now
          (fun occ =>
@@ -618,12 +707,51 @@ Section MergePoint.
       strong_local_fairness ex ->
       always (~_ (now circular_wait)) ex ->
       always (now phase_one) ex ->
-      
+
       forall st,
         merge_point (occ_gst (hd ex)) a b j ->
         sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
         pred st = None ->
         eventually (pred_or_succ_improves j) ex.
+  Proof.
+  Admitted.
+
+  Lemma counting_opt_error_depends_on_live_addrs :
+    forall gst gst' p bb,
+      live_addrs gst' = live_addrs gst ->
+      wf_ptr p ->
+      counting_opt_error gst (Some p) bb = counting_opt_error gst' (Some p) bb.
+  Proof.
+    intros.
+    unfold counting_opt_error.
+    assert (live_ptrs gst = live_ptrs gst')
+      by (unfold live_ptrs; now f_equal).
+    repeat find_rewrite.
+    repeat break_match; try reflexivity.
+    - find_apply_lem_hyp live_In_live_ptrs; auto.
+      find_rewrite.
+      find_apply_lem_hyp In_live_ptrs_live.
+      tauto.
+    - find_apply_lem_hyp live_In_live_ptrs; auto.
+      find_reverse_rewrite.
+      find_apply_lem_hyp In_live_ptrs_live.
+      tauto.
+  Qed.
+
+  Lemma a_before_pred_merge_point_with_stabilize_request :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+
+      forall st p,
+        merge_point (occ_gst (hd ex)) a b j ->
+        sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
+        pred st = Some p ->
+        a <=? p = true ->
+        eventually (pred_or_succ_improves a) ex.
   Proof.
   Admitted.
 
@@ -640,8 +768,17 @@ Section MergePoint.
         sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
         pred st = Some p ->
         a <=? p = true ->
-        eventually (pred_or_succ_improves j) ex.
+        eventually (pred_or_succ_improves a) ex.
   Proof.
+    intros.
+    find_eapply_lem_hyp stabilize_with_better_pred_completes'; eauto.
+    assert (eventually (next (now (fun occ => has_first_succ (occ_gst occ) (addr_of a) p))) ex)
+      by admit.
+    induction 0.
+    - apply E0.
+      destruct s as [o [o' s]]; simpl in *.
+      unfold measure_decreasing; simpl in *.
+
   Admitted.
 
   Lemma a_after_pred_merge_point :
@@ -725,17 +862,6 @@ Lemma error_means_merge_point_or_wrong_pred :
           wrong_pred gst h) \/
     exists a b j,
       merge_point gst a b j.
-Proof.
-Admitted.
-
-Theorem phase_two_error_continuously_nonincreasing :
-  forall ex,
-    lb_execution ex ->
-    reachable_st (occ_gst (infseq.hd ex)) ->
-    strong_local_fairness ex ->
-    always (~_ (now circular_wait)) ex ->
-    always (now phase_one) ex ->
-    continuously (local_measures_nonincreasing pred_and_first_succ_error) ex.
 Proof.
 Admitted.
 
