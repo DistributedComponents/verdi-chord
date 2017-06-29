@@ -4,22 +4,9 @@ Require Import Verdi.DynamicNet.
 Require Chord.Chord.
 Import Chord.Chord.Chord.
 Import Chord.ChordIDSpace.
-Require Import Chord.ChordLocalProps.
-Require Import Chord.ChordProof.
-Require Import Chord.ChordDefinitionLemmas.
-Require Import List.
-Import ListNotations.
-Require Import InfSeqExt.infseq.
-Require Import InfSeqExt.classical.
-
-Set Bullet Behavior "Strict Subproofs".
-
 Require Chord.ChordSemantics.
 Import Chord.ChordSemantics.ChordSemantics.
 Import Chord.ChordSemantics.ConstrainedChord.
-Require Import Chord.ChordDefinitionLemmas.
-Require Import Chord.Measure.
-Require Import Chord.InfSeqTactics.
 
 Ltac live_node_invariant_finish_goal :=
   unfold live_node in *; simpl in *; intuition;
