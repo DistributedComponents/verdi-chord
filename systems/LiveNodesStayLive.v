@@ -37,10 +37,7 @@ Proof.
   | H : labeled_step_dynamic _ _ _ |- _ =>
     inv H
   end.
-  - find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-    find_apply_lem_hyp timeout_handler_eff_definition; expand_def.
-    + eapply live_node_characterization; eauto using sigma_ahr_passthrough.
-    unfold timeout_handler_l, timeout_handler_eff,
+  - unfold timeout_handler_l, timeout_handler_eff,
     tick_handler, keepalive_handler, do_rectify, request_timeout_handler,
     add_tick, handle_query_timeout, clear_query, end_query, start_query,
     update_query, update_succ_list in *.
