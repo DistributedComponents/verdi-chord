@@ -17,6 +17,7 @@ Require Import Chord.ChordSemantics.
 Import ChordSemantics.
 Import ConstrainedChord.
 Require Import Chord.ChordValidPointersInvariant.
+Require Import Chord.ChordQueryInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordDefinitionLemmas.
@@ -454,20 +455,117 @@ Proof.
   eexists; split; eauto using live_node_in_active.
 Qed.
 
-Definition has_pred (gst : global_state) (h : pointer) (p : option pointer) : Prop :=
+Definition has_pred (gst : global_state) (h : addr) (p : option pointer) : Prop :=
   exists st,
-    sigma gst (addr_of h) = Some st /\
+    sigma gst h = Some st /\
     pred st = p.
 
-Definition has_first_succ (gst : global_state) (h s : pointer) : Prop :=
+Definition has_first_succ (gst : global_state) (h : addr) (s : pointer) : Prop :=
   exists st,
-    sigma gst (addr_of h) = Some st /\
+    sigma gst h = Some st /\
     hd_error (succ_list st) = Some s.
+
+Lemma stabilize_with_better_pred_completes :
+  forall ex h dst p succs,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always (~_ (now circular_wait)) ex ->
+
+    open_stabilize_request_to (occ_gst (hd ex)) h dst ->
+    live_node (occ_gst (hd ex)) h ->
+    live_node (occ_gst (hd ex)) dst ->
+
+    In (GotPredAndSuccs (Some p) succs) (channel (occ_gst (hd ex)) dst h) ->
+
+    live_node (occ_gst (hd ex)) (addr_of p) ->
+    ptr_between (make_pointer h) p (make_pointer dst) ->
+
+    eventually (now (fun occ =>
+                       (* don't actually care about the Notify here *)
+                       In Notify (channel (occ_gst occ) h (addr_of p)) /\
+                       has_first_succ (occ_gst occ) h p))
+               ex.
+Proof.
+Admitted.
+
+Lemma stabilize_with_worse_pred_completes :
+  forall ex h dst p succs,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always (~_ (now circular_wait)) ex ->
+
+    open_stabilize_request_to (occ_gst (hd ex)) h dst ->
+    live_node (occ_gst (hd ex)) h ->
+    live_node (occ_gst (hd ex)) dst ->
+
+    In (GotPredAndSuccs (Some p) succs) (channel (occ_gst (hd ex)) dst h) ->
+
+    In (addr_of p) (failed_nodes (occ_gst (hd ex))) \/
+    ~ ptr_between (make_pointer h) p (make_pointer dst) ->
+
+    eventually (now (fun occ =>
+                       In Notify (channel (occ_gst occ) h dst) /\
+                       has_first_succ (occ_gst occ) h (make_pointer dst)))
+               ex.
+Proof.
+Admitted.
+
+Lemma notify_causes_rectify_or_sets_pred :
+  forall ex h dst st,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always (~_ (now circular_wait)) ex ->
+
+    live_node (occ_gst (hd ex)) h ->
+    live_node (occ_gst (hd ex)) dst ->
+    sigma (occ_gst (hd ex)) dst = Some st ->
+
+    pred_error (occ_gst (hd ex)) (make_pointer dst) (Some (make_pointer h)) <=
+    pred_error (occ_gst (hd ex)) (make_pointer dst) (pred st) ->
+    In Notify (channel (occ_gst (hd ex)) h dst) ->
+    
+    eventually
+      ((now
+         (fun occ =>
+            exists h',
+              wf_ptr h' /\
+              live_node (occ_gst occ) (addr_of h') /\
+              better_pred (occ_gst occ) (make_pointer dst) (make_pointer h) h' /\
+              open_request_to (occ_gst (hd ex)) dst (addr_of h') Ping)) \/_
+      (now
+         (fun occ =>
+            has_pred (occ_gst occ) dst (Some (make_pointer h)))))
+      ex.
+Proof.
+Admitted.
+
+Lemma rectify_with_live_pred_sets_pred :
+  forall ex h dst st,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always (~_ (now circular_wait)) ex ->
+
+    live_node (occ_gst (hd ex)) h ->
+    live_node (occ_gst (hd ex)) dst ->
+    sigma (occ_gst (hd ex)) dst = Some st ->
+
+    pred_error (occ_gst (hd ex)) (make_pointer dst) (Some (make_pointer h)) <=
+    pred_error (occ_gst (hd ex)) (make_pointer dst) (pred st) ->
+    open_request_to (occ_gst (hd ex)) dst h Ping ->
+    In Notify (channel (occ_gst (hd ex)) h dst) ->
+    
+    eventually
+      (now
+         (fun occ =>
+            has_pred (occ_gst occ) dst (Some (make_pointer h))))
+      ex.
+Proof.
+Admitted.
 
 Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
   ptr_between a b j /\
-  has_first_succ gst a j /\
-  has_first_succ gst b j /\
+  has_first_succ gst (addr_of a) j /\
+  has_first_succ gst (addr_of b) j /\
   wf_ptr a /\
   wf_ptr b /\
   wf_ptr j /\

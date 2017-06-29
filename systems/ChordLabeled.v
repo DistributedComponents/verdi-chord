@@ -24,6 +24,7 @@ Require Import Chord.ChordDefinitionLemmas.
 Require Import Chord.Measure.
 Require Import Chord.InfSeqTactics.
 Require Import Chord.LiveNodesStayLive.
+Require Import Chord.ChordQueryInvariant.
 
 (* assuming sigma gst h = Some st *)
 Definition failed_successors (gst : global_state) (st : data) : list pointer :=
@@ -1444,23 +1445,6 @@ Proof.
   - break_exists_exists. now constructor.
 Qed.
 
-Inductive request_msg_for_query : query -> payload -> Prop :=
-| RectifyMsg : forall p, request_msg_for_query (Rectify p) Ping
-| StabilizeMsg : request_msg_for_query Stabilize GetPredAndSuccs
-| Stabilize2Msg : forall p, request_msg_for_query (Stabilize2 p) GetSuccList
-| JoinGetBestPredecessor : forall k p, request_msg_for_query (Join k) (GetBestPredecessor p)
-| JoinGetSuccList : forall k, request_msg_for_query (Join k) GetSuccList
-| Join2Msg : forall s, request_msg_for_query (Join2 s) GetSuccList.
-
-Definition open_request_to (gst : global_state) (h : addr) (dst : addr) (m : payload) : Prop :=
-  In (Request dst m) (timeouts gst h) /\
-  In (h, (dst, m)) (msgs gst) /\
-  exists q st dstp,
-    request_msg_for_query q m /\
-    sigma gst h = Some st /\
-    addr_of dstp = dst /\
-    cur_request st = Some (dstp, q, m).
-
 Lemma Timeout_enabled_when_open_request_to_dead_node :
   forall occ h st dst req,
     live_node (occ_gst occ) h ->
@@ -1829,20 +1813,6 @@ Lemma msgs_remain_after_timeout :
     In (src, (dst, p)) (msgs gst').
 Admitted.
 
-Definition Request_payload_has_response (gst : global_state) : Prop :=
-  forall src dst p,
-    In (Request dst p) (timeouts gst src) ->
-    exists m,
-      request_response_pair p m.
-
-Definition responses_are_unique (gst : global_state) : Prop :=
-  forall src dst p m m',
-    In (src, (dst, m)) (msgs gst) ->
-    request_response_pair p m ->
-    In (src, (dst, m')) (msgs gst) ->
-    request_response_pair p m' ->
-    m = m'.
-
 Lemma handle_rectify_preserves_timeouts_in :
   forall st my_pred notifier st' ms nts cts,
     handle_rectify st my_pred notifier = (st', ms, nts, cts) ->
@@ -2054,22 +2024,6 @@ Proof using.
     apply E_next.
     now apply IHH_recv.
 Qed.
-
-Definition Request_has_message (gst : global_state) : Prop :=
-  forall src dst p m,
-    In (Request dst p) (timeouts gst src) ->
-    request_response_pair p m ->
-    (~ In dst (failed_nodes gst) /\
-     In (src, (dst, p)) (msgs gst)) \/
-    In (dst, (src, m)) (msgs gst).
-
-Definition Request_messages_unique (gst : global_state) : Prop :=
-  forall src dst p m m',
-    In (Request dst p) (timeouts gst src) ->
-    request_response_pair p m ->
-    In (dst, (src, m)) (msgs gst) ->
-    In (dst, (src, m')) (msgs gst) ->
-    m = m'.
 
 Lemma requests_eventually_get_responses :
   forall s,

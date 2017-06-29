@@ -297,6 +297,7 @@ Qed.
 Definition run_init_for (gst : global_state) (h : addr) : global_state :=
   let res := start_handler h initial_nodes in
   apply_handler_result h (res, []) [] gst.
+Hint Unfold run_init_for.
 
 Definition initial_st : global_state :=
   fold_left run_init_for initial_nodes

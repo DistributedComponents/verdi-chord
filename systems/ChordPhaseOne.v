@@ -18,6 +18,7 @@ Require Import Chord.ChordProof.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
+Require Import Chord.ChordQueryInvariant.
 Require Import Chord.ChordDefinitionLemmas.
 Require Import Chord.LiveNodesStayLive.
 Require Import Chord.ChordDeadNodesGoQuiet.

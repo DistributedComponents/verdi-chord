@@ -110,8 +110,6 @@ Proof.
       exfalso; eapply gt_irrefl; eauto.
 Qed.
 
-Hint Unfold run_init_for.
-
 Lemma msgs_initial_st_empty :
   msgs initial_st = nil.
 Proof.
@@ -162,3 +160,61 @@ Proof.
     repeat find_rewrite; find_apply_lem_hyp app_eq_nil; break_and.
     discriminate.
 Abort.
+
+Inductive request_msg_for_query : query -> payload -> Prop :=
+| RectifyMsg :
+    forall p,
+      request_msg_for_query (Rectify p) Ping
+| StabilizeMsg :
+    request_msg_for_query Stabilize GetPredAndSuccs
+| Stabilize2Msg :
+    forall p,
+      request_msg_for_query (Stabilize2 p) GetSuccList
+| JoinGetBestPredecessor :
+    forall k p,
+      request_msg_for_query (Join k) (GetBestPredecessor p)
+| JoinGetSuccList :
+    forall k,
+      request_msg_for_query (Join k) GetSuccList
+| Join2Msg :
+    forall s,
+      request_msg_for_query (Join2 s) GetSuccList.
+
+Definition open_request_to (gst : global_state) (h : addr) (dst : addr) (m : payload) : Prop :=
+  In (Request dst m) (timeouts gst h) /\
+  In (h, (dst, m)) (msgs gst) /\
+  exists q st dstp,
+    request_msg_for_query q m /\
+    sigma gst h = Some st /\
+    addr_of dstp = dst /\
+    cur_request st = Some (dstp, q, m).
+
+Definition responses_are_unique (gst : global_state) : Prop :=
+  forall src dst p m m',
+    In (src, (dst, m)) (msgs gst) ->
+    request_response_pair p m ->
+    In (src, (dst, m')) (msgs gst) ->
+    request_response_pair p m' ->
+    m = m'.
+
+Definition Request_has_message (gst : global_state) : Prop :=
+  forall src dst p m,
+    In (Request dst p) (timeouts gst src) ->
+    request_response_pair p m ->
+    (~ In dst (failed_nodes gst) /\
+     In (src, (dst, p)) (msgs gst)) \/
+    In (dst, (src, m)) (msgs gst).
+
+Definition Request_messages_unique (gst : global_state) : Prop :=
+  forall src dst p m m',
+    In (Request dst p) (timeouts gst src) ->
+    request_response_pair p m ->
+    In (dst, (src, m)) (msgs gst) ->
+    In (dst, (src, m')) (msgs gst) ->
+    m = m'.
+
+Definition Request_payload_has_response (gst : global_state) : Prop :=
+  forall src dst p,
+    In (Request dst p) (timeouts gst src) ->
+    exists m,
+      request_response_pair p m.
