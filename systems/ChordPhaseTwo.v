@@ -798,6 +798,14 @@ Section MergePoint.
   Proof.
   Admitted.
 
+  Lemma now_hd :
+    forall T (P : T -> Prop) ex,
+      now P ex ->
+      P (hd ex).
+  Proof.
+    now destruct ex.
+  Qed.
+
   Lemma a_before_pred_merge_point :
     forall ex,
       lb_execution ex ->
@@ -817,33 +825,52 @@ Section MergePoint.
     inv_prop merge_point; break_and.
     assert (has_pred (occ_gst (hd ex)) (addr_of j) (Some p))
       by (eexists; eauto).
-    eapply better_pred_eventually_improves_succ; eauto.
-    (* something about the unrolling and the regular between relation *)
-    { admit. }
-    replace (let (_, addr) := a in addr) with (addr_of a)
-      by reflexivity.
-    assert (always (now (fun occ => forall p', has_pred (occ_gst occ) (addr_of j) (Some p') -> ptr_between p p' j \/ p = p')) ex)
+    assert (always (now (fun occ => exists p', has_pred (occ_gst occ) (addr_of j) (Some p') /\
+                                       (ptr_between p p' j \/ p = p'))) ex)
            by admit.
-    cut (eventually (now (fun o => open_stabilize_request_to_first_succ (occ_gst o) (addr_of a))) ex);
-      [|auto using start_stabilize_with_first_successor_eventually].
-    intros.
-    clear H17 H6.
+    assert (eventually (now (fun o => open_stabilize_request_to_first_succ (occ_gst o) (addr_of a))) ex)
+      by auto using start_stabilize_with_first_successor_eventually.
+    clear H6 H17.
     clear dependent b.
     clear dependent st.
     induction 0 as [ex | o [o' ex]].
-    - find_apply_lem_hyp open_stabilize_request_eventually_gets_response;
+    - inv_prop always.
+      find_apply_lem_hyp now_hd.
+      break_exists; break_and.
+      eapply better_pred_eventually_improves_succ; eauto.
+      (* something about the unrolling and the regular between relation *)
+      { admit. }
+      (* shouldn't have to do this *)
+      replace (let (_, addr) := a in addr) with (addr_of a)
+        by reflexivity.
+      find_apply_lem_hyp open_stabilize_request_eventually_gets_response;
         try now destruct ex.
       eapply eventually_monotonic;
         [ | | eapply H18 | eapply H9];
         invar_eauto.
       intros.
-      inv_prop always.
+      clear dependent ex.
       destruct s; simpl in *.
-      firstorder.
-      repeat eexists; firstorder eauto.
-    - apply E_next.
-      apply IHeventually;
-        invar_eauto.
+      repeat break_and.
+      split; auto.
+      break_exists_exists; break_and.
+      split; auto.
+      split; auto.
+      inv_prop always; simpl in *.
+      break_exists; break_and.
+      admit.
+    - assert (live_node (occ_gst o') (addr_of a))
+        by (inv_prop lb_execution; invar_eauto).
+      inv_prop live_node; break_and.
+      break_exists_name a_st; break_and.
+      destruct (hd_error (succ_list a_st)) as [s |] eqn:?H.
+      + destruct (pointer_eq_dec s j); subst.
+        * apply E_next.
+          apply IHeventually;
+            invar_eauto.
+          eexists; eauto.
+        * admit.
+      + admit.
   Admitted.
 
   Lemma a_after_pred_merge_point :
