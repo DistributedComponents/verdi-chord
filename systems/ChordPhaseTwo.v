@@ -665,6 +665,28 @@ Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
 Definition pred_or_succ_improves (h : pointer) : infseq occurrence -> Prop :=
   consecutive (measure_decreasing (pred_and_first_succ_error (addr_of h))).
 
+Lemma better_pred_eventually_improves_succ :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
+    
+    forall h p s,
+      has_first_succ (occ_gst (hd ex)) h s ->
+      has_pred (occ_gst (hd ex)) (addr_of s) (Some p) ->
+      ptr_between (make_pointer h) p s ->
+      eventually (now (fun occ =>
+                         open_request_to (occ_gst occ) h (addr_of s) GetPredAndSuccs /\
+                         exists p' succs,
+                           In (GotPredAndSuccs (Some p') succs) (channel (occ_gst occ) (addr_of s) h) /\
+                           (ptr_between p p' s \/ p = p') /\
+                           has_pred (occ_gst occ) (addr_of s) (Some p'))) ex ->
+      eventually (pred_or_succ_improves (make_pointer h)) ex.
+Proof.
+Admitted.
+
 Section MergePoint.
   Variables j a b : pointer.
 
@@ -771,14 +793,12 @@ Section MergePoint.
         eventually (pred_or_succ_improves a) ex.
   Proof.
     intros.
-    find_eapply_lem_hyp stabilize_with_better_pred_completes'; eauto.
-    assert (eventually (next (now (fun occ => has_first_succ (occ_gst occ) (addr_of a) p))) ex)
-      by admit.
-    induction 0.
-    - apply E0.
-      destruct s as [o [o' s]]; simpl in *.
-      unfold measure_decreasing; simpl in *.
-
+    inv_prop merge_point; break_and.
+    assert (has_pred (occ_gst (hd ex)) (addr_of j) (Some p))
+      by (eexists; eauto).
+    eapply better_pred_eventually_improves_succ; eauto.
+    (* something about the unrolling and the regular between relation *)
+    admit.
   Admitted.
 
   Lemma a_after_pred_merge_point :

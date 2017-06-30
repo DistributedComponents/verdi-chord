@@ -319,6 +319,7 @@ Proof.
 Qed.
 
 Definition open_stabilize_request_to (gst : global_state) (h : addr) (dst : addr) : Prop :=
+  In GetPredAndSuccs (channel gst h dst) /\
   open_request_to gst h dst GetPredAndSuccs.
 
 Definition open_stabilize_request (gst : global_state) (h : addr) : Prop :=
@@ -609,10 +610,10 @@ Proof.
     find_apply_lem_hyp hd_error_tl_exists; expand_def.
     repeat (find_rewrite; repeat find_injection).
     simpl in *.
-    repeat split; simpl in *;
-      rewrite_update;
-      repeat eexists;
-      eauto using StabilizeMsg with datatypes.
+    repeat split;
+      try apply channel_contents; simpl in *;
+      rewrite_update; repeat eexists;
+        eauto using StabilizeMsg with datatypes.
   - simpl in *.
     find_rewrite.
     find_injection.
@@ -757,7 +758,6 @@ Proof.
   repeat find_reverse_rewrite.
   find_injection.
 
-  clear H11.
   inv_prop open_request_to; expand_def.
   inv_prop request_msg_for_query.
   simpl in *.
@@ -846,24 +846,23 @@ Proof.
   intros.
   find_copy_apply_lem_hyp leading_failed_succs_nonzero_means_dead_succ; expand_def.
   unfold open_stabilize_request_to_first_succ in *.
+  invc_prop has_dead_first_succ; expand_def.
   inv_prop has_dead_first_succ; expand_def.
   find_copy_apply_hyp_hyp.
+  inv_prop open_stabilize_request_to.
   find_copy_eapply_lem_hyp open_stabilize_request_until_timeout; eauto.
   find_copy_apply_lem_hyp request_eventually_fires;
     eauto using strong_local_fairness_weak.
   find_copy_apply_lem_hyp eventually_weak_until_cumul; eauto.
   find_copy_apply_lem_hyp reachable_st_always; auto.
-  eapply eventually_monotonic; [| | eauto | eauto]; intros.
-  - invar_eauto.
-  - invc_prop always.
-    unfold and_tl in *; break_and.
-    invcs_prop weak_until; break_and;
-      destruct s;
-      eapply stabilize_Request_timeout_decreases_error; eauto.
+  - eapply eventually_monotonic; [| | eauto | eauto]; intros.
+    + invar_eauto.
+    + invc_prop always.
+      unfold and_tl in *; break_and.
+      invcs_prop weak_until; break_and;
+        destruct s;
+        eapply stabilize_Request_timeout_decreases_error; eauto.
   - eapply weak_until_latch_eventually; eauto.
-  - invcs_prop has_dead_first_succ; expand_def.
-    invcs_prop has_dead_first_succ; expand_def.
-    congruence.
 Qed.
 
 Lemma nonzero_phase_one_error_eventually_drops_dead_quiet :
