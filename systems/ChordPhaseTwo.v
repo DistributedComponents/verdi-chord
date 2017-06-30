@@ -672,7 +672,7 @@ Lemma better_pred_eventually_improves_succ :
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
     always (now phase_one) ex ->
-    
+
     forall h p s,
       has_first_succ (occ_gst (hd ex)) h s ->
       has_pred (occ_gst (hd ex)) (addr_of s) (Some p) ->
@@ -684,6 +684,27 @@ Lemma better_pred_eventually_improves_succ :
                            (ptr_between p p' s \/ p = p') /\
                            has_pred (occ_gst occ) (addr_of s) (Some p'))) ex ->
       eventually (pred_or_succ_improves (make_pointer h)) ex.
+Proof.
+Admitted.
+
+Lemma open_stabilize_request_eventually_gets_response :
+  forall ex h j,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
+    wf_ptr j ->
+    has_first_succ (occ_gst (hd ex)) h j ->
+    open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    eventually
+      (now (fun occ =>
+              open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
+              (exists p succs,
+                  In (GotPredAndSuccs (Some p) succs)
+                     (channel (occ_gst occ) (addr_of j) h) /\
+                  has_pred (occ_gst occ) (addr_of j) (Some p))))
+      ex.
 Proof.
 Admitted.
 
@@ -798,7 +819,31 @@ Section MergePoint.
       by (eexists; eauto).
     eapply better_pred_eventually_improves_succ; eauto.
     (* something about the unrolling and the regular between relation *)
-    admit.
+    { admit. }
+    replace (let (_, addr) := a in addr) with (addr_of a)
+      by reflexivity.
+    assert (always (now (fun occ => forall p', has_pred (occ_gst occ) (addr_of j) (Some p') -> ptr_between p p' j \/ p = p')) ex)
+           by admit.
+    cut (eventually (now (fun o => open_stabilize_request_to_first_succ (occ_gst o) (addr_of a))) ex);
+      [|auto using start_stabilize_with_first_successor_eventually].
+    intros.
+    clear H17 H6.
+    clear dependent b.
+    clear dependent st.
+    induction 0 as [ex | o [o' ex]].
+    - find_apply_lem_hyp open_stabilize_request_eventually_gets_response;
+        try now destruct ex.
+      eapply eventually_monotonic;
+        [ | | eapply H18 | eapply H9];
+        invar_eauto.
+      intros.
+      inv_prop always.
+      destruct s; simpl in *.
+      firstorder.
+      repeat eexists; firstorder eauto.
+    - apply E_next.
+      apply IHeventually;
+        invar_eauto.
   Admitted.
 
   Lemma a_after_pred_merge_point :
