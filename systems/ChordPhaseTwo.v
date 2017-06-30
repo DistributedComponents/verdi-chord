@@ -27,6 +27,33 @@ Require Import Chord.ChordPhaseOne.
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
 
+Lemma now_hd :
+  forall T (P : T -> Prop) ex,
+    now P ex ->
+    P (hd ex).
+Proof.
+  now destruct ex.
+Qed.
+
+Lemma always_now' :
+  forall T (P : infseq T -> Prop) ex,
+    always P ex ->
+    P ex.
+Proof.
+  destruct ex.
+  apply always_now.
+Qed.
+
+Lemma always_now_hd :
+  forall T (P : T -> Prop) ex,
+    always (now P) ex ->
+    P (hd ex).
+Proof.
+  intros.
+  destruct ex.
+  now find_apply_lem_hyp always_Cons.
+Qed.
+
 Definition live_addrs (gst : global_state) : list addr :=
   filter (fun a => Coqlib.proj_sumbool (live_node_dec gst a))
          (nodes gst).
@@ -658,6 +685,9 @@ Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
   wf_ptr a /\
   wf_ptr b /\
   wf_ptr j /\
+  a <> j /\
+  b <> j /\
+  a <> b /\
   live_node gst (addr_of a) /\
   live_node gst (addr_of b) /\
   live_node gst (addr_of j).
@@ -727,6 +757,7 @@ Section MergePoint.
     destruct (unroll_between h y x) eqn:?H;
       eauto using unrolling_antisymmetric.
   Qed.
+
   Lemma order_cases_le_gt :
     forall x y,
       x <=? y = true \/ x >? y = true.
@@ -798,13 +829,55 @@ Section MergePoint.
   Proof.
   Admitted.
 
-  Lemma now_hd :
-    forall T (P : T -> Prop) ex,
-      now P ex ->
-      P (hd ex).
+  Lemma has_pred_eq :
+    forall gst h p q,
+      has_pred gst h p ->
+      has_pred gst h q ->
+      p = q.
   Proof.
-    now destruct ex.
+    intros.
+    repeat invcs_prop has_pred; break_and.
+    congruence.
   Qed.
+
+  Ltac find_has_pred_eq :=
+    match goal with
+    | H : has_pred _ _ _ |- _ =>
+      eapply has_pred_eq in H;
+      [|clear H; now eauto]
+    end.
+
+  Definition pred_not_worse (h l : pointer) (ex : infseq occurrence) :=
+    exists p,
+      ptr_between l p h /\
+      now (fun occ => has_pred (occ_gst occ) (addr_of h) (Some p)) ex /\
+      always (now (fun occ =>
+                     exists p',
+                       has_pred (occ_gst occ) (addr_of h) (Some p') /\
+                       (ptr_between p p' h \/ p = p')))
+             ex.
+
+  Lemma pred_bound_pred_not_worse :
+    forall ex p,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      always (now phase_one) ex ->
+
+      j <> a ->
+      has_pred (occ_gst (hd ex)) (addr_of j) (Some p) ->
+      a <=? p = true ->
+      always (pred_not_worse j a) ex.
+  Proof.
+  Admitted.
+
+  Ltac eapply_prop' P :=
+    match goal with
+    | H: P _ |- _ => eapply H
+    | H: P _ _ |- _ => eapply H
+    | H: P _ _ _ |- _ => eapply H
+    | H: P _ _ _ _ |- _ => eapply H
+    | H: context[P] |- _ => eapply H
+    end.
 
   Lemma a_before_pred_merge_point :
     forall ex,
@@ -822,54 +895,52 @@ Section MergePoint.
         eventually (pred_or_succ_improves a) ex.
   Proof.
     intros.
-    inv_prop merge_point; break_and.
+    invcs_prop merge_point; break_and.
     assert (has_pred (occ_gst (hd ex)) (addr_of j) (Some p))
       by (eexists; eauto).
-    assert (always (now (fun occ => exists p', has_pred (occ_gst occ) (addr_of j) (Some p') /\
-                                       (ptr_between p p' j \/ p = p'))) ex)
-           by admit.
+    assert (always (pred_not_worse j a) ex)
+      by eauto using pred_bound_pred_not_worse.
     assert (eventually (now (fun o => open_stabilize_request_to_first_succ (occ_gst o) (addr_of a))) ex)
       by auto using start_stabilize_with_first_successor_eventually.
-    clear H6 H17.
-    clear dependent b.
+    clear dependent p.
     clear dependent st.
+    clear dependent b.
     induction 0 as [ex | o [o' ex]].
-    - inv_prop always.
+    - find_copy_apply_lem_hyp always_now'.
+      inv_prop pred_not_worse; expand_def.
       find_apply_lem_hyp now_hd.
-      break_exists; break_and.
       eapply better_pred_eventually_improves_succ; eauto.
-      (* something about the unrolling and the regular between relation *)
-      { admit. }
-      (* shouldn't have to do this *)
-      replace (let (_, addr) := a in addr) with (addr_of a)
-        by reflexivity.
+      {
+        (* Why do I have to do this? *)
+        fold (ptrAddr a) (addr_of a).
+        try now rewrite <- wf_ptr_eq.
+      }
       find_apply_lem_hyp open_stabilize_request_eventually_gets_response;
         try now destruct ex.
+      find_eapply_lem_hyp always_and_tl; [|eapply_prop' pred_not_worse].
       eapply eventually_monotonic;
-        [ | | eapply H18 | eapply H9];
+        [ | | eapply_prop' always | eauto ];
         invar_eauto.
       intros.
       clear dependent ex.
       destruct s; simpl in *.
-      repeat break_and.
-      split; auto.
-      break_exists_exists; break_and.
-      split; auto.
-      split; auto.
-      inv_prop always; simpl in *.
-      break_exists; break_and.
-      admit.
+      intuition.
+      repeat break_exists_exists.
+      intuition.
+      repeat find_apply_lem_hyp always_now'.
+      unfold and_tl in *; simpl in *; break_and; break_exists; break_and.
+      invc_prop pred_not_worse; break_and.
+      repeat find_has_pred_eq.
+      congruence.
     - assert (live_node (occ_gst o') (addr_of a))
         by (inv_prop lb_execution; invar_eauto).
       inv_prop live_node; break_and.
       break_exists_name a_st; break_and.
-      destruct (hd_error (succ_list a_st)) as [s |] eqn:?H.
-      + destruct (pointer_eq_dec s j); subst.
-        * apply E_next.
+      destruct (option_eq_dec _ pointer_eq_dec (Some j) (hd_error (succ_list a_st))) eqn:?H.
+      + apply E_next.
           apply IHeventually;
             invar_eauto.
           eexists; eauto.
-        * admit.
       + admit.
   Admitted.
 
