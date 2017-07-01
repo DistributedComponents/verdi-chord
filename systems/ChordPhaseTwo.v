@@ -259,7 +259,7 @@ Definition pred_correct (gst : global_state) (h : pointer) (p : option pointer) 
     forall p',
       ~ better_pred gst h p0 p'.
 
-Definition pred_error (gst : global_state) (h : addr) : nat :=
+Definition pred_error (h : addr) (gst : global_state) : nat :=
   match sigma gst h with
   | Some st =>
     counting_opt_error gst (pred st) (better_pred_bool (make_pointer h))
@@ -283,7 +283,7 @@ Definition first_succ_correct (gst : global_state) (h : pointer) (p : option poi
     p = Some p0 /\
     forall p', ~ better_succ gst h p0 p'.
 
-Definition first_succ_error (gst : global_state) (h : addr) : nat :=
+Definition first_succ_error (h : addr) (gst : global_state) : nat :=
   match sigma gst h with
   | Some st =>
     counting_opt_error gst (hd_error (succ_list st)) (better_succ_bool (make_pointer h))
@@ -297,7 +297,7 @@ Definition pred_and_first_succ_correct (gst : global_state) (h : pointer) (st : 
   first_succ_correct gst h (hd_error (succ_list st)).
 
 Definition pred_and_first_succ_error (h : addr) (gst : global_state) : nat :=
-  pred_error gst h + first_succ_error gst h.
+  pred_error h gst + first_succ_error h gst.
 
 Definition phase_two_error : global_state -> nat :=
   global_measure pred_and_first_succ_error.
@@ -343,7 +343,7 @@ Lemma phase_two_zero_error_has_pred :
     sigma gst (addr_of h) = Some st ->
     pred_and_first_succ_error (addr_of h) gst = 0 ->
     exists p, pred st = Some p /\
-         pred_error gst (addr_of h) = 0.
+         pred_error (addr_of h) gst = 0.
 Proof.
   intros.
   rewrite (wf_ptr_eq h); auto.
@@ -364,7 +364,7 @@ Lemma phase_two_zero_error_has_first_succ :
     pred_and_first_succ_error (addr_of h) gst = 0 ->
     exists s rest,
       succ_list st = s :: rest /\
-      first_succ_error gst (addr_of h) = 0.
+      first_succ_error (addr_of h) gst = 0.
 Proof.
   intros.
   rewrite (wf_ptr_eq h); auto.
@@ -534,8 +534,8 @@ Lemma pred_error_bound :
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
     sigma (occ_gst (hd ex)) h = Some st ->
-    pred_error (occ_gst (hd ex)) h = n ->
-    always (now (fun occ => pred_error (occ_gst occ) h <= n)) ex.
+    pred_error h (occ_gst (hd ex)) = n ->
+    always (now (fun occ => pred_error h (occ_gst occ) <= n)) ex.
 Proof.
 Admitted.
 
@@ -544,8 +544,8 @@ Lemma first_succ_error_bound :
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
     sigma (occ_gst (hd ex)) h = Some st ->
-    first_succ_error (occ_gst (hd ex)) h = n ->
-    always (now (fun occ => first_succ_error (occ_gst occ) h <= n)) ex.
+    first_succ_error h (occ_gst (hd ex)) = n ->
+    always (now (fun occ => first_succ_error h (occ_gst occ) <= n)) ex.
 Proof.
 Admitted.
 
@@ -944,8 +944,8 @@ Section MergePoint.
       + apply E0.
         simpl in *.
         find_apply_lem_hyp always_now; break_and.
-        cut (first_succ_error (occ_gst o') (addr_of a) < 
-             first_succ_error (occ_gst o) (addr_of a)).
+        cut (first_succ_error (addr_of a) (occ_gst o') < 
+             first_succ_error (addr_of a) (occ_gst o)).
         * admit.
         * admit.
   Admitted.
