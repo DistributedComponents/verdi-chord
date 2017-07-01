@@ -1470,6 +1470,15 @@ Proof.
   destruct (eq_dec a x); eauto using remove_preserve.
 Qed.
 
+Lemma if_branches_same :
+  forall A p (x : A),
+    (if p then x else x) = x.
+Proof.
+  intros.
+  break_if; auto.
+Qed.
+  
+
 Lemma open_request_to_dead_node_preserved_or_times_out :
   forall gst l gst' h dst req,
     reachable_st gst ->
@@ -1484,24 +1493,73 @@ Lemma open_request_to_dead_node_preserved_or_times_out :
 Proof.
   intros.
   inv_labeled_step.
-  - admit.
-  - left. repeat unfold recv_handler_l, recv_handler,
-    handle_msg, do_delayed_queries,
-    clear_delayed_queries, tick_handler, keepalive_handler, do_rectify, request_timeout_handler,
-    handle_rectify, handle_query_req,
-    handle_query_req_busy, handle_query_res, start_query, delay_query,
-    schedule_rectify_with,
-    handle_stabilize,
-    add_tick,
-    update_query, update_succ_list,
-    end_query, clear_query
-      in *. repeat break_match; simpl in *; try discriminate.
-    + repeat find_inversion. simpl. unfold open_request_to in *.
-      simpl in *.
-      update_destruct; subst; rewrite_update; repeat find_rewrite; intuition.
-      * rewrite app_nil_r.
-        eauto using remove_all_add_back.
-    +
+  - find_apply_lem_hyp timeout_handler_l_definition.
+    break_exists; intuition; subst.
+    destruct t.
+    + left. simpl in *.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and.
+      destruct (addr_eq_dec h h0).
+      * subst. repeat find_rewrite. find_inversion.
+        unfold tick_handler in *.
+        repeat find_rewrite. find_inversion.
+        simpl in *. rewrite_update.
+        intuition; [|repeat eexists; intuition; now eauto].
+        in_crush. right. eapply remove_preserve; eauto; congruence.
+      * rewrite_update. intuition.
+        repeat eexists; intuition; now eauto.
+    + left. simpl in *.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and.
+      destruct (addr_eq_dec h h0).
+      * subst. repeat find_rewrite. find_inversion.
+        unfold do_rectify in *.
+        repeat find_rewrite.
+        find_rewrite_lem if_branches_same.
+        find_inversion.
+        simpl in *. rewrite_update.
+        intuition; [|repeat eexists; intuition; now eauto].
+        eapply remove_preserve; eauto; congruence.
+      * rewrite_update. intuition.
+        repeat eexists; intuition; now eauto.
+    + left. simpl in *.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and.
+      destruct (addr_eq_dec h h0).
+      * subst. repeat find_rewrite. find_inversion.
+        unfold keepalive_handler in *.
+        repeat find_rewrite.
+        find_inversion.
+        simpl in *. rewrite_update.
+        intuition; [|repeat eexists; intuition; now eauto].
+        in_crush. right. eapply remove_preserve; eauto; congruence.
+      * rewrite_update. intuition.
+        repeat eexists; intuition; now eauto.
+    + simpl in *.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and.
+      destruct (addr_eq_dec h h0).
+      * subst. repeat find_rewrite. find_inversion.
+        unfold request_timeout_handler in *.
+        repeat find_rewrite. break_if.
+        -- find_inversion. right. f_equal.
+           eauto using at_most_one_request_timeout_uniqueness,
+           at_most_one_requuest_timeout_invariant.
+        -- left. find_inversion.
+           simpl in *. rewrite_update.
+           intuition; [|repeat eexists; intuition; now eauto].
+           eapply remove_preserve; eauto; congruence.
+      * left. rewrite_update. intuition.
+        repeat eexists; intuition; now eauto.
+  - left. find_apply_lem_hyp recv_handler_labeling.
+    destruct m as [snd [recv pay]]. simpl in *.
+    destruct pay.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      admit (* Blocked on change to Chord to ignore irrelevant messages *)
+    + admit.
 Admitted.
 
 Lemma in_active_in_nodes :
