@@ -936,12 +936,18 @@ Section MergePoint.
         by (inv_prop lb_execution; invar_eauto).
       inv_prop live_node; break_and.
       break_exists_name a_st; break_and.
-      destruct (option_eq_dec _ pointer_eq_dec (Some j) (hd_error (succ_list a_st))) eqn:?H.
+      destruct (option_eq_dec _ pointer_eq_dec (Some j) (hd_error (succ_list a_st))).
       + apply E_next.
           apply IHeventually;
             invar_eauto.
           eexists; eauto.
-      + admit.
+      + apply E0.
+        simpl in *.
+        find_apply_lem_hyp always_now; break_and.
+        cut (first_succ_error (occ_gst o') (addr_of a) < 
+             first_succ_error (occ_gst o) (addr_of a)).
+        * admit.
+        * admit.
   Admitted.
 
   Lemma a_after_pred_merge_point :
