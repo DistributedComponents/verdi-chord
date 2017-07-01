@@ -145,7 +145,8 @@ Lemma handle_msg_definition :
          (is_request p = true /\
           handle_query_req_busy src st p = (st', ms, newts, clearedts) \/
           is_request p = false /\
-          handle_query_res src dst st query p = (st', ms, newts, clearedts))) \/
+          (addr_of query_dst <> src /\ st' = st /\ clearedts = [] /\ newts = [] /\ ms = [] \/
+          handle_query_res src dst st query p = (st', ms, newts, clearedts)))) \/
 
      cur_request st = None /\
      st' = st /\
@@ -163,8 +164,11 @@ Proof.
     repeat split; try auto.
     destruct (cur_request st) as [[[query_dst query] query_msg]|] eqn:H_cur.
     + left; repeat eexists; eauto.
-      destruct (is_request p) eqn:H_isreq;
-        repeat break_match; simpl in *; congruence || tauto.
+      destruct (is_request p) eqn:?H;
+        destruct (addr_eq_dec (addr_of query_dst) src) eqn:?H;
+        repeat find_rewrite; simpl in *;
+          break_match; simpl in *;
+            try congruence; try tuple_inversion; intuition.
     + repeat break_match; try tuple_inversion; tauto.
 Qed.
 

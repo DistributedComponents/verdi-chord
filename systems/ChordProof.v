@@ -113,6 +113,7 @@ Proof.
     end.
   - eapply handle_query_req_busy_sends_busy; eauto.
   - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
+  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
 Qed.
 
 Lemma real_requests_get_response_handle_query_req :
@@ -173,6 +174,7 @@ Proof.
   find_apply_lem_hyp handle_msg_definition; expand_def.
   - solve_by_inversion.
   - congruence.
+  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
   - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
   - eapply real_requests_get_response_handle_query_req; eauto.
 Qed.

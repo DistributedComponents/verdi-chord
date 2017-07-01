@@ -1855,14 +1855,20 @@ Lemma timeout_constraint_lifted_by_clearing :
   forall o o' src dst p,
     responses_are_unique (occ_gst o) ->
     Request_payload_has_response (occ_gst o) ->
-    In (Request dst p) (timeouts (occ_gst o) src) ->
+    open_request_to (occ_gst o) src dst p ->
     labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst o') ->
     ~ timeout_constraint (occ_gst o) src (Request dst p) ->
     ~ timeout_constraint (occ_gst o') src (Request dst p) \/
     clears_timeout src (Request dst p) o.
 Proof using.
   move => o o' src dst p H_uniqr H_res H_req H_step H_nt.
-  inv_labeled_step.
+  invc H_req.
+  break_exists_name q;
+    break_exists_name st;
+    break_exists_name dstp;
+    break_and.
+  inv_labeled_step;
+    remember (addr_of dstp) as dst.
   - left.
     destruct (addr_eq_dec h src);
       destruct (timeout_eq_dec t (Request dst p));
@@ -1901,7 +1907,7 @@ Proof using.
         repeat find_rewrite.
         find_copy_eapply_lem_hyp msgs_remain_after_timeout;
           intuition eauto.
-  - copy_apply H_res H_req.
+  - find_apply_lem_hyp H_res.
     break_exists_name m'.
     (* should really be: request_response_pair p m is decidable *)
     pose proof (msg_eq_dec (dst, (src, m')) m) as H_eqdec.
@@ -1911,15 +1917,17 @@ Proof using.
       simpl in *.
       unfold recv_handler_l in *; tuple_inversion.
       eapply ct_RecvMsg; eauto.
-      destruct (handle_msg dst src d m') as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
-      destruct (do_delayed_queries dst st') as [[[?st ?ms] ?nts] ?cts] eqn:?H.
+      destruct (handle_msg (addr_of dstp) src d m') as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
+      destruct (do_delayed_queries (addr_of dstp) st') as [[[?st ?ms] ?nts] ?cts] eqn:?H.
       find_copy_eapply_lem_hyp recv_handler_definition; eauto; break_and.
       repeat find_rewrite. simpl.
       find_apply_lem_hyp handle_msg_definition; expand_def.
-      + inversion H0.
-      + inversion H0.
+      + solve_by_inversion.
+      + solve_by_inversion.
       + find_apply_lem_hyp is_request_same_as_request_payload.
-        inversion H11; inversion H0; congruence.
+        inv_prop request_response_pair;
+          solve_by_inversion.
+      + admit.
       + find_apply_lem_hyp handle_query_res_definition; expand_def; simpl;
         try (find_apply_lem_hyp is_request_same_as_request_payload; find_contradiction).
         -- find_copy_eapply_lem_hyp timeouts_in_Request; eauto.
@@ -2025,17 +2033,32 @@ Proof.
   - firstorder.
 Qed.
 
+Definition Request_has_open_request_to (gst : global_state) :=
+  forall src dst p,
+    In (Request dst p) (timeouts gst src) ->
+    open_request_to gst src dst p.
+
+Lemma Request_implies_open_request_to :
+  forall dst p gst l gst' src,
+    labeled_step_dynamic gst l gst' ->
+    open_request_to gst src dst p ->
+    In (Request dst p) (timeouts gst' src) ->
+    open_request_to gst' src dst p.
+Proof.
+Admitted.
+
 Lemma queries_now_closed :
   forall s p m dst src,
     lb_execution s ->
     reachable_st (occ_gst (hd s)) ->
     request_response_pair p m ->
+    open_request_to (occ_gst (hd s)) src dst p ->
     In (Request dst p) (timeouts (occ_gst (hd s)) src) ->
     ~ timeout_constraint (occ_gst (hd s)) src (Request dst p) ->
     eventually (now (occurred (RecvMsg dst src m))) s ->
     eventually (now (clears_timeout src (Request dst p))) s.
 Proof using.
-  move => s p m dst src H_exec H_inv H_pair H_t H_const H_recv.
+  move => s p m dst src H_exec H_inv H_pair H_req H_t H_const H_recv.
   induction H_recv as [ | o s'].
   - apply E0.
     unfold now in *.
@@ -2050,7 +2073,9 @@ Proof using.
     copy_eapply request_stays_in H_exec; eauto.
     break_or_hyp; [| by apply E0].
     apply E_next.
-    now apply IHH_recv.
+    apply IHH_recv; auto.
+    inv_prop (lb_execution (Cons o (Cons o' s'))).
+    eapply Request_implies_open_request_to; eauto.
 Qed.
 
 Lemma requests_eventually_get_responses :
@@ -2080,13 +2105,14 @@ Lemma requests_eventually_complete :
       In dst (nodes (occ_gst (hd s))) ->
       request_response_pair p m ->
       ~ timeout_constraint (occ_gst (hd s)) src (Request dst p) ->
-      In (Request dst p) (timeouts (occ_gst (hd s)) src) ->
+      open_request_to (occ_gst (hd s)) src dst p ->
       eventually (now (clears_timeout src (Request dst p))) s.
 Proof using.
   intros.
+  inv_prop open_request_to; expand_def.
   find_copy_eapply_lem_hyp requests_eventually_get_responses; eauto.
-  break_exists_name m'.
-  now eapply queries_now_closed with (m:=m').
+  break_exists_name m'; break_and.
+  eapply queries_now_closed with (m:=m'); eauto.
 Qed.
 
 Lemma constrained_timeout_eventually_cleared :
@@ -2099,6 +2125,8 @@ Lemma constrained_timeout_eventually_cleared :
     Request_goes_to_real_node (occ_gst (hd s)) ->
     Request_payload_has_response (occ_gst (hd s)) ->
     Request_has_message (occ_gst (hd s)) ->
+    Request_has_open_request_to (occ_gst (hd s)) ->
+
     forall h st t,
       In t (timeouts (occ_gst (hd s)) h) ->
       In h (nodes (occ_gst (hd s))) ->
@@ -2107,7 +2135,7 @@ Lemma constrained_timeout_eventually_cleared :
       ~ timeout_constraint (occ_gst (hd s)) h t ->
       eventually (now (clears_timeout h t)) s.
 Proof using.
-  move => s H_exec H_fair H_inv H_tmsg H_reqnode H_res H_uniqm h st t H_t H_node H_live H_st H_constraint.
+  move => s H_exec H_fair H_inv H_tmsg H_reqnode H_res H_uniqm H_openreq h st t H_t H_node H_live H_st H_constraint.
   destruct t.
   - (* Tick case is.. impossible *)
     exfalso.

@@ -602,7 +602,10 @@ Module Chord <: DynamicSystem.
     | Notify, _, _ => schedule_rectify_with st (make_pointer src)
     | Ping, _, _ => (st, [(src, Pong)], [], [])
     | _, Some (query_dst, q, _), true => handle_query_req_busy src st msg
-    | _, Some (query_dst, q, _), false => handle_query_res src dst st q msg
+    | _, Some (query_dst, q, _), false =>
+      if addr_eq_dec (addr_of query_dst) src
+      then handle_query_res src dst st q msg
+      else (st, [], [], [])
     | _, None, _ => (st, handle_query_req st src msg, [], [])
     end.
 
