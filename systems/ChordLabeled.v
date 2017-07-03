@@ -1477,7 +1477,26 @@ Proof.
   intros.
   break_if; auto.
 Qed.
-  
+
+Lemma channel_empty_not_in :
+  forall st snd recv p,
+    channel st snd recv = [] ->
+    ~ In (snd, (recv, p)) (msgs st).
+Proof.
+  intros. intro.
+  find_rewrite_lem channel_contents.
+  repeat find_rewrite. solve_by_inversion.
+Qed.
+
+Lemma schedule_rectify_with_cur_request :
+  forall st ptr st' ms nts cts,
+    schedule_rectify_with st ptr = (st', ms, nts, cts) ->
+    cur_request st' = cur_request st.
+Proof.
+  intros.
+  unfold schedule_rectify_with in *.
+  repeat break_match; simpl in *; find_inversion; auto.
+Qed.
 
 Lemma open_request_to_dead_node_preserved_or_times_out :
   forall gst l gst' h dst req,
@@ -1558,9 +1577,151 @@ Proof.
       repeat break_let. subst. find_inversion.
       unfold open_request_to in *; simpl in *.
       break_and; break_exists; break_and. subst.
-      admit (* Blocked on change to Chord to ignore irrelevant messages *)
-    + admit.
-Admitted.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        find_apply_lem_hyp handle_query_req_busy_definition.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update; intuition; repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        find_apply_lem_hyp handle_query_req_busy_definition.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update; intuition; repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        find_apply_lem_hyp handle_query_req_busy_definition.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update; intuition; repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        find_copy_apply_lem_hyp schedule_rectify_with_cur_request.
+        find_apply_lem_hyp schedule_rectify_with_never_clears.
+        subst.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update; intuition; repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+  - auto.
+  - auto.
+Qed.
 
 Lemma in_active_in_nodes :
   forall h gst,
