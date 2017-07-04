@@ -1761,14 +1761,23 @@ Proof.
     eauto using nodes_never_removed, in_active_in_nodes, failed_nodes_never_added, in_active_not_failed.
 Qed.
 
+Lemma lb_execution_cons_cons :
+  forall o o' ex,
+    lb_execution (Cons o (Cons o' ex)) ->
+    labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst o').
+Proof.
+  intros.
+  now inv_lb_execution.
+Qed.
+
 Lemma lb_execution_step_one_cons :
   forall o ex,
     lb_execution (Cons o ex) ->
     labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst (hd ex)).
 Proof.
   intros.
-  destruct ex.
-  now inv_lb_execution.
+  destruct ex; simpl.
+  eapply lb_execution_cons_cons; eauto.
 Qed.
 
 Lemma lb_execution_two_cons :
@@ -1778,7 +1787,7 @@ Lemma lb_execution_two_cons :
 Proof.
   intros.
   do 2 destruct ex.
-  now inv_lb_execution.
+  eapply lb_execution_cons_cons; eauto.
 Qed.
 
 Ltac invar_eauto :=
@@ -1789,7 +1798,8 @@ Ltac invar_eauto :=
         live_node_invariant,
         labeled_step_is_unlabeled_step,
         reachableStep,
-        lb_execution_step_one_cons.
+        lb_execution_step_one_cons,
+        lb_execution_cons_cons.
 
 Lemma channel_stays_empty :
   forall ex src dst,
