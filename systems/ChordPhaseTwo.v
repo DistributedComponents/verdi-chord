@@ -157,8 +157,8 @@ Definition counting_opt_error (gst : global_state) (p : option pointer) (better_
   | Some p0 =>
     if live_node_dec gst (addr_of p0)
     then length (filter (better_bool p0) (live_ptrs gst))
-    else length (live_ptrs gst) + 1
-  | None => length (live_ptrs gst) + 1
+    else S (length (live_ptrs gst))
+  | None => S (length (live_ptrs gst))
   end.
 
 Lemma live_addr_In_live_addrs :
@@ -242,6 +242,69 @@ Proof.
   apply in_nil.
 Qed.
 
+Lemma filter_length_bound :
+  forall A f (l : list A),
+    length (filter f l) <= length l.
+Proof.
+  induction l.
+  - easy.
+  - simpl.
+    break_if; simpl; omega.
+Qed.
+
+Lemma len_eq_Slen_absurd :
+  forall A f (l : list A),
+    length (filter f l) <> S (length l).
+Proof.
+  intros.
+  apply Nat.lt_neq.
+  apply le_lt_n_Sm.
+  apply filter_length_bound.
+Qed.
+
+Lemma length_filter_by_cmp_same_eq :
+  forall A (l : list A) cmp x y,
+    (forall a b c, In a l -> In b l -> In c l ->
+              cmp a b = true ->
+              cmp b c = true ->
+              cmp a c = true) ->
+    (forall a b, In a l -> In b l ->
+            cmp a b = true ->
+            cmp b a = true ->
+            a = b) ->
+    In x l ->
+    In y l ->
+    length (filter (cmp x) l) = length (filter (cmp y) l) ->
+    x = y.
+Proof.
+Admitted.
+
+Lemma counting_opt_error_inj :
+  forall gst cmp x y l,
+    l = live_ptrs gst ->
+    (forall a b c, In a l -> In b l -> In c l ->
+              cmp a b = true ->
+              cmp b c = true ->
+              cmp a c = true) ->
+    (forall a b, In a l -> In b l ->
+            cmp a b = true ->
+            cmp b a = true ->
+            a = b) ->
+    wf_ptr x ->
+    wf_ptr y ->
+    counting_opt_error gst (Some x) cmp = counting_opt_error gst (Some y) cmp ->
+    x = y \/ ~ live_node gst (addr_of x) /\ ~ live_node gst (addr_of y).
+Proof.
+  unfold counting_opt_error.
+  intros.
+  subst.
+  repeat break_match;
+    try solve [exfalso; eapply len_eq_Slen_absurd; eauto | tauto].
+  left.
+  eapply length_filter_by_cmp_same_eq; eauto;
+    eapply live_In_live_ptrs; auto.
+Qed.
+
 (** Predecessor phase two definitions *)
 Definition better_pred (gst : global_state) (h p p' : pointer) : Prop :=
   wf_ptr h /\
@@ -264,7 +327,7 @@ Definition pred_error (h : addr) (gst : global_state) : nat :=
   | Some st =>
     counting_opt_error gst (pred st) (better_pred_bool (make_pointer h))
   | None =>
-    length (active_nodes gst) + 1
+    S (length (active_nodes gst))
   end.
 
 (** First successor phase two definitions *)
@@ -288,7 +351,7 @@ Definition first_succ_error (h : addr) (gst : global_state) : nat :=
   | Some st =>
     counting_opt_error gst (hd_error (succ_list st)) (better_succ_bool (make_pointer h))
   | None =>
-    length (active_nodes gst) + 1
+    S (length (active_nodes gst))
   end.
 
 (** First successor and predecessor combined phase two definitions *)
@@ -529,6 +592,67 @@ Definition has_first_succ (gst : global_state) (h : addr) (s : pointer) : Prop :
     sigma gst h = Some st /\
     hd_error (succ_list st) = Some s.
 
+Lemma pred_error_nonincreasing :
+  forall gst l gst' h,
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    In h (active_nodes gst) ->
+    pred_error h gst' <= pred_error h gst.
+Proof.
+Admitted.
+
+Lemma first_succ_error_nonincreasing :
+  forall gst l gst' h,
+    reachable_st gst ->
+    In h (active_nodes gst) ->
+    labeled_step_dynamic gst l gst' ->
+    first_succ_error h gst' <= first_succ_error h gst.
+Proof.
+Admitted.
+
+Lemma nonincreasing_always_nonincreasing :
+  forall meas,
+    (forall gst l gst' h,
+        reachable_st gst ->
+        labeled_step_dynamic gst l gst' ->
+        In h (active_nodes gst) ->
+        meas h gst' <= meas h gst) ->
+    forall ex,
+      reachable_st (occ_gst (hd ex)) ->
+      lb_execution ex ->
+      always (local_measures_nonincreasing meas) ex.
+Proof.
+  intros meas H_nonincreasing.
+  cofix c.
+  intros.
+  constructor.
+  - intros until 1.
+    destruct ex as [o [o' ex]]; simpl in *.
+    eapply H_nonincreasing; invar_eauto.
+  - destruct ex.
+    apply c; invar_eauto.
+Qed.
+
+Lemma pred_error_always_nonincreasing :
+  forall ex,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    always (local_measures_nonincreasing pred_error) ex.
+Proof.
+  eapply nonincreasing_always_nonincreasing;
+    eauto using pred_error_nonincreasing.
+Qed.
+
+Lemma first_succ_error_always_nonincreasing :
+  forall ex,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    always (local_measures_nonincreasing first_succ_error) ex.
+Proof.
+  eapply nonincreasing_always_nonincreasing;
+    eauto using first_succ_error_nonincreasing.
+Qed.
+
 Lemma pred_error_bound :
   forall ex h st n,
     lb_execution ex ->
@@ -549,16 +673,33 @@ Lemma first_succ_error_bound :
 Proof.
 Admitted.
 
-Theorem phase_two_error_continuously_nonincreasing :
+Ltac find_always_and_tl :=
+  match goal with
+  | H : always ?P ?ex, H' : always ?Q ?ex |- _ =>
+    pose proof (always_and_tl H H');
+    clear H H'
+  end.
+
+Theorem phase_two_error_always_nonincreasing :
   forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
-    strong_local_fairness ex ->
-    always (~_ (now circular_wait)) ex ->
-    always (now phase_one) ex ->
-    continuously (local_measures_nonincreasing pred_and_first_succ_error) ex.
+    always (local_measures_nonincreasing pred_and_first_succ_error) ex.
 Proof.
-Admitted.
+  intros.
+  find_copy_apply_lem_hyp pred_error_always_nonincreasing; auto.
+  find_copy_apply_lem_hyp first_succ_error_always_nonincreasing; auto.
+  find_always_and_tl.
+  eapply always_monotonic; [|eauto].
+  clear dependent ex.
+  intros.
+  do 2 destruct s; simpl in *.
+  unfold and_tl, local_measures_nonincreasing in *.
+  simpl in *.
+  unfold measure_nonincreasing in *; break_and.
+  intros.
+  apply plus_le_compat; auto.
+Qed.
 
 Lemma stabilize_with_better_pred_completes :
   forall ex h dst p succs,
@@ -669,7 +810,7 @@ Lemma rectify_with_live_pred_sets_pred :
         better_pred (occ_gst (hd ex)) (make_pointer dst) (make_pointer h) p) ->
     open_request_to (occ_gst (hd ex)) dst h Ping ->
     In Notify (channel (occ_gst (hd ex)) h dst) ->
-
+ 
     eventually
       (now
          (fun occ =>
@@ -879,6 +1020,14 @@ Section MergePoint.
     | H: context[P] |- _ => eapply H
     end.
 
+  Lemma hd_error_None :
+    forall A (l : list A),
+      hd_error l = None ->
+      l = [].
+  Proof.
+    now destruct l.
+  Qed.
+
   Lemma a_before_pred_merge_point :
     forall ex,
       lb_execution ex ->
@@ -944,10 +1093,11 @@ Section MergePoint.
       + apply E0.
         simpl in *.
         find_apply_lem_hyp always_now; break_and.
-        cut (first_succ_error (addr_of a) (occ_gst o') < 
-             first_succ_error (addr_of a) (occ_gst o)).
+        destruct (hd_error (succ_list a_st)) eqn:?H.
         * admit.
-        * admit.
+        * exfalso.
+          find_apply_lem_hyp hd_error_None.
+          eapply (nodes_have_nonempty_succ_lists (occ_gst o')); invar_eauto.
   Admitted.
 
   Lemma a_after_pred_merge_point :
@@ -1100,6 +1250,6 @@ Proof.
   intros.
   eapply continuously_zero_phase_two_error_phase_two; eauto.
   eapply local_measure_causes_measure_zero_continuosly; eauto.
-  - eapply phase_two_error_continuously_nonincreasing; eauto.
+  - apply E0; eapply phase_two_error_always_nonincreasing; eauto.
   - apply E0; eapply phase_two_nonzero_error_continuous_drop; eauto.
 Qed.
