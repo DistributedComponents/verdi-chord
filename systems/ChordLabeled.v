@@ -443,71 +443,34 @@ Proof using.
 Qed.
 
 Lemma RecvMsg_enabled_until_occurred :
-  forall s, lb_execution s ->
-            forall src dst m, l_enabled (RecvMsg src dst m) (hd s) ->
-                              weak_until (now (l_enabled (RecvMsg src dst m)))
-                                         (now (occurred (RecvMsg src dst m)))
-                                         s.
+  forall s,
+    lb_execution s ->
+    forall src dst m,
+      l_enabled (RecvMsg src dst m) (hd s) ->
+      ~ client_addr dst ->
+      weak_until (now (l_enabled (RecvMsg src dst m)))
+                 (now (occurred (RecvMsg src dst m)))
+                 s.
 Proof using.
   cofix c.
-  case => /=.
-  case => /= gst.
-  case => [from to p|h t|from to p |from to p].
-  - case.
-    case => /= gst' lb' s H_exec src dst m H_en.
-    inversion H_exec; subst_max.
-    simpl in *.
-    case (addr_eq_dec dst to) => H_dec_dst.
-    case (addr_eq_dec src from) => H_dec_src.
-    case (payload_eq_dec m p) => H_dec_m.
-    subst_max.
-    admit. (* was: exact: W0 *)
-    subst_max.
-    apply: W_tl; first by [].
-    apply: c => //=.
-    unfold l_enabled in *.
-    simpl in *.
-    unfold enabled in H_en.
-    break_exists.
-    move: H1 H H_dec_m.
-    admit.
-    (* exact: labeled_step_dynamic_neq_payload_enabled. *)
-    subst_max.
-    apply: W_tl; first by [].
-    apply: c => //=.
-    unfold l_enabled in *.
-    simpl in *.
-    unfold enabled in H_en.
-    break_exists.
-    move: H1 H H_dec_src.
-    admit.
-    (* exact: labeled_step_dynamic_neq_src_enabled. *)
-    apply: W_tl; first by [].
-    apply: c => //=.
-    unfold l_enabled in *.
-    simpl in *.
-    unfold enabled in H_en.
-    break_exists.
-    move: H1 H H_dec_dst.
-    admit.
-    (* exact: labeled_step_dynamic_neq_dst_enabled. *)
+  intros.
+  destruct s as [o [o' s]].
+  inv_prop lb_execution.
+  destruct (label_eq_dec (RecvMsg src dst m) (occ_label o));
+    try (apply W0; assumption).
+  inv_labeled_step;
+    clean_up_labeled_step_cases.
+  - find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+    eapply W_tl.
+    + repeat find_rewrite.
+      assumption.
+    + apply c; auto.
+      unfold l_enabled in *; simpl in *.
+      repeat find_rewrite.
+      inv_prop (enabled (RecvMsg src dst m)).
+      eapply labeled_step_dynamic_timeout_enabled; eauto.
   - admit.
   - admit.
-    (*
-    case.
-    case => /= gst' lb' s H_exec src dst m H_en.
-    inversion H_exec; subst_max.
-    simpl in *.
-    rewrite /l_enabled /= in H_en.
-    apply: W_tl; first by [].
-    apply: c => //=.
-    unfold l_enabled in *.
-    simpl in *.
-    unfold enabled in H_en.
-    break_exists.
-    move: H1 H.
-    exact: labeled_step_dynamic_eq_enabled.
-     *)
   - admit.
 Admitted.
 
@@ -517,19 +480,22 @@ Lemma RecvMsg_eventually_occurred :
             forall src dst m d,
               In dst (nodes (occ_gst (hd s))) ->
               ~ In dst (failed_nodes (occ_gst (hd s))) ->
+              ~ client_addr dst ->
               In (src, (dst, m)) (msgs (occ_gst (hd s))) ->
               sigma (occ_gst (hd s)) dst = Some d ->
               eventually (now (occurred (RecvMsg src dst m))) s.
 Proof using.
-  move => s H_exec H_fair src dst m d H_in_n H_in_f H_in_m H_s.
-  have H_un := RecvMsg_enabled_until_occurred _ H_exec src dst m.
-  apply weak_until_until_or_always in H_un; last by apply: l_enabled_RecvMsg_In_msgs; eauto.
-  case: H_un; first exact: until_eventually.
-  move => H_al.
-  apply always_continuously in H_al.
-  apply H_fair in H_al.
-  destruct s as [x s].
-    by apply always_now in H_al.
+  intros.
+  pose proof (RecvMsg_enabled_until_occurred _ ltac:(eauto) src dst m).
+  find_copy_apply_lem_hyp weak_until_until_or_always;
+    eauto using l_enabled_RecvMsg_In_msgs.
+  break_or_hyp.
+  - eapply until_eventually; eauto.
+  - destruct s.
+    apply always_now.
+    unfold weak_local_fairness in *.
+    find_eapply_lem_hyp always_continuously.
+    now find_apply_hyp_hyp.
 Qed.
 
 Lemma timeout_step_satisfies_constraint :
