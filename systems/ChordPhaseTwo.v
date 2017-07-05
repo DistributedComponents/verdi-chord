@@ -354,6 +354,34 @@ Definition first_succ_error (h : addr) (gst : global_state) : nat :=
     S (length (active_nodes gst))
   end.
 
+Lemma pred_between_improves_error :
+  forall h gst p p',
+    ptr_between p p' (make_pointer h) ->
+    live_node gst (addr_of p) ->
+    live_node gst (addr_of p') ->
+    counting_opt_error gst (Some p') (better_pred_bool (make_pointer h)) <
+    counting_opt_error gst (Some p) (better_pred_bool (make_pointer h)).
+Proof.
+  intros.
+  simpl.
+  repeat break_if; try congruence.
+  unfold better_pred_bool.
+Admitted.
+
+Lemma succ_between_improves_error :
+  forall h gst gst' st st' s s',
+    sigma gst h = Some st ->
+    sigma gst' h = Some st' ->
+    hd_error (succ_list st) = Some s ->
+    hd_error (succ_list st') = Some s' ->
+    live_node gst (addr_of s) ->
+    live_node gst' (addr_of s') ->
+    ptr_between (make_pointer h) s' s ->
+    counting_opt_error gst' (Some s') (better_succ_bool (make_pointer h)) <
+    counting_opt_error gst (Some s) (better_succ_bool (make_pointer h)).
+Proof.
+Admitted.
+
 (** First successor and predecessor combined phase two definitions *)
 Definition pred_and_first_succ_correct (gst : global_state) (h : pointer) (st : data) : Prop :=
   pred_correct gst h (pred st) /\
@@ -592,9 +620,35 @@ Definition has_first_succ (gst : global_state) (h : addr) (s : pointer) : Prop :
     sigma gst h = Some st /\
     hd_error (succ_list st) = Some s.
 
+Lemma has_first_succ_intro :
+  forall gst h s st,
+    sigma gst h = Some st ->
+    hd_error (succ_list st) = Some s ->
+    has_first_succ gst h s.
+Proof.
+  intros.
+  eexists; eauto.
+Qed.
+
+Definition no_joins (gst gst' : global_state) :=
+  forall h,
+    live_node gst' h ->
+    live_node gst h.
+
+Theorem joins_stop :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always (~_ (now circular_wait)) ex ->
+    strong_local_fairness ex ->
+    continuously (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex.
+Proof.
+Admitted.
+
 Lemma pred_error_nonincreasing :
   forall gst l gst' h,
     reachable_st gst ->
+    no_joins gst gst' ->
     labeled_step_dynamic gst l gst' ->
     In h (active_nodes gst) ->
     pred_error h gst' <= pred_error h gst.
@@ -604,8 +658,9 @@ Admitted.
 Lemma first_succ_error_nonincreasing :
   forall gst l gst' h,
     reachable_st gst ->
-    In h (active_nodes gst) ->
+    no_joins gst gst' ->
     labeled_step_dynamic gst l gst' ->
+    In h (active_nodes gst) ->
     first_succ_error h gst' <= first_succ_error h gst.
 Proof.
 Admitted.
@@ -614,12 +669,14 @@ Lemma nonincreasing_always_nonincreasing :
   forall meas,
     (forall gst l gst' h,
         reachable_st gst ->
+        no_joins gst gst' ->
         labeled_step_dynamic gst l gst' ->
         In h (active_nodes gst) ->
         meas h gst' <= meas h gst) ->
     forall ex,
       reachable_st (occ_gst (hd ex)) ->
       lb_execution ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
       always (local_measures_nonincreasing meas) ex.
 Proof.
   intros meas H_nonincreasing.
@@ -629,28 +686,45 @@ Proof.
   - intros until 1.
     destruct ex as [o [o' ex]]; simpl in *.
     eapply H_nonincreasing; invar_eauto.
+    now find_apply_lem_hyp always_now.
   - destruct ex.
     apply c; invar_eauto.
 Qed.
 
-Lemma pred_error_always_nonincreasing :
+Lemma pred_error_continuously_nonincreasing :
   forall ex,
     reachable_st (occ_gst (hd ex)) ->
     lb_execution ex ->
-    always (local_measures_nonincreasing pred_error) ex.
+    always (~_ now circular_wait) ex ->
+    strong_local_fairness ex ->
+    continuously (local_measures_nonincreasing pred_error) ex.
 Proof.
-  eapply nonincreasing_always_nonincreasing;
-    eauto using pred_error_nonincreasing.
+  intros.
+  find_apply_lem_hyp joins_stop; auto.
+  induction 0.
+  - apply E0.
+    apply nonincreasing_always_nonincreasing;
+      eauto using pred_error_nonincreasing.
+  - apply E_next.
+    apply IHeventually; invar_eauto.
 Qed.
 
-Lemma first_succ_error_always_nonincreasing :
+Lemma first_succ_error_continuously_nonincreasing :
   forall ex,
     reachable_st (occ_gst (hd ex)) ->
     lb_execution ex ->
-    always (local_measures_nonincreasing first_succ_error) ex.
+    always (~_ now circular_wait) ex ->
+    strong_local_fairness ex ->
+    continuously (local_measures_nonincreasing first_succ_error) ex.
 Proof.
-  eapply nonincreasing_always_nonincreasing;
-    eauto using first_succ_error_nonincreasing.
+  intros.
+  find_apply_lem_hyp joins_stop; auto.
+  induction 0.
+  - apply E0.
+    apply nonincreasing_always_nonincreasing;
+      eauto using first_succ_error_nonincreasing.
+  - apply E_next.
+    apply IHeventually; invar_eauto.
 Qed.
 
 Lemma pred_error_bound :
@@ -680,20 +754,28 @@ Ltac find_always_and_tl :=
     clear H H'
   end.
 
-Theorem phase_two_error_always_nonincreasing :
+Ltac find_continuously_and_tl :=
+  match goal with
+  | H : continuously ?P ?ex, H' : continuously ?Q ?ex |- _ =>
+    pose proof (continuously_and_tl H H');
+    clear H H'
+  end.
+
+Theorem phase_two_error_continuously_nonincreasing :
   forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (infseq.hd ex)) ->
-    always (local_measures_nonincreasing pred_and_first_succ_error) ex.
+    always (~_ now circular_wait) ex ->
+    strong_local_fairness ex ->
+    continuously (local_measures_nonincreasing pred_and_first_succ_error) ex.
 Proof.
   intros.
-  find_copy_apply_lem_hyp pred_error_always_nonincreasing; auto.
-  find_copy_apply_lem_hyp first_succ_error_always_nonincreasing; auto.
-  find_always_and_tl.
-  eapply always_monotonic; [|eauto].
-  clear dependent ex.
+  find_copy_apply_lem_hyp pred_error_continuously_nonincreasing; auto.
+  find_copy_apply_lem_hyp first_succ_error_continuously_nonincreasing; auto.
+  find_continuously_and_tl.
+  eapply continuously_monotonic; [|eauto].
   intros.
-  do 2 destruct s; simpl in *.
+  destruct s as [o [o' s]].
   unfold and_tl, local_measures_nonincreasing in *.
   simpl in *.
   unfold measure_nonincreasing in *; break_and.
@@ -833,6 +915,12 @@ Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
   live_node gst (addr_of b) /\
   live_node gst (addr_of j).
 
+Definition merge_point_dec :
+  forall gst a b j,
+    {merge_point gst a b j} + {~ merge_point gst a b j}.
+Proof.
+Admitted.
+
 Definition pred_or_succ_improves (h : pointer) : infseq occurrence -> Prop :=
   consecutive (measure_decreasing (pred_and_first_succ_error (addr_of h))).
 
@@ -877,6 +965,18 @@ Lemma open_stabilize_request_eventually_gets_response :
                   has_pred (occ_gst occ) (addr_of j) (Some p))))
       ex.
 Proof.
+Admitted.
+
+Lemma live_successor_changed_improves :
+  forall gst l gst' h s s',
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    ~ In (addr_of s) (failed_nodes gst) ->
+    has_first_succ gst h s ->
+    has_first_succ gst' h s' ->
+    s' <> s ->
+    ptr_between (make_pointer h) s' s.
+Proof using.
 Admitted.
 
 Section MergePoint.
@@ -1008,7 +1108,7 @@ Section MergePoint.
       has_pred (occ_gst (hd ex)) (addr_of j) (Some p) ->
       a <=? p = true ->
       always (pred_not_worse j a) ex.
-  Proof.
+  Proof using a j.
   Admitted.
 
   Ltac eapply_prop' P :=
@@ -1028,6 +1128,15 @@ Section MergePoint.
     now destruct l.
   Qed.
 
+  Lemma successors_are_live_nodes :
+    forall gst h s,
+      reachable_st gst ->
+      all_first_succs_best gst ->
+      has_first_succ gst h s ->
+      live_node gst (addr_of s).
+  Proof using.
+  Admitted.
+
   Lemma a_before_pred_merge_point :
     forall ex,
       lb_execution ex ->
@@ -1035,6 +1144,7 @@ Section MergePoint.
       strong_local_fairness ex ->
       always (~_ (now circular_wait)) ex ->
       always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
 
       forall st p,
         merge_point (occ_gst (hd ex)) a b j ->
@@ -1087,18 +1197,33 @@ Section MergePoint.
       break_exists_name a_st; break_and.
       destruct (option_eq_dec _ pointer_eq_dec (Some j) (hd_error (succ_list a_st))).
       + apply E_next.
-          apply IHeventually;
-            invar_eauto.
-          eexists; eauto.
+        apply IHeventually;
+          invar_eauto.
+        eexists; eauto.
       + apply E0.
-        simpl in *.
+        invcs_prop has_first_succ; break_and.
         find_apply_lem_hyp always_now; break_and.
         destruct (hd_error (succ_list a_st)) eqn:?H.
-        * admit.
+        * apply Nat.add_le_lt_mono.
+          -- eapply pred_error_nonincreasing; invar_eauto;
+               eauto using live_node_in_active.
+             now inv_prop no_joins.
+          -- unfold first_succ_error; repeat find_rewrite.
+             eapply succ_between_improves_error; eauto.
+             ++ inv_prop phase_one.
+                unfold phase_one in *.
+                find_apply_lem_hyp always_Cons; break_and.
+                eapply successors_are_live_nodes; invar_eauto.
+                eapply has_first_succ_intro; eauto.
+             ++ inv_prop (live_node (occ_gst o) (addr_of j)); expand_def.
+                eapply live_successor_changed_improves; invar_eauto.
+                eapply has_first_succ_intro; eauto.
+                eapply has_first_succ_intro; eauto.
+                congruence.
         * exfalso.
           find_apply_lem_hyp hd_error_None.
           eapply (nodes_have_nonempty_succ_lists (occ_gst o')); invar_eauto.
-  Admitted.
+  Qed.
 
   Lemma a_after_pred_merge_point :
     forall ex,
@@ -1107,6 +1232,7 @@ Section MergePoint.
       strong_local_fairness ex ->
       always (~_ (now circular_wait)) ex ->
       always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
 
       forall st p,
         merge_point (occ_gst (hd ex)) a b j ->
@@ -1114,6 +1240,20 @@ Section MergePoint.
         pred st = Some p ->
         a >? p = true ->
         eventually (pred_or_succ_improves j) ex.
+  Proof.
+  Admitted.
+
+  Lemma merge_point_gone_improved_something :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      always (now phase_one) ex ->
+
+      merge_point (occ_gst (hd ex)) a b j ->
+      ~ merge_point (occ_gst (hd (tl ex))) a b j ->
+      eventually (pred_or_succ_improves a) ex \/
+      eventually (pred_or_succ_improves b) ex \/
+      eventually (pred_or_succ_improves j) ex.
   Proof.
   Admitted.
 
@@ -1131,12 +1271,17 @@ Section MergePoint.
       eventually (pred_or_succ_improves j) ex.
   Proof.
     intros.
-    inv_prop merge_point; break_and.
-    inv_prop (live_node (occ_gst (hd ex)) (addr_of j)); expand_def.
-    destruct (pred ltac:(auto)) as [p |] eqn:?H.
-    - pose proof (order_cases_le_gt a p); break_or_hyp;
-        eauto using a_before_pred_merge_point, a_after_pred_merge_point.
-    - eauto using no_pred_merge_point.
+    find_copy_apply_lem_hyp joins_stop; auto using strong_local_fairness_weak.
+    induction 0 as [ex | o [o' ex]].
+    - inv_prop merge_point; break_and.
+      inv_prop (live_node (occ_gst (hd ex)) (addr_of j)); expand_def.
+      destruct (pred ltac:(auto)) as [p |] eqn:?H.
+      + pose proof (order_cases_le_gt a p); break_or_hyp;
+          eauto using a_before_pred_merge_point, a_after_pred_merge_point.
+      + eauto using no_pred_merge_point.
+    - destruct (merge_point_dec (occ_gst o') a b j).
+      + elim IHeventually; invar_eauto; intuition eauto using E_next.
+      + apply merge_point_gone_improved_something; auto.
   Qed.
 
 End MergePoint.
@@ -1250,6 +1395,7 @@ Proof.
   intros.
   eapply continuously_zero_phase_two_error_phase_two; eauto.
   eapply local_measure_causes_measure_zero_continuosly; eauto.
-  - apply E0; eapply phase_two_error_always_nonincreasing; eauto.
+  - eapply phase_two_error_continuously_nonincreasing;
+      eauto using strong_local_fairness_weak.
   - apply E0; eapply phase_two_nonzero_error_continuous_drop; eauto.
 Qed.
