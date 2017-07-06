@@ -64,12 +64,9 @@ Lemma handle_query_res_definition :
          (pred st = None /\
          end_query (update_pred st n, [], [], []) = (st', ms, newts, clearedts)))) \/
     (q = Stabilize /\
-     ((exists new_succ succs,
-         p = GotPredAndSuccs (Some new_succ) succs /\
-         handle_stabilize dst (make_pointer src) st q new_succ succs = (st', ms, newts, clearedts)) \/
-     (exists succs,
-         p = GotPredAndSuccs None succs /\
-         end_query (st, [], [], []) = (st', ms, newts, clearedts)))) \/
+     exists new_succ succs,
+       p = GotPredAndSuccs new_succ succs /\
+       handle_stabilize dst (make_pointer src) st q new_succ succs = (st', ms, newts, clearedts)) \/
     (exists new_succ,
         q = Stabilize2 new_succ /\
         exists succs,
@@ -105,7 +102,6 @@ Proof using.
   repeat break_match; try tuple_inversion; try tauto.
   - do 2 right. left. eexists; intuition eauto.
   - do 2 right. left. eexists; intuition eauto.
-  - intuition eauto.
   - intuition eauto.
   - intuition eauto.
   - do 5 right. left.

@@ -672,7 +672,7 @@ Proof using.
     autorewrite with list.
     apply timeouts_in_never_has_Tick.
   - (* need handle_stabilize_definition *)
-    unfold handle_stabilize in *; break_if.
+    unfold handle_stabilize in *; repeat break_match.
     + find_apply_lem_hyp start_query_definition;
         break_or_hyp; break_exists; break_and; subst_max;
           auto using timeouts_in_never_has_Tick.
@@ -680,10 +680,10 @@ Proof using.
         break_and; subst_max;
           autorewrite with list;
           auto using timeouts_in_never_has_Tick.
-  - find_apply_lem_hyp end_query_definition;
-      break_and; subst_max;
-        autorewrite with list;
-        auto using timeouts_in_never_has_Tick.
+    + find_apply_lem_hyp end_query_definition;
+        break_and; subst_max;
+          autorewrite with list;
+          auto using timeouts_in_never_has_Tick.
   - find_apply_lem_hyp end_query_definition;
       break_and; subst_max;
         autorewrite with list;
@@ -2077,7 +2077,6 @@ Proof using.
            find_copy_eapply_lem_hyp timeouts_in_Request; eauto.
            find_erewrite_lem handle_rectify_preserves_timeouts_in.
            admit.
-        -- admit.
         -- admit.
         -- admit.
         -- admit.

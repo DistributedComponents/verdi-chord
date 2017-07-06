@@ -1058,9 +1058,9 @@ Proof using.
   unfold handle_stabilize.
   unfold update_succ_list.
   intuition.
-  repeat break_match.
-  - find_apply_lem_hyp joined_preserved_by_start_query; auto.
-  - find_apply_lem_hyp joined_preserved_by_end_query; auto.
+  repeat break_match;
+    solve [find_apply_lem_hyp joined_preserved_by_start_query; auto |
+           find_apply_lem_hyp joined_preserved_by_end_query; auto].
 Qed.
 
 Lemma joined_preserved_by_end_query_handle_rectify :

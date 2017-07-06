@@ -538,11 +538,16 @@ Module Chord <: DynamicSystem.
     then (update_pred st notifier, [], [], [])
     else (st, [], [], []).
 
-  Definition handle_stabilize (h : addr) (src : pointer) (st : data) (q : query) (new_succ : pointer) (succs : list pointer) : res :=
+  Definition handle_stabilize (h : addr) (src : pointer) (st : data) (q : query) (new_succ : option pointer) (succs : list pointer) : res :=
     let new_st := update_succ_list st (make_succs src succs) in
-    if ptr_between_bool (ptr st) new_succ src
-    then start_query h new_st (Stabilize2 new_succ)
-    else end_query (new_st, [(addr_of src, Notify)], [], []).
+    match new_succ with
+    | Some new_succ =>
+      if ptr_between_bool (ptr st) new_succ src
+      then start_query h new_st (Stabilize2 new_succ)
+      else end_query (new_st, [(addr_of src, Notify)], [], [])
+    | None =>
+      end_query (new_st, [(addr_of src, Notify)], [], [])
+    end.
 
   Definition next_msg_for_join (self : pointer) (src best_pred : addr) : payload :=
     if addr_eq_dec best_pred src
@@ -557,10 +562,7 @@ Module Chord <: DynamicSystem.
       | None => end_query (update_pred st notifier, [], [], [])
       end
     | Stabilize, GotPredAndSuccs new_succ succs =>
-      match new_succ with
-      | Some ns => (handle_stabilize h (make_pointer src) st q ns succs)
-      | None => end_query (st, [], [], [])
-      end
+      handle_stabilize h (make_pointer src) st q new_succ succs
     | Stabilize2 new_succ, GotSuccList succs =>
       end_query (update_succ_list st (make_succs new_succ succs),
                  [(addr_of new_succ, Notify)],
