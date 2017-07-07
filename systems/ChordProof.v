@@ -70,6 +70,27 @@ Proof using.
     auto || discriminate.
 Qed.
 
+Lemma delay_query_adds_query :
+  forall st src msg st',
+    delay_query st src msg = st' ->
+    In (src, msg) (delayed_queries st').
+Proof.
+  intros.
+  subst.
+  simpl.
+  break_if; auto using dedup_In with datatypes.
+Qed.
+
+Lemma handle_query_req_busy_delays_query :
+  forall src st msg st' ms nts cts,
+    handle_query_req_busy src st msg = (st', ms, nts, cts) ->
+    In (src, msg) (delayed_queries st').
+Proof.
+  intros.
+  find_apply_lem_hyp handle_query_req_busy_definition; expand_def;
+    eauto using delay_query_adds_query.
+Qed.
+
 Lemma handle_query_req_busy_sends_busy :
   forall src st msg st' ms nts cts,
     handle_query_req_busy src st msg = (st', ms, nts, cts) ->
@@ -80,6 +101,16 @@ Proof using.
   break_if;
     tuple_inversion;
     exact: in_eq.
+Qed.
+
+Lemma handle_query_req_busy_preserves_cur_request :
+  forall src st msg st' ms nts cts,
+    handle_query_req_busy src st msg = (st', ms, nts, cts) ->
+    cur_request st' = cur_request st.
+Proof.
+  intros.
+  find_apply_lem_hyp handle_query_req_busy_definition; expand_def;
+    easy.
 Qed.
 
 Lemma handle_query_req_gives_response :
@@ -96,6 +127,40 @@ Proof using.
     eauto || congruence.
 Qed.
 
+Lemma do_delayed_queries_busy_nop :
+  forall h st st' ms nts cts,
+    cur_request st <> None ->
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    st' = st /\ ms = [] /\ nts = [] /\ cts = [].
+Proof.
+  unfold do_delayed_queries.
+  intros.
+  break_match; repeat split; congruence.
+Qed.
+
+Lemma real_requests_get_queued_and_busy_response :
+  forall src dst msg st st' sends nts cts,
+    request_payload msg ->
+    cur_request st <> None ->
+    msg <> Ping ->
+    recv_handler src dst st msg = (st', sends, nts, cts) ->
+    In (src, Busy) sends /\
+    In (src, msg) (delayed_queries st').
+Proof.
+  intros.
+  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
+  find_apply_lem_hyp handle_msg_definition; expand_def.
+  - inv_prop request_payload.
+  - split.
+    + eauto using handle_query_req_busy_sends_busy with datatypes.
+    + find_copy_apply_lem_hyp handle_query_req_busy_preserves_cur_request.
+      find_copy_apply_lem_hyp do_delayed_queries_busy_nop; expand_def;
+        try congruence.
+      eapply handle_query_req_busy_delays_query; eauto.
+  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
+  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
+Qed.
+
 Lemma real_requests_get_busy_response :
   forall src dst msg st st' sends nts cts,
     request_payload msg ->
@@ -105,15 +170,19 @@ Lemma real_requests_get_busy_response :
     In (src, Busy) sends.
 Proof.
   intros.
-  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
-  apply in_or_app; right.
-  find_apply_lem_hyp handle_msg_definition; expand_def.
-  - match goal with
-    | [H: request_payload _ |- _] => inv H
-    end.
-  - eapply handle_query_req_busy_sends_busy; eauto.
-  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
-  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
+  find_apply_lem_hyp real_requests_get_queued_and_busy_response; tauto.
+Qed.
+
+Lemma real_requests_get_queued :
+  forall src dst msg st st' sends nts cts,
+    request_payload msg ->
+    cur_request st <> None ->
+    msg <> Ping ->
+    recv_handler src dst st msg = (st', sends, nts, cts) ->
+    In (src, msg) (delayed_queries st').
+Proof.
+  intros.
+  find_apply_lem_hyp real_requests_get_queued_and_busy_response; tauto.
 Qed.
 
 Lemma real_requests_get_response_handle_query_req :

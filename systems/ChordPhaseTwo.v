@@ -1430,6 +1430,90 @@ Section MergePoint.
     eauto using recv_GotPredAndSuccs_causes_Notify.
   Qed.
 
+  Lemma handle_msg_busy_is_handle_query_req_busy :
+    forall src dst st p,
+      cur_request st <> None ->
+      request_payload p ->
+      p <> Ping ->
+      handle_msg src dst st p = handle_query_req_busy src st p.
+  Proof.
+    intros.
+    destruct (handle_msg _ _ _) as [[[?st ?ms] ?nts] ?cts] eqn:?H.
+    symmetry.
+    find_apply_lem_hyp handle_msg_definition; expand_def;
+      solve [assumption | now invc_prop request_payload].
+  Qed.
+
+  Lemma recv_handler_GetPredAndSuccs_gives_GotPredAndSuccs :
+    forall src dst st st' sends nts cts,
+      cur_request st = None ->
+      recv_handler src dst st GetPredAndSuccs = (st', sends, nts, cts) ->
+      In (src, GotPredAndSuccs (pred st) (succ_list st)) sends.
+  Proof.
+    intros.
+    find_copy_apply_lem_hyp recv_handler_definition_existential; expand_def.
+    eapply sent_by_handle_msg_sent_by_recv_handler; eauto.
+    simpl in *.
+    repeat find_rewrite. tuple_inversion.
+    auto with datatypes.
+  Qed.
+
+  Lemma recv_GetPredAndSuccs_busy_queues_request :
+    forall gst gst' src dst st st',
+      labeled_step_dynamic gst (RecvMsg src dst GetPredAndSuccs) gst' ->
+      reachable_st gst ->
+      sigma gst dst = Some st ->
+      cur_request st <> None ->
+      sigma gst' dst = Some st' ->
+      In (src, GetPredAndSuccs) (delayed_queries st').
+  Proof.
+    intros.
+    inv_labeled_step.
+    find_copy_apply_lem_hyp define_msg_from_recv_step_equality; break_and.
+    find_copy_apply_lem_hyp recv_handler_labeling.
+    repeat find_rewrite. simpl in *. rewrite_update. repeat find_injection.
+    find_apply_lem_hyp recv_handler_definition_existential; expand_def.
+    rewrite handle_msg_busy_is_handle_query_req_busy in *; auto;
+      try constructor; try congruence.
+    find_copy_apply_lem_hyp handle_query_req_busy_preserves_cur_request.
+    find_copy_apply_lem_hyp do_delayed_queries_busy_nop; expand_def;
+      try congruence.
+    eapply handle_query_req_busy_delays_query; eauto.
+  Qed.
+
+  Lemma recv_GetPredAndSuccs_not_busy_causes_GotPredAndSuccs :
+    forall gst gst' src dst st,
+      labeled_step_dynamic gst (RecvMsg src dst GetPredAndSuccs) gst' ->
+      reachable_st gst ->
+      sigma gst dst = Some st ->
+      cur_request st = None ->
+      In (GotPredAndSuccs (pred st) (succ_list st)) (channel gst' dst src).
+  Proof.
+    intros.
+    inv_labeled_step.
+    find_copy_apply_lem_hyp define_msg_from_recv_step_equality; break_and.
+    find_copy_apply_lem_hyp recv_handler_labeling.
+    repeat find_rewrite. simpl in *. find_injection.
+    apply channel_contents.
+    eapply in_sends_in_msgs; eauto.
+    eapply recv_handler_GetPredAndSuccs_gives_GotPredAndSuccs; eauto.
+  Qed.
+
+  Lemma recv_GetPredAndSuccs_causes_GotPredAndSuccs_eq :
+    forall gst gst' src dst st,
+      labeled_step_dynamic gst (RecvMsg src dst GetPredAndSuccs) gst' ->
+      reachable_st gst ->
+      sigma gst dst = Some st ->
+      cur_request st = None ->
+      forall p succs,
+        p = pred st ->
+        succs = succ_list st ->
+        In (GotPredAndSuccs p succs) (channel gst' dst src).
+  Proof.
+    intros. subst.
+    eapply recv_GetPredAndSuccs_not_busy_causes_GotPredAndSuccs; eauto.
+  Qed.
+
   Lemma has_pred_eq :
     forall gst h p q,
       has_pred gst h p ->
@@ -1585,6 +1669,170 @@ Section MergePoint.
           eapply (nodes_have_nonempty_succ_lists (occ_gst o')); invar_eauto.
   Qed.
 
+  Check notify_in_response_to_GotPredAndSuccs_Some.
+
+  Theorem ptr_correct :
+    forall gst h st,
+      reachable_st gst ->
+      sigma gst h = Some st ->
+      ptr st = make_pointer h.
+  Proof.
+  Admitted.
+
+  Lemma not_between_xxy :
+    forall x y,
+      ~ between x x y.
+  Proof.
+    intros; intro.
+    inv_prop between;
+      solve [tauto | eapply Chord.ChordIDSpace.lt_irrefl; eauto].
+  Qed.
+
+  Lemma not_between_xyy :
+    forall x y,
+      ~ between x y y.
+  Proof.
+    intros; intro.
+    inv_prop between;
+      solve [tauto | eapply Chord.ChordIDSpace.lt_irrefl; eauto].
+  Qed.
+
+  Lemma between_xyx :
+    forall x y,
+      x <> y ->
+      between x y x.
+  Proof.
+    intros.
+    pose proof (Chord.ChordIDSpace.lt_total x y); repeat break_or_hyp;
+      congruence || eauto using BetweenWrapL, BetweenWrapR, Chord.ChordIDSpace.lt_asymm, Chord.ChordIDSpace.lt_irrefl.
+  Qed.
+
+  Lemma lt_asymm_neg :
+    forall x y,
+      ~ Chord.ChordIDSpace.lt x y ->
+      Chord.ChordIDSpace.lt y x \/ x = y.
+  Proof.
+    intros.
+    pose proof (Chord.ChordIDSpace.lt_total x y).
+    repeat break_or_hyp; tauto.
+  Qed.
+
+  Lemma between_rot :
+    forall x y z,
+      x <> z ->
+      between x y z ->
+      between y z x.
+  Proof.
+    intros.
+    invcs_prop between.
+    - auto using BetweenWrapL, BetweenWrapR, Chord.ChordIDSpace.lt_asymm.
+    - find_copy_apply_lem_hyp lt_asymm_neg.
+      break_or_hyp; try congruence.
+      auto using BetweenWrapL, BetweenWrapR, Chord.ChordIDSpace.lt_asymm.
+    - find_copy_apply_lem_hyp lt_asymm_neg.
+      break_or_hyp; try congruence.
+      auto using BetweenMono, Chord.ChordIDSpace.lt_asymm.
+  Qed.
+
+  Lemma unrolled_not_between_rot :
+    forall x y z,
+      unroll_between z x y = false ->
+      ~ between x y z.
+  Proof.
+    intros.
+    unfold unroll_between in *.
+    repeat break_if; try congruence.
+    - subst.
+      apply not_between_xyy.
+    - intro.
+      eapply between_bool_false_not_between;
+        eauto using between_rot.
+  Qed.
+
+  Lemma recv_GotPredAndSuccs_with_a_after_p_causes_Notify :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+
+      forall p js,
+        merge_point (occ_gst (hd ex)) a b j ->
+        a >? p = true ->
+        open_stabilize_request_to (occ_gst (hd ex)) (addr_of a) (addr_of j) ->
+        now (occurred (RecvMsg (addr_of j) (addr_of a) (GotPredAndSuccs (Some p) js))) ex ->
+        next (now (fun o => In Notify (channel (occ_gst o) (addr_of a) (addr_of j)))) ex.
+  Proof.
+    intros.
+    destruct ex as [o [o' ex]].
+    inv_prop merge_point; break_and.
+    inv_prop lb_execution.
+    simpl in *.
+    find_eapply_lem_hyp (live_node_means_state_exists (occ_gst o) (addr_of a)).
+    break_exists_name a_st.
+    invc_prop occurred.
+    repeat find_reverse_rewrite.
+    assert (ptr a_st = a)
+      by (erewrite ptr_correct, <- wf_ptr_eq; eauto).
+    eapply recv_GotPredAndSuccs_causes_Notify_Some; eauto.
+    repeat find_rewrite.
+    eapply unrolled_not_between_rot.
+    eapply Bool.negb_true_iff.
+    erewrite (wf_ptr_eq j); auto.
+  Qed.
+
+  (* Lemma a_after_pred_merge_point_response_incoming : *)
+  (*   forall ex, *)
+  (*     lb_execution ex -> *)
+  (*     reachable_st (occ_gst (hd ex)) -> *)
+  (*     strong_local_fairness ex -> *)
+  (*     always (~_ (now circular_wait)) ex -> *)
+  (*     always (now phase_one) ex -> *)
+  (*     always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex -> *)
+
+  (*     forall st p jp js, *)
+  (*       merge_point (occ_gst (hd ex)) a b j -> *)
+  (*       sigma (occ_gst (hd ex)) (addr_of j) = Some st -> *)
+  (*       pred st = Some p -> *)
+  (*       a >? p = true -> *)
+  (*       In (GotPredAndSuccs (Some p) js) (channel (occ_gst (hd ex)) (addr_of j) (addr_of a)) -> *)
+  (*       until *)
+  (*         (now (fun o => has_pred (occ_gst o) (addr_of j) (Some p))) *)
+  (*         (pred_improves j) ex. *)
+  (* Proof. *)
+  (* Admitted. *)
+
+  Lemma a_after_pred_merge_point_stabilize_open :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+
+      forall st p,
+        merge_point (occ_gst (hd ex)) a b j ->
+        sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
+        pred st = Some p ->
+        a >? p = true ->
+        open_stabilize_request_to_first_succ (occ_gst (hd ex)) (addr_of a) ->
+        until
+          (now (fun o => has_pred (occ_gst o) (addr_of j) (Some p)))
+          (pred_improves j) ex.
+  Proof using a b j.
+    (* intros. *)
+    (* inv_prop merge_point; break_and. *)
+    (* find_copy_apply_lem_hyp (open_stabilize_request_eventually_gets_response ex (addr_of a)); auto. *)
+    (* induction 0. *)
+    (* - find_apply_lem_hyp now_hd; expand_def. *)
+    (*   eapply a_after_pred_merge_point_response_incoming; eauto. *)
+    (* -  *)
+  Admitted.
+
+
   Lemma a_after_pred_merge_point_precise :
     forall ex,
       lb_execution ex ->
@@ -1605,16 +1853,8 @@ Section MergePoint.
   Proof.
     intros.
     inv_prop merge_point; break_and.
-    (* find_eapply_lem_hyp stabilize_with_better_pred_completes; eauto. *)
-
-    (* find_copy_eapply_lem_hyp notify_when_pred_dead_eventually_improves; eauto. *)
-    (* destruct (In_dec addr_eq_dec (addr_of p) (failed_nodes (occ_gst (hd ex)))). *)
-    (* - *)
-
-    (*   admit. *)
-    (*   eexists; eauto. *)
-
-    (* -  *)
+    find_eapply_lem_hyp notify_when_pred_worse_eventually_improves;
+      eauto using has_pred_intro.
   Admitted.
 
   Lemma a_after_pred_merge_point :
