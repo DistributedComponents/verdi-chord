@@ -91,57 +91,6 @@ Lemma nonempty_succ_lists_always_belong_to_joined_nodes :
 Proof.
 Admitted.
 
-Lemma zero_leading_failed_nodes_leading_node_live :
-  forall gst h st s rest,
-    succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st) = 0 ->
-    reachable_st gst ->
-    sigma gst h = Some st ->
-    succ_list st = s :: rest ->
-    wf_ptr s ->
-    wf_ptr s /\ live_node gst (addr_of s).
-Proof.
-  intros.
-  repeat find_rewrite.
-  simpl in *.
-  break_if; try congruence.
-  unfold succ_list_leading_failed_nodes.
-  find_apply_lem_hyp successor_nodes_always_valid.
-  assert (In s (succ_list st)).
-  {
-    find_rewrite.
-    apply in_eq.
-  }
-  find_eapply_lem_hyp successor_nodes_valid_inv; eauto; repeat (break_exists_name pst || break_and).
-  eauto using live_node_characterization.
-Qed.
-
-Lemma live_node_has_Tick_in_timeouts :
-  forall ex h,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    live_node (occ_gst (hd ex)) h ->
-    In Tick (timeouts (occ_gst (hd ex)) h).
-Proof.
-Admitted.
-
-Lemma loaded_Tick_enabled_if_now_not_busy_if_live :
-  forall h ex,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    live_node (occ_gst (hd ex)) h ->
-    now (not_busy_if_live h) ex ->
-    now (l_enabled (Timeout h Tick StartStabilize)) ex.
-Proof.
-  intros.
-  destruct ex.
-  find_copy_apply_lem_hyp live_node_has_Tick_in_timeouts; eauto.
-  simpl in *.
-  find_copy_apply_lem_hyp live_node_joined; break_exists; break_and.
-  unfold not_busy_if_live in *; find_copy_apply_hyp_hyp.
-  eapply loaded_Tick_enabled_when_cur_request_None; eauto.
-Qed.
-
 (** In phase two we want to talk about the existence and number of better
     predecessors and better first successors to a node. We do this with the
     following functions.
