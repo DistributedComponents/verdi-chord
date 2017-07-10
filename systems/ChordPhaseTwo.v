@@ -897,11 +897,7 @@ Lemma notify_when_pred_None_eventually_improves :
       wf_ptr p ->
       has_pred (occ_gst (hd ex)) (addr_of h) None ->
       In Notify (channel (occ_gst (hd ex)) (addr_of p) (addr_of h)) ->
-      until
-        (now (fun o =>
-                has_pred (occ_gst o) (addr_of h) None /\
-                In Notify (channel (occ_gst (hd ex)) (addr_of p) (addr_of h))))
-        (pred_improves h) ex.
+      eventually (pred_improves h) ex.
 Proof.
 Admitted.
 
@@ -937,15 +933,10 @@ Lemma notify_when_pred_worse_eventually_improves :
     always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
 
     forall h p p',
-      wf_ptr h ->
-      wf_ptr p ->
-      wf_ptr p' ->
-      has_pred (occ_gst (hd ex)) (addr_of h) (Some p) ->
-      ptr_between p p' h ->
-      In Notify (channel (occ_gst (hd ex)) (addr_of p') (addr_of h)) ->
-      until
-        (now (fun o => has_pred (occ_gst o) (addr_of h) (Some p)))
-        (pred_improves h) ex.
+      In Notify (channel (occ_gst (hd ex)) p' h) ->
+      has_pred (occ_gst (hd ex)) h (Some p) ->
+      between (id_of p) (hash p') (hash h) ->
+      eventually (pred_improves (make_pointer h)) ex.
 Proof.
 Admitted.
 
@@ -1018,6 +1009,16 @@ Definition merge_point_dec :
     {merge_point gst a b j} + {~ merge_point gst a b j}.
 Proof.
 Admitted.
+
+Lemma merge_point_wf :
+  forall gst a b j,
+    (merge_point gst a b j -> wf_ptr a) /\
+    (merge_point gst a b j -> wf_ptr b) /\
+    (merge_point gst a b j -> wf_ptr j).
+Proof.
+  unfold merge_point.
+  tauto.
+Qed.
 
 Lemma weak_until_eventually_until :
   forall T (P Q : infseq T -> Prop) s,
@@ -1136,6 +1137,21 @@ Section MergePoint.
       has_pred (occ_gst (hd ex)) h p ->
       eventually (now (fun o => has_pred (occ_gst o) h p')) ex ->
       eventually (pred_or_succ_improves (make_pointer h)) ex.
+  Proof.
+  Admitted.
+
+  Lemma pred_same_until_improvement :
+    forall ex h p,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+
+      has_pred (occ_gst (hd ex)) h p ->
+      weak_until (now (fun o => has_pred (occ_gst o) h p))
+                 (pred_or_succ_improves (make_pointer h)) ex.
   Proof.
   Admitted.
 
@@ -1375,13 +1391,12 @@ Section MergePoint.
       h = ptr st ->
       wf_ptr s ->
       labeled_step_dynamic gst (RecvMsg (addr_of s) (addr_of h) (GotPredAndSuccs p succs)) gst' ->
-      open_stabilize_request_to gst (addr_of h) (addr_of s) ->
+      open_request_to gst (addr_of h) (addr_of s) GetPredAndSuccs ->
       (exists p', p = Some p' /\ ~ ptr_between (ptr st) p' s) \/ p = None ->
       In Notify (channel gst' (addr_of h) (addr_of s)).
   Proof.
     intros.
     apply channel_contents.
-    inv_prop open_stabilize_request_to.
     inv_prop open_request_to; break_exists; break_and.
     inv_labeled_step; clean_up_labeled_step_cases.
     find_copy_apply_lem_hyp define_msg_from_recv_step_equality; break_exists; break_and.
@@ -1410,7 +1425,7 @@ Section MergePoint.
       h = ptr st ->
       wf_ptr s ->
       labeled_step_dynamic gst (RecvMsg (addr_of s) (addr_of h) (GotPredAndSuccs (Some p) succs)) gst' ->
-      open_stabilize_request_to gst (addr_of h) (addr_of s) ->
+      open_request_to gst (addr_of h) (addr_of s) GetPredAndSuccs ->
       ~ ptr_between (ptr st) p s ->
       In Notify (channel gst' (addr_of h) (addr_of s)).
   Proof.
@@ -1424,7 +1439,7 @@ Section MergePoint.
       h = ptr st ->
       wf_ptr s ->
       labeled_step_dynamic gst (RecvMsg (addr_of s) (addr_of h) (GotPredAndSuccs None succs)) gst' ->
-      open_stabilize_request_to gst (addr_of h) (addr_of s) ->
+      open_request_to gst (addr_of h) (addr_of s) GetPredAndSuccs ->
       In Notify (channel gst' (addr_of h) (addr_of s)).
   Proof.
     eauto using recv_GotPredAndSuccs_causes_Notify.
@@ -1669,8 +1684,6 @@ Section MergePoint.
           eapply (nodes_have_nonempty_succ_lists (occ_gst o')); invar_eauto.
   Qed.
 
-  Check notify_in_response_to_GotPredAndSuccs_Some.
-
   Theorem ptr_correct :
     forall gst h st,
       reachable_st gst ->
@@ -1678,6 +1691,9 @@ Section MergePoint.
       ptr st = make_pointer h.
   Proof.
   Admitted.
+
+  Ltac id_auto :=
+    auto using BetweenMono, BetweenWrapL, BetweenWrapR, Chord.ChordIDSpace.lt_asymm, Chord.ChordIDSpace.lt_irrefl.
 
   Lemma not_between_xxy :
     forall x y,
@@ -1704,7 +1720,7 @@ Section MergePoint.
   Proof.
     intros.
     pose proof (Chord.ChordIDSpace.lt_total x y); repeat break_or_hyp;
-      congruence || eauto using BetweenWrapL, BetweenWrapR, Chord.ChordIDSpace.lt_asymm, Chord.ChordIDSpace.lt_irrefl.
+      congruence || id_auto.
   Qed.
 
   Lemma lt_asymm_neg :
@@ -1717,21 +1733,32 @@ Section MergePoint.
     repeat break_or_hyp; tauto.
   Qed.
 
-  Lemma between_rot :
+  Lemma between_rot_l :
     forall x y z,
       x <> z ->
       between x y z ->
       between y z x.
   Proof.
     intros.
-    invcs_prop between.
-    - auto using BetweenWrapL, BetweenWrapR, Chord.ChordIDSpace.lt_asymm.
-    - find_copy_apply_lem_hyp lt_asymm_neg.
-      break_or_hyp; try congruence.
-      auto using BetweenWrapL, BetweenWrapR, Chord.ChordIDSpace.lt_asymm.
-    - find_copy_apply_lem_hyp lt_asymm_neg.
-      break_or_hyp; try congruence.
-      auto using BetweenMono, Chord.ChordIDSpace.lt_asymm.
+    invcs_prop between;
+      id_auto;
+      find_copy_apply_lem_hyp lt_asymm_neg;
+      break_or_hyp;
+      congruence || id_auto.
+  Qed.
+
+  Lemma between_rot_r :
+    forall x y z,
+      x <> z ->
+      between x y z ->
+      between z x y.
+  Proof.
+    intros.
+    invcs_prop between;
+      id_auto;
+      find_copy_apply_lem_hyp lt_asymm_neg;
+      break_or_hyp;
+      congruence || id_auto.
   Qed.
 
   Lemma unrolled_not_between_rot :
@@ -1746,22 +1773,47 @@ Section MergePoint.
       apply not_between_xyy.
     - intro.
       eapply between_bool_false_not_between;
-        eauto using between_rot.
+        eauto using between_rot_r.
+  Qed.
+
+  Lemma not_between_swap :
+    forall x y z,
+      y <> z ->
+      ~ between x y z ->
+      between x z y.
+  Proof.
+    intros.
+    pose proof (Chord.ChordIDSpace.lt_total x z).
+    pose proof (Chord.ChordIDSpace.lt_total x y).
+    pose proof (Chord.ChordIDSpace.lt_total y z).
+    repeat break_or_hyp;
+      solve [id_auto | congruence | find_false; id_auto].
+  Qed.
+
+  Lemma not_between_between :
+    forall x y z,
+      unroll_between x y z = false ->
+      between z y x.
+  Proof.
+    unfold unroll_between.
+    intros.
+    repeat break_if; subst; try congruence.
+    - now apply between_xyx.
+    - apply between_rot_r; auto.
+      apply between_rot_r; auto.
+      apply not_between_swap; auto.
+      now apply between_bool_false_not_between.
   Qed.
 
   Lemma recv_GotPredAndSuccs_with_a_after_p_causes_Notify :
     forall ex,
       lb_execution ex ->
       reachable_st (occ_gst (hd ex)) ->
-      strong_local_fairness ex ->
-      always (~_ (now circular_wait)) ex ->
-      always (now phase_one) ex ->
-      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
 
       forall p js,
         merge_point (occ_gst (hd ex)) a b j ->
         a >? p = true ->
-        open_stabilize_request_to (occ_gst (hd ex)) (addr_of a) (addr_of j) ->
+        open_request_to (occ_gst (hd ex)) (addr_of a) (addr_of j) GetPredAndSuccs ->
         now (occurred (RecvMsg (addr_of j) (addr_of a) (GotPredAndSuccs (Some p) js))) ex ->
         next (now (fun o => In Notify (channel (occ_gst o) (addr_of a) (addr_of j)))) ex.
   Proof.
@@ -1781,6 +1833,221 @@ Section MergePoint.
     eapply unrolled_not_between_rot.
     eapply Bool.negb_true_iff.
     erewrite (wf_ptr_eq j); auto.
+  Qed.
+
+  Lemma wf_ptr_hash_eq :
+    forall p,
+      wf_ptr p ->
+      hash (addr_of p) = id_of p.
+  Proof.
+    auto.
+  Qed.
+
+  Lemma recv_GotPredAndSuccs_with_a_after_p_causes_improvement :
+    forall o ex,
+      lb_execution (Cons o ex) ->
+      reachable_st (occ_gst o) ->
+      strong_local_fairness (Cons o ex) ->
+      always (~_ (now circular_wait)) (Cons o ex) ->
+      always (now phase_one) (Cons o ex) ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+      merge_point (occ_gst o) a b j ->
+      merge_point (occ_gst (hd ex)) a b j ->
+
+      forall p js,
+        has_pred (occ_gst (hd ex)) (addr_of j) (Some p) ->
+        a >? p = true ->
+        open_request_to (occ_gst o) (addr_of a) (addr_of j) GetPredAndSuccs ->
+        now (occurred (RecvMsg (addr_of j) (addr_of a) (GotPredAndSuccs (Some p) js))) (Cons o ex) ->
+        eventually (pred_improves j) ex.
+  Proof.
+    intros.
+    find_apply_lem_hyp recv_GotPredAndSuccs_with_a_after_p_causes_Notify; simpl in *; invar_eauto.
+    destruct ex as [o' ex]; simpl in *.
+    rewrite (wf_ptr_eq j) by (eapply merge_point_wf; eauto).
+    eapply notify_when_pred_worse_eventually_improves; invar_eauto.
+    inv_prop merge_point; break_and.
+    apply not_between_between.
+    unfold unroll_between_ptr in *.
+    apply Bool.negb_true_iff.
+    unfold ChordIDParams.hash in *.
+    rewrite !(wf_ptr_hash_eq a), !(wf_ptr_hash_eq j) in *; auto.
+  Qed.
+
+  Lemma live_nodes_not_clients :
+    forall gst h,
+      reachable_st gst ->
+      live_node gst h ->
+      ~ client_addr h.
+  Proof.
+  Admitted.
+
+  Lemma occurred_is_step :
+    forall l o o' ex,
+      occurred l o ->
+      lb_execution (Cons o (Cons o' ex)) ->
+      labeled_step_dynamic (occ_gst o) l (occ_gst o').
+  Proof.
+    unfold occurred.
+    intros.
+    now inv_prop lb_execution.
+  Qed.
+
+  Definition pred_or_succ_improves_abj : infseq occurrence -> Prop :=
+    pred_or_succ_improves a \/_
+    pred_or_succ_improves b \/_
+    pred_or_succ_improves j.
+  Hint Unfold pred_or_succ_improves_abj.
+
+  Lemma merge_points_preserved_until_error_drops :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      always (now phase_one) ex ->
+
+      merge_point (occ_gst (hd ex)) a b j ->
+      weak_until (now (fun occ => merge_point (occ_gst occ) a b j))
+                 pred_or_succ_improves_abj
+                 ex.
+  Proof.
+  Admitted.
+
+  Lemma merge_point_gone_improved_something :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      always (now phase_one) ex ->
+
+      merge_point (occ_gst (hd ex)) a b j ->
+      ~ merge_point (occ_gst (hd (tl ex))) a b j ->
+      eventually (pred_or_succ_improves a) ex \/
+      eventually (pred_or_succ_improves b) ex \/
+      eventually (pred_or_succ_improves j) ex.
+  Proof.
+    intros.
+    find_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+    destruct ex as [o [o' ex]].
+    autounfold in *.
+    find_apply_lem_hyp weak_until_Cons; break_or_hyp.
+    - unfold or_tl in *.
+      intuition auto using E0.
+    - break_and.
+      find_apply_lem_hyp weak_until_Cons; break_or_hyp.
+      + unfold or_tl in *.
+        intuition auto using E_next, E0.
+      + tauto.
+  Qed.
+
+  Lemma eventually_or_tl_intror :
+    forall T (P Q : infseq T -> Prop) s,
+      eventually Q s ->
+      eventually (P \/_ Q) s.
+  Proof.
+    intros until 0.
+    apply eventually_monotonic_simple.
+    firstorder.
+  Qed.
+
+  Lemma eventually_or_tl_introl :
+    forall T (P Q : infseq T -> Prop) s,
+      eventually P s ->
+      eventually (P \/_ Q) s.
+  Proof.
+    intros until 0.
+    apply eventually_monotonic_simple.
+    firstorder.
+  Qed.
+
+  Lemma open_request_with_response_on_wire_closed_or_preserved :
+    forall gst l gst' src dst req res,
+      labeled_step_dynamic gst l gst' ->
+      open_request_to gst src dst req ->
+      request_response_pair req res ->
+      In res (channel gst dst src) ->
+      RecvMsg dst src res = l \/
+      open_request_to gst' src dst req /\
+      In res (channel gst' dst src).
+  Proof.
+  Admitted.
+
+  Lemma incoming_GotPredAndSuccs_with_a_after_p_causes_improvement :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+      merge_point (occ_gst (hd ex)) a b j ->
+
+      forall p js,
+        has_pred (occ_gst (hd ex)) (addr_of j) (Some p) ->
+        a >? p = true ->
+        open_request_to (occ_gst (hd ex)) (addr_of a) (addr_of j) GetPredAndSuccs ->
+        In (GotPredAndSuccs (Some p) js) (channel (occ_gst (hd ex)) (addr_of j) (addr_of a)) ->
+        eventually pred_or_succ_improves_abj ex.
+  Proof.
+    intros.
+    inv_prop merge_point; break_and.
+    find_apply_lem_hyp channel_contents.
+    inv_prop (live_node (occ_gst (hd ex)) (addr_of a)).
+    expand_def.
+
+    find_eapply_lem_hyp RecvMsg_eventually_occurred; invar_eauto;
+      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists, live_nodes_not_clients.
+    induction 0 as [[o [o' ex]] | o [o' ex]].
+    - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+      find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+      eapply_lem_prop_hyp weak_until_Cons merge_point.
+      break_or_hyp; [now auto using E_next, E0|].
+      break_and.
+      eapply_lem_prop_hyp weak_until_Cons merge_point.
+      break_or_hyp; [now auto using E_next, E0|].
+      break_and.
+
+      eapply_lem_prop_hyp weak_until_Cons has_pred.
+      break_or_hyp; [now eauto using eventually_or_tl_intror, E0, E_next|].
+      break_and.
+      eapply_lem_prop_hyp weak_until_Cons has_pred.
+      break_or_hyp; [now eauto using eventually_or_tl_intror, E0, E_next|].
+      break_and.
+
+      apply E_next.
+      do 2 apply eventually_or_tl_intror.
+      apply pred_improvement_suffices; invar_eauto.
+      eapply recv_GotPredAndSuccs_with_a_after_p_causes_improvement;
+        invar_eauto.
+    - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+      find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+
+      eapply_lem_prop_hyp weak_until_Cons merge_point.
+      break_or_hyp; [now auto using E_next, E0|].
+      break_and.
+      eapply_lem_prop_hyp weak_until_Cons merge_point.
+      break_or_hyp; [now auto using E_next, E0|].
+      break_and.
+      eapply_lem_prop_hyp weak_until_Cons has_pred.
+      break_or_hyp; [now eauto using eventually_or_tl_intror, E0, E_next|].
+      break_and.
+      eapply_lem_prop_hyp weak_until_Cons has_pred.
+      break_or_hyp; [now eauto using eventually_or_tl_intror, E0, E_next|].
+      break_and.
+      simpl in *.
+      inv_prop lb_execution.
+      find_copy_apply_lem_hyp channel_contents.
+      eapply_lem_prop_hyp open_request_with_response_on_wire_closed_or_preserved labeled_step_dynamic;
+        eauto using pair_GetPredAndSuccs.
+      break_or_hyp; break_and.
+      + apply E_next.
+        do 2 apply eventually_or_tl_intror.
+        apply pred_improvement_suffices; invar_eauto.
+        eapply recv_GotPredAndSuccs_with_a_after_p_causes_improvement;
+          invar_eauto.
+      + find_apply_lem_hyp channel_contents.
+        inv_prop (merge_point (occ_gst o')); break_and.
+        inv_prop (live_node (occ_gst o') (addr_of a)); expand_def.
+        apply E_next.
+        apply IHeventually; invar_eauto.
   Qed.
 
   (* Lemma a_after_pred_merge_point_response_incoming : *)
@@ -1900,20 +2167,6 @@ Section MergePoint.
     (* inv_prop merge_point; break_and. *)
     (* apply pred_improvement_suffices; *)
     (*   eauto using until_eventually. *)
-  Admitted.
-
-  Lemma merge_point_gone_improved_something :
-    forall ex,
-      lb_execution ex ->
-      reachable_st (occ_gst (hd ex)) ->
-      always (now phase_one) ex ->
-
-      merge_point (occ_gst (hd ex)) a b j ->
-      ~ merge_point (occ_gst (hd (tl ex))) a b j ->
-      eventually (pred_or_succ_improves a) ex \/
-      eventually (pred_or_succ_improves b) ex \/
-      eventually (pred_or_succ_improves j) ex.
-  Proof.
   Admitted.
 
   Lemma error_decreases_at_merge_point :
