@@ -1004,6 +1004,30 @@ Lemma better_pred_eventually_improves_succ :
 Proof.
 Admitted.
 
+Lemma open_stabilize_request_until_response :
+  forall ex h j,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
+    wf_ptr j ->
+    has_first_succ (occ_gst (hd ex)) h j ->
+    open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    until
+      (now (fun occ =>
+              open_stabilize_request_to_first_succ (occ_gst occ) h /\
+              has_first_succ (occ_gst (hd ex)) h j))
+      (now (fun occ =>
+              open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
+              (exists p succs,
+                  In (GotPredAndSuccs (Some p) succs)
+                     (channel (occ_gst occ) (addr_of j) h) /\
+                  has_pred (occ_gst occ) (addr_of j) (Some p))))
+      ex.
+Proof.
+Admitted.
+
 Lemma open_stabilize_request_eventually_gets_response :
   forall ex h j,
     lb_execution ex ->
@@ -1023,7 +1047,10 @@ Lemma open_stabilize_request_eventually_gets_response :
                   has_pred (occ_gst occ) (addr_of j) (Some p))))
       ex.
 Proof.
-Admitted.
+  intros.
+  eapply until_eventually.
+  eapply open_stabilize_request_until_response; eauto.
+Qed.
 
 Lemma live_successor_changed_improves :
   forall gst l gst' h s s',
@@ -1981,28 +2008,7 @@ Section MergePoint.
         apply IHeventually; invar_eauto.
   Qed.
 
-  (* Lemma a_after_pred_merge_point_response_incoming : *)
-  (*   forall ex, *)
-  (*     lb_execution ex -> *)
-  (*     reachable_st (occ_gst (hd ex)) -> *)
-  (*     strong_local_fairness ex -> *)
-  (*     always (~_ (now circular_wait)) ex -> *)
-  (*     always (now phase_one) ex -> *)
-  (*     always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex -> *)
-
-  (*     forall st p jp js, *)
-  (*       merge_point (occ_gst (hd ex)) a b j -> *)
-  (*       sigma (occ_gst (hd ex)) (addr_of j) = Some st -> *)
-  (*       pred st = Some p -> *)
-  (*       a >? p = true -> *)
-  (*       In (GotPredAndSuccs (Some p) js) (channel (occ_gst (hd ex)) (addr_of j) (addr_of a)) -> *)
-  (*       until *)
-  (*         (now (fun o => has_pred (occ_gst o) (addr_of j) (Some p))) *)
-  (*         (pred_improves j) ex. *)
-  (* Proof. *)
-  (* Admitted. *)
-
-  Lemma a_after_pred_merge_point_stabilize_open :
+  Lemma open_stabilize_request_eventually_improves_join_point :
     forall ex,
       lb_execution ex ->
       reachable_st (occ_gst (hd ex)) ->
@@ -2010,26 +2016,18 @@ Section MergePoint.
       always (~_ (now circular_wait)) ex ->
       always (now phase_one) ex ->
       always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
-
-      forall st p,
-        merge_point (occ_gst (hd ex)) a b j ->
-        sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
-        pred st = Some p ->
-        a >? p = true ->
-        open_stabilize_request_to_first_succ (occ_gst (hd ex)) (addr_of a) ->
-        until
-          (now (fun o => has_pred (occ_gst o) (addr_of j) (Some p)))
-          (pred_improves j) ex.
-  Proof using a b j.
-    (* intros. *)
-    (* inv_prop merge_point; break_and. *)
-    (* find_copy_apply_lem_hyp (open_stabilize_request_eventually_gets_response ex (addr_of a)); auto. *)
-    (* induction 0. *)
-    (* - find_apply_lem_hyp now_hd; expand_def. *)
-    (*   eapply a_after_pred_merge_point_response_incoming; eauto. *)
-    (* -  *)
+      merge_point (occ_gst (hd ex)) a b j ->
+      open_stabilize_request_to_first_succ (occ_gst (hd ex)) (addr_of a) ->
+      eventually pred_or_succ_improves_abj ex.
+  Proof.
+    intros.
+    find_copy_eapply_lem_hyp open_stabilize_request_until_response;
+      try now (inv_prop merge_point; break_and); eauto.
+    induction 0.
+    - (* broken induction ??? *)
+      simpl in *. expand_def.
+      (* eapply incoming_GotPredAndSuccs_with_a_after_p_causes_improvement; invar_eauto. *)
   Admitted.
-
 
   Lemma a_after_pred_merge_point_precise :
     forall ex,
