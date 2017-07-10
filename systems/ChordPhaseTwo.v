@@ -1947,20 +1947,10 @@ Section MergePoint.
     induction 0 as [[o [o' ex]] | o [o' ex]].
     - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
       find_copy_apply_lem_hyp pred_same_until_improvement; auto.
-      eapply_lem_prop_hyp weak_until_Cons merge_point.
-      break_or_hyp; [now auto using E_next, E0|].
-      break_and.
-      eapply_lem_prop_hyp weak_until_Cons merge_point.
-      break_or_hyp; [now auto using E_next, E0|].
-      break_and.
-
-      eapply_lem_prop_hyp weak_until_Cons has_pred.
-      break_or_hyp; [now eauto using eventually_or_tl_intror, E0, E_next|].
-      break_and.
-      eapply_lem_prop_hyp weak_until_Cons has_pred.
-      break_or_hyp; [now eauto using eventually_or_tl_intror, E0, E_next|].
-      break_and.
-
+      do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
+            intuition auto using E_next, E0).
+      do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
+            intuition eauto using eventually_or_tl_intror, E0, E_next).
       apply E_next.
       do 2 apply eventually_or_tl_intror.
       apply pred_improvement_suffices; invar_eauto.
@@ -1968,20 +1958,11 @@ Section MergePoint.
         invar_eauto.
     - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
       find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+      do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
+            intuition auto using E_next, E0).
+      do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
+            intuition eauto using eventually_or_tl_intror, E0, E_next).
 
-      eapply_lem_prop_hyp weak_until_Cons merge_point.
-      break_or_hyp; [now auto using E_next, E0|].
-      break_and.
-      eapply_lem_prop_hyp weak_until_Cons merge_point.
-      break_or_hyp; [now auto using E_next, E0|].
-      break_and.
-      eapply_lem_prop_hyp weak_until_Cons has_pred.
-      break_or_hyp; [now eauto using eventually_or_tl_intror, E0, E_next|].
-      break_and.
-      eapply_lem_prop_hyp weak_until_Cons has_pred.
-      break_or_hyp; [now eauto using eventually_or_tl_intror, E0, E_next|].
-      break_and.
-      simpl in *.
       inv_prop lb_execution.
       find_copy_apply_lem_hyp channel_contents.
       eapply_lem_prop_hyp open_request_with_response_on_wire_closed_or_preserved labeled_step_dynamic;
@@ -1993,6 +1974,7 @@ Section MergePoint.
         eapply recv_GotPredAndSuccs_with_a_after_p_causes_improvement;
           invar_eauto.
       + find_apply_lem_hyp channel_contents.
+        simpl in *.
         inv_prop (merge_point (occ_gst o')); break_and.
         inv_prop (live_node (occ_gst o') (addr_of a)); expand_def.
         apply E_next.
