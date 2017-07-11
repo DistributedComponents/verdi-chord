@@ -1021,9 +1021,9 @@ Lemma open_stabilize_request_until_response :
       (now (fun occ =>
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
               (exists p succs,
-                  In (GotPredAndSuccs (Some p) succs)
+                  In (GotPredAndSuccs p succs)
                      (channel (occ_gst occ) (addr_of j) h) /\
-                  has_pred (occ_gst occ) (addr_of j) (Some p))))
+                  has_pred (occ_gst occ) (addr_of j) p)))
       ex.
 Proof.
 Admitted.
@@ -1042,9 +1042,9 @@ Lemma open_stabilize_request_eventually_gets_response :
       (now (fun occ =>
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
               (exists p succs,
-                  In (GotPredAndSuccs (Some p) succs)
+                  In (GotPredAndSuccs p succs)
                      (channel (occ_gst occ) (addr_of j) h) /\
-                  has_pred (occ_gst occ) (addr_of j) (Some p))))
+                  has_pred (occ_gst occ) (addr_of j) p)))
       ex.
 Proof.
   intros.
@@ -1130,54 +1130,6 @@ Section MergePoint.
                  (pred_or_succ_improves (make_pointer h)) ex.
   Proof.
   Admitted.
-
-  Lemma no_pred_merge_point' :
-    forall ex,
-      lb_execution ex ->
-      reachable_st (occ_gst (hd ex)) ->
-      strong_local_fairness ex ->
-      always (~_ (now circular_wait)) ex ->
-      always (now phase_one) ex ->
-      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
-
-      merge_point (occ_gst (hd ex)) a b j ->
-      has_pred (occ_gst (hd ex)) (addr_of j) None ->
-
-      until
-        (now (fun o => has_pred (occ_gst o) (addr_of j) None))
-        (pred_or_succ_improves j)
-        ex.
-  Proof.
-    intros.
-    find_copy_apply_lem_hyp (start_stabilize_with_first_successor_eventually ex (addr_of a));
-      eauto.
-    2:now inv_prop merge_point.
-    induction 0.
-    - inv_prop merge_point; break_and.
-      clear dependent b.
-      find_apply_lem_hyp now_hd.
-      find_eapply_lem_hyp (open_stabilize_request_eventually_gets_response s); eauto.
-
-  Admitted.
-
-  Lemma no_pred_merge_point :
-    forall ex,
-      lb_execution ex ->
-      reachable_st (occ_gst (hd ex)) ->
-      strong_local_fairness ex ->
-      always (~_ (now circular_wait)) ex ->
-      always (now phase_one) ex ->
-      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
-
-      merge_point (occ_gst (hd ex)) a b j ->
-      has_pred (occ_gst (hd ex)) (addr_of j) None ->
-
-      eventually (pred_or_succ_improves j) ex.
-  Proof.
-    intros.
-    eapply until_eventually.
-    eapply no_pred_merge_point'; eauto.
-  Qed.
 
   Lemma counting_opt_error_depends_on_live_addrs :
     forall gst gst' p bb,
@@ -1616,14 +1568,23 @@ Section MergePoint.
         invar_eauto.
       intros.
       destruct s; simpl in *.
-      intuition break_exists_exists.
       intuition.
+      break_exists_name p.
       repeat find_apply_lem_hyp always_now'.
-      invcs_prop and_tl; break_exists.
-      invc_prop pred_not_worse; break_and.
-      invc_prop pred_not_worse; break_and.
-      repeat find_has_pred_eq.
-      congruence.
+      destruct p as [p|].
+      + exists p. break_exists_exists.
+        intuition.
+        invcs_prop and_tl; break_exists.
+        invc_prop pred_not_worse; break_and.
+        invc_prop pred_not_worse; break_and.
+        repeat find_has_pred_eq.
+        find_injection.
+        congruence.
+      + invcs_prop and_tl; break_exists.
+        invcs_prop and_tl; break_exists.
+        invc_prop pred_not_worse; break_and.
+        find_has_pred_eq.
+        congruence.
     - assert (live_node (occ_gst o') (addr_of a))
         by (inv_prop lb_execution; invar_eauto).
       invcs_prop live_node; break_and.
@@ -1809,6 +1770,30 @@ Section MergePoint.
     eapply unrolled_not_between_rot.
     eapply Bool.negb_true_iff.
     erewrite (wf_ptr_eq j); auto.
+  Qed.
+
+  Lemma recv_GotPredAndSuccs_with_pred_None_causes_Notify :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+
+      forall js,
+        merge_point (occ_gst (hd ex)) a b j ->
+        open_request_to (occ_gst (hd ex)) (addr_of a) (addr_of j) GetPredAndSuccs ->
+        now (occurred (RecvMsg (addr_of j) (addr_of a) (GotPredAndSuccs None js))) ex ->
+        next (now (fun o => In Notify (channel (occ_gst o) (addr_of a) (addr_of j)))) ex.
+  Proof.
+    intros.
+    destruct ex as [o [o' ex]].
+    inv_prop merge_point; break_and.
+    inv_prop lb_execution.
+    simpl in *.
+    find_eapply_lem_hyp (live_node_means_state_exists (occ_gst o) (addr_of a)).
+    break_exists.
+    invcs_prop occurred.
+    repeat find_reverse_rewrite.
+    eapply recv_GotPredAndSuccs_causes_Notify_None; eauto.
+    erewrite ptr_correct, <- wf_ptr_eq; eauto.
   Qed.
 
   Lemma wf_ptr_hash_eq :
@@ -2018,6 +2003,131 @@ Section MergePoint.
         apply IHeventually; invar_eauto.
   Qed.
 
+  Lemma recv_GotPredAndSuccs_with_pred_None_causes_improvement :
+    forall o ex,
+      lb_execution (Cons o ex) ->
+      reachable_st (occ_gst o) ->
+      strong_local_fairness (Cons o ex) ->
+      always (~_ (now circular_wait)) (Cons o ex) ->
+      always (now phase_one) (Cons o ex) ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+      merge_point (occ_gst o) a b j ->
+      merge_point (occ_gst (hd ex)) a b j ->
+
+      forall js,
+        has_pred (occ_gst (hd ex)) (addr_of j) None ->
+        open_request_to (occ_gst o) (addr_of a) (addr_of j) GetPredAndSuccs ->
+        now (occurred (RecvMsg (addr_of j) (addr_of a) (GotPredAndSuccs None js))) (Cons o ex) ->
+        eventually (pred_improves j) ex.
+  Proof.
+    intros.
+    find_apply_lem_hyp recv_GotPredAndSuccs_with_pred_None_causes_Notify;
+      simpl in *; invar_eauto.
+    destruct ex as [o' ex]; simpl in *.
+    eapply notify_when_pred_None_eventually_improves; simpl; invar_eauto;
+      inv_prop merge_point; tauto.
+  Qed.
+
+  Lemma incoming_GotPredAndSuccs_with_pred_None_causes_improvement :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+      merge_point (occ_gst (hd ex)) a b j ->
+
+      forall js,
+        has_pred (occ_gst (hd ex)) (addr_of j) None ->
+        open_request_to (occ_gst (hd ex)) (addr_of a) (addr_of j) GetPredAndSuccs ->
+        In (GotPredAndSuccs None js) (channel (occ_gst (hd ex)) (addr_of j) (addr_of a)) ->
+        eventually pred_or_succ_improves_abj ex.
+  Proof.
+    intros.
+    inv_prop merge_point; break_and.
+    find_apply_lem_hyp channel_contents.
+    inv_prop (live_node (occ_gst (hd ex)) (addr_of a)).
+    expand_def.
+    find_eapply_lem_hyp RecvMsg_eventually_occurred; invar_eauto;
+      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists, live_nodes_not_clients.
+    (* recv_GotPredAndSuccs_causes_Notify_None : *)
+
+    induction 0 as [[o [o' ex]] | o [o' ex]].
+    - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+      find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+      do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
+            intuition auto using E_next, E0).
+      do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
+            intuition eauto using eventually_or_tl_intror, E0, E_next).
+      apply E_next.
+      do 2 apply eventually_or_tl_intror.
+      apply pred_improvement_suffices; invar_eauto.
+      eapply recv_GotPredAndSuccs_with_pred_None_causes_improvement;
+        invar_eauto.
+    - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+      find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+      do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
+            intuition auto using E_next, E0).
+      do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
+            intuition eauto using eventually_or_tl_intror, E0, E_next).
+
+      inv_prop lb_execution.
+      find_copy_apply_lem_hyp channel_contents.
+      eapply_lem_prop_hyp open_request_with_response_on_wire_closed_or_preserved labeled_step_dynamic;
+        eauto using pair_GetPredAndSuccs.
+      break_or_hyp; break_and.
+      + apply E_next.
+        do 2 apply eventually_or_tl_intror.
+        apply pred_improvement_suffices; invar_eauto.
+        eapply recv_GotPredAndSuccs_with_pred_None_causes_improvement;
+          invar_eauto.
+      + find_apply_lem_hyp channel_contents.
+        simpl in *.
+        inv_prop (merge_point (occ_gst o')); break_and.
+        inv_prop (live_node (occ_gst o') (addr_of a)); expand_def.
+        apply E_next.
+        apply IHeventually; invar_eauto.
+  Qed.
+
+  Lemma open_stabilize_request_pred_None_eventually_improves_join_point :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+      merge_point (occ_gst (hd ex)) a b j ->
+      has_pred (occ_gst (hd ex)) (addr_of j) None ->
+      open_stabilize_request_to_first_succ (occ_gst (hd ex)) (addr_of a) ->
+      eventually pred_or_succ_improves_abj ex.
+  Proof.
+    intros.
+    find_copy_eapply_lem_hyp open_stabilize_request_until_response;
+      try now (inv_prop merge_point; break_and); eauto.
+    induction 0 as [[o [o' ex]] | o [o' ex]].
+    - simpl in *. break_and.
+      break_exists_name p; expand_def.
+      destruct p as [p|].
+      + find_has_pred_eq.
+        congruence.
+      + eapply incoming_GotPredAndSuccs_with_pred_None_causes_improvement; invar_eauto.
+    - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+      find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+      do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
+            intuition auto using E_next, E0).
+      do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
+            intuition eauto using eventually_or_tl_intror, E0, E_next).
+      find_apply_lem_hyp until_Cons; simpl in *; expand_def.
+      + find_has_pred_eq; subst.
+        apply E_next.
+        eapply incoming_GotPredAndSuccs_with_pred_None_causes_improvement;
+          invar_eauto;
+          eauto using channel_contents.
+      + apply E_next, IHuntil; invar_eauto.
+  Qed.
+
   Lemma open_stabilize_request_a_after_p_eventually_improves_join_point :
     forall ex p,
       lb_execution ex ->
@@ -2037,9 +2147,8 @@ Section MergePoint.
       try now (inv_prop merge_point; break_and); eauto.
     induction 0 as [[o [o' ex]] | o [o' ex]].
     - simpl in *. expand_def.
+      find_has_pred_eq; subst.
       eapply incoming_GotPredAndSuccs_with_a_after_p_causes_improvement; invar_eauto.
-      find_has_pred_eq.
-      now find_injection.
     - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
       find_copy_apply_lem_hyp pred_same_until_improvement; auto.
       do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
@@ -2047,15 +2156,11 @@ Section MergePoint.
       do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
             intuition eauto using eventually_or_tl_intror, E0, E_next).
       find_apply_lem_hyp until_Cons; simpl in *; expand_def.
-      + destruct (option_eq_dec _ pointer_eq_dec (Some p) (Some x)).
-        * find_injection.
-          apply E_next.
-          eapply incoming_GotPredAndSuccs_with_a_after_p_causes_improvement;
-            invar_eauto;
-            eauto using channel_contents.
-        * find_eapply_lem_hyp pred_changing_suffices; eauto using E_next, E0.
-          do 2 apply eventually_or_tl_intror.
-          auto.
+      + find_has_pred_eq; subst.
+        apply E_next.
+        eapply incoming_GotPredAndSuccs_with_a_after_p_causes_improvement;
+          invar_eauto;
+          eauto using channel_contents.
       + apply E_next, IHuntil; invar_eauto.
   Qed.
 
@@ -2082,6 +2187,35 @@ Section MergePoint.
       try now (inv_prop merge_point; break_and); eauto.
     induction 0 as [[o [o' ex]] | o [o' ex]].
     - eapply open_stabilize_request_a_after_p_eventually_improves_join_point;
+        eauto using has_pred_intro.
+    - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+      find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+      do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
+            intuition auto using E_next, E0).
+      do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
+            intuition eauto using eventually_or_tl_intror, E0, E_next).
+      eapply E_next, IHeventually; invar_eauto.
+  Qed.
+
+  Lemma no_pred_merge_point :
+    forall ex,
+      lb_execution ex ->
+      reachable_st (occ_gst (hd ex)) ->
+      strong_local_fairness ex ->
+      always (~_ (now circular_wait)) ex ->
+      always (now phase_one) ex ->
+      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+
+      merge_point (occ_gst (hd ex)) a b j ->
+      has_pred (occ_gst (hd ex)) (addr_of j) None ->
+
+      eventually pred_or_succ_improves_abj ex.
+  Proof.
+    intros.
+    find_copy_apply_lem_hyp (start_stabilize_with_first_successor_eventually ex (addr_of a));
+      try now (inv_prop merge_point; break_and); eauto.
+    induction 0 as [[o [o' ex]] | o [o' ex]].
+    - eapply open_stabilize_request_pred_None_eventually_improves_join_point;
         eauto using has_pred_intro.
     - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
       find_copy_apply_lem_hyp pred_same_until_improvement; auto.
