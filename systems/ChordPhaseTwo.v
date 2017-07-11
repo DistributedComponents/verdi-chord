@@ -2049,30 +2049,6 @@ Section MergePoint.
       + apply E_next, IHuntil; invar_eauto.
   Qed.
 
-  Lemma a_after_pred_merge_point_precise :
-    forall ex,
-      lb_execution ex ->
-      reachable_st (occ_gst (hd ex)) ->
-      strong_local_fairness ex ->
-      always (~_ (now circular_wait)) ex ->
-      always (now phase_one) ex ->
-      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
-
-      forall st p,
-        merge_point (occ_gst (hd ex)) a b j ->
-        sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
-        pred st = Some p ->
-        a >? p = true ->
-        until
-          (now (fun o => has_pred (occ_gst o) (addr_of j) (Some p)))
-          (pred_improves j) ex.
-  Proof.
-    intros.
-    inv_prop merge_point; break_and.
-    find_eapply_lem_hyp notify_when_pred_worse_eventually_improves;
-      eauto using has_pred_intro.
-  Admitted.
-
   Lemma a_after_pred_merge_point :
     forall ex,
       lb_execution ex ->
@@ -2087,36 +2063,24 @@ Section MergePoint.
         sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
         pred st = Some p ->
         a >? p = true ->
-        eventually (pred_or_succ_improves j) ex.
+        eventually pred_or_succ_improves_abj ex.
   Proof.
     intros.
-    invc_prop merge_point; break_and.
-    find_copy_apply_lem_hyp (start_stabilize_with_first_successor_eventually ex (addr_of a)); auto.
-    induction 0.
-    2:admit.
-
-    destruct s as [o s]; simpl in *.
-    invc_prop has_first_succ; break_and.
-    inv_prop has_first_succ; break_and.
-    find_apply_lem_hyp hd_error_tl_exists; break_exists.
-    find_eapply_lem_hyp open_stabilize_request_to_first_succ_elim; eauto.
-
-    find_eapply_lem_hyp open_stabilize_request_eventually_gets_response; eauto.
-    induction 0.
-    2:admit.
-    destruct s0.
-    (* find_copy_eapply_lem_hyp *)
-    (*   (stabilize_with_worse_pred_completes (Cons o s) (addr_of a) (addr_of j)); *)
-    (*   eauto. *)
-    (* destruct s in *. *)
-    (* simpl in *. *)
-
-    (*   open_stabilize_request_eventually_gets_response *)
-    (* find_copy_eapply_lem_hyp a_after_pred_merge_point_precise; eauto. *)
-    (* inv_prop merge_point; break_and. *)
-    (* apply pred_improvement_suffices; *)
-    (*   eauto using until_eventually. *)
-  Admitted.
+    find_eapply_lem_hyp has_pred_intro; eauto.
+    clear dependent st.
+    find_copy_apply_lem_hyp (start_stabilize_with_first_successor_eventually ex (addr_of a));
+      try now (inv_prop merge_point; break_and); eauto.
+    induction 0 as [[o [o' ex]] | o [o' ex]].
+    - eapply open_stabilize_request_a_after_p_eventually_improves_join_point;
+        eauto using has_pred_intro.
+    - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+      find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+      do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
+            intuition auto using E_next, E0).
+      do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
+            intuition eauto using eventually_or_tl_intror, E0, E_next).
+      eapply E_next, IHeventually; invar_eauto.
+  Qed.
 
   Lemma error_decreases_at_merge_point :
     forall ex,
