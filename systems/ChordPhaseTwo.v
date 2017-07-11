@@ -1934,6 +1934,16 @@ Section MergePoint.
     firstorder.
   Qed.
 
+  Lemma eventually_or_tl_or :
+    forall T (P Q : infseq T -> Prop) s,
+      eventually (P \/_ Q) s ->
+      eventually P s \/ eventually Q s.
+  Proof.
+    intros.
+    induction 0;
+      firstorder using E0, E_next.
+  Qed.
+
   Lemma open_request_with_response_on_wire_closed_or_preserved :
     forall gst l gst' src dst req res,
       labeled_step_dynamic gst l gst' ->
@@ -2091,22 +2101,25 @@ Section MergePoint.
       always (now phase_one) ex ->
 
       merge_point (occ_gst (hd ex)) a b j ->
-      eventually (pred_or_succ_improves a) ex \/
-      eventually (pred_or_succ_improves b) ex \/
-      eventually (pred_or_succ_improves j) ex.
+      eventually pred_or_succ_improves_abj ex.
   Proof.
     intros.
+    find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
     find_copy_apply_lem_hyp joins_stop; auto using strong_local_fairness_weak.
     induction 0 as [ex | o [o' ex]].
-    - inv_prop merge_point; break_and.
+    - inv_prop (merge_point (occ_gst (hd ex))); break_and.
       inv_prop (live_node (occ_gst (hd ex)) (addr_of j)); expand_def.
       destruct (pred ltac:(auto)) as [p |] eqn:?H.
-      + pose proof (order_cases_le_gt a p); break_or_hyp;
-          eauto using a_before_pred_merge_point, a_after_pred_merge_point.
-      + eauto using no_pred_merge_point, has_pred_intro.
-    - destruct (merge_point_dec (occ_gst o') a b j).
-      + elim IHeventually; invar_eauto; intuition eauto using E_next.
-      + apply merge_point_gone_improved_something; auto.
+      + pose proof (order_cases_le_gt a p); break_or_hyp.
+        * eauto using a_before_pred_merge_point, eventually_or_tl_introl.
+        * eauto using a_after_pred_merge_point.
+      + eauto using no_pred_merge_point, has_pred_intro, eventually_or_tl_introl, eventually_or_tl_intror.
+    - find_apply_lem_hyp weak_until_Cons; break_or_hyp;
+        [now auto using E_next, E0|break_and].
+      find_copy_apply_lem_hyp weak_until_Cons; break_or_hyp;
+        [now auto using E_next, E0|break_and].
+      eapply E_next, IHeventually;
+        invar_eauto.
   Qed.
 
 End MergePoint.
@@ -2186,7 +2199,9 @@ Proof.
     eexists; eauto using live_node_is_active.
   - inv_prop merge_point; break_and.
     find_apply_lem_hyp error_decreases_at_merge_point; eauto.
-    repeat break_or_hyp; eexists; eauto using live_node_is_active.
+    unfold pred_or_succ_improves_abj in *.
+    repeat (find_apply_lem_hyp eventually_or_tl_or; auto; try break_or_hyp);
+      eexists; eauto using live_node_is_active.
 Qed.
 
 Lemma phase_two_nonzero_error_continuous_drop :
