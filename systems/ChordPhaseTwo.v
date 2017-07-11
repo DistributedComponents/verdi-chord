@@ -2273,6 +2273,47 @@ Definition wrong_pred (gst : global_state) (h : pointer) : Prop :=
     pred st = Some p /\
     better_pred gst h p p'.
 
+Lemma best_pred_is_best_first_succ :
+  forall gst p s,
+      pred_correct gst s (Some p) ->
+      first_succ_correct gst p (Some s).
+Proof.
+  unfold first_succ_correct, pred_correct.
+  intros.
+  break_exists. break_and.
+  find_injection.
+  eexists; split; eauto; repeat intro.
+  invcs_prop better_succ. break_and.
+  find_eapply_prop better_pred.
+  unfold better_pred.
+  intuition eauto.
+Qed.
+
+Lemma best_first_succ_is_best_pred :
+  forall gst p s,
+      first_succ_correct gst p (Some s) ->
+      pred_correct gst s (Some p).
+Proof.
+  unfold first_succ_correct, pred_correct.
+  intros.
+  break_exists. break_and.
+  find_injection.
+  eexists; split; eauto; repeat intro.
+  invcs_prop better_pred. break_and.
+  find_eapply_prop better_succ.
+  unfold better_succ.
+  intuition eauto.
+Qed.
+
+Lemma correct_pred_exists :
+  forall gst h,
+    reachable_st gst ->
+    exists p,
+      live_node gst (addr_of p) /\
+      pred_correct gst h (Some p).
+Proof.
+Admitted.
+
 Lemma error_decreases_when_succs_right :
   forall ex h,
     lb_execution ex ->
@@ -2283,8 +2324,11 @@ Lemma error_decreases_when_succs_right :
 
     first_succs_correct (occ_gst (hd ex)) ->
     wrong_pred (occ_gst (hd ex)) h ->
-    eventually (pred_or_succ_improves h) ex.
+    eventually (pred_improves h) ex.
 Proof.
+  intros.
+  find_copy_apply_lem_hyp (correct_pred_exists (occ_gst (hd ex)) h).
+  break_exists_name p. break_and.
 Admitted.
 
 Lemma error_means_merge_point_or_wrong_pred :
@@ -2320,6 +2364,7 @@ Lemma phase_two_nonzero_error_causes_measure_drop :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ now circular_wait) ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
     always (now phase_one) ex ->
 
     nonzero_error_causes_measure_drop pred_and_first_succ_error ex.
@@ -2330,7 +2375,7 @@ Proof.
   find_apply_lem_hyp error_means_merge_point_or_wrong_pred; auto.
   expand_def.
   - find_eapply_lem_hyp error_decreases_when_succs_right; eauto.
-    eexists; eauto using live_node_is_active.
+    eexists; eauto using live_node_is_active, pred_improvement_suffices.
   - inv_prop merge_point; break_and.
     find_apply_lem_hyp error_decreases_at_merge_point; eauto.
     unfold pred_or_succ_improves_abj in *.
@@ -2339,22 +2384,27 @@ Proof.
 Qed.
 
 Lemma phase_two_nonzero_error_continuous_drop :
-  forall ex : infseq occurrence,
+  forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ now circular_wait) ex ->
     always (now phase_one) ex ->
-    always (nonzero_error_causes_measure_drop pred_and_first_succ_error) ex.
+    continuously (nonzero_error_causes_measure_drop pred_and_first_succ_error) ex.
 Proof.
-  cofix c.
   intros.
-  intros.
-  destruct ex.
-  constructor.
-  - apply phase_two_nonzero_error_causes_measure_drop; auto.
-  - simpl.
-    apply c; invar_eauto.
+  find_copy_apply_lem_hyp joins_stop; auto.
+  induction 0.
+  - apply E0.
+    generalize dependent s.
+    cofix c.
+    intros.
+    destruct s.
+    constructor.
+    + apply phase_two_nonzero_error_causes_measure_drop; auto.
+    + simpl.
+      apply c; invar_eauto.
+  - apply E_next, IHeventually; invar_eauto.
 Qed.
 
 Lemma phase_two_continuously :
@@ -2367,9 +2417,7 @@ Lemma phase_two_continuously :
     continuously (now phase_two) ex.
 Proof.
   intros.
-  eapply continuously_zero_phase_two_error_phase_two; eauto.
-  eapply local_measure_causes_measure_zero_continuosly; eauto.
-  - eapply phase_two_error_continuously_nonincreasing;
-      eauto using strong_local_fairness_weak.
-  - apply E0; eapply phase_two_nonzero_error_continuous_drop; eauto.
+  apply continuously_zero_phase_two_error_phase_two; auto.
+  apply local_measure_causes_measure_zero_continuosly;
+    auto using phase_two_error_continuously_nonincreasing, phase_two_nonzero_error_continuous_drop.
 Qed.
