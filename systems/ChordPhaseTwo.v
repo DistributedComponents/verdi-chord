@@ -1017,7 +1017,7 @@ Lemma open_stabilize_request_until_response :
     until
       (now (fun occ =>
               open_stabilize_request_to_first_succ (occ_gst occ) h /\
-              has_first_succ (occ_gst (hd ex)) h j))
+              has_first_succ (occ_gst occ) h j))
       (now (fun occ =>
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
               (exists p succs,
@@ -2008,8 +2008,8 @@ Section MergePoint.
         apply IHeventually; invar_eauto.
   Qed.
 
-  Lemma open_stabilize_request_eventually_improves_join_point :
-    forall ex,
+  Lemma open_stabilize_request_a_after_p_eventually_improves_join_point :
+    forall ex p,
       lb_execution ex ->
       reachable_st (occ_gst (hd ex)) ->
       strong_local_fairness ex ->
@@ -2017,17 +2017,37 @@ Section MergePoint.
       always (now phase_one) ex ->
       always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
       merge_point (occ_gst (hd ex)) a b j ->
+      has_pred (occ_gst (hd ex)) (addr_of j) (Some p) ->
+      (a >? p) = true ->
       open_stabilize_request_to_first_succ (occ_gst (hd ex)) (addr_of a) ->
       eventually pred_or_succ_improves_abj ex.
   Proof.
     intros.
     find_copy_eapply_lem_hyp open_stabilize_request_until_response;
       try now (inv_prop merge_point; break_and); eauto.
-    induction 0.
-    - (* broken induction ??? *)
-      simpl in *. expand_def.
-      (* eapply incoming_GotPredAndSuccs_with_a_after_p_causes_improvement; invar_eauto. *)
-  Admitted.
+    induction 0 as [[o [o' ex]] | o [o' ex]].
+    - simpl in *. expand_def.
+      eapply incoming_GotPredAndSuccs_with_a_after_p_causes_improvement; invar_eauto.
+      find_has_pred_eq.
+      now find_injection.
+    - find_copy_apply_lem_hyp merge_points_preserved_until_error_drops; auto.
+      find_copy_apply_lem_hyp pred_same_until_improvement; auto.
+      do 2 (eapply_lem_prop_hyp weak_until_Cons merge_point;
+            intuition auto using E_next, E0).
+      do 2 (eapply_lem_prop_hyp weak_until_Cons has_pred;
+            intuition eauto using eventually_or_tl_intror, E0, E_next).
+      find_apply_lem_hyp until_Cons; simpl in *; expand_def.
+      + destruct (option_eq_dec _ pointer_eq_dec (Some p) (Some x)).
+        * find_injection.
+          apply E_next.
+          eapply incoming_GotPredAndSuccs_with_a_after_p_causes_improvement;
+            invar_eauto;
+            eauto using channel_contents.
+        * find_eapply_lem_hyp pred_changing_suffices; eauto using E_next, E0.
+          do 2 apply eventually_or_tl_intror.
+          auto.
+      + apply E_next, IHuntil; invar_eauto.
+  Qed.
 
   Lemma a_after_pred_merge_point_precise :
     forall ex,
