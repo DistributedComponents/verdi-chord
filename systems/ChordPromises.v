@@ -46,12 +46,20 @@ Lemma successor_nodes_always_valid :
 Proof.
 Admitted.
 
-
 Lemma wf_ptr_succ_list_invariant :
   forall gst h st p rest,
     reachable_st gst ->
     sigma gst h = Some st ->
     succ_list st = p :: rest ->
+    wf_ptr p.
+Proof.
+Admitted.
+
+Lemma wf_ptr_pred_invariant :
+  forall gst h st p,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    pred st = Some p ->
     wf_ptr p.
 Proof.
 Admitted.
