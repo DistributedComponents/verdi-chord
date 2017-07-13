@@ -64,6 +64,14 @@ Lemma wf_ptr_pred_invariant :
 Proof.
 Admitted.
 
+Lemma ptr_correct :
+  forall gst h st,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    ptr st = make_pointer h.
+Proof.
+Admitted.
+
 Definition nonempty_succ_lists (gst : global_state) : Prop :=
   forall h st,
     sigma gst h = Some st ->
