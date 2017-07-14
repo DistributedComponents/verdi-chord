@@ -72,12 +72,6 @@ Section Sorting.
   Definition sort : list t -> list t :=
     iter_merge [].
 
-  Theorem sort_makes_sorted :
-    forall l l',
-      l' = sort l ->
-      sorted l'.
-  Admitted.
-
   Theorem sort_permutes :
     forall l l',
       l' = sort l ->

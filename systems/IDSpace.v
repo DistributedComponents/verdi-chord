@@ -76,24 +76,6 @@ Module IDSpace(P : IDSpaceParams).
   Definition addr_of : pointer -> P.name :=
     ptrAddr.
 
-  Lemma make_pointer_correct_addr :
-    forall p a,
-      p = make_pointer a ->
-      addr_of p = a.
-  Proof using.
-    intros.
-    now find_rewrite.
-  Qed.
-
-  Lemma make_pointer_correct_id :
-    forall p a,
-      p = make_pointer a ->
-      id_of p = P.hash a.
-  Proof using.
-    intros.
-    now find_rewrite.
-  Qed.
-
   Definition pointer_eq_dec : forall x y : pointer,
       {x = y} + {x <> y}.
   Proof using.
@@ -236,16 +218,6 @@ Module IDSpace(P : IDSpaceParams).
          else if P.id_eq_dec x y
               then true
               else between_bool h x y.
-
-  Lemma unrolling_makes_h_least :
-    forall h x,
-      unroll_between h h x = true.
-  Proof using.
-    unfold unroll_between.
-    intros.
-    repeat break_if;
-      congruence.
-  Qed.
 
   Lemma between_bool_yz_antisymmetric :
     forall x y z,

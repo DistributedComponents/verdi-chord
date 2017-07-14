@@ -51,29 +51,6 @@ Proof.
     congruence.
 Qed.
 
-Lemma recv_handler_label_is_RecvMsg :
-  forall h st src m res l,
-    recv_handler_l h src st m = (res, l) ->
-    l = RecvMsg h src m.
-Proof.
-  unfold recv_handler_l.
-  congruence.
-Qed.
-
-Lemma live_In_live_ptrs_with_states :
-  forall gst h st,
-    live_node gst (addr_of h) ->
-    wf_ptr h ->
-    sigma gst (addr_of h) = Some st ->
-    In (h, st) (live_ptrs_with_states gst).
-Proof.
-  unfold live_ptrs_with_states.
-  intros.
-  apply FilterMap.filterMap_In with (a:=h).
-  - by find_rewrite.
-  - by apply live_In_live_ptrs.
-Qed.
-
 (** Phase three: all successors become correct. *)
 Definition all_in_dec
            {A : Type}
@@ -101,9 +78,6 @@ Definition succs_error (h : addr) (gst : global_state) :=
     Chord.SUCC_LIST_LEN + 1
   end.
 
-Definition phase_three_error : global_state -> nat :=
-  global_measure succs_error.
-
 Definition correct_succs (gst : global_state) (h : pointer) (st : data) : Prop :=
   forall s xs ys s',
     wf_ptr h ->
@@ -119,13 +93,6 @@ Definition all_succs_correct (gst : global_state) : Prop :=
     wf_ptr h ->
     correct_succs gst h st /\
     length (succ_list st) = Chord.SUCC_LIST_LEN.
-
-Lemma succs_error_zero_locally_correct :
-  forall gst h st,
-    succs_error (addr_of h) gst = 0 ->
-    correct_succs gst h st.
-Proof.
-Admitted.
 
 Theorem phase_three :
   forall ex,

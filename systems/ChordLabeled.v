@@ -26,10 +26,6 @@ Require Import Chord.InfSeqTactics.
 Require Import Chord.LiveNodesStayLive.
 Require Import Chord.ChordQueryInvariant.
 
-(* assuming sigma gst h = Some st *)
-Definition failed_successors (gst : global_state) (st : data) : list pointer :=
-  filter (fun p : pointer => In_dec addr_eq_dec (addr_of p) (failed_nodes gst)) (succ_list st).
-
 Lemma l_enabled_RecvMsg_In_msgs :
   forall e src dst m d,
     In dst (nodes (occ_gst e)) ->
@@ -227,33 +223,6 @@ Proof using.
   auto using in_or_app, in_eq.
 Qed.
 
-Lemma recv_implies_msg_in_after :
-  forall gst gst' gst'' dst to src from m p,
-    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-    labeled_step_dynamic gst (RecvMsg src dst m) gst'' ->
-    (src, (dst, m)) <> (from, (to, p)) ->
-    In (src, (dst, m)) (msgs gst').
-Proof using.
-  intros.
-  eapply irrelevant_message_not_removed.
-  - eauto.
-  - admit.
-  - admit.
-(*
-    - invc_labeled_step.
-      invc_labeled_step.
-      recover_msg_from_recv_step_equality_clear.
-      recover_msg_from_recv_step_equality_clear.
-      match goal with
-      | H: msgs ?gst = _ ++ ?packet :: _,
-        H': ?packet = ?tuple
-        |- In ?tuple (msgs ?gst) =>
-        rewrite H; rewrite H'
-      end.
-      auto using in_or_app, in_eq.
-    - congruence. *)
-Admitted.
-
 Ltac construct_gst_RecvMsg :=
   match goal with
   | Hst: sigma ?gst ?d = Some ?st,
@@ -326,7 +295,6 @@ Proof using.
   now invc_labeled_step.
 Qed.
 
-
 Lemma nodes_never_removed :
   forall gst gst' l h,
     labeled_step_dynamic gst l gst' ->
@@ -335,60 +303,6 @@ Lemma nodes_never_removed :
 Proof using.
   intros.
   now invc_labeled_step.
-Qed.
-
-Lemma labeled_step_dynamic_neq_payload_enabled :
-  forall gst gst' gst'' to from m p,
-    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-    labeled_step_dynamic gst (RecvMsg from to m) gst'' ->
-    m <> p ->
-    enabled (RecvMsg from to m) gst'.
-Proof using.
-  intros.
-  apply when_RecvMsg_enabled.
-  - eauto using recv_implies_node_in, nodes_never_removed.
-  - eauto using recv_implies_node_not_failed, failed_nodes_never_added.
-  - eauto using recv_implies_state_exists.
-  - eapply irrelevant_message_not_removed.
-    * eauto.
-    * eauto using recv_implies_msg_in_before.
-    * congruence.
-Qed.
-
-Lemma labeled_step_dynamic_neq_src_enabled :
-  forall gst gst' gst'' to src from m p,
-    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-    labeled_step_dynamic gst (RecvMsg src to m) gst'' ->
-    src <> from ->
-    enabled (RecvMsg src to m) gst'.
-Proof using.
-  intros.
-  apply when_RecvMsg_enabled.
-  - eauto using recv_implies_node_in, nodes_never_removed.
-  - eauto using recv_implies_node_not_failed, failed_nodes_never_added.
-  - eauto using recv_implies_state_exists.
-  - eapply irrelevant_message_not_removed.
-    * eauto.
-    * eauto using recv_implies_msg_in_before.
-    * congruence.
-Qed.
-
-Lemma labeled_step_dynamic_neq_dst_enabled :
-  forall gst gst' gst'' dst to src from m p,
-    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-    labeled_step_dynamic gst (RecvMsg src dst m) gst'' ->
-    dst <> to ->
-    enabled (RecvMsg src dst m) gst'.
-Proof using.
-  intros.
-  apply when_RecvMsg_enabled.
-  - eauto using recv_implies_node_in, nodes_never_removed.
-  - eauto using recv_implies_node_not_failed, failed_nodes_never_added.
-  - eauto using recv_implies_state_exists.
-  - eapply irrelevant_message_not_removed.
-    * eauto.
-    * eauto using recv_implies_msg_in_before.
-    * congruence.
 Qed.
 
 Lemma recv_implies_state_exists_after_timeout :
@@ -619,15 +533,6 @@ Proof using.
     exact: update_diff.
 Qed.
 
-Lemma timeout_step_implies_timeout_exists :
-  forall gst gst' h t eff,
-    labeled_step_dynamic gst (Timeout h t eff) gst' ->
-    In t (timeouts gst h).
-Proof using.
-  intros.
-  invc_labeled_step.
-Qed.
-
 Lemma handle_query_req_busy_never_clears :
   forall src st p st' ms nts cts,
     handle_query_req_busy src st p = (st', ms, nts, cts) ->
@@ -840,47 +745,11 @@ Ltac inv_query_request :=
   | H : query_request _ _ |- _ => inv H
   end.
 
-Lemma pointers_exist :
-  forall a,
-  exists p,
-    addr_of p = a.
-Proof using.
-  move => a.
-    by exists (make_pointer a).
-Qed.
-
 Ltac inv_request_response_pair :=
   match goal with
   | H: request_response_pair _ _ |- _ =>
     inv H
   end.
-
-Lemma handle_query_res_doesnt_remove_constrained_requests :
-  forall h dst gst req st p q st' ms nts cts,
-    timeouts_match_query gst ->
-    (* handle_query_res is only called on responses, so this should hold *)
-    request_response_pair req p ->
-    In h (nodes gst) ->
-    sigma gst h = Some st ->
-    In (Request dst req) (timeouts gst h) ->
-    timeout_constraint gst h (Request dst req) ->
-    In (dst, (h, p)) (msgs gst) ->
-    handle_query_res dst h st q p = (st', ms, nts, cts) ->
-    In (Request dst req) nts \/ ~ In (Request dst req) cts.
-Proof using.
-  unfold handle_query_res.
-  intros.
-  assert (exists q, cur_request st = Some (make_pointer dst, q, req) /\
-               query_request q req)
-    by eauto.
-  break_exists.
-  break_and.
-  inv_request_response_pair;
-    break_match;
-    inv_timeout_constraint;
-    inv_query_request;
-    firstorder with datatypes.
-Qed.
 
 Definition request_response_pair_dec :
   forall p q,
@@ -891,42 +760,6 @@ Proof using.
     try by eauto using pair_GetSuccList, pair_GetBestPredecessor, pair_GetPredAndSuccs, pair_Ping;
     right; intro H; inv H.
 Defined.
-
-Lemma unsafe_not_req_payload_is_response :
-  forall p,
-    is_safe p = false ->
-    is_request p = false ->
-    response_payload p.
-Proof using.
-  intros.
-  destruct p;
-    try (simpl in *; discriminate);
-    auto using res_GotBestPredecessor, res_GotSuccList, res_GotPredAndSuccs, res_Pong, res_Busy.
-Qed.
-
-Lemma responses_come_from_dst_of_timeout :
-  forall gst dst req h src p,
-    reachable_st gst ->
-    In (Request dst req) (timeouts gst h) ->
-    In (src, (h, p)) (msgs gst) ->
-    response_payload p ->
-    src = dst.
-Admitted.
-
-Lemma responses_are_paired_to_requests :
-  forall gst req dst h p,
-    reachable_st gst ->
-    In (Request dst req) (timeouts gst h) ->
-    In (dst, (h, p)) (msgs gst) ->
-    response_payload p ->
-    request_response_pair req p.
-Admitted.
-
-Lemma invariant_implies_timeouts_match_query :
-  forall gst,
-    reachable_st gst ->
-    timeouts_match_query gst.
-Admitted.
 
 Lemma constrained_Request_not_cleared_by_recv_handler :
   forall gst h dst req p src st st' ms nts cts,
@@ -1002,79 +835,6 @@ Lemma request_constraint_prevents_recv_adding_msgs :
     ~ In (dst, (h, q)) (msgs gst').
 Proof using.
   move => gst from to m gst' h dst p gst'' q.
-Admitted.
-
-Lemma labeled_step_dynamic_recv_timeout_enabled :
-  forall gst gst' gst'' a b m h t eff,
-    reachable_st gst ->
-    t <> KeepaliveTick ->
-    labeled_step_dynamic gst (RecvMsg a b m) gst' ->
-    labeled_step_dynamic gst (Timeout h t eff) gst'' ->
-    exists eff',
-      enabled (Timeout h t eff') gst'.
-Proof using.
-  move => gst gst' gst'' a b m h t eff H_inv H_notkeepalive H_recv H_timeout.
-  find_copy_apply_lem_hyp timeout_step_satisfies_constraint.
-  find_copy_apply_lem_hyp timeout_implies_state_exists.
-  break_exists_name st.
-  copy_eapply states_not_removed_by_recv_step H_recv; eauto.
-  break_exists_name st'.
-  eapply when_Timeout_enabled.
-  - find_apply_lem_hyp timeout_implies_node_exists.
-    move: H_recv H_timeout.
-    exact: nodes_never_removed.
-  - find_apply_lem_hyp timeout_implies_node_not_failed.
-    move: H_recv H_timeout.
-    exact: failed_nodes_never_added.
-  - by eauto.
-  - invc_labeled_step.
-    inv_labeled_step.
-    eapply recv_handler_keeps_timeouts_satisfying_constraint; eauto.
-    find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-    solve_by_inversion.
-  - inv_timeout_constraint; constructor.
-    + eapply failed_nodes_never_removed; eauto.
-    + move => q H_pair.
-      now eapply request_constraint_prevents_recv_adding_msgs; eauto.
-Qed.
-
-Lemma labeled_step_dynamic_timeout_neq_h_timeout_enabled :
-  forall gst gst' gst'' h h' t t' eff eff',
-    labeled_step_dynamic gst (Timeout h t eff) gst' ->
-    labeled_step_dynamic gst (Timeout h' t' eff') gst'' ->
-    h <> h' ->
-    enabled (Timeout h' t' eff') gst'.
-Admitted.
-
-Lemma labeled_step_dynamic_timeout_neq_timeout_enabled :
-  forall gst gst' gst'' h h' t t' eff eff',
-    labeled_step_dynamic gst (Timeout h t eff) gst' ->
-    labeled_step_dynamic gst (Timeout h' t' eff') gst'' ->
-    t <> t' ->
-    exists eff'',
-      enabled (Timeout h' t' eff'') gst'.
-Admitted.
-
-(* This is true because when nodes set joined = true they also set a Tick
-   timeout, and Tick is preserved by all steps except failures (see
-   enabled_Tick_invariant). *)
-Lemma active_node_eventually_joins :
-  forall ex h,
-    reachable_st (hd ex).(occ_gst) ->
-    weak_local_fairness ex ->
-    lb_execution ex ->
-    In h (nodes (hd ex).(occ_gst)) ->
-    ~ In h (failed_nodes (hd ex).(occ_gst)) ->
-    eventually
-      (consecutive
-         (fun occ occ' =>
-            exists eff eff',
-              ~ live_node occ.(occ_gst) h /\
-              ~ enabled (Timeout h Tick eff) occ.(occ_gst) /\
-              live_node occ'.(occ_gst) h /\
-              enabled (Timeout h Tick eff') occ'.(occ_gst)))
-      ex.
-Proof.
 Admitted.
 
 
@@ -1178,21 +938,6 @@ Definition enabled_Tick_with_effect (h : addr) (eff : timeout_effect) (gst : glo
 
 Hint Unfold enabled_Tick_with_effect.
 
-Lemma Tick_continuously_enabled :
-  forall ex h,
-    reachable_st (occ_gst (hd ex)) ->
-    lb_execution ex ->
-    live_node (occ_gst (hd ex)) h ->
-    continuously (now (fun occ => exists eff, l_enabled (Timeout h Tick eff) occ)) ex.
-Proof.
-  intros.
-  find_eapply_lem_hyp Tick_eventually_enabled; eauto.
-  unfold l_enabled.
-  eapply eventual_exists_invariant_always_true with (P:=enabled_Tick_with_effect h); eauto.
-  autounfold.
-  eauto using enabled_Tick_invariant.
-Qed.
-
 Lemma l_enabled_Timeout_In_timeouts :
   forall h t e st,
     In h (nodes (occ_gst e)) ->
@@ -1265,18 +1010,6 @@ Proof.
   - in_crush; find_apply_hyp_hyp; in_crush.
 Qed.
 
-Lemma timeout_constraint_invar :
-  forall s,
-    reachable_st (hd s).(occ_gst) ->
-    lb_execution s ->
-    forall h t,
-      timeout_constraint (occ_gst (hd s)) h t ->
-      timeout_constraint (occ_gst (hd (tl s))) h t.
-Proof.
-  intros. inv_lb_execution.
-  simpl in *. eauto using step_preserves_timeout_constraint.
-Qed.
-
 Lemma other_timeouts_not_cleared:
   forall (gst : global_state) (h : addr) (t : timeout) st gst' h' t' st' ms newts clearedts eff,
     reachable_st gst ->
@@ -1304,7 +1037,7 @@ Proof.
   - find_apply_lem_hyp tick_handler_definition. expand_def.
     +
 Admitted.
-  
+
 Lemma weak_until_timeout :
   forall s,
     lb_execution s ->
@@ -1377,17 +1110,6 @@ Proof.
       now repeat find_rewrite.
 Qed.
 
-Lemma eventually_exists :
-  forall T A P (s : infseq T),
-    eventually (fun y => exists (x : A), P x y) s ->
-    exists x,
-      eventually (fun y => P x y) s.
-Proof.
-  induction 1.
-  - break_exists_exists. now constructor.
-  - break_exists_exists. now constructor.
-Qed.
-
 Lemma Timeout_enabled_when_open_request_to_dead_node :
   forall occ h st dst req,
     live_node (occ_gst occ) h ->
@@ -1410,30 +1132,6 @@ Proof.
   repeat find_injection.
   eexists; repeat find_rewrite; eapply LTimeout; eauto.
   eapply Request_needs_dst_dead_and_no_msgs; eauto.
-Qed.
-
-Lemma open_request_to_preserved_state_timeouts :
-  forall gst gst' h dst req,
-    open_request_to gst h dst req ->
-    sigma gst h = sigma gst' h ->
-    timeouts gst h = timeouts gst' h ->
-    open_request_to gst' h dst req.
-Proof.
-  unfold open_request_to.
-  intros; break_and; break_exists; break_and.
-  repeat find_rewrite.
-  repeat split.
-  - auto.
-  - repeat eexists; eauto.
-Qed.
-
-Lemma remove_all_add_back :
-  forall A eq_dec (x : A) l' l,
-    In x l ->
-    In x (l' ++ remove_all eq_dec l' l).
-Proof.
-  induction l'; intros; simpl in *; auto.
-  destruct (eq_dec a x); eauto using remove_preserve.
 Qed.
 
 Lemma if_branches_same :
@@ -1746,16 +1444,6 @@ Proof.
   eapply lb_execution_cons_cons; eauto.
 Qed.
 
-Lemma lb_execution_two_cons :
-  forall ex,
-    lb_execution ex ->
-    labeled_step_dynamic (occ_gst (hd ex)) (occ_label (hd ex)) (occ_gst (hd (tl ex))).
-Proof.
-  intros.
-  do 2 destruct ex.
-  eapply lb_execution_cons_cons; eauto.
-Qed.
-
 Ltac invar_eauto :=
   eauto using
         always_invar,
@@ -1894,35 +1582,6 @@ Proof.
   inv_prop live_node; expand_def.
   apply in_nodes_not_failed_in_active; auto.
 Qed.
-
-Lemma unconstrained_timeout_eventually_occurred :
-  forall s,
-    lb_execution s ->
-    weak_local_fairness s ->
-    reachable_st (hd s).(occ_gst) ->
-    forall h st t,
-      t <> KeepaliveTick ->
-      In t (timeouts (occ_gst (hd s)) h) ->
-      In h (nodes (occ_gst (hd s))) ->
-      ~ In h (failed_nodes (occ_gst (hd s))) ->
-      sigma (occ_gst (hd s)) h = Some st ->
-      timeout_constraint (occ_gst (hd s)) h t ->
-      exists eff,
-        eventually (now (occurred (Timeout h t eff))) s.
-Proof using.
-  intros.
-  find_eapply_lem_hyp weak_until_timeout; eauto.
-  find_apply_lem_hyp weak_until_until_or_always.
-  intuition.
-  - find_apply_lem_hyp until_eventually.
-    find_apply_lem_hyp eventually_exists.
-    break_exists_exists.
-    eapply eventually_monotonic_simple; [|eauto]; eauto.
-    intros. now destruct s0.
-  - unfold weak_local_fairness in *.
-    (* this is going to be a problem. the "exists" is in the wrong place! *)
-Admitted.
-
 
 Definition res_clears_timeout (r : res) (t : timeout) : Prop :=
   match r with
@@ -2292,34 +1951,4 @@ Proof using.
     * break_exists.
       break_and.
       eapply requests_eventually_complete; eauto.
-Qed.
-
-Lemma always_in_nodes :
-  forall s, lb_execution s ->
-       forall h, In h (nodes (occ_gst (hd s))) ->
-            always (now (fun o => In h (nodes (occ_gst o)))) s.
-Proof using.
-  cofix c.
-  case => /= o; case => o' s H_exec h H_in_f.
-  inversion H_exec; subst.
-  apply: Always; first by [].
-  rewrite /=.
-  apply: c; first by [].
-  rewrite /=.
-    by apply: nodes_never_removed; eauto.
-Qed.
-
-Lemma always_not_failed :
-  forall s, lb_execution s ->
-       forall h, ~ In h (failed_nodes (occ_gst (hd s))) ->
-            always (now (fun o => ~ In h (failed_nodes (occ_gst o)))) s.
-Proof using.
-  cofix c.
-  case => /= o; case => o' s H_exec h H_in_f.
-  inversion H_exec; subst.
-  apply: Always; first by [].
-  rewrite /=.
-  apply: c; first by [].
-  rewrite /=.
-    by apply: failed_nodes_never_added; eauto.
 Qed.

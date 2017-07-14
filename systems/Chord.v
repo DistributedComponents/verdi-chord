@@ -305,15 +305,6 @@ Module Chord <: DynamicSystem.
     | _ => false
     end.
 
-  Definition closes_request (req res : payload) : bool :=
-    match req, res with
-    | GetBestPredecessor _, GotBestPredecessor _ => true
-    | GetSuccList, GotSuccList _ => true
-    | GetPredAndSuccs, GotPredAndSuccs _ _ => true
-    | Ping, Pong => true
-    | _, _ => false
-    end.
-
   Definition add_tick (r : res) : res :=
     let '(st, sends, newts, cts) := r in
     (st, sends, Tick :: newts, cts).
@@ -529,9 +520,6 @@ Module Chord <: DynamicSystem.
     let clearreq := timeouts_in st in
     let st' := clear_query st in
     (st', outs, nts, clearreq ++ cts).
-
-  Definition ptrs_to_addrs : list (pointer * payload) -> list (addr * payload) :=
-    map (fun p => (addr_of (fst p), (snd p))).
 
   Definition handle_rectify (st : data) (my_pred : pointer) (notifier : pointer) : res :=
     if ptr_between_bool my_pred notifier (ptr st)

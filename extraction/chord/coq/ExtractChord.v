@@ -38,7 +38,6 @@ Extraction "extraction/chord/coq/ExtractedChord.ml"
            handleNet
            handleTimeout
            is_request
-           closes_request
            ascii_to_id
            id_to_ascii
            forge_pointer.

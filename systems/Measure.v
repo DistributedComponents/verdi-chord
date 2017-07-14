@@ -25,19 +25,8 @@ Section Measure.
   Definition measure_decreasing (o o' : occurrence) : Prop :=
     |occ_gst o'| < |occ_gst o|.
 
-  Definition measure_nonzero (o : occurrence) :=
-    |occ_gst o| > 0.
-
   Definition measure_zero (o : occurrence) : Prop :=
     |occ_gst o| = 0.
-
-  Lemma measure_zero_elim :
-    forall o,
-      measure_zero o ->
-      |occ_gst o| = 0.
-  Proof.
-    easy.
-  Qed.
 
   Definition zero_or_eventually_decreasing : infseq occurrence -> Prop :=
     now measure_zero \/_
@@ -339,29 +328,6 @@ Section Measure.
     intros.
     now rewrite and_tl_comm.
   Qed.
-
-  Lemma measure_decreasing_to_zero_continuously :
-    forall ex,
-      continuously (consecutive measure_nonincreasing) ex ->
-      always zero_or_eventually_decreasing ex ->
-      continuously (now measure_zero) ex.
-  Proof.
-    intros.
-    eapply eventually_idempotent.
-    eapply eventually_monotonic_simple with (P:=always zero_or_eventually_decreasing /\_ always (consecutive measure_nonincreasing)).
-    - intros.
-      unfold and_tl in *; break_and.
-      eapply measure_decreasing_to_zero; eauto.
-    - find_eapply_lem_hyp eventually_always_cumul; eauto.
-      apply eventually_and_tl_comm.
-      eapply eventually_monotonic_simple; [|eauto].
-      intros.
-      split.
-      + now inv_prop and_tl.
-      + inv_prop and_tl.
-        now inv_prop always.
-  Qed.
-
 End Measure.
 
 Section LocalMeasure.
@@ -370,20 +336,6 @@ Section LocalMeasure.
 
   Definition sum (l : list nat) :=
     fold_left Nat.add l 0.
-
-  Lemma equal_folds_means_equal_acc :
-    forall l a b,
-      fold_left Nat.add l a = fold_left Nat.add l b ->
-      a = b.
-  Proof.
-    unfold sum.
-    induction l.
-    - easy.
-    - simpl.
-      intros.
-      find_apply_hyp_hyp.
-      omega.
-  Qed.
 
   Lemma fold_left_acc_comm :
     forall a l,
@@ -511,10 +463,6 @@ Section LocalMeasure.
       + exists hd; firstorder.
   Qed.
 
-  Definition active_node (gst : global_state) (h : addr) :=
-    In h (nodes gst) /\
-    ~ In h (failed_nodes gst).
-
   Definition active_nodes (gst : global_state) :=
     RemoveAll.remove_all addr_eq_dec (failed_nodes gst) (nodes gst).
 
@@ -568,20 +516,6 @@ Section LocalMeasure.
       eapply sum_of_nats_zero_means_all_zero; eauto.
       change (|x in gst|) with ((fun y => |y in gst|) x).
       now apply in_map.
-  Qed.
-
-  Lemma global_nonzero_local_nonzero :
-    forall gst,
-      |gst| > 0 ->
-      exists h,
-        In h (active_nodes gst) /\
-        |h in gst| > 0.
-  Proof.
-    intros.
-    find_apply_lem_hyp sum_nonzero_implies_addend_nonzero; break_exists; break_and.
-    find_apply_lem_hyp in_map_iff.
-    break_exists_exists; break_and.
-    split; congruence.
   Qed.
 
   Lemma measure_mono :

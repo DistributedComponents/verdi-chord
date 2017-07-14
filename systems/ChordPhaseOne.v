@@ -335,16 +335,6 @@ Definition open_stabilize_request_to_first_succ (gst : global_state) (h : addr) 
     succ_list st = dst :: rest ->
     open_stabilize_request_to gst h (addr_of dst).
 
-Lemma open_stabilize_request_to_first_succ_elim :
-  forall gst h st hd rest,
-    open_stabilize_request_to_first_succ gst h ->
-    sigma gst h = Some st ->
-    succ_list st = hd :: rest ->
-    open_stabilize_request_to gst h (addr_of hd).
-Proof.
-  eauto.
-Qed.
-
 Lemma timeout_handler_eff_StartStabilize :
   forall h st r eff,
     timeout_handler_eff h st Tick = (r, eff) ->

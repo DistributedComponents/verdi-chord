@@ -44,16 +44,6 @@ Proof.
   apply always_now.
 Qed.
 
-Lemma always_now_hd :
-  forall T (P : T -> Prop) ex,
-    always (now P) ex ->
-    P (hd ex).
-Proof.
-  intros.
-  destruct ex.
-  now find_apply_lem_hyp always_Cons.
-Qed.
-
 Definition live_addrs (gst : global_state) : list addr :=
   filter (fun a => Coqlib.proj_sumbool (live_node_dec gst a))
          (nodes gst).
@@ -68,28 +58,6 @@ Definition live_ptrs_with_states (gst : global_state) : list (pointer * data) :=
                          | None => None
                          end)
                       (live_ptrs gst).
-
-Lemma successor_nodes_valid_state :
-  forall gst h p st,
-    In p (succ_list st) ->
-    successor_nodes_valid gst ->
-    sigma gst h = Some st ->
-    exists pst, sigma gst (addr_of p) = Some pst /\
-           joined pst = true.
-Proof.
-  intros.
-  eapply_prop_hyp successor_nodes_valid @eq; eauto.
-  now break_and.
-Qed.
-
-Lemma nonempty_succ_lists_always_belong_to_joined_nodes :
-  forall gst h st,
-    reachable_st gst ->
-    sigma gst h = Some st ->
-    succ_list st <> [] ->
-    joined st = true.
-Proof.
-Admitted.
 
 (** In phase two we want to talk about the existence and number of better
     predecessors and better first successors to a node. We do this with the
@@ -469,7 +437,6 @@ Proof.
   unfold better_pred.
   tauto.
 Qed.
-
 Lemma better_pred_bool_true_better_pred :
   forall gst h p p',
     wf_ptr h ->

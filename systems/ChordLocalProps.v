@@ -49,27 +49,3 @@ Proof.
   intuition.
   break_match; auto || discriminate.
 Qed.
-
-Lemma only_safe_request_is_Ping :
-  forall msg,
-    request_payload msg ->
-    is_safe msg = true ->
-    msg = Ping.
-Proof.
-  intuition.
-  request_payload_inversion;
-    find_apply_lem_hyp safe_msgs;
-    break_or_hyp;
-    auto || discriminate.
-Qed.
-
-Lemma unsafe_msgs_not_safe_ones :
-  forall msg,
-    is_safe msg = false ->
-    msg <> Notify /\ msg <> Ping.
-Proof.
-  unfold is_safe.
-  intuition;
-    break_match;
-    easy.
-Qed.

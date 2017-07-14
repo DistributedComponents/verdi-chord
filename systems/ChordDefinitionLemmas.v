@@ -320,30 +320,6 @@ Proof using.
   repeat split.
 Qed.
 
-Lemma pi_definition :
-  forall A B C D a b c d,
-    @pi A B C D (a, b, c, d) = (a, b, c).
-Proof.
-  intros.
-  tauto.
-Qed.
-
-Lemma start_handler_definition :
-  forall h k st ms newts,
-    start_handler h [k] = (st, ms, newts) ->
-    exists clearedts,
-      start_query
-        h
-        (init_state_join h k)
-        (Join (make_pointer k)) = (st, ms, newts, clearedts).
-Proof.
-  unfold start_handler, start_query.
-  intros.
-  simpl in *.
-  tuple_inversion.
-  eexists; eauto.
-Qed.
-
 Lemma add_tick_definition :
   forall st ms nts cts st' ms' nts' cts',
     add_tick (st, ms, nts, cts) = (st', ms', nts', cts') ->
@@ -454,19 +430,6 @@ Proof.
   unfold timeout_handler_eff.
   intros.
   break_match; intuition eauto.
-Qed.
-
-Lemma timeout_handler_definition :
-  forall h st t st' ms nts cts,
-    timeout_handler h st t = (st', ms, nts, cts) ->
-    exists eff,
-      timeout_handler_eff h st t = (st', ms, nts, cts, eff).
-Proof.
-  intros.
-  unfold timeout_handler in *.
-  destruct (timeout_handler_eff _ _ _) as [[[[?a ?b] ?c] ?d] ?e].
-  simpl in *; tuple_inversion.
-  eexists; eauto.
 Qed.
 
 Lemma timeout_handler_l_definition :

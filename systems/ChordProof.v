@@ -55,14 +55,6 @@ Proof.
   eexists; eauto.
 Qed.
 
-Definition timeouts_detect_failure (gst : global_state) : Prop :=
-  forall xs t ys h dead req,
-    (trace gst) = xs ++ t :: ys ->
-    (* if a request timeout occurs at some point in the trace... *)
-    t = (e_timeout h (Request dead req)) ->
-    (* then it corresponds to an earlier node failure. *)
-    In (e_fail dead) xs.
-
 Lemma busy_response_exists :
   forall msg st' sends nts cts src st,
     request_payload msg ->
@@ -85,19 +77,6 @@ Proof using.
   intuition;
     break_match;
     easy.
-Qed.
-
-Lemma only_safe_request_is_Ping :
-  forall msg,
-    request_payload msg ->
-    is_safe msg = true ->
-    msg = Ping.
-Proof using.
-  intuition.
-  request_payload_inversion;
-    find_apply_lem_hyp safe_msgs;
-    break_or_hyp;
-    auto || discriminate.
 Qed.
 
 Lemma delay_query_adds_query :
@@ -551,23 +530,6 @@ Proof using.
       congruence || eauto using live_node_characterization.
 Qed.
 
-Theorem having_st_means_node :
-  forall gst h st,
-    reachable_st gst ->
-    sigma gst h = Some st ->
-    In h (nodes gst).
-Proof.
-Admitted.
-
-Theorem nodes_have_st :
-  forall gst h,
-    reachable_st gst ->
-    In h (nodes gst) ->
-    exists st,
-      sigma gst h = Some st.
-Proof.
-Admitted.
-
 (* transitive closure of best_succ *)
 (* treat as opaque *)
 Inductive reachable (gst : global_state) : addr -> addr -> Prop :=
@@ -632,13 +594,6 @@ Definition at_most_one_ring (gst : global_state) : Prop :=
     ring_member gst x ->
     ring_member gst y ->
     reachable gst x y.
-
-Definition ordered_ring (gst : global_state) : Prop :=
-  forall h s x,
-    ring_member gst (addr_of h) ->
-    best_succ gst (addr_of h) (addr_of s) ->
-    ring_member gst (addr_of x) ->
-    ~ between (id_of h) (id_of x) (id_of s).
 
 Definition connected_appendages (gst : global_state) : Prop :=
   forall a, live_node gst a ->
@@ -712,10 +667,6 @@ Proof using.
   intros.
   now apply (Coqlib.proj_sumbool_is_true (addr_eq_dec a a)).
 Qed.
-
-Definition on_channel (src dst : addr) (t : addr * (addr * payload)) :=
-  let '(s, (d, m)) := t in
-  andb (addr_eqb src s) (addr_eqb dst d).
 
 Definition channel (gst : global_state) (src dst : addr) : list payload :=
   filterMap
@@ -1254,16 +1205,6 @@ Proof using.
   congruence.
 Qed.
 
-Lemma joined_preserved_by_update_pred :
-  forall st p st',
-    st' = update_pred st p ->
-    joined st = joined st'.
-Proof using.
-  unfold update_pred.
-  intuition.
-  find_rewrite; auto.
-Qed.
-
 Lemma joined_preserved_by_handle_query_timeout :
   forall h st dst q st' ms nts cts,
     handle_query_timeout h st dst q = (st', ms, nts, cts) ->
@@ -1674,14 +1615,6 @@ Definition timeout_step_preserves (P : global_state -> Prop) : Prop :=
               gst) ->
     P gst'.
 
-Definition preserved_when_nodes_and_sigma_preserved (P : global_state -> Prop) : Prop :=
-  forall gst gst',
-    inductive_invariant gst ->
-    nodes gst' = nodes gst ->
-    failed_nodes gst' = failed_nodes gst ->
-    sigma gst' = sigma gst ->
-    P gst'.
-
 Definition node_deliver_step_preserves (P : global_state -> Prop) : Prop :=
   forall gst xs m ys gst' h d st ms nts cts e,
     inductive_invariant gst ->
@@ -1871,19 +1804,6 @@ Definition chord_output_invariant (P : global_state -> Prop) :=
     msgs gst = xs ++ m :: ys ->
     h = fst (snd m) ->
     P (update_msgs_and_trace gst (xs ++ ys) (e_recv m)).
-
-Lemma update_msgs_definition :
-  forall gst gst' ms,
-    gst' = update_msgs gst ms ->
-    nodes gst = nodes gst' /\
-    failed_nodes gst = failed_nodes gst' /\
-    timeouts gst = timeouts gst' /\
-    sigma gst = sigma gst' /\
-    msgs gst' = ms /\
-    trace gst = trace gst'.
-Proof using.
-  intros; subst; tauto.
-Qed.
 
 Lemma global_state_eq_ext :
   forall gst gst',
