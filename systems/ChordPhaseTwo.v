@@ -499,7 +499,6 @@ Proof.
   now apply between_between_bool_equiv.
 Qed.
 
-Print better_succ.
 Lemma better_succ_intro :
   forall gst h s s',
     wf_ptr h ->
@@ -651,36 +650,6 @@ Proof.
   eapply sum_of_nats_zero_means_all_zero; eauto.
   apply in_map_iff.
   eexists; split; eauto using live_node_in_active.
-Qed.
-
-Definition has_pred (gst : global_state) (h : addr) (p : option pointer) : Prop :=
-  exists st,
-    sigma gst h = Some st /\
-    pred st = p.
-
-Lemma has_pred_intro :
-  forall gst h p st,
-    sigma gst h = Some st ->
-    pred st = p ->
-    has_pred gst h p.
-Proof.
-  unfold has_pred.
-  eauto.
-Qed.
-
-Definition has_first_succ (gst : global_state) (h : addr) (s : pointer) : Prop :=
-  exists st,
-    sigma gst h = Some st /\
-    hd_error (succ_list st) = Some s.
-
-Lemma has_first_succ_intro :
-  forall gst h s st,
-    sigma gst h = Some st ->
-    hd_error (succ_list st) = Some s ->
-    has_first_succ gst h s.
-Proof.
-  intros.
-  eexists; eauto.
 Qed.
 
 Definition no_joins (gst gst' : global_state) :=
@@ -1202,8 +1171,26 @@ Lemma live_successor_changed_improves :
 Proof using.
 Admitted.
 
+Lemma has_pred_eq :
+  forall gst h p q,
+    has_pred gst h p ->
+    has_pred gst h q ->
+    p = q.
+Proof.
+  intros.
+  repeat invcs_prop has_pred; break_and.
+  congruence.
+Qed.
+
 Ltac id_auto :=
   eauto using BetweenMono, BetweenWrapL, BetweenWrapR, Chord.ChordIDSpace.lt_asymm, Chord.ChordIDSpace.lt_irrefl, Chord.ChordIDSpace.lt_trans.
+
+Ltac find_has_pred_eq :=
+  match goal with
+  | H : has_pred _ _ _ |- _ =>
+    eapply has_pred_eq in H;
+    [|clear H; now eauto]
+  end.
 
 Section MergePoint.
   Variables j a b : pointer.
@@ -1612,24 +1599,6 @@ Section MergePoint.
     intros. subst.
     eapply recv_GetPredAndSuccs_not_busy_causes_GotPredAndSuccs; eauto.
   Qed.
-
-  Lemma has_pred_eq :
-    forall gst h p q,
-      has_pred gst h p ->
-      has_pred gst h q ->
-      p = q.
-  Proof.
-    intros.
-    repeat invcs_prop has_pred; break_and.
-    congruence.
-  Qed.
-
-  Ltac find_has_pred_eq :=
-    match goal with
-    | H : has_pred _ _ _ |- _ =>
-      eapply has_pred_eq in H;
-      [|clear H; now eauto]
-    end.
 
   Definition pred_not_worse (h l : pointer) (ex : infseq occurrence) :=
     exists p,
@@ -2505,6 +2474,20 @@ Proof.
     solve [id_auto | eapply Chord.ChordIDSpace.lt_asymm; eauto].
 Qed.
 
+Lemma between_swap_not_xy :
+  forall x y z,
+    between x y z ->
+    between y x z ->
+    False.
+Proof.
+  unfold not.
+  intros.
+  repeat invcs_prop between;
+    try solve [id_auto | eapply Chord.ChordIDSpace.lt_asymm; eauto].
+  apply (Chord.ChordIDSpace.lt_irrefl y).
+  eauto using Chord.ChordIDSpace.lt_trans.
+Qed.
+
 Lemma not_between_between_bool_equiv :
   forall x y z,
     between_bool x y z = false <->
@@ -2772,6 +2755,33 @@ Proof.
   tauto.
 Qed.
 
+Lemma wrong_pred_not_correct_pred :
+  forall gst h p_wrong p_correct,
+    wrong_pred gst h ->
+    has_pred gst (addr_of h) p_wrong ->
+    pred_correct gst h (Some p_correct) ->
+    p_wrong <> (Some p_correct).
+Proof.
+  intros.
+  intro.
+  subst.
+  invcs_prop pred_correct.
+  invcs_prop wrong_pred.
+  expand_def.
+  find_has_pred_eq.
+  repeat find_injection.
+  invcs_prop better_pred.
+  break_and.
+  assert (better_pred gst h x1 x).
+  {
+    find_eapply_prop better_pred; auto.
+    intro; subst.
+    eapply not_between_xxy; eauto.
+  }
+  inv_prop better_pred. expand_def.
+  eapply between_swap_not_xy; eauto.
+Qed.
+
 Lemma error_decreases_when_succs_right :
   forall ex h,
     lb_execution ex ->
@@ -2801,29 +2811,44 @@ Proof.
       find_apply_lem_hyp hd_error_tl_exists. break_exists.
       eauto.
     }
-    eapply open_request_from_better_pred_eventually_improves_error.
-    15:eauto.
-    15:eauto.
-    all:eauto.
-    + unfold better_pred in *. intuition auto.
-    + admit.
-    + admit.
-    + admit.
-    + unfold pred_correct in *.
-      break_exists; intuition find_injection.
-      unfold better_pred in *.
-      apply H18; intuition eauto.
-      subst.
+    destruct (In_dec addr_eq_dec (addr_of x) (failed_nodes (occ_gst o))).
+    + inv_prop wrong_pred. expand_def.
+      inv_prop better_pred. expand_def.
+      find_has_pred_eq. repeat find_injection.
       admit.
-      (* last thing isn't true! *)
-      admit.
+    + eapply open_request_from_better_pred_eventually_improves_error.
+      15:eauto.
+      15:eauto.
+      all:eauto.
+      * unfold better_pred in *. intuition auto.
+      * find_apply_lem_hyp (first_succ_never_self (occ_gst o) (addr_of p) h); auto.
+        congruence.
+      * inv_prop better_pred. expand_def.
+        cut (Some x <> Some p); [congruence|].
+        eapply wrong_pred_not_correct_pred; eauto.
+      * find_apply_lem_hyp pred_never_self; auto.
+        congruence.
+      * unfold pred_correct in *.
+        break_exists; intuition find_injection.
+        unfold better_pred in *.
+        apply H18; try by intuition eauto; subst.
+        -- break_and.
+           unfold ptr_between in *.
+           intro; subst.
+           find_eapply_lem_hyp wrong_pred_not_correct_pred; eauto.
+           assert (addr_of h <> addr_of x1)
+             by (eapply pred_never_self; eauto).
+           assert (id_of h <> id_of x1)
+             by (apply wf_ptr_neq_id_neq; auto; congruence).
+           admit.
+        -- admit.
   - inv_prop wrong_pred. expand_def.
     find_copy_eapply_lem_hyp pred_same_until_improvement; eauto.
     find_apply_lem_hyp weak_until_Cons. break_or_hyp.
     + apply E0; eauto.
-    + apply E_next, IHeventually; invar_eauto; eauto.
-      (* these are all manageable *)
-      all:admit.
+    + apply E_next, IHeventually; invar_eauto; eauto;
+        (* these are all manageable *)
+        admit.
 Admitted.
 
 Lemma error_means_merge_point_or_wrong_pred :

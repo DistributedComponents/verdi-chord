@@ -131,3 +131,30 @@ Theorem queries_eventually_stop :
 Proof.
   (*         -____-   *)
 Admitted.
+
+Theorem first_succ_never_self :
+  forall gst h s,
+    reachable_st gst ->
+    has_first_succ gst h s ->
+    h <> (addr_of s).
+Proof.
+Admitted.
+
+Theorem pred_never_self :
+  forall gst h p,
+    reachable_st gst ->
+    has_pred gst h (Some p) ->
+    h <> (addr_of p).
+Proof.
+Admitted.
+
+Theorem preds_are_joined :
+  forall gst h p,
+    reachable_st gst ->
+    has_pred gst h (Some p) ->
+    In (addr_of p) (nodes gst) /\
+    exists st,
+      sigma gst (addr_of p) = Some st /\
+      joined st = true.
+Proof.
+Admitted.
