@@ -2,6 +2,7 @@ Require Import List.
 Import ListNotations.
 
 Require Import InfSeqExt.infseq.
+Require Import StructTact.StructTactics.
 
 Require Import Chord.Chord.
 Import Chord.Chord.Chord.
@@ -21,14 +22,24 @@ Definition nodes_have_live_succs (gst : global_state) : Prop :=
       In s (succ_list st).
 
 Theorem nodes_always_have_live_succs :
-  forall ex,
-    lb_execution ex ->
-    reachable_st ex.(hd).(occ_gst) ->
-    always (now (fun occ => nodes_have_live_succs occ.(occ_gst))) ex.
+  forall gst,
+    reachable_st gst ->
+    nodes_have_live_succs gst.
 Proof.
+(*
+In Zave's paper, this is one half of the inductive invariant. The
+other half of the invariant is SufficientPrincipals. So it's provable,
+but it will require coming up with an inductive invariant that works
+for verdi-chord.
+
+DIFFICULTY: 5
+USED: below to prove node successor lists are nonempty, which is used
+in phase one.
+ *)
 Admitted.
 
 Definition circular_wait : occurrence -> Prop.
+(* This is Ryan's problem. *)
 Admitted.
 
 Definition successor_nodes_valid (gst : global_state) : Prop :=
@@ -39,13 +50,6 @@ Definition successor_nodes_valid (gst : global_state) : Prop :=
     exists pst, sigma gst (addr_of p) = Some pst /\
            joined pst = true.
 
-Lemma successor_nodes_always_valid :
-  forall gst,
-    reachable_st gst ->
-    successor_nodes_valid gst.
-Proof.
-Admitted.
-
 Lemma wf_ptr_succ_list_invariant :
   forall gst h st p rest,
     reachable_st gst ->
@@ -53,6 +57,14 @@ Lemma wf_ptr_succ_list_invariant :
     succ_list st = p :: rest ->
     wf_ptr p.
 Proof.
+(*
+This invariant says pointers in successor lists are well-formed. It
+should be inductive if we tack on something about the contents of
+GotPredAndSuccs/GotSuccList messages.
+
+DIFFICULTY: 3
+USED: In phase one.
+*)
 Admitted.
 
 Lemma wf_ptr_pred_invariant :
@@ -62,6 +74,30 @@ Lemma wf_ptr_pred_invariant :
     pred st = Some p ->
     wf_ptr p.
 Proof.
+(* 
+This lemma says the same thing as wf_ptr_succ_list_invariant, but for
+predecessor pointers instead of successor pointers.
+
+DIFFICULTY: 3
+USED: Nowhere? I think I could use it in phase two to lift some assumptions.
+ *)
+Admitted.
+
+Lemma successor_nodes_always_valid :
+  forall gst,
+    reachable_st gst ->
+    successor_nodes_valid gst.
+Proof.
+(*
+This invariant says every successor list pointer points to a node
+that's both live and has joined st = true.  It will require some
+strengthening before it's inductive.
+- Need to add somethine about the contents of GotPredAndSuccs messages
+- Need to say nodes only end up in a sucessor list if they've joined
+
+DIFFICULTY: 3
+USED: In phase one.
+*)
 Admitted.
 
 Lemma ptr_correct :
@@ -70,10 +106,20 @@ Lemma ptr_correct :
     sigma gst h = Some st ->
     ptr st = make_pointer h.
 Proof.
+(*
+This is a very good and easy invariant.  At a node h, ptr st is a copy
+of a pointer to h. It's set when the node starts up and never changed
+anywhere.
+
+DIFFICULTY: 1
+USED: In phase two.
+*)
 Admitted.
 
 Definition nonempty_succ_lists (gst : global_state) : Prop :=
   forall h st,
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
     sigma gst h = Some st ->
     joined st = true ->
     succ_list st <> [].
@@ -83,7 +129,15 @@ Lemma nodes_have_nonempty_succ_lists :
     reachable_st gst ->
     nonempty_succ_lists gst.
 Proof.
-Admitted.
+  unfold nonempty_succ_lists.
+  intros.
+  find_apply_lem_hyp nodes_always_have_live_succs;
+    eauto using live_node_characterization.
+  break_exists.
+  intro.
+  repeat find_rewrite.
+  intuition.
+Qed.
 
 Theorem stabilize_only_with_first_succ :
   forall gst h st dst,
@@ -95,6 +149,17 @@ Theorem stabilize_only_with_first_succ :
       cur_request st = Some (s, Stabilize, GetPredAndSuccs) /\
       hd_error (succ_list st) = Some s.
 Proof.
+  intros. eexists. repeat split.
+(*
+This lemma says that if we have an appropriate Request timeout, we
+have all the other trappings of a Stabilize request. It's going to be
+some work to prove because we have to show that
+- whenever we register timeouts we also set the other stuff
+- when the timeout isn't removed, the other stuff doesn't change
+
+DIFFICULTY: 3
+PRoof 
+*)
 Admitted.
 
 Theorem nodes_not_joined_have_no_successors :
