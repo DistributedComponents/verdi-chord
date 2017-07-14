@@ -208,7 +208,6 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
         (* hypotheses on the list of known nodes *)
         In k (nodes gst) ->
         ~ In k (failed_nodes gst) ->
-        (* note that clearedts might as well be [] *)
         gst' = update_for_start gst h (start_handler h (k :: nil)) ->
         step_dynamic gst gst'
   | Fail :
