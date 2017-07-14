@@ -35,15 +35,7 @@ Core files
   * handle_msg is the interesting function; Notify -> schedule rectify; forward to busy/non-busy handler; otherwise handle req
   * functions are deeply nested
 
-- `ChordDefinitionLemmas.v`: huge lemmas that characterize the output of each handler function used by nodes
-  * facts about implementation functions only!
-  * distinct lemmas, no big plan
-
-- `ChordProof.v`: handler lemmas, simple safety properties
-  * defines initial state of the network
-  * mix of semantic properties and handler properties
-  * candidate for reorganization
-  * proves "meta-theorems" that make proving induction properties easier (not finished yet, though)
+- `ChordLocalProps.v`: predicates on payloads and lemmas about predicates
 
 - `ChordSemantics.v`: defines constraints for constrained dynamic system
   * timeout constraints
@@ -51,13 +43,16 @@ Core files
   * bottom module yields the naked semantics
   * plugs Chord handler definitions into the semantics
 
-- `ChordLocalProps.v`: predicates on payloads and lemmas about predicates
-  
-- `ChordCorrectness.v`: collection of all liveness lemmas
-   * top level theorem is the last theorem in file
-   * phases are in their own files
-   * request always effective: distinguish between timeouts
+- `ChordDefinitionLemmas.v`: huge lemmas that characterize the output of each handler function used by nodes
+  * facts about implementation functions only!
+  * distinct lemmas, no big plan
 
+- `ChordProof.v`: basic handler lemmas, simple safety properties
+  * defines initial state of the network
+  * mix of semantic properties and handler properties
+  * candidate for reorganization
+  * proves "meta-theorems" that make proving induction properties easier (not finished yet, though)
+ 
 - `ChordLabeled.v`: basic lemmas about labeled semantics (messages eventually delivered, etc.)
 
 - `ChordValidPointersInvariant.v`: pointers point to reasonable things
@@ -75,3 +70,8 @@ Core files
   * use that ticks eventually happen, we have that from phase one
   * lots of admits, not all used
   * mergepoints: part of the argument, case analysis
+
+- `ChordCorrectness.v`: collection of all liveness lemmas
+   * top level theorem is the last theorem in file
+   * phases are in their own files
+   * request always effective: distinguish between timeouts
