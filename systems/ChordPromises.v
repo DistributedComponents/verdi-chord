@@ -158,7 +158,7 @@ some work to prove because we have to show that
 - when the timeout isn't removed, the other stuff doesn't change
 
 DIFFICULTY: 3
-PRoof 
+USED: In phase one.
 *)
 Admitted.
 
@@ -169,6 +169,13 @@ Theorem nodes_not_joined_have_no_successors :
     joined st = false ->
     succ_list st = [].
 Proof.
+(*
+Nodes do not set their successor lists until they finish joining. I don't really
+know what invariants are needed here but they shouldn't be too complicated?
+
+DIFFICULTY: 2
+USED: In phase one
+*)
 Admitted.
 
 Definition busy_if_live (h : addr) (occ : occurrence) :=
@@ -194,7 +201,17 @@ Theorem queries_eventually_stop :
     always (~_ (now circular_wait)) ex ->
     eventually (now (not_busy_if_live h)) ex.
 Proof.
-  (*         -____-   *)
+(*
+This is tricky.
+
+  If you have an open request, you're in the middle of some operation.
+  Operations (stabilization, rectifying, etc) undertaken by joined nodes complete
+  in finitely many request-response pairs.
+  A request eventually gets a response if there are no circular waits...
+
+DIFFICULTY: Ryan
+USED: In phase one for the proof of eventual stabilization.
+*)
 Admitted.
 
 Theorem first_succ_never_self :
@@ -203,6 +220,12 @@ Theorem first_succ_never_self :
     has_first_succ gst h s ->
     h <> (addr_of s).
 Proof.
+(*
+Easy consequence of the (difficult) Zave invariant.
+
+DIFFCULTY: 1
+USED: In phase two.
+*)
 Admitted.
 
 Theorem pred_never_self :
@@ -211,15 +234,10 @@ Theorem pred_never_self :
     has_pred gst h (Some p) ->
     h <> (addr_of p).
 Proof.
-Admitted.
+(*
+Easy consequence of the (difficult) Zave invariant.
 
-Theorem preds_are_joined :
-  forall gst h p,
-    reachable_st gst ->
-    has_pred gst h (Some p) ->
-    In (addr_of p) (nodes gst) /\
-    exists st,
-      sigma gst (addr_of p) = Some st /\
-      joined st = true.
-Proof.
+DIFFCULTY: 1
+USED: In phase two.
+*)
 Admitted.
