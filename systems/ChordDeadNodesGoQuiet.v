@@ -3,12 +3,7 @@ Import ListNotations.
 
 Require Import InfSeqExt.infseq.
 
-Require Import Chord.Chord.
-Import Chord.Chord.Chord.
-Import ChordIDSpace.
 Require Import Chord.ChordSemantics.
-Import ChordSemantics.
-Import ConstrainedChord.
 Require Import Chord.ChordProof.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordValidPointersInvariant.

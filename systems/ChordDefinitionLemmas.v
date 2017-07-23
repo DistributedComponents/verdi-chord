@@ -5,12 +5,8 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 Require Import StructTact.RemoveAll.
 
-Require Chord.Chord.
-Import Chord.Chord.Chord.
+Require Import Chord.ChordSemantics.
 Require Import Chord.ChordLocalProps.
-Require Chord.ChordSemantics.
-Import Chord.ChordSemantics.ChordSemantics.
-Import Chord.ChordIDSpace.
 
 Ltac expand_def :=
   repeat (try break_or_hyp; try break_and; try break_exists);

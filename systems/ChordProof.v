@@ -8,16 +8,10 @@ Require Import mathcomp.ssreflect.ssreflect.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 Require Verdi.Coqlib.
-Require Import Verdi.DynamicNet.
 
-Require Chord.Chord.
-Import Chord.Chord.Chord.
-Import Chord.ChordIDSpace.
+Require Import Chord.ChordSemantics.
 Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordDefinitionLemmas.
-Require Chord.ChordSemantics.
-Import Chord.ChordSemantics.ConstrainedChord.
-Import Chord.ChordSemantics.ChordSemantics.
 
 Set Bullet Behavior "Strict Subproofs".
 

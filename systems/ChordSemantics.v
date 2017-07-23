@@ -127,3 +127,7 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
 End ConstrainedChord.
 
 Module ChordSemantics := DynamicSemantics(ConstrainedChord).
+
+Export ChordSemantics.
+Export ConstrainedChord.
+Export Chord.ChordIDSpace.

@@ -89,8 +89,9 @@ Module ChordIDParams <: IDSpaceParams.
   Definition id_eq_dec := id_eq_dec.
 
   (* useful notations for lt and ltb *)
-  Notation "a < b" := (lt a b) (at level 70).
-  Notation "a <? b" := (ltb a b) (at level 70).
+  Notation "a < b" := (lt a b) : id_scope.
+  Notation "a <? b" := (ltb a b) : id_scope.
+  Open Scope id_scope.
 
   (* ltb is a decision procedure for the lt relation *)
   Definition ltb_correct :
@@ -200,10 +201,13 @@ Module ChordIDParams <: IDSpaceParams.
       + find_apply_lem_hyp binary_value_inj.
         auto.
   Qed.
+
+  Close Scope id_scope.
 End ChordIDParams.
 
 Module ChordIDSpace := IDSpace(ChordIDParams).
 Import ChordIDSpace.
+Export ChordIDSpace.
 
 (* only need this to make client.ml work :/ *)
 Definition forge_pointer (i : id) : ChordIDSpace.pointer :=
@@ -799,3 +803,4 @@ Module Chord <: DynamicSystem.
   Qed.
 
 End Chord.
+Export Chord.

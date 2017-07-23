@@ -1,26 +1,20 @@
-Require Import StructTact.StructTactics.
-Require Import StructTact.Util.
-Require Import Verdi.DynamicNet.
-Require Chord.Chord.
-Import Chord.Chord.Chord.
-Import Chord.ChordIDSpace.
-Require Import Chord.ChordLocalProps.
-Require Import Chord.ChordProof.
-Require Import Chord.ChordDefinitionLemmas.
 Require Import List.
 Import ListNotations.
-(*Require Import Wf_nat.*)
-Require Import InfSeqExt.infseq.
-Require Import InfSeqExt.classical.
+
 Require Import mathcomp.ssreflect.ssreflect.
 Require Import mathcomp.ssreflect.ssrbool.
-
 Set Bullet Behavior "Strict Subproofs".
 
-Require Chord.ChordSemantics.
-Import Chord.ChordSemantics.ChordSemantics.
-Import Chord.ChordSemantics.ConstrainedChord.
+Require Import StructTact.StructTactics.
+Require Import StructTact.Util.
+Require Import InfSeqExt.infseq.
+Require Import InfSeqExt.classical.
+Require Import Verdi.DynamicNet.
+
+Require Import Chord.ChordSemantics.
 Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.ChordProof.
+Require Import Chord.ChordLocalProps.
 Require Import Chord.Measure.
 Require Import Chord.InfSeqTactics.
 Require Import Chord.LiveNodesStayLive.
@@ -1135,7 +1129,7 @@ Proof.
 Qed.
 
 Lemma if_branches_same :
-  forall A p (x : A),
+  forall A (p : bool) (x : A),
     (if p then x else x) = x.
 Proof.
   intros.

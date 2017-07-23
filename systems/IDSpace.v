@@ -30,10 +30,12 @@ Module Type IDSpaceParams.
         {a = b} + {a <> b}.
 
   (* useful notations for lt and ltb *)
-  Notation "a < b < c" := (and (lt a b) (lt b c)) (at level 70, b at next level).
-  Notation "a < b" := (lt a b) (at level 70).
-  Notation "a <? b <? c" := (andb (ltb a b) (ltb b c)) (at level 70, b at next level).
-  Notation "a <? b" := (ltb a b) (at level 70).
+  Notation "a < b < c" := (and (lt a b) (lt b c)) (at level 70, b at next level) : id_scope.
+  Notation "a < b" := (lt a b) (at level 70) : id_scope.
+  Notation "a <? b <? c" := (andb (ltb a b) (ltb b c)) (at level 70, b at next level) : id_scope.
+  Notation "a <? b" := (ltb a b) (at level 70) : id_scope.
+  Delimit Scope id_scope with id.
+  Local Open Scope id_scope.
 
   (* ltb is a decision procedure for the lt relation *)
   Variable ltb_correct :
@@ -61,6 +63,7 @@ End IDSpaceParams.
 Module IDSpace(P : IDSpaceParams).
 
   Include P.
+  Local Open Scope id_scope.
 
   Record pointer :=
     mkPointer { ptrId : P.id;

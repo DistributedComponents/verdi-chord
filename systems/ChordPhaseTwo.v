@@ -9,13 +9,9 @@ Require Import InfSeqExt.infseq.
 Require Import Chord.InfSeqTactics.
 Require Import Chord.Measure.
 
-Require Import Chord.Chord.
-Import Chord.Chord.Chord.
-Import ChordIDSpace.
-Require Import Chord.ChordProof.
 Require Import Chord.ChordSemantics.
-Import ChordSemantics.
-Import ConstrainedChord.
+Require Import Chord.ChordProof.
+Require Import Chord.ChordLocalProps.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordQueryInvariant.
 Require Import Chord.ChordLabeled.
@@ -171,7 +167,7 @@ Proof.
       destruct p as [a i], p' as [a' i']; simpl in *.
       congruence.
     }
-    apply hash_inj.
+    apply Chord.hash_inj.
     now rewrite !wf_ptr_hash_eq by auto.
   }
   eapply not_in_filter_false; eauto.
@@ -1185,7 +1181,7 @@ Section MergePoint.
   Proof.
     intros.
     unfold unroll_between_ptr in *.
-    pose proof unrolling_total (ChordIDParams.hash (addr_of j)) (ptrId x) (ptrId y).
+    pose proof unrolling_total (hash (addr_of j)) (ptrId x) (ptrId y).
     break_or_hyp.
     - tauto.
     - find_copy_apply_lem_hyp unrolling_symmetry_cases.
@@ -1931,7 +1927,7 @@ Section MergePoint.
     apply not_between_between.
     unfold unroll_between_ptr in *.
     apply Bool.negb_true_iff.
-    unfold ChordIDParams.hash in *.
+    unfold Chord.ChordIDParams.hash in *.
     rewrite !(wf_ptr_hash_eq a), !(wf_ptr_hash_eq j) in *; auto.
   Qed.
 
@@ -2487,7 +2483,7 @@ Proof.
     intros.
     destruct p, q; simpl in *; congruence.
   }
-  apply hash_inj.
+  apply Chord.hash_inj.
   now rewrite !wf_ptr_hash_eq by auto.
 Qed.
 

@@ -9,13 +9,8 @@ Require Import InfSeqExt.infseq.
 Require Import Chord.InfSeqTactics.
 Require Import Chord.Measure.
 
-Require Import Chord.Chord.
-Import Chord.Chord.Chord.
-Import ChordIDSpace.
-Require Import Chord.ChordProof.
 Require Import Chord.ChordSemantics.
-Import ChordSemantics.
-Import ConstrainedChord.
+Require Import Chord.ChordProof.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordPromises.

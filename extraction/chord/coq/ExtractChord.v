@@ -7,7 +7,6 @@ Require Import ExtrOcamlString.
 Require Import ExtrOcamlNatInt.
 
 Require Import Chord.Chord.
-Import Chord.Chord.Chord.
 
 Extract Inlined Constant Chord.SUCC_LIST_LEN => "3".
 

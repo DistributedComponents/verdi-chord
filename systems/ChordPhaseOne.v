@@ -8,12 +8,7 @@ Require Import InfSeqExt.infseq.
 Require Import Chord.Measure.
 Require Import Chord.InfSeqTactics.
 
-Require Import Chord.Chord.
-Import Chord.Chord.Chord.
-Import ChordIDSpace.
 Require Import Chord.ChordSemantics.
-Import ChordSemantics.
-Import ConstrainedChord.
 Require Import Chord.ChordProof.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordValidPointersInvariant.
@@ -425,14 +420,6 @@ Proof.
       eapply live_node_invariant; eauto.
     + eapply always_invar; eauto.
 Qed.
-
-Lemma live_node_has_Tick_in_timeouts :
-  forall ex h,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    live_node (occ_gst (hd ex)) h ->
-    In Tick (timeouts (occ_gst (hd ex)) h).
-Admitted.
 
 Lemma loaded_Tick_enabled_if_now_not_busy_if_live :
   forall h ex,

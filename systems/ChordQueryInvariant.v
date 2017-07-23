@@ -2,14 +2,10 @@ Require Import List.
 Require Import Omega.
 Require Import StructTact.StructTactics.
 
-Require Import Chord.Chord.
-Require Import Chord.ChordLocalProps.
-Require Import Chord.ChordProof.
 Require Import Chord.ChordSemantics.
 Require Import Chord.ChordDefinitionLemmas.
-Import ChordSemantics.
-Import Chord.Chord.Chord.
-Import ChordIDSpace.
+Require Import Chord.ChordLocalProps.
+Require Import Chord.ChordProof.
 
 Set Bullet Behavior "Strict Subproofs".
 

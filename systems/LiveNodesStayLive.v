@@ -1,12 +1,8 @@
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 Require Import Verdi.DynamicNet.
-Require Chord.Chord.
-Import Chord.Chord.Chord.
-Import Chord.ChordIDSpace.
-Require Chord.ChordSemantics.
-Import Chord.ChordSemantics.ChordSemantics.
-Import Chord.ChordSemantics.ConstrainedChord.
+
+Require Import Chord.ChordSemantics.
 
 Ltac live_node_invariant_finish_goal :=
   unfold live_node in *; simpl in *; intuition;

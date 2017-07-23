@@ -1,8 +1,7 @@
 Require Import Omega.
+Require Import StructTact.StructTactics.
 
 Require Import Chord.Chord.
-Import Chord.Chord.Chord.
-Require Import StructTact.StructTactics.
 
 (* Requests and responses *)
 Inductive request_payload : payload -> Prop :=
