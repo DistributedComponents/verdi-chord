@@ -106,22 +106,6 @@ Proof using.
            eauto using sigma_ahr_updates, sigma_ahr_passthrough].
 Qed.
 
-Lemma other_elements_remain_after_removal :
-  forall A (l xs ys : list A) (a b : A),
-    l = xs ++ b :: ys ->
-    In a l ->
-    a <> b ->
-    In a (xs ++ ys).
-Proof using.
-  intros.
-  subst_max.
-  do_in_app.
-  break_or_hyp.
-  - auto with datatypes.
-  - find_apply_lem_hyp in_inv.
-    break_or_hyp; auto using in_or_app || congruence.
-Qed.
-
 Lemma define_msg_from_recv_step_equality :
   forall m d st ms nts cts src dst p,
     recv_handler_l (fst m) (fst (snd m)) d (snd (snd m)) = (st, ms, nts, cts, RecvMsg src dst p) ->
@@ -152,8 +136,10 @@ Proof using.
   apply in_or_app.
   right.
   recover_msg_from_recv_step_equality.
-  eapply other_elements_remain_after_removal; eauto.
-  now repeat find_rewrite.
+  repeat find_reverse_rewrite.
+  eauto with struct_util datatypes.
+  cut (In (from, (to, m)) (xs ++ ys));
+    eauto with struct_util.
 Qed.
 
 Ltac destruct_recv_handler_l :=

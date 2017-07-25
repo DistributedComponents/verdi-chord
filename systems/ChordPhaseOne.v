@@ -3,7 +3,7 @@ Import ListNotations.
 Require Import Omega.
 
 Require Import StructTact.StructTactics.
-Require Import StructTact.Update.
+Require Import StructTact.Util.
 Require Import InfSeqExt.infseq.
 Require Import Chord.Measure.
 Require Import Chord.InfSeqTactics.
@@ -20,22 +20,6 @@ Require Import Chord.ChordDeadNodesGoQuiet.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
-
-(* TODO(ryan) move to infseq *)
-Lemma weak_until_latch_eventually :
-  forall T (P Q : infseq T -> Prop) ex,
-    weak_until (P /\_ ~_ Q) (P /\_ Q) ex ->
-    eventually Q ex ->
-    eventually (P /\_ Q) ex.
-Proof.
-  induction 2.
-  - inv_prop weak_until.
-    + now apply E0.
-    + exfalso; firstorder.
-  - inv_prop weak_until.
-    + now apply E0.
-    + eauto using E_next.
-Qed.
 
 Definition has_dead_first_succ (gst : global_state) (h : addr) (s : pointer) :=
   exists st,
@@ -551,19 +535,6 @@ Proof.
   find_eapply_lem_hyp add_tick_definition; expand_def.
   find_apply_lem_hyp start_query_definition; expand_def;
     repeat find_rewrite; solve_by_inversion.
-Qed.
-
-(* TODO(ryan) move to structtact *)
-Lemma hd_error_tl_exists :
-  forall A (l : list A) x,
-    hd_error l = Some x ->
-    exists tl,
-      l = x :: tl.
-Proof.
-  intros.
-  destruct l; simpl in *.
-  - congruence.
-  - eexists; solve_by_inversion.
 Qed.
 
 Lemma effective_Tick_sends_request :

@@ -1,8 +1,7 @@
 Require Import List.
 Require Import Arith.
 Require Import StructTact.StructTactics.
-Require Import StructTact.Update.
-Require Import StructTact.RemoveAll.
+Require Import StructTact.Util.
 Require Import InfSeqExt.infseq.
 Import ListNotations.
 
@@ -407,16 +406,6 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
     | H: labeled_step_dynamic _ _ _ |- _ =>
       invc H
     end.
-
-  Lemma list_neq_cons :
-    forall A (l : list A) x,
-      x :: l <> l.
-  Proof using.
-    intuition.
-    symmetry in H.
-    induction l;
-      now inversion H.
-  Qed.
 
   Lemma labeled_step_dynamic_preserves_nodes :
     forall gst l gst',

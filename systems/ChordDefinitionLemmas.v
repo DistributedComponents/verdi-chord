@@ -2,8 +2,7 @@ Require Import List.
 Import ListNotations.
 
 Require Import StructTact.StructTactics.
-Require Import StructTact.Update.
-Require Import StructTact.RemoveAll.
+Require Import StructTact.Util.
 
 Require Import Chord.ChordSemantics.
 Require Import Chord.ChordLocalProps.

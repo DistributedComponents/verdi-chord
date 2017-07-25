@@ -4,7 +4,7 @@ Require Import Omega.
 
 Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
-Require Import StructTact.Update.
+Require Import StructTact.Util.
 Require Import InfSeqExt.infseq.
 Require Import Chord.InfSeqTactics.
 Require Import Chord.Measure.
@@ -22,23 +22,6 @@ Require Import Chord.ChordPhaseOne.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
-
-Lemma now_hd :
-  forall T (P : T -> Prop) ex,
-    now P ex ->
-    P (hd ex).
-Proof.
-  now destruct ex.
-Qed.
-
-Lemma always_now' :
-  forall T (P : infseq T -> Prop) ex,
-    always P ex ->
-    P ex.
-Proof.
-  destruct ex.
-  apply always_now.
-Qed.
 
 Definition live_addrs (gst : global_state) : list addr :=
   filter (fun a => Coqlib.proj_sumbool (live_node_dec gst a))
@@ -121,18 +104,6 @@ Proof.
   now find_apply_lem_hyp in_map_iff; expand_def.
 Qed.
 
-Lemma not_in_filter_false :
-  forall A (f : A -> bool) l x,
-    In x l ->
-    ~ In x (filter f l) ->
-    f x = false.
-Proof.
-  intros.
-  destruct (f x) eqn:?H; [|tauto].
-  unfold not in *; find_false.
-  now eapply filter_In.
-Qed.
-
 Lemma wf_ptr_hash_eq :
   forall p,
     wf_ptr p ->
@@ -175,26 +146,6 @@ Proof.
   apply in_nil.
 Qed.
 
-Lemma filter_length_bound :
-  forall A f (l : list A),
-    length (filter f l) <= length l.
-Proof.
-  induction l.
-  - easy.
-  - simpl.
-    break_if; simpl; omega.
-Qed.
-
-Lemma len_eq_Slen_absurd :
-  forall A f (l : list A),
-    length (filter f l) <> S (length l).
-Proof.
-  intros.
-  apply Nat.lt_neq.
-  apply le_lt_n_Sm.
-  apply filter_length_bound.
-Qed.
-
 Lemma length_filter_by_cmp_same_eq :
   forall A (l : list A) cmp x y,
     (forall a b c, In a l -> In b l -> In c l ->
@@ -231,11 +182,12 @@ Proof.
   unfold counting_opt_error.
   intros.
   subst.
+  pose proof (filter_length_bound (cmp x) (live_ptrs gst)).
+  pose proof (filter_length_bound (cmp y) (live_ptrs gst)).
   repeat break_match;
-    try solve [exfalso; eapply len_eq_Slen_absurd; eauto | tauto].
+    try solve [eauto with zarith | tauto].
   left.
-  eapply length_filter_by_cmp_same_eq; eauto;
-    eapply live_In_live_ptrs; auto.
+  eauto using length_filter_by_cmp_same_eq, live_In_live_ptrs.
 Qed.
 
 (** Predecessor phase two definitions *)
@@ -1037,19 +989,6 @@ Proof.
   tauto.
 Qed.
 
-Lemma weak_until_eventually_until :
-  forall T (P Q : infseq T -> Prop) s,
-    weak_until P Q s ->
-    eventually Q s ->
-    until P Q s.
-Proof.
-  intros.
-  induction 0.
-  - now apply U0.
-  - find_apply_lem_hyp weak_until_Cons.
-    intuition auto using U0, U_next.
-Qed.
-
 Lemma better_pred_eventually_improves_succ :
   forall ex,
     lb_execution ex ->
@@ -1595,14 +1534,6 @@ Section MergePoint.
     | H: context[P] |- _ => eapply H
     end.
 
-  Lemma hd_error_None :
-    forall A (l : list A),
-      hd_error l = None ->
-      l = [].
-  Proof.
-    now destruct l.
-  Qed.
-
   Lemma successors_are_live_nodes :
     forall gst h s,
       reachable_st gst ->
@@ -1995,26 +1926,6 @@ Section MergePoint.
       + tauto.
   Qed.
 
-  Lemma eventually_or_tl_intror :
-    forall T (P Q : infseq T -> Prop) s,
-      eventually Q s ->
-      eventually (P \/_ Q) s.
-  Proof.
-    intros until 0.
-    apply eventually_monotonic_simple.
-    firstorder.
-  Qed.
-
-  Lemma eventually_or_tl_introl :
-    forall T (P Q : infseq T -> Prop) s,
-      eventually P s ->
-      eventually (P \/_ Q) s.
-  Proof.
-    intros until 0.
-    apply eventually_monotonic_simple.
-    firstorder.
-  Qed.
-
   Lemma pred_improves_pred_and_succ_improves :
     forall h ex,
       consecutive (measure_nonincreasing (first_succ_error (addr_of h))) ex ->
@@ -2069,16 +1980,6 @@ Section MergePoint.
     intros.
     unfold pred_or_succ_improves_abj, or_tl.
     intuition auto using first_succ_improves_pred_and_succ_improves.
-  Qed.
-
-  Lemma eventually_or_tl_or :
-    forall T (P Q : infseq T -> Prop) s,
-      eventually (P \/_ Q) s ->
-      eventually P s \/ eventually Q s.
-  Proof.
-    intros.
-    induction 0;
-      firstorder using E0, E_next.
   Qed.
 
   Lemma open_request_with_response_on_wire_closed_or_preserved :

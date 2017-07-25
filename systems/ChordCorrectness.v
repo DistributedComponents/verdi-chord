@@ -22,30 +22,6 @@ Require Import Chord.ChordPhaseTwo.
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
 
-(* this isn't used anywhere but might be useful in the future *)
-Lemma request_always_effective :
-  forall s eff h dst dstp q msg msg' st,
-    lb_execution s ->
-    now (occurred (Timeout h (Request dst msg) eff)) s ->
-    sigma (occ_gst (hd s)) h = Some st ->
-    cur_request st = Some (dstp, q, msg') ->
-    addr_of dstp = dst ->
-    eff = DetectFailure.
-Proof.
-  intros.
-  do 2 destruct s.
-  simpl in *.
-  inv_prop lb_execution.
-  inv_prop occurred.
-  repeat find_reverse_rewrite.
-  inv_labeled_step; clean_up_labeled_step_cases.
-  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
-    try congruence.
-  find_apply_lem_hyp request_timeout_handler_definition; expand_def;
-    congruence.
-Qed.
-
 (** Phase three: all successors become correct. *)
 Definition all_in_dec
            {A : Type}

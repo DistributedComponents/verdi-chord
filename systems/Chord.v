@@ -6,9 +6,8 @@ Require ZArith.
 Require Zdigits.
 Require Import Omega.
 
-Require Import StructTact.Dedup.
-Require Import StructTact.RemoveAll.
 Require Import StructTact.StructTactics.
+Require Import StructTact.Util.
 Require Import Verdi.DynamicNet.
 
 Require Import Chord.Sorting.
