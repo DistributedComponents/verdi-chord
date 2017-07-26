@@ -7,17 +7,16 @@
 # server "example.com", user: "deploy", roles: %w{app web}, other_property: :other_value
 # server "db.example.com", user: "deploy", roles: %w{db}
 
-server "db01", roles: %w{node}, host: 'discoberry01.duckdns.org', name: "17", succs: %w(79 99), preds: %w(155), ip: '128.208.7.17'
-server "db02", roles: %w{node}, host: 'discoberry02.duckdns.org', name: "155", succs: %w(17 79), preds: %w(99), ip: '128.208.7.155'
-server "db03", roles: %w{node}, host: 'discoberry03.duckdns.org', name: "79", succs: %w(99 155), preds: %w(17), ip: '172.28.7.79'
-server "db04", roles: %w{node}, host: 'discoberry04.duckdns.org', name: "99", succs: %w(155 17), preds: %w(79), ip: '172.28.7.99'
-## server "db05", roles: %w{node}, host: 'discoberry05.duckdns.org', name: "4", adjacent: %w(0 6)
-#server "db06", roles: %w{node}, host: 'discoberry06.duckdns.org', name: "5", adjacent: %w(1 9), ip: '128.208.7.91'
-## server "db07", roles: %w{node}, host: 'discoberry07.duckdns.org', name: "6", adjacent: %w(4)
-#server "db08", roles: %w{node}, host: 'discoberry08.duckdns.org', name: "7", adjacent: %w(1), ip: '128.208.7.18'
-## server "db09", roles: %w{node}, host: 'discoberry09.duckdns.org', name: "8", adjacent: %w(6)
-#server "db10", roles: %w{node}, host: 'discoberry10.duckdns.org', name: "9", adjacent: %w(5), ip: '128.208.7.41'
-
+server 'discoberry01.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.17',  name: '17',  succs: %w(41 108), preds: %w(155)
+server 'discoberry02.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.155', name: '155', succs: %w(17 41),  preds: %w(79)
+server 'discoberry03.duckdns.org', user: 'pi', roles: %w{node}, ip: '172.28.7.79',   name: '79',  succs: %w(155 17), preds: %w(99)
+server 'discoberry04.duckdns.org', user: 'pi', roles: %w{node}, ip: '172.28.7.99',   name: '99',  succs: %w(79 155), preds: %w(183)
+server 'discoberry05.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.183', name: '183', succs: %w(99 79),  preds: %w(91)
+server 'discoberry06.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.91',  name: '91',  succs: %w(183 99), preds: %w(20)
+server 'discoberry07.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.20',  name: '20',  succs: %w(91 183), preds: %w(18)
+server 'discoberry08.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.18',  name: '18',  succs: %w(20 91),  preds: %w(108)
+server 'discoberry09.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.108', name: '108', succs: %w(18 20),  preds: %w(41)
+server 'discoberry10.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.41',  name: '41',  succs: %w(108 18), preds: %w(17)
 
 # role-based syntax
 # ==================
@@ -42,6 +41,7 @@ server "db04", roles: %w{node}, host: 'discoberry04.duckdns.org', name: "99", su
 # Feel free to add new variables to customise your setup.
 
 set :node_port, 7000
+set :make_jobs, 2
 
 # Custom SSH Options
 # ==================
