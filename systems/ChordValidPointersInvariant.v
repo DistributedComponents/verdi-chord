@@ -4,9 +4,8 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordSemantics.
-Import Chord.ChordSemantics.ChordSemantics.
-Import Chord.ChordSemantics.ConstrainedChord.
+Import Chord.ChordSemantics.
+Import Chord.ConstrainedChord.
 Import Chord.ChordIDSpace.
 Require Import Chord.ChordProof.
 Require Import Chord.ChordDefinitionLemmas.

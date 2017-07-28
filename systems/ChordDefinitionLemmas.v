@@ -4,8 +4,7 @@ Import ListNotations.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 
-Require Import Chord.ChordSemantics.
-Require Import Chord.ChordLocalProps.
+Require Import Chord.Chord.
 
 Ltac expand_def :=
   repeat (try break_or_hyp; try break_and; try break_exists);
