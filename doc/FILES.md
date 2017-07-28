@@ -36,12 +36,15 @@ Core files
   * functions are deeply nested
 
 - `ChordLocalProps.v`: predicates on payloads and lemmas about predicates
+  * merge into chord semantics? or chord.v?
 
 - `ChordSemantics.v`: defines constraints for constrained dynamic system
   * timeout constraints
   * failure constraints
   * bottom module yields the naked semantics
   * plugs Chord handler definitions into the semantics
+  * merge into chord.v?
+  * split out constraints that don't refer to chord?
 
 - `ChordDefinitionLemmas.v`: huge lemmas that characterize the output of each handler function used by nodes
   * facts about implementation functions only!
@@ -54,8 +57,13 @@ Core files
   * proves "meta-theorems" that make proving induction properties easier (not finished yet, though)
  
 - `ChordLabeled.v`: basic lemmas about labeled semantics (messages eventually delivered, etc.)
+  * move into core?
 
 - `ChordValidPointersInvariant.v`: pointers point to reasonable things
+  * move into `invariants` subdirectory
+  
+- `LiveNodesStayLive.`
+  * move into `invariants` subdirectory
 
 - `ChordPromises.v`: admits that should be proven
 
