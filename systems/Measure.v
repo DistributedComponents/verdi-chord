@@ -5,8 +5,7 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.FilterMap.
 Require Import InfSeqExt.infseq.
 Require Import Chord.InfSeqTactics.
-
-Require Import Chord.ChordSemantics.
+Require Import Chord.Chord.
 
 Section Measure.
 

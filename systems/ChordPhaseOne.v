@@ -8,7 +8,7 @@ Require Import InfSeqExt.infseq.
 Require Import Chord.Measure.
 Require Import Chord.InfSeqTactics.
 
-Require Import Chord.ChordSemantics.
+Require Import Chord.Chord.
 Require Import Chord.ChordProof.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordValidPointersInvariant.

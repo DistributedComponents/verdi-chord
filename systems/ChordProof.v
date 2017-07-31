@@ -9,8 +9,7 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 Require Verdi.Coqlib.
 
-Require Import Chord.ChordSemantics.
-Require Import Chord.ChordLocalProps.
+Require Import Chord.Chord.
 Require Import Chord.ChordDefinitionLemmas.
 
 Set Bullet Behavior "Strict Subproofs".
