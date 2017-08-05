@@ -62,7 +62,7 @@ class Node(object):
 
     def readlines(self):
         lines = []
-        while len(lines) < 10:
+        while len(lines) == 0:
             try:
                 lines.append(self.output_queue.get_nowait())
             except Queue.Empty:
