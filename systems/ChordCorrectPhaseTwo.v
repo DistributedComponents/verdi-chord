@@ -16,7 +16,7 @@ Require Import Chord.ChordQueryInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordHandlerLemmas.
-Require Import Chord.ChordPhaseOne.
+Require Import Chord.ChordCorrectPhaseOne.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
