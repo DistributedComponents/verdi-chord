@@ -15,7 +15,7 @@ Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordQueryInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordPromises.
-Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordPhaseOne.
 
 Set Bullet Behavior "Strict Subproofs".

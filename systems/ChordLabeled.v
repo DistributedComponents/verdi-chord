@@ -12,7 +12,7 @@ Require Import InfSeqExt.classical.
 Require Import Verdi.DynamicNet.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordProof.
 Require Import Chord.Measure.
 Require Import Chord.InfSeqTactics.

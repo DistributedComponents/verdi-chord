@@ -7,8 +7,9 @@ Require Import Chord.Chord.
 Import Chord.ChordSemantics.
 Import Chord.ConstrainedChord.
 Import Chord.ChordIDSpace.
+
 Require Import Chord.ChordProof.
-Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.ChordHandlerLemmas.
 
 Notation hash := Chord.hash.
 

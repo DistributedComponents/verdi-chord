@@ -10,7 +10,7 @@ Require Import StructTact.Util.
 Require Verdi.Coqlib.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.ChordHandlerLemmas.
 
 Set Bullet Behavior "Strict Subproofs".
 

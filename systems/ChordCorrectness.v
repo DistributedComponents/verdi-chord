@@ -14,7 +14,7 @@ Require Import Chord.ChordProof.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordPromises.
-Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordPhaseOne.
 Require Import Chord.ChordPhaseTwo.
 
