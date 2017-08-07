@@ -215,6 +215,21 @@ USED: In phase one for the proof of eventual stabilization.
 *)
 Admitted.
 
+Definition has_first_succ (gst : global_state) (h : addr) (s : pointer) : Prop :=
+  exists st,
+    sigma gst h = Some st /\
+    hd_error (succ_list st) = Some s.
+
+Lemma has_first_succ_intro :
+  forall gst h s st,
+    sigma gst h = Some st ->
+    hd_error (succ_list st) = Some s ->
+    has_first_succ gst h s.
+Proof.
+  intros.
+  eexists; eauto.
+Qed.
+
 Theorem first_succ_never_self :
   forall gst h s,
     reachable_st gst ->
@@ -228,6 +243,21 @@ DIFFCULTY: 1
 USED: In phase two.
 *)
 Admitted.
+
+Definition has_pred (gst : global_state) (h : addr) (p : option pointer) : Prop :=
+  exists st,
+    sigma gst h = Some st /\
+    pred st = p.
+
+Lemma has_pred_intro :
+  forall gst h p st,
+    sigma gst h = Some st ->
+    pred st = p ->
+    has_pred gst h p.
+Proof.
+  unfold has_pred.
+  eauto.
+Qed.
 
 Theorem pred_never_self :
   forall gst h p,

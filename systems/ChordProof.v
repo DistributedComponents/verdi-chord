@@ -18,38 +18,6 @@ Close Scope boolean_if_scope.
 Open Scope general_if_scope.
 Open Scope string_scope.
 
-(* used in phase two *)
-Definition has_pred (gst : global_state) (h : addr) (p : option pointer) : Prop :=
-  exists st,
-    sigma gst h = Some st /\
-    pred st = p.
-
-Lemma has_pred_intro :
-  forall gst h p st,
-    sigma gst h = Some st ->
-    pred st = p ->
-    has_pred gst h p.
-Proof.
-  unfold has_pred.
-  eauto.
-Qed.
-
-(* used in phase two *)
-Definition has_first_succ (gst : global_state) (h : addr) (s : pointer) : Prop :=
-  exists st,
-    sigma gst h = Some st /\
-    hd_error (succ_list st) = Some s.
-
-Lemma has_first_succ_intro :
-  forall gst h s st,
-    sigma gst h = Some st ->
-    hd_error (succ_list st) = Some s ->
-    has_first_succ gst h s.
-Proof.
-  intros.
-  eexists; eauto.
-Qed.
-
 Ltac inv_prop P :=
   match goal with
   | [ H : context[P] |- _] =>
