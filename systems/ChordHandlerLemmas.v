@@ -439,7 +439,7 @@ Lemma timeout_handler_l_definition :
 
     exists eff,
       timeout_handler_eff h st t = (st', ms, nts, cts, eff) /\
-      l = Chord.Chord.Timeout h t eff.
+      l = Chord.ChordSystem.Timeout h t eff.
 Proof.
   unfold timeout_handler_l.
   intros.

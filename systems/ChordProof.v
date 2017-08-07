@@ -18,17 +18,6 @@ Close Scope boolean_if_scope.
 Open Scope general_if_scope.
 Open Scope string_scope.
 
-Ltac inv_prop P :=
-  match goal with
-  | [ H : context[P] |- _] =>
-    inv H
-  end.
-
-Fixpoint fake_name (k : nat) :=
-  match k with
-  | 0 => ":^)"
-  | S k' => String.append ":^) " (fake_name k')
-  end.
 
 Lemma fake_name_inj :
   forall i j,
@@ -40,12 +29,6 @@ Proof.
     simpl in *; try congruence.
   find_injection; auto.
 Qed.
-
-Fixpoint make_initial_nodes (num_nodes : nat) : list addr :=
-  match num_nodes with
-  | 0 => []
-  | S k => fake_name k :: make_initial_nodes k
-  end.
 
 Lemma in_make_initial_nodes :
   forall k nm,
@@ -87,32 +70,15 @@ Proof.
   - simpl; now f_equal.
 Qed.
 
-Definition initial_nodes : list addr :=
-  make_initial_nodes (Chord.SUCC_LIST_LEN + 1).
-
-Lemma initial_nodes_NoDup : NoDup initial_nodes.
-Proof.
-  apply make_initial_nodes_NoDup.
-Qed.
+  Lemma initial_nodes_NoDup : NoDup initial_nodes.
+  Proof.
+    apply make_initial_nodes_NoDup.
+  Qed.
 
 Lemma initial_nodes_length : length initial_nodes = Chord.SUCC_LIST_LEN + 1.
 Proof.
   apply make_initial_nodes_length.
 Qed.
-
-Definition run_init_for (gst : global_state) (h : addr) : global_state :=
-  let res := start_handler h initial_nodes in
-  apply_handler_result h (res, []) [] gst.
-Hint Unfold run_init_for.
-
-Definition initial_st : global_state :=
-  fold_left run_init_for initial_nodes
-            {| nodes := initial_nodes;
-               failed_nodes := [];
-               timeouts := fun h => [];
-               sigma := fun h => None;
-               msgs := [];
-               trace := [] |}.
 
 Inductive reachable_st : global_state -> Prop :=
 | reachableInit : reachable_st initial_st
