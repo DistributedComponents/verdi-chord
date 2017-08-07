@@ -18,6 +18,7 @@ Close Scope boolean_if_scope.
 Open Scope general_if_scope.
 Open Scope string_scope.
 
+(* used in phase two *)
 Definition has_pred (gst : global_state) (h : addr) (p : option pointer) : Prop :=
   exists st,
     sigma gst h = Some st /\
@@ -33,6 +34,7 @@ Proof.
   eauto.
 Qed.
 
+(* used in phase two *)
 Definition has_first_succ (gst : global_state) (h : addr) (s : pointer) : Prop :=
   exists st,
     sigma gst h = Some st /\
@@ -48,248 +50,11 @@ Proof.
   eexists; eauto.
 Qed.
 
-Lemma busy_response_exists :
-  forall msg st' sends nts cts src st,
-    request_payload msg ->
-    (st', sends, nts, cts) = handle_query_req_busy src st msg ->
-    In (src, Busy) sends.
-Proof using.
-  unfold handle_query_req_busy.
-  intuition.
-  break_if;
-    tuple_inversion;
-    now apply in_eq.
-Qed.
-
-Lemma unsafe_msgs_not_safe_ones :
-  forall msg,
-    is_safe msg = false ->
-    msg <> Notify /\ msg <> Ping.
-Proof using.
-  unfold is_safe.
-  intuition;
-    break_match;
-    easy.
-Qed.
-
-Lemma delay_query_adds_query :
-  forall st src msg st',
-    delay_query st src msg = st' ->
-    In (src, msg) (delayed_queries st').
-Proof.
-  intros.
-  subst.
-  simpl.
-  break_if; auto using dedup_In with datatypes.
-Qed.
-
-Lemma handle_query_req_busy_delays_query :
-  forall src st msg st' ms nts cts,
-    handle_query_req_busy src st msg = (st', ms, nts, cts) ->
-    In (src, msg) (delayed_queries st').
-Proof.
-  intros.
-  find_apply_lem_hyp handle_query_req_busy_definition; expand_def;
-    eauto using delay_query_adds_query.
-Qed.
-
-Lemma handle_query_req_busy_sends_busy :
-  forall src st msg st' ms nts cts,
-    handle_query_req_busy src st msg = (st', ms, nts, cts) ->
-    In (src, Busy) ms.
-Proof using.
-  unfold handle_query_req_busy.
-  intuition.
-  break_if;
-    tuple_inversion;
-    exact: in_eq.
-Qed.
-
-Lemma handle_query_req_busy_preserves_cur_request :
-  forall src st msg st' ms nts cts,
-    handle_query_req_busy src st msg = (st', ms, nts, cts) ->
-    cur_request st' = cur_request st.
-Proof.
-  intros.
-  find_apply_lem_hyp handle_query_req_busy_definition; expand_def;
-    easy.
-Qed.
-
-Lemma handle_query_req_gives_response :
-  forall st src m,
-    is_safe m = false ->
-    request_payload m ->
-    exists p,
-      handle_query_req st src m = [(src, p)].
-Proof using.
-  unfold handle_query_req.
-  intuition.
-  find_copy_apply_lem_hyp unsafe_msgs_not_safe_ones; break_and.
-  request_payload_inversion;
-    eauto || congruence.
-Qed.
-
-Lemma do_delayed_queries_busy_nop :
-  forall h st st' ms nts cts,
-    cur_request st <> None ->
-    do_delayed_queries h st = (st', ms, nts, cts) ->
-    st' = st /\ ms = [] /\ nts = [] /\ cts = [].
-Proof.
-  unfold do_delayed_queries.
-  intros.
-  break_match; repeat split; congruence.
-Qed.
-
-Lemma real_requests_get_queued_and_busy_response :
-  forall src dst msg st st' sends nts cts,
-    request_payload msg ->
-    cur_request st <> None ->
-    msg <> Ping ->
-    recv_handler src dst st msg = (st', sends, nts, cts) ->
-    In (src, Busy) sends /\
-    In (src, msg) (delayed_queries st').
-Proof.
-  intros.
-  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
-  find_apply_lem_hyp handle_msg_definition; expand_def.
-  - inv_prop request_payload.
-  - split.
-    + eauto using handle_query_req_busy_sends_busy with datatypes.
-    + find_copy_apply_lem_hyp handle_query_req_busy_preserves_cur_request.
-      find_copy_apply_lem_hyp do_delayed_queries_busy_nop; expand_def;
-        try congruence.
-      eapply handle_query_req_busy_delays_query; eauto.
-  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
-  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
-Qed.
-
-Lemma real_requests_get_busy_response :
-  forall src dst msg st st' sends nts cts,
-    request_payload msg ->
-    cur_request st <> None ->
-    msg <> Ping ->
-    recv_handler src dst st msg = (st', sends, nts, cts) ->
-    In (src, Busy) sends.
-Proof.
-  intros.
-  find_apply_lem_hyp real_requests_get_queued_and_busy_response; tauto.
-Qed.
-
-Lemma real_requests_get_queued :
-  forall src dst msg st st' sends nts cts,
-    request_payload msg ->
-    cur_request st <> None ->
-    msg <> Ping ->
-    recv_handler src dst st msg = (st', sends, nts, cts) ->
-    In (src, msg) (delayed_queries st').
-Proof.
-  intros.
-  find_apply_lem_hyp real_requests_get_queued_and_busy_response; tauto.
-Qed.
-
-Lemma real_requests_get_response_handle_query_req :
-  forall st src req sends,
-    request_payload req ->
-    req <> Ping ->
-    handle_query_req st src req = sends ->
-    exists res,
-      In (src, res) sends /\
-      request_response_pair req res.
-Proof.
-  intros.
-  match goal with
-  | [H: request_payload _ |- _] =>
-    inv H; congruence || simpl
-  end;
-    eexists; intuition eauto; constructor.
-Qed.
-
-Lemma pings_always_get_pongs_handle_msg :
-  forall src dst st st' sends nts cts,
-    handle_msg src dst st Ping = (st', sends, nts, cts) ->
-    In (src, Pong) sends.
-Proof.
-  intros.
-  find_apply_lem_hyp handle_msg_definition; expand_def;
-    solve [auto with datatypes | congruence].
-Qed.
-
-Lemma pings_always_get_pongs_recv_handler :
-  forall src dst st st' sends nts cts,
-    recv_handler src dst st Ping = (st', sends, nts, cts) ->
-    In (src, Pong) sends.
-Proof.
-  intros.
-  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
-  apply in_or_app; right.
-  eapply pings_always_get_pongs_handle_msg; eauto.
-Qed.
-
 Ltac inv_prop P :=
   match goal with
   | [ H : context[P] |- _] =>
     inv H
   end.
-
-Lemma real_requests_get_responses_handle_msg :
-  forall src dst st req st' sends nts cts,
-    handle_msg src dst st req = (st', sends, nts, cts) ->
-    request_payload req ->
-    req <> Ping ->
-    cur_request st = None ->
-    exists res,
-      In (src, res) sends /\
-      request_response_pair req res.
-Proof.
-  intros.
-  find_apply_lem_hyp handle_msg_definition; expand_def.
-  - solve_by_inversion.
-  - congruence.
-  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
-  - find_apply_lem_hyp is_request_same_as_request_payload; congruence.
-  - eapply real_requests_get_response_handle_query_req; eauto.
-Qed.
-
-Lemma real_requests_get_responses_recv_handler :
-  forall src dst st req st' sends nts cts,
-    recv_handler src dst st req = (st', sends, nts, cts) ->
-    request_payload req ->
-    req <> Ping ->
-    cur_request st = None ->
-    exists res,
-      In (src, res) sends /\
-      request_response_pair req res.
-Proof.
-  intros.
-  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
-  find_apply_lem_hyp real_requests_get_responses_handle_msg; eauto.
-  break_exists_exists; break_and.
-  eauto with datatypes.
-Qed.
-
-Lemma requests_are_always_responded_to :
-  forall src dst req st st' sends nts cts,
-    request_payload req ->
-    recv_handler src dst st req = (st', sends, nts, cts) ->
-
-    cur_request st <> None /\
-    req <> Ping /\
-    In (src, Busy) sends \/
-
-    exists res,
-      In (src, res) sends /\
-      request_response_pair req res.
-Proof.
-  intros.
-  destruct (payload_eq_dec req Ping); subst.
-  - right.
-    eexists; eauto using pings_always_get_pongs_recv_handler, pair_Ping.
-  - destruct (cur_request st) eqn:?H.
-    + find_copy_eapply_lem_hyp real_requests_get_busy_response; eauto.
-      * left; repeat split; assumption || congruence.
-      * congruence.
-    + find_apply_lem_hyp real_requests_get_responses_recv_handler; auto.
-Qed.
 
 Fixpoint fake_name (k : nat) :=
   match k with
@@ -428,22 +193,6 @@ Proof using.
   induct_reachable_st; econstructor; eauto.
 Qed.
 
-Theorem live_node_characterization :
-  forall gst h st,
-    sigma gst h = Some st ->
-    joined st = true ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst) ->
-    live_node gst h.
-Proof using.
-  unfold live_node.
-  intuition.
-  match goal with
-  | x : data |- exists _ : data, _ => exists x
-  end.
-  intuition.
-Qed.
-
 Definition live_node_bool (gst : global_state) (h : addr) :=
   match sigma gst h with
   | Some st =>
@@ -455,12 +204,6 @@ Definition live_node_bool (gst : global_state) (h : addr) :=
          else false
     else false
   | None => false
-  end.
-
-Ltac break_live_node :=
-  match goal with
-  | H : live_node _ _ |- _ =>
-    unfold live_node in H; repeat break_and; break_exists; repeat break_and
   end.
 
 Ltac break_live_node_name var :=
@@ -1002,226 +745,7 @@ Proof using.
   * repeat find_rewrite; eauto.
 Qed.
 
-Lemma apply_handler_result_preserves_nodes :
-  forall gst gst' h res e,
-    gst' = apply_handler_result h res e gst ->
-    nodes gst = nodes gst'.
-Proof using.
-  unfold apply_handler_result.
-  intuition.
-  repeat break_let.
-  find_rewrite; auto.
-Qed.
-
-Lemma apply_handler_result_preserves_failed_nodes :
-  forall gst gst' h res e,
-    gst' = apply_handler_result h res e gst ->
-    failed_nodes gst = failed_nodes gst'.
-Proof using.
-  unfold apply_handler_result.
-  intuition.
-  repeat break_let.
-  find_rewrite; auto.
-Qed.
-
-Lemma when_apply_handler_result_preserves_live_node :
-  forall h h0 st st' gst gst' e ms cts nts,
-    live_node gst h ->
-    sigma gst h = Some st ->
-    sigma gst' h = Some st' ->
-    joined st' = true ->
-    gst' = apply_handler_result h0 (st', ms, cts, nts) e gst ->
-    live_node gst' h.
-Proof using.
-  intuition.
-  eapply live_node_characterization.
-  - eauto.
-  - break_live_node.
-    repeat find_rewrite.
-    find_inversion; eauto.
-  - find_apply_lem_hyp apply_handler_result_preserves_nodes.
-    find_inversion.
-    break_live_node; auto.
-  - find_apply_lem_hyp apply_handler_result_preserves_failed_nodes.
-    find_inversion.
-    break_live_node; auto.
-Qed.
-
-Lemma joined_preserved_by_start_query :
-  forall h st k st' ms nts cts,
-    start_query h st k = (st', ms, nts, cts) ->
-    joined st = joined st'.
-Proof using.
-  unfold start_query.
-  intuition.
-  break_match.
-  - break_let.
-    tuple_inversion.
-    unfold update_query; auto.
-  - tuple_inversion; auto.
-Qed.
-
-Lemma joined_preserved_by_do_rectify :
-  forall h st st' ms' cts' nts' eff,
-    do_rectify h st = (st', ms', cts', nts', eff) ->
-    joined st = joined st'.
-Proof using.
-  intros.
-  find_eapply_lem_hyp do_rectify_definition; expand_def;
-    try find_eapply_lem_hyp joined_preserved_by_start_query;
-    simpl in *; eauto.
-Qed.
-
-Lemma joined_preserved_by_do_delayed_queries :
-  forall h st st' ms nts cts,
-    do_delayed_queries h st = (st', ms, nts, cts) ->
-    joined st = joined st'.
-Proof.
-  intros.
-  find_eapply_lem_hyp do_delayed_queries_definition; expand_def;
-    simpl in *; eauto.
-Qed.
-
-Lemma joined_preserved_by_end_query :
-  forall st st' ms ms' cts cts' nts nts',
-    end_query (st, ms, cts, nts) = (st', ms', cts', nts') ->
-    joined st = joined st'.
-Proof using.
-  unfold end_query.
-  intros.
-  tuple_inversion.
-  tauto.
-Qed.
-
-Lemma joined_preserved_by_handle_stabilize :
-  forall h src st q new_succ succ st' ms nts cts,
-    handle_stabilize h src st q new_succ succ = (st', ms, nts, cts) ->
-    joined st = joined st'.
-Proof using.
-  unfold handle_stabilize.
-  unfold update_succ_list.
-  intuition.
-  repeat break_match;
-    solve [find_apply_lem_hyp joined_preserved_by_start_query; auto |
-           find_apply_lem_hyp joined_preserved_by_end_query; auto].
-Qed.
-
-Lemma joined_preserved_by_end_query_handle_rectify :
-  forall st p n st' ms nts cts,
-    end_query (handle_rectify st p n) = (st', ms, nts, cts) ->
-    joined st = joined st'.
-Proof using.
-  unfold handle_rectify.
-  intuition.
-  repeat break_match;
-    find_apply_lem_hyp joined_preserved_by_end_query;
-    now simpl in *.
-Qed.
-
-(* not as strong as the other ones since handle_query for a Join query can change joined st from false to true *)
-Lemma joined_preserved_by_handle_query :
-  forall src h st q m st' ms nts cts,
-    handle_query_res src h st q m = (st', ms, nts, cts) ->
-    joined st = true ->
-    joined st' = true.
-Proof.
-  intros.
-  find_eapply_lem_hyp handle_query_res_definition; expand_def; auto;
-    try (find_eapply_lem_hyp joined_preserved_by_end_query; simpl in *; congruence).
-  - find_eapply_lem_hyp joined_preserved_by_end_query_handle_rectify; congruence.
-  - find_eapply_lem_hyp joined_preserved_by_handle_stabilize; congruence.
-  - find_rewrite; simpl; congruence.
-  - find_eapply_lem_hyp joined_preserved_by_start_query; simpl in *; congruence.
-Qed.
-
-Lemma schedule_rectify_with_definition :
-  forall st rw st' ms nts cts,
-    schedule_rectify_with st rw = (st', ms, nts, cts) ->
-
-    ms = [] /\
-    cts = [] /\
-
-    ((exists rw0,
-        rectify_with st = Some rw0 /\
-        nts = [] /\
-        (ptr_between_bool rw0 rw (ptr st) = true /\
-         st' = set_rectify_with st rw \/
-         ptr_between_bool rw0 rw (ptr st) = false /\
-         st' = st)) \/
-
-     rectify_with st = None /\
-     st' = st /\
-     nts = [RectifyTick]).
-Proof.
-  unfold schedule_rectify_with.
-  intros.
-  repeat break_match; tuple_inversion;
-    intuition (eexists; eauto).
-Qed.
-
-Lemma joined_preserved_by_schedule_rectify_with :
-  forall st rw st' ms nts cts,
-    schedule_rectify_with st rw = (st', ms, nts, cts) ->
-    joined st = joined st'.
-Proof.
-  intros.
-  simpl in *.
-  find_apply_lem_hyp schedule_rectify_with_definition; expand_def;
-    simpl; auto.
-Qed.
-
-Lemma joined_preserved_by_recv_handler :
-  forall src h st msg st' ms nts cts,
-    recv_handler src h st msg = (st', ms, nts, cts) ->
-    joined st = true ->
-    joined st' = true.
-Proof using.
-  intros.
-  find_apply_lem_hyp recv_handler_definition_existential; expand_def.
-  find_apply_lem_hyp joined_preserved_by_do_delayed_queries.
-  find_apply_lem_hyp handle_msg_definition; expand_def; try congruence.
-  - find_apply_lem_hyp joined_preserved_by_schedule_rectify_with; congruence.
-  - find_apply_lem_hyp handle_query_req_busy_definition; expand_def; simpl in *; congruence.
-  - find_apply_lem_hyp joined_preserved_by_handle_query; congruence.
-Qed.
-
-Lemma joined_preserved_by_tick_handler :
-  forall h st st' ms nts cts eff,
-    tick_handler h st = (st', ms, nts, cts, eff) ->
-    joined st = joined st'.
-Proof using.
-  intros.
-  find_apply_lem_hyp tick_handler_definition; expand_def; auto.
-  destruct (start_query _ _ _) as [[[[?st ?ms] ?nts] ?cts] ?eff] eqn:?H.
-  find_eapply_lem_hyp add_tick_definition; expand_def.
-  find_eapply_lem_hyp joined_preserved_by_start_query.
-  congruence.
-Qed.
-
-Lemma joined_preserved_by_handle_query_timeout :
-  forall h st dst q st' ms nts cts,
-    handle_query_timeout h st dst q = (st', ms, nts, cts) ->
-    joined st = joined st'.
-Proof using.
-  unfold handle_query_timeout.
-  intuition.
-  repeat break_match;
-    find_apply_lem_hyp joined_preserved_by_end_query ||
-                       find_apply_lem_hyp joined_preserved_by_start_query;
-    eauto.
-Qed.
-
-Lemma joined_preserved_by_timeout_handler_eff :
-  forall h st t st' ms nts cts eff,
-    timeout_handler_eff h st t = (st', ms, nts, cts, eff) ->
-    joined st = joined st'.
-Proof using.
-  unfold timeout_handler_eff.
-  intuition.
-  repeat break_match;
-    try tuple_inversion;
-    eauto using joined_preserved_by_tick_handler, joined_preserved_by_handle_query_timeout, joined_preserved_by_do_rectify.
-Admitted.
+(* ---- *)
 
 Lemma update_determined_by_f :
   forall A (f : addr -> A) x d d' y,
@@ -1234,57 +758,6 @@ Proof using.
   repeat find_reverse_rewrite.
   apply update_diff.
   now apply not_eq_sym.
-Qed.
-
-Lemma apply_handler_result_updates_sigma :
-  forall h st ms nts cts e gst gst',
-    gst' = apply_handler_result h (st, ms, nts, cts) e gst ->
-    sigma gst' h = Some st.
-Proof using.
-  unfold apply_handler_result, update.
-  intuition.
-  repeat find_rewrite.
-  simpl in *.
-  break_if; congruence.
-Qed.
-
-Theorem live_node_preserved_by_recv_step :
-  forall gst h src st msg gst' e st' ms nts cts,
-    live_node gst h ->
-    Some st = sigma gst h ->
-    recv_handler src h st msg = (st', ms, nts, cts) ->
-    gst' = apply_handler_result h (st', ms, nts, cts) e gst ->
-    live_node gst' h.
-Proof using.
-  intuition.
-  eapply when_apply_handler_result_preserves_live_node; eauto.
-  - eauto using apply_handler_result_updates_sigma.
-  - eapply joined_preserved_by_recv_handler.
-    * eauto.
-    * break_live_node.
-      find_rewrite.
-      find_injection.
-      auto.
-Qed.
-
-Theorem live_node_preserved_by_timeout_step :
-  forall gst h st st' t ms nts cts e gst',
-    live_node gst h ->
-    sigma gst h = Some st ->
-    timeout_handler h st t = (st', ms, nts, cts) ->
-    gst' = apply_handler_result h (st', ms, nts, t :: cts) e gst ->
-    live_node gst' h.
-Proof using.
-  intuition.
-  eapply when_apply_handler_result_preserves_live_node; eauto.
-  - eauto using apply_handler_result_updates_sigma.
-  - break_live_node.
-    unfold timeout_handler, fst in *; break_let.
-    repeat find_rewrite.
-    find_apply_lem_hyp joined_preserved_by_timeout_handler_eff.
-    repeat find_rewrite.
-    find_injection.
-    eauto.
 Qed.
 
 Lemma adding_nodes_does_not_affect_live_node :
@@ -1536,6 +1009,7 @@ Admitted.
         auto using in_middle_means_in_whole.
   Qed.
  *)
+
 Lemma coarse_reachable_characterization :
   forall from to gst gst',
     reachable gst from to ->
@@ -1935,27 +1409,4 @@ Proof using.
       now repeat find_rewrite.
     + eapply_prop chord_input_invariant; eauto.
     + eapply_prop chord_output_invariant; eauto.
-Qed.
-
-Lemma sigma_ahr_updates :
-  forall gst n st ms nts cts e,
-    sigma (apply_handler_result n (st, ms, nts, cts) e gst) n = Some st.
-Proof using.
-  unfold apply_handler_result.
-  simpl.
-  intros.
-  exact: update_eq.
-Qed.
-
-Lemma sigma_ahr_passthrough :
-  forall gst n st ms nts cts e h d,
-    n <> h ->
-    sigma gst h = Some d ->
-    sigma (apply_handler_result n (st, ms, nts, cts) e gst) h = Some d.
-Proof using.
-  unfold apply_handler_result.
-  simpl.
-  intros.
-  find_reverse_rewrite.
-  exact: update_diff.
 Qed.

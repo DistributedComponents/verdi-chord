@@ -6,9 +6,12 @@ Require Import StructTact.StructTactics.
 
 Require Import Chord.Chord.
 Import ChordIDSpace.
+
 Require Import Chord.ChordProof.
 Import ChordSemantics.
 Import ConstrainedChord.
+
+Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordValidPointersInvariant.
 
 Definition nodes_have_live_succs (gst : global_state) : Prop :=
