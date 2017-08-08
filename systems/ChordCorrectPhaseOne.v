@@ -21,6 +21,7 @@ Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodesStayLive.
 Require Import Chord.DeadNodesGoQuiet.
 Require Import Chord.ValidPointersInvariant.
+Require Import Chord.NodesAlwaysHaveLiveSuccs.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
