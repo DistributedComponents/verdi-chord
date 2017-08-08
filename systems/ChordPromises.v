@@ -8,6 +8,7 @@ Require Import Chord.Chord.
 
 Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordSystemLemmas.
+Require Import Chord.ChordSystemReachable.
 Require Import Chord.ChordValidPointersInvariant.
 
 Definition nodes_have_live_succs (gst : global_state) : Prop :=

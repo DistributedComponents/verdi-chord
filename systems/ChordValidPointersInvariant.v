@@ -7,6 +7,7 @@ Require Import Chord.Chord.
 
 Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordSystemLemmas.
+Require Import Chord.ChordSystemReachable.
 
 Notation hash := Chord.hash.
 
