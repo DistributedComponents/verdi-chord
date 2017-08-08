@@ -14,7 +14,7 @@ Require Import Chord.ChordPromises.
 Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordSystemLemmas.
 Require Import Chord.ChordSystemReachable.
-Require Import Chord.ChordLabeled.
+Require Import Chord.ChordLabeledLemmas.
 
 Require Import Chord.ChordQueryInvariant.
 Require Import Chord.LiveNodesStayLive.
