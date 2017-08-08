@@ -4,7 +4,6 @@ Import ListNotations.
 Require Import InfSeqExt.infseq.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordPromises.
 
 Require Import Chord.ChordLabeledLemmas.
 Require Import Chord.ChordHandlerLemmas.
