@@ -5,9 +5,10 @@ Require Import Omega.
 Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
+
 Require Import InfSeqExt.infseq.
+
 Require Import Chord.InfSeqTactics.
-Require Import Chord.Measure.
 
 Require Import Chord.Chord.
 Require Import Chord.ChordPromises.
@@ -16,8 +17,9 @@ Require Import Chord.ChordLabeledLemmas.
 Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordSystemLemmas.
 Require Import Chord.ChordSystemReachable.
+Require Import Chord.ChordLabeledMeasures.
 
-Require Import Chord.ChordValidPointersInvariant.
+Require Import Chord.ValidPointersInvariant.
 
 Require Import Chord.ChordCorrectPhaseOne.
 Require Import Chord.ChordCorrectPhaseTwo.

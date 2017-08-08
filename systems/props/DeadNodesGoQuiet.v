@@ -5,11 +5,13 @@ Require Import InfSeqExt.infseq.
 
 Require Import Chord.Chord.
 Require Import Chord.ChordPromises.
-Require Import Chord.ChordValidPointersInvariant.
+
 Require Import Chord.ChordLabeledLemmas.
 Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordSystemLemmas.
+
 Require Import Chord.LiveNodesStayLive.
+Require Import Chord.ValidPointersInvariant.
 
 Definition no_msgs_from (h : addr) (occ : occurrence) :=
   forall dst,

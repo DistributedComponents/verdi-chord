@@ -5,7 +5,7 @@ Require Import Omega.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 Require Import InfSeqExt.infseq.
-Require Import Chord.Measure.
+
 Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
@@ -15,11 +15,12 @@ Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordSystemLemmas.
 Require Import Chord.ChordSystemReachable.
 Require Import Chord.ChordLabeledLemmas.
+Require Import Chord.ChordLabeledMeasures.
 
-Require Import Chord.ChordQueryInvariant.
+Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodesStayLive.
-Require Import Chord.ChordDeadNodesGoQuiet.
-Require Import Chord.ChordValidPointersInvariant.
+Require Import Chord.DeadNodesGoQuiet.
+Require Import Chord.ValidPointersInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.

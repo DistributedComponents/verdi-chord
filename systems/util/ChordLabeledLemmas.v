@@ -7,18 +7,23 @@ Set Bullet Behavior "Strict Subproofs".
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
+
 Require Import InfSeqExt.infseq.
 Require Import InfSeqExt.classical.
+
 Require Import Verdi.DynamicNet.
 
+Require Import Chord.InfSeqTactics.
+
 Require Import Chord.Chord.
+
 Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordSystemLemmas.
 Require Import Chord.ChordSystemReachable.
-Require Import Chord.Measure.
-Require Import Chord.InfSeqTactics.
+Require Import Chord.ChordLabeledMeasures.
+
 Require Import Chord.LiveNodesStayLive.
-Require Import Chord.ChordQueryInvariant.
+Require Import Chord.QueryInvariant.
 
 Lemma l_enabled_RecvMsg_In_msgs :
   forall e src dst m d,
