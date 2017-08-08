@@ -9,7 +9,6 @@ Require Import InfSeqExt.infseq.
 Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordPromises.
 
 Require Import Chord.ChordHandlerLemmas.
 Require Import Chord.ChordSystemLemmas.
