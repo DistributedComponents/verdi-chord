@@ -4,6 +4,7 @@ Require Import List.
 Import List.ListNotations.
 
 Require Import mathcomp.ssreflect.ssreflect.
+Set Bullet Behavior "Strict Subproofs".
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
@@ -12,10 +13,175 @@ Require Verdi.Coqlib.
 Require Import Chord.Chord.
 Require Import Chord.ChordHandlerLemmas.
 
-Set Bullet Behavior "Strict Subproofs".
+(* ----------- *)
+(* Live nodes  *)
+(* ----------- *)
 
 Close Scope boolean_if_scope.
 Open Scope general_if_scope.
+
+Definition live_node_bool (gst : global_state) (h : addr) :=
+  match sigma gst h with
+  | Some st =>
+    if joined st
+    then if in_dec addr_eq_dec h (nodes gst)
+         then if in_dec addr_eq_dec h (failed_nodes gst)
+              then false
+              else true
+         else false
+    else false
+  | None => false
+  end.
+
+Ltac break_live_node_name var :=
+  match goal with
+  | H : live_node _ _ |- _ =>
+    unfold live_node in H; repeat break_and; break_exists_name var; repeat break_and
+  end.
+
+Ltac break_live_node_exists_exists :=
+  match goal with
+  | H : live_node _ _ |- _ =>
+    unfold live_node in H; repeat break_and; break_exists_exists; repeat break_and
+  end.
+
+Ltac break_dead_node :=
+  match goal with
+  | H : dead_node _ _ |- _ =>
+    unfold dead_node in H; repeat break_and; break_exists; repeat break_and
+  end.
+
+Ltac break_dead_node_name var :=
+  match goal with
+  | H : dead_node _ _ |- _ =>
+    unfold dead_node in H; repeat break_and; break_exists_name var; repeat break_and
+  end.
+
+Ltac break_dead_node_exists_exists :=
+  match goal with
+  | H : dead_node _ _ |- _ =>
+    unfold dead_node in H; repeat break_and; break_exists_exists; repeat break_and
+  end.
+
+Ltac break_live_node :=
+  match goal with
+  | H : live_node _ _ |- _ =>
+    unfold live_node in H; repeat break_and; break_exists; repeat break_and
+  end.
+
+Theorem live_node_characterization :
+  forall gst h st,
+    sigma gst h = Some st ->
+    joined st = true ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    live_node gst h.
+Proof using.
+  unfold live_node.
+  intuition.
+  match goal with
+  | x : data |- exists _ : data, _ => exists x
+  end.
+  intuition.
+Qed.
+
+Lemma when_apply_handler_result_preserves_live_node :
+  forall h h0 st st' gst gst' e ms cts nts,
+    live_node gst h ->
+    sigma gst h = Some st ->
+    sigma gst' h = Some st' ->
+    joined st' = true ->
+    gst' = apply_handler_result h0 (st', ms, cts, nts) e gst ->
+    live_node gst' h.
+Proof using.
+  intuition.
+  eapply live_node_characterization.
+  - eauto.
+  - break_live_node.
+    repeat find_rewrite.
+    find_inversion; eauto.
+  - find_apply_lem_hyp apply_handler_result_preserves_nodes.
+    find_inversion.
+    break_live_node; auto.
+  - find_apply_lem_hyp apply_handler_result_preserves_failed_nodes.
+    find_inversion.
+    break_live_node; auto.
+Qed.
+
+Theorem live_node_preserved_by_recv_step :
+  forall gst h src st msg gst' e st' ms nts cts,
+    live_node gst h ->
+    Some st = sigma gst h ->
+    recv_handler src h st msg = (st', ms, nts, cts) ->
+    gst' = apply_handler_result h (st', ms, nts, cts) e gst ->
+    live_node gst' h.
+Proof using.
+  intuition.
+  eapply when_apply_handler_result_preserves_live_node; eauto.
+  - eauto using apply_handler_result_updates_sigma.
+  - eapply joined_preserved_by_recv_handler.
+    * eauto.
+    * break_live_node.
+      find_rewrite.
+      find_injection.
+      auto.
+Qed.
+
+Theorem live_node_preserved_by_timeout_step :
+  forall gst h st st' t ms nts cts e gst',
+    live_node gst h ->
+    sigma gst h = Some st ->
+    timeout_handler h st t = (st', ms, nts, cts) ->
+    gst' = apply_handler_result h (st', ms, nts, t :: cts) e gst ->
+    live_node gst' h.
+Proof using.
+  intuition.
+  eapply when_apply_handler_result_preserves_live_node; eauto.
+  - eauto using apply_handler_result_updates_sigma.
+  - break_live_node.
+    unfold timeout_handler, fst in *; break_let.
+    repeat find_rewrite.
+    find_apply_lem_hyp joined_preserved_by_timeout_handler_eff.
+    repeat find_rewrite.
+    find_injection.
+    eauto.
+Qed.
+
+Definition live_node_dec (gst : global_state) :
+  forall h,
+    {live_node gst h} + {~ live_node gst h}.
+Proof using.
+  move => h.
+  destruct (sigma gst h) as [st |] eqn:H_st.
+  - destruct (joined st) eqn:H_joined;
+      destruct (In_dec addr_eq_dec h (nodes gst));
+      destruct (In_dec addr_eq_dec h (failed_nodes gst));
+      try (right; move => H_live; break_live_node; easy || congruence).
+    left; eapply live_node_characterization; eauto.
+  - right.
+    move => H_live.
+    break_live_node.
+    congruence.
+Defined.
+
+Theorem live_node_dec_equiv_live_node :
+  forall gst h,
+    live_node gst h <-> live_node_bool gst h = true.
+Proof using.
+  unfold live_node_bool.
+  intuition.
+  - repeat break_match;
+      break_live_node;
+      congruence || auto.
+  - repeat break_match;
+      congruence || eauto using live_node_characterization.
+Qed.
+
+
+
+(* ------------- *)
+(* Reachability  *)
+(* ------------- *)
 
 Inductive reachable_st : global_state -> Prop :=
 | reachableInit : reachable_st initial_st
@@ -62,79 +228,6 @@ Lemma reachable_intermediate_reachable :
 Proof using.
   intros.
   induct_reachable_st; econstructor; eauto.
-Qed.
-
-Definition live_node_bool (gst : global_state) (h : addr) :=
-  match sigma gst h with
-  | Some st =>
-    if joined st
-    then if in_dec addr_eq_dec h (nodes gst)
-         then if in_dec addr_eq_dec h (failed_nodes gst)
-              then false
-              else true
-         else false
-    else false
-  | None => false
-  end.
-
-Ltac break_live_node_name var :=
-  match goal with
-  | H : live_node _ _ |- _ =>
-    unfold live_node in H; repeat break_and; break_exists_name var; repeat break_and
-  end.
-
-Ltac break_live_node_exists_exists :=
-  match goal with
-  | H : live_node _ _ |- _ =>
-    unfold live_node in H; repeat break_and; break_exists_exists; repeat break_and
-  end.
-
-Ltac break_dead_node :=
-  match goal with
-  | H : dead_node _ _ |- _ =>
-    unfold dead_node in H; repeat break_and; break_exists; repeat break_and
-  end.
-
-Ltac break_dead_node_name var :=
-  match goal with
-  | H : dead_node _ _ |- _ =>
-    unfold dead_node in H; repeat break_and; break_exists_name var; repeat break_and
-  end.
-
-Ltac break_dead_node_exists_exists :=
-  match goal with
-  | H : dead_node _ _ |- _ =>
-    unfold dead_node in H; repeat break_and; break_exists_exists; repeat break_and
-  end.
-
-Definition live_node_dec (gst : global_state) :
-  forall h,
-    {live_node gst h} + {~ live_node gst h}.
-Proof using.
-  move => h.
-  destruct (sigma gst h) as [st |] eqn:H_st.
-  - destruct (joined st) eqn:H_joined;
-      destruct (In_dec addr_eq_dec h (nodes gst));
-      destruct (In_dec addr_eq_dec h (failed_nodes gst));
-      try (right; move => H_live; break_live_node; easy || congruence).
-    left; eapply live_node_characterization; eauto.
-  - right.
-    move => H_live.
-    break_live_node.
-    congruence.
-Defined.
-
-Theorem live_node_dec_equiv_live_node :
-  forall gst h,
-    live_node gst h <-> live_node_bool gst h = true.
-Proof using.
-  unfold live_node_bool.
-  intuition.
-  - repeat break_match;
-      break_live_node;
-      congruence || auto.
-  - repeat break_match;
-      congruence || eauto using live_node_characterization.
 Qed.
 
 (* transitive closure of best_succ *)
