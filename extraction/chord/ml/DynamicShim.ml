@@ -308,7 +308,7 @@ module Shim (A: DYNAMIC_ARRANGEMENT) : ShimSig = struct
     else s, ts
 
   let rec eloop env nm (s, ts) =
-    let env = prune_conns env in
+    (*let env = prune_conns env in*)
     let fds, _, _ = iterated_select (readable_socks_in_env env) (free_time ts) in
     let s', ts' = handle_readable_fds env nm s ts fds in
     let s'', ts'' = timeout_step env nm s' ts' in
