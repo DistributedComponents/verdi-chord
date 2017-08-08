@@ -41,7 +41,7 @@ proofalytics-aux: Makefile.coq
 Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq -no-install \
 	  -extra '$(CHORDMLFILES)' \
-	    'extraction/chord/coq/ExtractChord.v systems/Chord.vo' \
+	    'extraction/chord/coq/ExtractChord.v systems/chord/Chord.vo' \
 	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v' \
 	  -extra-phony 'distclean' 'clean' \
 	    'rm -f $$(join $$(dir $$(VFILES)),$$(addprefix .,$$(notdir $$(patsubst %.v,%.aux,$$(VFILES)))))'

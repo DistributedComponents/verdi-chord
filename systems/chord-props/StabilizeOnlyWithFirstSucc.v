@@ -3,7 +3,7 @@ Import ListNotations.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordSystemReachable.
+Require Import Chord.SystemReachable.
 
 Theorem stabilize_only_with_first_succ :
   forall gst h st dst,

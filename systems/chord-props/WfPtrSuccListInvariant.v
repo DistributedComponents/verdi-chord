@@ -3,7 +3,7 @@ Import ListNotations.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordSystemReachable.
+Require Import Chord.SystemReachable.
 
 Require Import Chord.ValidPointersInvariant.
 

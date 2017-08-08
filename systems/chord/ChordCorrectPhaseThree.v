@@ -12,11 +12,11 @@ Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordLabeledLemmas.
-Require Import Chord.ChordHandlerLemmas.
-Require Import Chord.ChordSystemLemmas.
-Require Import Chord.ChordSystemReachable.
-Require Import Chord.ChordLabeledMeasures.
+Require Import Chord.LabeledLemmas.
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
+Require Import Chord.SystemReachable.
+Require Import Chord.LabeledMeasures.
 
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.QueriesEventuallyStop.

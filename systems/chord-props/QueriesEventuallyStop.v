@@ -5,7 +5,7 @@ Require Import InfSeqExt.infseq.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordSystemReachable.
+Require Import Chord.SystemReachable.
 
 Definition circular_wait : occurrence -> Prop.
 (* This is Ryan's problem. *)

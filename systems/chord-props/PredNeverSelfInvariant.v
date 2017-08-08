@@ -3,7 +3,7 @@ Import ListNotations.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordSystemReachable.
+Require Import Chord.SystemReachable.
 
 Definition has_pred (gst : global_state) (h : addr) (p : option pointer) : Prop :=
   exists st,

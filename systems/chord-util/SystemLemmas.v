@@ -11,7 +11,7 @@ Require Import StructTact.Util.
 Require Verdi.Coqlib.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordHandlerLemmas.
+Require Import Chord.HandlerLemmas.
 
 (* ----------- *)
 (* Live nodes  *)

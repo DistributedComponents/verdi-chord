@@ -5,9 +5,9 @@ Require Import StructTact.Update.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordHandlerLemmas.
-Require Import Chord.ChordSystemLemmas.
-Require Import Chord.ChordSystemReachable.
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
+Require Import Chord.SystemReachable.
 
 Notation hash := Chord.hash.
 

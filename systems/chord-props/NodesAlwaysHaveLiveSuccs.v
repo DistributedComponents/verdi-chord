@@ -5,8 +5,8 @@ Require Import StructTact.StructTactics.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordSystemLemmas.
-Require Import Chord.ChordSystemReachable.
+Require Import Chord.SystemLemmas.
+Require Import Chord.SystemReachable.
 
 Definition nodes_have_live_succs (gst : global_state) : Prop :=
   forall h st,

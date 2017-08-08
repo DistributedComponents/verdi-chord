@@ -5,7 +5,7 @@ Require Import InfSeqExt.infseq.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordSystemReachable.
+Require Import Chord.SystemReachable.
 
 Lemma live_node_has_Tick_in_timeouts :
   forall ex h,

@@ -3,7 +3,7 @@ Import ListNotations.
 
 Require Import Chord.Chord.
 
-Require Import Chord.ChordSystemReachable.
+Require Import Chord.SystemReachable.
 
 Definition successor_nodes_valid (gst : global_state) : Prop :=
   forall h p st,

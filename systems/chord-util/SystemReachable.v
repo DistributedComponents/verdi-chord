@@ -11,8 +11,8 @@ Require Import StructTact.Util.
 Require Verdi.Coqlib.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordHandlerLemmas.
-Require Import Chord.ChordSystemLemmas.
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
 
 Inductive reachable_st : global_state -> Prop :=
 | reachableInit : reachable_st initial_st
