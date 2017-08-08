@@ -20,6 +20,7 @@ Require Import Chord.ChordSystemReachable.
 Require Import Chord.ChordLabeledMeasures.
 
 Require Import Chord.ValidPointersInvariant.
+Require Import Chord.QueriesEventuallyStop.
 
 Require Import Chord.ChordCorrectPhaseOne.
 Require Import Chord.ChordCorrectPhaseTwo.

@@ -22,6 +22,10 @@ Require Import Chord.ChordLabeledMeasures.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.QueryInvariant.
 Require Import Chord.NodesAlwaysHaveLiveSuccs.
+Require Import Chord.PtrCorrectInvariant.
+Require Import Chord.QueriesEventuallyStop.
+Require Import Chord.FirstSuccNeverSelf.
+Require Import Chord.PredNeverSelfInvariant.
 
 Require Import Chord.ChordCorrectPhaseOne.
 
