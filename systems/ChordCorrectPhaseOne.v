@@ -9,12 +9,12 @@ Require Import Chord.Measure.
 Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordProof.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordQueryInvariant.
 Require Import Chord.ChordHandlerLemmas.
+Require Import Chord.ChordSystemLemmas.
 Require Import Chord.LiveNodesStayLive.
 Require Import Chord.ChordDeadNodesGoQuiet.
 

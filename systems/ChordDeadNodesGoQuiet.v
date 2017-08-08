@@ -4,11 +4,11 @@ Import ListNotations.
 Require Import InfSeqExt.infseq.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordProof.
 Require Import Chord.ChordPromises.
 Require Import Chord.ChordValidPointersInvariant.
 Require Import Chord.ChordLabeled.
 Require Import Chord.ChordHandlerLemmas.
+Require Import Chord.ChordSystemLemmas.
 Require Import Chord.LiveNodesStayLive.
 
 Definition no_msgs_from (h : addr) (occ : occurrence) :=

@@ -4,12 +4,9 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 
 Require Import Chord.Chord.
-Import Chord.ChordSemantics.
-Import Chord.ConstrainedChord.
-Import Chord.ChordIDSpace.
 
-Require Import Chord.ChordProof.
 Require Import Chord.ChordHandlerLemmas.
+Require Import Chord.ChordSystemLemmas.
 
 Notation hash := Chord.hash.
 

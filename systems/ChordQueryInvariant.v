@@ -4,7 +4,7 @@ Require Import StructTact.StructTactics.
 
 Require Import Chord.Chord.
 Require Import Chord.ChordHandlerLemmas.
-Require Import Chord.ChordProof.
+Require Import Chord.ChordSystemLemmas.
 
 Set Bullet Behavior "Strict Subproofs".
 
