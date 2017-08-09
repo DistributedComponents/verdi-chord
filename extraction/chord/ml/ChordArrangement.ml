@@ -4,7 +4,7 @@ open Printf
 open Str
 
 let show_id i =
-  Digest.to_hex (ChordUtil.implode (id_to_ascii i))
+  Digest.to_hex (Util.bytes_of_char_list (id_to_ascii i))
 
 let show_pointer p =
   show_id p.ChordIDSpace.ptrId
@@ -14,7 +14,7 @@ let show_pointer_list ps =
   "[" ^ String.concat ", " strs ^ "]"
 
 let show_addr a =
-  ChordUtil.implode a
+  Util.bytes_of_char_list a
 
 let caps_bool b =
   if b then "True" else "False"
@@ -117,10 +117,10 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
   type timeout = ExtractedChord.ChordSystem._timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let addr_of_name n =
-    let (a :: p :: _) = split (regexp ":") (ChordUtil.implode n) in
+    let (a :: p :: _) = split (regexp ":") (Util.bytes_of_char_list n) in
     (a, int_of_string p)
   let name_of_addr (s, p) =
-    ChordUtil.explode (s ^ ":" ^ string_of_int p)
+    Util.char_list_of_string (s ^ ":" ^ string_of_int p)
   let start_handler n ks =
     Random.self_init ();
     rebracket3 (init n ks)
@@ -142,15 +142,17 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
 
   let default_timeout = 1.0
   let debug = C.debug
-  let debug_recv st (src, msg) = log_st st; log_recv st src msg
-  let debug_send st (dst, msg) = log_st st; log_send st dst msg
-  let debug_timeout st t = log_timeout st t
-  let show_timeout = function
-    | Tick -> "Tick"
-    | KeepaliveTick -> "KeepaliveTick"
-    | RectifyTick -> "RectifyTick"
-    | Request (dead, msg) ->
-       sprintf "Request(%s, %s)" (show_addr dead) (show_msg msg)
+  let debug_recv st (src, msg) =
+    log_st st;
+    log_recv st src msg;
+    flush_all ()
+  let debug_send st (dst, msg) =
+    log_st st;
+    log_send st dst msg;
+    flush_all ()
+  let debug_timeout st t =
+    log_timeout st t;
+    flush_all ()
 end
 
 let run cc nm knowns =
