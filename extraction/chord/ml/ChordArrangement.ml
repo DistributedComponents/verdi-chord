@@ -1,5 +1,5 @@
 open ExtractedChord
-open ExtractedChord.Chord
+open ExtractedChord.ChordSystem
 open Printf
 open Str
 
@@ -42,13 +42,13 @@ let show_query = function
   | Join2 p -> "Join2 " ^ show_pointer p
 
 let show_st_ptr st =
-  show_pointer (ptr st)
+  show_pointer st.ptr
 
 let show_request ((ptr, q), _) =
   Printf.sprintf "query(%s, %s)" (show_pointer ptr) (show_query q)
 
 let show_st_cur_request st =
-  Util.map_default show_request "None" (cur_request st)
+  Util.map_default show_request "None" st.cur_request
 
 let log_info_from st msg =
   let prefix = Printf.sprintf "node(%s):" (show_st_ptr st) in
@@ -60,11 +60,11 @@ let log_dbg_from st msg =
 
 let log_st st =
   let log = log_info_from st in
-  log ("succ_list := " ^ show_pointer_list (succ_list st));
-  log ("pred := " ^ show_opt_pointer (pred st));
-  log ("known := " ^ show_pointer (known st));
-  log ("joined := " ^ caps_bool (joined st));
-  log ("rectify_with := " ^ show_opt_pointer (rectify_with st));
+  log ("succ_list := " ^ show_pointer_list st.succ_list);
+  log ("pred := " ^ show_opt_pointer st.pred);
+  log ("known := " ^ show_pointer st.known);
+  log ("joined := " ^ caps_bool st.joined);
+  log ("rectify_with := " ^ show_opt_pointer st.rectify_with);
   log ("cur_request := " ^ show_st_cur_request st)
 
 let log_recv st src msg =
@@ -81,7 +81,7 @@ let log_timeout st = function
   | KeepaliveTick -> log_dbg_from st "ticked for keepalive"
   | Request (dead, msg) ->
     log_dbg_from st ("request " ^ show_msg msg
-                     ^ " from " ^ show_pointer (ptr st)
+                     ^ " from " ^ show_pointer st.ptr
                      ^ " to " ^ show_addr dead ^ " timed out")
 
 let rebracket4 (((a, b), c), d) = (a, b, c, d)
@@ -112,9 +112,9 @@ let make_config_module cc =
 module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = struct
   let chord_port = 8000
   type name = addr
-  type state = data
+  type state = _data
   type msg = payload
-  type timeout = ExtractedChord.Chord.timeout
+  type timeout = ExtractedChord.ChordSystem._timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let addr_of_name n =
     let (a :: p :: _) = split (regexp ":") (ChordUtil.implode n) in

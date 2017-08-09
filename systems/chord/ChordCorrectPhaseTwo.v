@@ -5,18 +5,28 @@ Require Import Omega.
 Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
+
 Require Import InfSeqExt.infseq.
+
 Require Import Chord.InfSeqTactics.
-Require Import Chord.Measure.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordProof.
-Require Import Chord.ChordValidPointersInvariant.
-Require Import Chord.ChordQueryInvariant.
-Require Import Chord.ChordLabeled.
-Require Import Chord.ChordPromises.
-Require Import Chord.ChordDefinitionLemmas.
-Require Import Chord.ChordPhaseOne.
+
+Require Import Chord.LabeledLemmas.
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
+Require Import Chord.SystemReachable.
+Require Import Chord.LabeledMeasures.
+
+Require Import Chord.ValidPointersInvariant.
+Require Import Chord.QueryInvariant.
+Require Import Chord.NodesAlwaysHaveLiveSuccs.
+Require Import Chord.PtrCorrectInvariant.
+Require Import Chord.QueriesEventuallyStop.
+Require Import Chord.FirstSuccNeverSelf.
+Require Import Chord.PredNeverSelfInvariant.
+
+Require Import Chord.ChordCorrectPhaseOne.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.

@@ -34,11 +34,6 @@ Core files
   * query is internal state node uses to track what to do when they get a response
   * handle_msg is the interesting function; Notify -> schedule rectify; forward to busy/non-busy handler; otherwise handle req
   * functions are deeply nested
-
-- `ChordLocalProps.v`: predicates on payloads and lemmas about predicates
-  * merge into chord semantics? or chord.v?
-
-- `ChordSemantics.v`: defines constraints for constrained dynamic system
   * timeout constraints
   * failure constraints
   * bottom module yields the naked semantics
@@ -46,7 +41,7 @@ Core files
   * merge into chord.v?
   * split out constraints that don't refer to chord?
 
-- `ChordDefinitionLemmas.v`: huge lemmas that characterize the output of each handler function used by nodes
+- `ChordHandlerLemmas.v`: huge lemmas that characterize the output of each handler function used by nodes
   * facts about implementation functions only!
   * distinct lemmas, no big plan
 
@@ -55,6 +50,9 @@ Core files
   * mix of semantic properties and handler properties
   * candidate for reorganization
   * proves "meta-theorems" that make proving induction properties easier (not finished yet, though)
+
+- `ChordLocalProps.v`: predicates on payloads and lemmas about predicates
+  * merge into chord semantics? or chord.v?
  
 - `ChordLabeled.v`: basic lemmas about labeled semantics (messages eventually delivered, etc.)
   * move into core?

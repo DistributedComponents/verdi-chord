@@ -1,5 +1,5 @@
 open ExtractedChord
-open ExtractedChord.Chord
+open ExtractedChord.ChordSystem
 open ExtractedChord.ChordIDSpace
 
 module type ClientSig = sig

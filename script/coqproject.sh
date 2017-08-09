@@ -76,7 +76,7 @@ done
 
 for dir in ${DIRS[@]}; do
     echo >> $COQPROJECT_TMP
-    find $dir -iname '*.v' -not -name '*\#*'  >> $COQPROJECT_TMP
+    find $dir -maxdepth 1 -iname '*.v' -not -name '*\#*'  >> $COQPROJECT_TMP
 done
 
 for extra in ${EXTRA[@]}; do

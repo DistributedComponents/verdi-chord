@@ -3,8 +3,9 @@ Require Import Omega.
 Require Import StructTact.StructTactics.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordDefinitionLemmas.
-Require Import Chord.ChordProof.
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
+Require Import Chord.SystemReachable.
 
 Set Bullet Behavior "Strict Subproofs".
 

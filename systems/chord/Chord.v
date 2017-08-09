@@ -205,7 +205,6 @@ Module ChordIDParams <: IDSpaceParams.
 End ChordIDParams.
 
 Module ChordIDSpace := IDSpace(ChordIDParams).
-Import ChordIDSpace.
 Export ChordIDSpace.
 
 (* only need this to make client.ml work :/ *)
@@ -213,7 +212,13 @@ Definition forge_pointer (i : id) : ChordIDSpace.pointer :=
   {| ptrAddr := "FAKE"%string;
      ptrId := i |}.
 
-Module Chord <: DynamicSystem.
+Ltac inv_prop P :=
+  match goal with
+  | [ H : context[P] |- _] =>
+    inv H
+  end.
+
+Module ChordSystem <: DynamicSystem.
   Definition addr := addr.
   Definition addr_eq_dec :
     forall a b : addr, {a = b} + {a <> b}
@@ -256,9 +261,12 @@ Module Chord <: DynamicSystem.
 
   Definition payload_eq_dec : forall x y : payload,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, addr_eq_dec.
+    decide equality.
+    - apply pointer_eq_dec.
+    - apply pointer_eq_dec.
+    - apply (list_eq_dec pointer_eq_dec).
+    - apply (list_eq_dec pointer_eq_dec).
+    - apply (option_eq_dec _ pointer_eq_dec).
   Defined.
 
   Inductive _timeout :=
@@ -270,9 +278,10 @@ Module Chord <: DynamicSystem.
 
   Definition timeout_eq_dec : forall x y : timeout,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, addr_eq_dec.
+    decide equality.
+    - subst.
+      apply payload_eq_dec.
+    - apply addr_eq_dec.
   Defined.
 
   Inductive _query :=
@@ -442,10 +451,11 @@ Module Chord <: DynamicSystem.
   Definition send_eq_dec :
     forall x y : addr * payload,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, payload_eq_dec.
-  Defined.
+    decide equality.
+    - subst.
+      apply payload_eq_dec.
+    - apply addr_eq_dec.
+   Defined.
 
   Definition delay_query (st : data) (src : addr) (msg : payload) : data :=
     {| ptr := ptr st;
@@ -801,8 +811,8 @@ Module Chord <: DynamicSystem.
       reflexivity.
   Qed.
 
-End Chord.
-Export Chord.
+End ChordSystem.
+Export ChordSystem.
 
 (* Requests and responses *)
 Inductive request_payload : payload -> Prop :=
@@ -850,9 +860,8 @@ Proof.
   break_match; auto || discriminate.
 Qed.
 
-
 Module ConstrainedChord <: ConstrainedDynamicSystem.
-  Include Chord.
+  Include ChordSystem.
 
   Definition msg : Type := (addr * (addr * payload))%type.
 
@@ -979,4 +988,34 @@ Module ChordSemantics := DynamicSemantics(ConstrainedChord).
 
 Export ChordSemantics.
 Export ConstrainedChord.
-Export ChordIDSpace.
+
+Open Scope string_scope.
+
+Fixpoint fake_name (k : nat) :=
+  match k with
+  | 0 => ":^)"
+  | S k' => String.append ":^) " (fake_name k')
+  end.
+
+Fixpoint make_initial_nodes (num_nodes : nat) : list addr :=
+  match num_nodes with
+  | 0 => []
+  | S k => fake_name k :: make_initial_nodes k
+  end.
+
+Definition initial_nodes : list addr :=
+  make_initial_nodes (SUCC_LIST_LEN + 1).
+
+Definition run_init_for (gst : global_state) (h : addr) : global_state :=
+  let res := start_handler h initial_nodes in
+  apply_handler_result h (res, []) [] gst.
+Hint Unfold run_init_for.
+
+Definition initial_st : global_state :=
+  fold_left run_init_for initial_nodes
+            {| nodes := initial_nodes;
+               failed_nodes := [];
+               timeouts := fun h => [];
+               sigma := fun h => None;
+               msgs := [];
+               trace := [] |}.

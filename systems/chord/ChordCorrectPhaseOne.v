@@ -5,18 +5,28 @@ Require Import Omega.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 Require Import InfSeqExt.infseq.
-Require Import Chord.Measure.
+
 Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordProof.
-Require Import Chord.ChordPromises.
-Require Import Chord.ChordValidPointersInvariant.
-Require Import Chord.ChordLabeled.
-Require Import Chord.ChordQueryInvariant.
-Require Import Chord.ChordDefinitionLemmas.
+
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
+Require Import Chord.SystemReachable.
+Require Import Chord.LabeledLemmas.
+Require Import Chord.LabeledMeasures.
+
+Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodesStayLive.
-Require Import Chord.ChordDeadNodesGoQuiet.
+Require Import Chord.DeadNodesGoQuiet.
+Require Import Chord.ValidPointersInvariant.
+Require Import Chord.NodesAlwaysHaveLiveSuccs.
+Require Import Chord.WfPtrSuccListInvariant.
+Require Import Chord.SuccessorNodesAlwaysValid.
+Require Import Chord.StabilizeOnlyWithFirstSucc.
+Require Import Chord.NodesNotJoinedHaveNoSuccessors.
+Require Import Chord.QueriesEventuallyStop.
+Require Import Chord.LiveNodeHasTickInTimeouts.
 
 Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
