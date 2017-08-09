@@ -261,9 +261,12 @@ Module ChordSystem <: DynamicSystem.
 
   Definition payload_eq_dec : forall x y : payload,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, addr_eq_dec.
+    decide equality.
+    - apply pointer_eq_dec.
+    - apply pointer_eq_dec.
+    - apply (list_eq_dec pointer_eq_dec).
+    - apply (list_eq_dec pointer_eq_dec).
+    - apply (option_eq_dec _ pointer_eq_dec).
   Defined.
 
   Inductive _timeout :=
@@ -275,9 +278,10 @@ Module ChordSystem <: DynamicSystem.
 
   Definition timeout_eq_dec : forall x y : timeout,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, addr_eq_dec.
+    decide equality.
+    - subst.
+      apply payload_eq_dec.
+    - apply addr_eq_dec.
   Defined.
 
   Inductive _query :=
@@ -447,10 +451,11 @@ Module ChordSystem <: DynamicSystem.
   Definition send_eq_dec :
     forall x y : addr * payload,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, payload_eq_dec.
-  Defined.
+    decide equality.
+    - subst.
+      apply payload_eq_dec.
+    - apply addr_eq_dec.
+   Defined.
 
   Definition delay_query (st : data) (src : addr) (msg : payload) : data :=
     {| ptr := ptr st;
