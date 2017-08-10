@@ -42,7 +42,7 @@ Proof.
   - easy.
 Qed.
 
-Theorem at_most_one_requuest_timeout_invariant :
+Theorem at_most_one_request_timeout_invariant :
   forall gst h,
     reachable_st gst ->
     at_most_one_request_timeout gst h.

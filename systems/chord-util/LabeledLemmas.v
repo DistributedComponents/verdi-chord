@@ -1212,7 +1212,7 @@ Proof.
         repeat find_rewrite. break_if.
         -- find_inversion. right. f_equal.
            eauto using at_most_one_request_timeout_uniqueness,
-           at_most_one_requuest_timeout_invariant.
+           at_most_one_request_timeout_invariant.
         -- left. find_inversion.
            simpl in *. rewrite_update.
            intuition; [|repeat eexists; intuition; now eauto].
