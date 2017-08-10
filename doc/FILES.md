@@ -7,6 +7,7 @@ Support files
 -------------
 
 - `lib/Sorting.v`: mergesort used by the Chord start handler to sort nodes according to identifier order
+  * admitted `sort_permutes`
 
 - `lib/Bitvectors.v`: representation and operations of node identifiers - namespace parameterized on the number of bytes in identifiers (could contain order as well)
 
@@ -24,6 +25,7 @@ Network files
   * churn semantics: clients can put messages in network or take messages
   * labeled semantics: all steps except join/fail + definitions for infseq
   * if you take churn step, there must be new nodes or fewer nodes
+  * admitted: `labeled_step_dynamic_is_step_dynamic_without_churn` (connection between labeled and unlabeled semantics)
 
 Chord files
 -----------
@@ -41,6 +43,7 @@ Chord files
   * plugs Chord handler definitions into the semantics
   * split out constraints that don't refer to chord?
   * initial state definition
+  * admitted: `ext_succ_list_span_includes` (definition needs to be changed to work with bitvectors)
 
 - `systems/chord/ChordCorrectPhaseOne.v`: general facts about that stabilization eventually happens in Chord systems
   * admits can be proved using simple facts from labeled semantics, exactly what is needed, may need to be reformulated 
@@ -64,16 +67,41 @@ Chord correctness support files
 
 - `systems/chord-util/HandlerLemmas.v`: lemmas about handlers
    * lemmas that characterize the output of each handler function used by nodes
+   * admitted: `joined_preserved_by_timeout_handler_eff`
 
 - `systems/chord-util/SystemLemmas.v`: lemmas about the Chord system and handler effects on global state
+  * admitted: `nodes_have_state` (all live nodes have some state in semantics with churn)
+  * admitted: `adding_nodes_did_not_affect_best_succ` (best successor remains the same under churn)
 
 - `systems/chord-util/LabeledLemmas.v`: basic lemmas about labeled semantics
   * messages eventually delivered, etc.
+  * admitted: `recv_implies_node_in` (receiving messages means receiver hasn't failed)
+  * admitted: `RecvMsg_enabled_until_occurred`
+  * admitted: `recv_handler_never_clears_RectifyTick`
+  * admitted: `constrained_Request_not_cleared_by_recv_handler`
+  * admitted: `request_constraint_prevents_recv_adding_msgs`
+  * admitted: `Tick_eventually_enabled`
+  * admitted: `clients_not_in_failed`
+  * admitted: `other_timeouts_not_cleared`
+  * admitted: `channel_stays_empty`
+  * admitted: `dead_node_channel_empties_out`
+  * admitted: `request_stays_in`
+  * admitted: `msgs_remain_after_timeout`
+  * admitted: `timeout_constraint_lifted_by_clearing`
+  * admitted: `queries_are_closed_by_recvmsg_occ`
+  * admitted: `inv_responses_are_unique`
+  * admitted: `inv_Request_payload_has_response`
+  * admitted: `now_recvmsg_now_clears_timeout`
+  * admitted: `Request_implies_open_request_to`
+  * admitted: `requests_eventually_get_responses`
 
 - `systems/chord-util/LabeledMeasures.v`: localizing liveness reasoning, uses the labeled semantics
 
 - `systems/chord-util/SystemReachable.v`: definition of a reachable state in the Chord system
   * proves "meta-theorems" that make proving induction properties easier (not finished yet, though)
+  * admitted: `queries_always_remote`
+  * admitted: `adding_node_preserves_reachable_converse`
+  * admitted: `query_state_net_invariant_inductive`
 
 Chord correctness properties files
 ----------------------------------
@@ -127,4 +155,15 @@ Chord correctness properties files
 - `systems/chord-props/SuccessorNodesAlwaysValid.v`: every successor list points to a node that is both live and has joined the ring
   * used in phase one correctness
 
+OCaml files
+-----------
 
+* `extraction/chord/ml/DynamicShim.ml`: TCP-based shim that handles network communication
+
+* `extraction/chord/ml/ChordArrangement.ml`: modules and functions to connect extracted functions to the shim
+
+* `extraction/chord/ml/ChordUtil.ml`: IP address and socket utility functions used by shim
+
+* `extraction/chord/ml/chord.ml`: command line interface to Chord server using shim and arrangement
+
+* `extraction/chord/ml/client.ml`: command line program to query Chord systems
