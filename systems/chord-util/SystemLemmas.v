@@ -149,7 +149,7 @@ Proof using.
     congruence.
 Defined.
 
-Theorem live_node_dec_equiv_live_node :
+Theorem live_node_equiv_live_node_bool :
   forall gst h,
     live_node gst h <-> live_node_bool gst h = true.
 Proof using.

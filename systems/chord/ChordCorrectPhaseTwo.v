@@ -9,6 +9,10 @@ Require Import InfSeqExt.infseq.
 
 Require Import Chord.InfSeqTactics.
 
+Require Import mathcomp.ssreflect.ssreflect.
+Require Import mathcomp.ssreflect.ssrbool.
+Set Bullet Behavior "Strict Subproofs".
+
 Require Import Chord.Chord.
 
 Require Import Chord.LabeledLemmas.
@@ -27,7 +31,6 @@ Require Import Chord.PredNeverSelfInvariant.
 
 Require Import Chord.ChordCorrectPhaseOne.
 
-Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
 
 Definition live_addrs (gst : global_state) : list addr :=
@@ -57,7 +60,7 @@ Definition live_ptrs_with_states (gst : global_state) : list (pointer * data) :=
 Definition counting_opt_error (gst : global_state) (p : option pointer) (better_bool : pointer -> pointer -> bool) : nat :=
   match p with
   | Some p0 =>
-    if live_node_dec gst (addr_of p0)
+    if live_node_bool gst (addr_of p0)
     then length (filter (better_bool p0) (live_ptrs gst))
     else S (length (live_ptrs gst))
   | None => S (length (live_ptrs gst))
@@ -72,7 +75,7 @@ Proof.
   intros.
   apply filter_In; split.
   - unfold live_node in *; break_and; auto.
-  - apply live_node_dec_equiv_live_node; auto.
+  - apply live_node_equiv_live_node_bool; auto.
 Qed.
 
 Lemma In_live_addrs_live :
@@ -83,7 +86,7 @@ Proof.
   unfold live_addrs.
   intros.
   find_apply_lem_hyp filter_In; break_and.
-  apply live_node_dec_equiv_live_node; auto.
+  apply live_node_equiv_live_node_bool; auto.
 Qed.
 
 Lemma live_In_live_ptrs :
@@ -145,7 +148,7 @@ Proof.
       congruence.
     }
     apply Chord.hash_inj.
-    now rewrite !wf_ptr_hash_eq by auto.
+    now rewrite !wf_ptr_hash_eq; auto.
   }
   eapply not_in_filter_false; eauto.
   find_rewrite.
@@ -192,8 +195,14 @@ Proof.
   pose proof (filter_length_bound (cmp y) (live_ptrs gst)).
   repeat break_match;
     try solve [eauto with zarith | tauto].
-  left.
-  eauto using length_filter_by_cmp_same_eq, live_In_live_ptrs.
+  - left.
+    apply live_node_equiv_live_node_bool in Heqb.
+    apply live_node_equiv_live_node_bool in Heqb0.
+    eauto using length_filter_by_cmp_same_eq, live_In_live_ptrs.
+  - right.
+    move/negP/live_node_equiv_live_node_bool: Heqb => H_l.
+    move/negP/live_node_equiv_live_node_bool: Heqb0 => H_l'.
+    by split.
 Qed.
 
 (** Predecessor phase two definitions *)
@@ -543,9 +552,10 @@ Proof.
     repeat find_rewrite.
     find_eapply_lem_hyp counting_opt_error_zero_implies_correct;
       eauto using better_pred_bool_antisymmetric.
-    all:assert (wf_ptr x /\ live_node gst (addr_of x)) by admit; try tauto.
-    rewrite <- wf_ptr_eq in * by auto.
-    apply better_pred_bool_true_better_pred; tauto.
+    * assert (wf_ptr x /\ live_node gst (addr_of x)) by admit; try tauto.
+      rewrite <- wf_ptr_eq in * by auto.
+      by apply better_pred_bool_true_better_pred; tauto.
+    * by admit.
   - find_copy_apply_lem_hyp phase_two_zero_error_has_first_succ; auto.
     break_exists_exists; expand_def; split; try find_rewrite; auto.
     unfold first_succ_error in *; break_match; try congruence.
@@ -1194,11 +1204,15 @@ Section MergePoint.
       by (unfold live_ptrs; now f_equal).
     repeat find_rewrite.
     repeat break_match; try reflexivity.
-    - find_apply_lem_hyp live_In_live_ptrs; auto.
+    - move/live_node_equiv_live_node_bool: Heqb0 => H_l.
+      move/negP/live_node_equiv_live_node_bool: Heqb1 => H_l'.
+      find_apply_lem_hyp live_In_live_ptrs; auto.
       find_rewrite.
       find_apply_lem_hyp In_live_ptrs_live.
       tauto.
-    - find_apply_lem_hyp live_In_live_ptrs; auto.
+    - move/negP/live_node_equiv_live_node_bool: Heqb0 => H_l.
+      move/live_node_equiv_live_node_bool: Heqb1 => H_l'.
+      find_apply_lem_hyp live_In_live_ptrs; auto.
       find_reverse_rewrite.
       find_apply_lem_hyp In_live_ptrs_live.
       tauto.
@@ -1467,7 +1481,7 @@ Section MergePoint.
     find_copy_apply_lem_hyp recv_handler_labeling.
     repeat find_rewrite. simpl in *. rewrite_update. repeat find_injection.
     find_apply_lem_hyp recv_handler_definition_existential; expand_def.
-    rewrite handle_msg_busy_is_handle_query_req_busy in *; auto;
+    rewrite handle_msg_busy_is_handle_query_req_busy in H3; auto;
       try constructor; try congruence.
     find_copy_apply_lem_hyp handle_query_req_busy_preserves_cur_request.
     find_copy_apply_lem_hyp do_delayed_queries_busy_nop; expand_def;
@@ -1859,13 +1873,13 @@ Section MergePoint.
     clear dependent b.
     find_apply_lem_hyp recv_GotPredAndSuccs_with_a_after_p_causes_Notify; simpl in *; invar_eauto.
     destruct ex as [o' ex]; simpl in *.
-    rewrite (wf_ptr_eq j) by eauto.
+    rewrite (wf_ptr_eq j); eauto.
     eapply notify_when_pred_worse_eventually_improves; invar_eauto.
     apply not_between_between.
     unfold unroll_between_ptr in *.
     apply Bool.negb_true_iff.
     unfold Chord.ChordIDParams.hash in *.
-    rewrite !(wf_ptr_hash_eq a), !(wf_ptr_hash_eq j) in *; auto.
+    by rewrite (wf_ptr_hash_eq a).
   Qed.
 
   Lemma live_nodes_not_clients :
@@ -2391,7 +2405,7 @@ Proof.
     destruct p, q; simpl in *; congruence.
   }
   apply Chord.hash_inj.
-  now rewrite !wf_ptr_hash_eq by auto.
+  by rewrite wf_ptr_hash_eq // wf_ptr_hash_eq.
 Qed.
 
 Lemma wf_ptr_neq_id_neq :
@@ -2443,7 +2457,7 @@ Lemma open_request_from_better_pred_eventually_improves_error :
 Proof using.
   intros.
   eapply open_stabilize_request_a_after_p_eventually_improves_join_point; eauto.
-  - unfold unroll_between_ptr in *.
+  - unfold unroll_between_ptr, ChordIDParams.hash in *.
     apply Bool.negb_true_iff.
     apply unroll_between_neq_swap_false; auto using wf_ptr_neq_id_neq.
     unfold ptr_between in *.
@@ -2451,7 +2465,7 @@ Proof using.
       rewrite wf_ptr_hash_eq;
       auto using wf_ptr_neq_id_neq.
     apply between_between_bool_equiv.
-    apply between_rot_r; auto using wf_ptr_neq_id_neq.
+    by apply between_rot_r; auto using wf_ptr_neq_id_neq.
   - unfold open_stabilize_request_to_first_succ. intros.
     cut (h = dst).
     { intros; subst; auto. }
