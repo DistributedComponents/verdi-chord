@@ -4,34 +4,19 @@ Require Import List.
 Import List.ListNotations.
 
 Require Import mathcomp.ssreflect.ssreflect.
+Require Import mathcomp.ssreflect.ssrbool.
 Set Bullet Behavior "Strict Subproofs".
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
-Require Verdi.Coqlib.
 
 Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 
-(* ----------- *)
-(* Live nodes  *)
-(* ----------- *)
-
-Close Scope boolean_if_scope.
-Open Scope general_if_scope.
-
-Definition live_node_bool (gst : global_state) (h : addr) :=
-  match sigma gst h with
-  | Some st =>
-    if joined st
-    then if in_dec addr_eq_dec h (nodes gst)
-         then if in_dec addr_eq_dec h (failed_nodes gst)
-              then false
-              else true
-         else false
-    else false
-  | None => false
-  end.
+Definition live_node_bool (gst : global_state) (h : addr) : bool :=
+  if sigma gst h is Some st then
+    joined st && in_dec addr_eq_dec h (nodes gst) && ~~ in_dec addr_eq_dec h (failed_nodes gst)
+  else false.
 
 Ltac break_live_node_name var :=
   match goal with
@@ -170,11 +155,16 @@ Theorem live_node_dec_equiv_live_node :
 Proof using.
   unfold live_node_bool.
   intuition.
-  - repeat break_match;
-      break_live_node;
-      congruence || auto.
-  - repeat break_match;
-      congruence || eauto using live_node_characterization.
+  - repeat break_match; break_live_node; last by congruence.
+    find_rewrite.
+    find_injection.
+    apply/andP; split; first by apply/andP; split => //; case in_dec.
+    by case in_dec.
+  - repeat break_match; last by congruence.
+    move/andP: H => [H H_f]; move/andP: H => [H H_n].
+    apply: live_node_characterization; eauto.
+    - by move: H_n; case in_dec.
+    - by move: H_f; case in_dec.
 Qed.
 
 Definition best_succ_of (gst : global_state) (h : addr) : option addr :=
@@ -214,7 +204,7 @@ Definition query_delayed_at (dst : addr) (st : data) (src : addr) (msg : payload
   In (src, msg) (delayed_queries st).
 
 Definition addr_eqb (a b : addr) : bool :=
-  Coqlib.proj_sumbool (addr_eq_dec a b).
+  addr_eq_dec a b.
 
 Lemma addr_eqb_true :
   forall a b,
@@ -223,7 +213,8 @@ Lemma addr_eqb_true :
 Proof using.
   unfold addr_eqb.
   intros.
-  now find_eapply_lem_hyp Coqlib.proj_sumbool_true.
+  move: H.
+  by case addr_eq_dec.
 Qed.
 
 Lemma addr_eqb_false :
@@ -232,20 +223,18 @@ Lemma addr_eqb_false :
     a <> b.
 Proof using.
   intros.
-  intuition.
-  find_apply_lem_hyp (Coqlib.proj_sumbool_is_true (addr_eq_dec a b)).
-  unfold addr_eqb in *.
-  destruct (addr_eqb a b);
-    congruence.
+  move: H.
+  rewrite /addr_eqb.
+  by case addr_eq_dec.
 Qed.
 
 Lemma addr_eqb_refl :
   forall a,
     addr_eqb a a = true.
 Proof using.
-  unfold addr_eqb.
-  intros.
-  now apply (Coqlib.proj_sumbool_is_true (addr_eq_dec a a)).
+  move => a.
+  rewrite /addr_eqb.
+  by case addr_eq_dec.
 Qed.
 
 Definition channel (gst : global_state) (src dst : addr) : list payload :=

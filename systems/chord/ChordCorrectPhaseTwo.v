@@ -2,7 +2,6 @@ Require Import List.
 Import ListNotations.
 Require Import Omega.
 
-Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 
@@ -32,8 +31,7 @@ Set Bullet Behavior "Strict Subproofs".
 Open Scope nat_scope.
 
 Definition live_addrs (gst : global_state) : list addr :=
-  filter (fun a => Coqlib.proj_sumbool (live_node_dec gst a))
-         (nodes gst).
+  filter (live_node_bool gst) (nodes gst).
 
 Definition live_ptrs (gst : global_state) : list pointer :=
   map make_pointer (live_addrs gst).
@@ -74,7 +72,7 @@ Proof.
   intros.
   apply filter_In; split.
   - unfold live_node in *; break_and; auto.
-  - auto using Coqlib.proj_sumbool_is_true.
+  - apply live_node_dec_equiv_live_node; auto.
 Qed.
 
 Lemma In_live_addrs_live :
@@ -85,7 +83,7 @@ Proof.
   unfold live_addrs.
   intros.
   find_apply_lem_hyp filter_In; break_and.
-  eapply Coqlib.proj_sumbool_true; eauto.
+  apply live_node_dec_equiv_live_node; auto.
 Qed.
 
 Lemma live_In_live_ptrs :

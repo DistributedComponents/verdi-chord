@@ -301,7 +301,7 @@ Proof.
   intros.
   find_apply_lem_hyp sum_nonzero_implies_addend_nonzero.
   break_exists; break_and.
-  find_eapply_lem_hyp Coqlib.list_in_map_inv.
+  find_eapply_lem_hyp in_map_iff.
   break_exists_exists.
   firstorder using in_active_in_nodes, in_active_not_failed.
   apply leading_failed_succs_nonzero_means_dead_succ; omega.

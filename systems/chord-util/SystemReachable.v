@@ -8,7 +8,6 @@ Set Bullet Behavior "Strict Subproofs".
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
-Require Verdi.Coqlib.
 
 Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
