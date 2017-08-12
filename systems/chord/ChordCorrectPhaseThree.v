@@ -16,6 +16,7 @@ Require Import Chord.LabeledLemmas.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
+Require Import Chord.SystemPointers.
 Require Import Chord.LabeledMeasures.
 
 Require Import Chord.ValidPointersInvariant.

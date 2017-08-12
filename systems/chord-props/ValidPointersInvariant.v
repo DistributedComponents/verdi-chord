@@ -8,8 +8,7 @@ Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
-
-Notation hash := Chord.hash.
+Require Import Chord.SystemPointers.
 
 Set Bullet Behavior "Strict Subproofs".
 

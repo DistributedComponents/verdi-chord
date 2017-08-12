@@ -5,6 +5,7 @@ Require Import Chord.Chord.
 
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
+Require Import Chord.SystemPointers.
 
 Lemma wf_ptr_pred_invariant :
   forall gst h st p,
