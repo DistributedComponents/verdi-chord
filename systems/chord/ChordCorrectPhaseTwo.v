@@ -33,20 +33,6 @@ Require Import Chord.ChordCorrectPhaseOne.
 
 Open Scope nat_scope.
 
-Definition live_addrs (gst : global_state) : list addr :=
-  filter (live_node_bool gst) (nodes gst).
-
-Definition live_ptrs (gst : global_state) : list pointer :=
-  map make_pointer (live_addrs gst).
-
-Definition live_ptrs_with_states (gst : global_state) : list (pointer * data) :=
-  FilterMap.filterMap (fun p =>
-                         match sigma gst (addr_of p) with
-                         | Some st => Some (p, st)
-                         | None => None
-                         end)
-                      (live_ptrs gst).
-
 (** In phase two we want to talk about the existence and number of better
     predecessors and better first successors to a node. We do this with the
     following functions.
@@ -66,29 +52,6 @@ Definition counting_opt_error (gst : global_state) (p : option pointer) (better_
   | None => S (length (live_ptrs gst))
   end.
 
-Lemma live_addr_In_live_addrs :
-  forall gst h,
-    live_node gst h ->
-    In h (live_addrs gst).
-Proof.
-  unfold live_addrs.
-  intros.
-  apply filter_In; split.
-  - unfold live_node in *; break_and; auto.
-  - apply live_node_equiv_live_node_bool; auto.
-Qed.
-
-Lemma In_live_addrs_live :
-  forall gst h,
-    In h (live_addrs gst) ->
-    live_node gst h.
-Proof.
-  unfold live_addrs.
-  intros.
-  find_apply_lem_hyp filter_In; break_and.
-  apply live_node_equiv_live_node_bool; auto.
-Qed.
-
 Lemma live_In_live_ptrs :
   forall gst h,
     live_node gst (addr_of h) ->
@@ -100,17 +63,6 @@ Proof.
   rewrite (wf_ptr_eq h); auto.
   apply in_map.
   now apply live_addr_In_live_addrs.
-Qed.
-
-Lemma In_live_ptrs_live :
-  forall gst h,
-    In h (live_ptrs gst) ->
-    live_node gst (addr_of h).
-Proof.
-  unfold live_ptrs.
-  intros.
-  apply In_live_addrs_live.
-  now find_apply_lem_hyp in_map_iff; expand_def.
 Qed.
 
 Lemma wf_ptr_hash_eq :

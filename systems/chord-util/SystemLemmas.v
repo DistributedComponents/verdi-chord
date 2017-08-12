@@ -70,6 +70,72 @@ Proof using.
   intuition.
 Qed.
 
+Definition live_addrs (gst : global_state) : list addr :=
+  filter (live_node_bool gst) (nodes gst).
+
+Definition live_ptrs (gst : global_state) : list pointer :=
+  map make_pointer (live_addrs gst).
+
+Definition live_ptrs_with_states (gst : global_state) : list (pointer * data) :=
+  FilterMap.filterMap (fun p =>
+                         match sigma gst (addr_of p) with
+                         | Some st => Some (p, st)
+                         | None => None
+                         end)
+                      (live_ptrs gst).
+
+Theorem live_node_equiv_live_node_bool :
+  forall gst h,
+    live_node gst h <-> live_node_bool gst h = true.
+Proof using.
+  unfold live_node_bool.
+  intuition.
+  - repeat break_match; break_live_node; last by congruence.
+    find_rewrite.
+    find_injection.
+    apply/andP; split; first by apply/andP; split => //; case in_dec.
+    by case in_dec.
+  - repeat break_match; last by congruence.
+    move/andP: H => [H H_f]; move/andP: H => [H H_n].
+    apply: live_node_characterization; eauto.
+    * by move: H_n; case in_dec.
+    * by move: H_f; case in_dec.
+Qed.
+
+Lemma live_addr_In_live_addrs :
+  forall gst h,
+    live_node gst h ->
+    In h (live_addrs gst).
+Proof.
+  unfold live_addrs.
+  intros.
+  apply filter_In; split.
+  - unfold live_node in *; break_and; auto.
+  - apply live_node_equiv_live_node_bool; auto.
+Qed.
+
+Lemma In_live_addrs_live :
+  forall gst h,
+    In h (live_addrs gst) ->
+    live_node gst h.
+Proof.
+  unfold live_addrs.
+  intros.
+  find_apply_lem_hyp filter_In; break_and.
+  apply live_node_equiv_live_node_bool; auto.
+Qed.
+
+Lemma In_live_ptrs_live :
+  forall gst h,
+    In h (live_ptrs gst) ->
+    live_node gst (addr_of h).
+Proof.
+  unfold live_ptrs.
+  intros.
+  apply In_live_addrs_live.
+  now find_apply_lem_hyp in_map_iff; expand_def.
+Qed.
+
 Lemma when_apply_handler_result_preserves_live_node :
   forall h h0 st st' gst gst' e ms cts nts,
     live_node gst h ->
@@ -130,41 +196,6 @@ Proof using.
     repeat find_rewrite.
     find_injection.
     eauto.
-Qed.
-
-Definition live_node_dec (gst : global_state) :
-  forall h,
-    {live_node gst h} + {~ live_node gst h}.
-Proof using.
-  move => h.
-  destruct (sigma gst h) as [st |] eqn:H_st.
-  - destruct (joined st) eqn:H_joined;
-      destruct (In_dec addr_eq_dec h (nodes gst));
-      destruct (In_dec addr_eq_dec h (failed_nodes gst));
-      try (right; move => H_live; break_live_node; easy || congruence).
-    left; eapply live_node_characterization; eauto.
-  - right.
-    move => H_live.
-    break_live_node.
-    congruence.
-Defined.
-
-Theorem live_node_equiv_live_node_bool :
-  forall gst h,
-    live_node gst h <-> live_node_bool gst h = true.
-Proof using.
-  unfold live_node_bool.
-  intuition.
-  - repeat break_match; break_live_node; last by congruence.
-    find_rewrite.
-    find_injection.
-    apply/andP; split; first by apply/andP; split => //; case in_dec.
-    by case in_dec.
-  - repeat break_match; last by congruence.
-    move/andP: H => [H H_f]; move/andP: H => [H H_n].
-    apply: live_node_characterization; eauto.
-    * by move: H_n; case in_dec.
-    * by move: H_f; case in_dec.
 Qed.
 
 Definition best_succ_of (gst : global_state) (h : addr) : option addr :=
