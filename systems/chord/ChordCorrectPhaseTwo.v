@@ -52,27 +52,6 @@ Definition counting_opt_error (gst : global_state) (p : option pointer) (better_
   | None => S (length (live_ptrs gst))
   end.
 
-Lemma live_In_live_ptrs :
-  forall gst h,
-    live_node gst (addr_of h) ->
-    wf_ptr h ->
-    In h (live_ptrs gst).
-Proof.
-  unfold live_ptrs, live_node.
-  intros.
-  rewrite (wf_ptr_eq h); auto.
-  apply in_map.
-  now apply live_addr_In_live_addrs.
-Qed.
-
-Lemma wf_ptr_hash_eq :
-  forall p,
-    wf_ptr p ->
-    hash (addr_of p) = id_of p.
-Proof.
-  auto.
-Qed.
-
 Lemma counting_opt_error_zero_implies_correct :
   forall gst p better_bool,
     (forall x y, id_of x <> id_of y -> better_bool x y = false -> better_bool y x = true) ->

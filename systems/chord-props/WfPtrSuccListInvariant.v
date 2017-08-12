@@ -3,9 +3,8 @@ Import ListNotations.
 
 Require Import Chord.Chord.
 
+Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
-
-Require Import Chord.ValidPointersInvariant.
 
 Lemma wf_ptr_succ_list_invariant :
   forall gst h st p rest,
