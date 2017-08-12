@@ -163,8 +163,8 @@ Proof using.
   - repeat break_match; last by congruence.
     move/andP: H => [H H_f]; move/andP: H => [H H_n].
     apply: live_node_characterization; eauto.
-    - by move: H_n; case in_dec.
-    - by move: H_f; case in_dec.
+    * by move: H_n; case in_dec.
+    * by move: H_f; case in_dec.
 Qed.
 
 Definition best_succ_of (gst : global_state) (h : addr) : option addr :=
