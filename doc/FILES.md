@@ -73,6 +73,17 @@ Chord correctness support files
   * admitted: `nodes_have_state` (all live nodes have some state in semantics with churn)
   * admitted: `adding_nodes_did_not_affect_best_succ` (best successor remains the same under churn)
 
+- `systems/chord-util/SystemPointers.v`: definition and lemmas about (valid) pointers
+  * admitted: `valid_ptrs_global_timeout_handler`
+  * admitted: `valid_ptrs_global_recv_handler`
+  * admitted: `apply_handler_result_In_timeouts`
+  * admitted: `valid_ptrs_global_timeouts`
+  * admitted: `valid_ptrs_global_sigma`
+  * admitted: `valid_ptrs_global_net`
+  * admitted: `valid_ptrs_global_trace`
+  * admitted: `valid_ptrs_state_nodes_subset`
+  * admitted: `start_handler_valid_ptrs_state`
+
 - `systems/chord-util/LabeledLemmas.v`: basic lemmas about labeled semantics
   * messages eventually delivered, etc.
   * admitted: `recv_implies_node_in` (receiving messages means receiver hasn't failed)
@@ -95,7 +106,7 @@ Chord correctness support files
   * admitted: `Request_implies_open_request_to`
   * admitted: `requests_eventually_get_responses`
 
-- `systems/chord-util/LabeledMeasures.v`: localizing liveness reasoning, uses the labeled semantics
+- `systems/chord-util/LabeledMeasures.v`: localized liveness reasoning on the labeled semantics
 
 - `systems/chord-util/SystemReachable.v`: definition of a reachable state in the Chord system
   * proves "meta-theorems" that make proving induction properties easier (not finished yet, though)
@@ -164,6 +175,6 @@ OCaml files
 
 * `extraction/chord/ml/ChordUtil.ml`: IP address and socket utility functions used by shim
 
-* `extraction/chord/ml/chord.ml`: command line interface to Chord server using shim and arrangement
+* `extraction/chord/ml/chord.ml`: command line interface to Chord node that uses shim and arrangement
 
 * `extraction/chord/ml/client.ml`: command line program to query Chord systems
