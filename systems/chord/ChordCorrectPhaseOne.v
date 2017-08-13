@@ -830,7 +830,7 @@ Lemma nonzero_phase_one_error_eventually_drops_dead_quiet :
     reachable_st (occ_gst (infseq.hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    always (now no_msgs_from_dead_nodes) ex ->
+    always (now no_msgs_to_live_from_dead_nodes) ex ->
 
     live_node (occ_gst (hd ex)) h ->
     leading_failed_succs h (occ_gst (hd ex)) > 0 ->
@@ -844,7 +844,7 @@ Proof.
     destruct ex.
     eapply open_stabilize_request_eventually_decreases_error; simpl in *; eauto.
     inv_prop has_dead_first_succ; expand_def.
-    inv_prop no_msgs_from_dead_nodes; simpl in *.
+    inv_prop no_msgs_to_live_from_dead_nodes; simpl in *.
     eapply no_msgs_from_dead_nodes_elim; eauto.
   - destruct ex as [o' ex].
     destruct (leading_failed_succs h (occ_gst o')) eqn:?H.
