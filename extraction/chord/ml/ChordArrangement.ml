@@ -110,7 +110,6 @@ let make_config_module cc =
    end : ChordConfig)
 
 module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = struct
-  let chord_port = 8000
   type name = addr
   type state = _data
   type msg = payload
