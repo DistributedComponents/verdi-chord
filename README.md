@@ -4,7 +4,7 @@ Verdi Chord
 [![Build Status](https://api.travis-ci.org/DistributedComponents/verdi-chord.svg?branch=master)](https://travis-ci.org/DistributedComponents/verdi-chord)
 
 An implementation of the Chord distributed lookup protocol in Coq using [the
-Verdi framework](http://verdi.uwplse.org/)
+Verdi framework](http://verdi.uwplse.org/).
 
 Requirements
 ------------
@@ -22,4 +22,20 @@ Run `./configure` in the root directory, and then run `make`.
 
 By default, the scripts look for `StructTact`, `InfSeqExt`, and `Verdi` in
 Coq's `user-contrib` directory, but this can be overridden by setting the
-`StructTact_PATH`, `InfSeqExt_PATH`, and `Verdi_PATH` environment variables.
+`StructTact_PATH`, `InfSeqExt_PATH`, and `Verdi_PATH` environment variables. For
+example, the following shell command will build Chord using a copy of StructTact
+located in `../StructTact`.
+
+```
+StructTact_PATH=../StructTact ./build.sh
+```
+
+Running `chord` on a real network
+---------------------------------
+
+First, execute `make chord` from the root of this repository. This will produce
+the executables `chord.native` and `client.native` in `./extraction/chord`.
+To start a ring of `n` nodes, run the following.
+```
+extraction/chord/scripts/demo.py n
+```
