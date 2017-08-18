@@ -681,13 +681,6 @@ Ltac find_always_and_tl :=
     clear H H'
   end.
 
-Ltac find_continuously_and_tl :=
-  match goal with
-  | H : continuously ?P ?ex, H' : continuously ?Q ?ex |- _ =>
-    pose proof (continuously_and_tl H H');
-    clear H H'
-  end.
-
 Theorem phase_two_error_always_nonincreasing :
   forall ex,
     lb_execution ex ->
