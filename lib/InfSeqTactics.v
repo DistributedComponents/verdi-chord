@@ -102,3 +102,10 @@ Ltac find_continuously_and_tl :=
     pose proof (continuously_and_tl H H');
     clear H H'
   end.
+
+Ltac find_always_and_tl :=
+  match goal with
+  | H : always ?P ?ex, H' : always ?Q ?ex |- _ =>
+    pose proof (always_and_tl H H');
+    clear H H'
+  end.

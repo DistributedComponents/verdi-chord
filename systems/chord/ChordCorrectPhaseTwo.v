@@ -714,13 +714,6 @@ Proof.
 (* USELESS *)
 Admitted.
 
-Ltac find_always_and_tl :=
-  match goal with
-  | H : always ?P ?ex, H' : always ?Q ?ex |- _ =>
-    pose proof (always_and_tl H H');
-    clear H H'
-  end.
-
 Theorem phase_two_error_always_nonincreasing :
   forall ex,
     lb_execution ex ->
@@ -849,7 +842,14 @@ Lemma notify_when_pred_None_eventually_improves :
       wf_ptr p ->
       eventually (pred_improves h) ex.
 Proof.
+(*
+This assumes rectiying works, so that's several more proofs that need to be done.
+
+DIFFICULTY: Ryan
+USED: In phase two.
+*)
 Admitted.
+
 
 Lemma notify_when_pred_dead_eventually_improves :
   forall ex,
@@ -871,6 +871,12 @@ Lemma notify_when_pred_dead_eventually_improves :
         (now (fun o => has_pred (occ_gst o) (addr_of h) (Some p)))
         (pred_improves h) ex.
 Proof.
+(*
+This assumes rectiying works, so that's several more proofs that need to be done.
+
+DIFFICULTY: Ryan
+USED: In phase two.
+*)
 Admitted.
 
 Lemma notify_when_pred_worse_eventually_improves :
@@ -888,6 +894,13 @@ Lemma notify_when_pred_worse_eventually_improves :
       between (id_of p) (hash p') (hash h) ->
       eventually (pred_improves (make_pointer h)) ex.
 Proof.
+(*
+This should be provable from the above two lemmas and a fact saying that if a
+better pred exists, then the current pred is either dead or None.
+
+DIFFICULTY: Ryan
+USED: in phase two
+*)
 Admitted.
 
 Lemma notify_causes_rectify :
@@ -914,6 +927,7 @@ Lemma notify_causes_rectify :
               open_request_to (occ_gst (hd ex)) dst (addr_of h') Ping))
       ex.
 Proof.
+(* USELESS *)
 Admitted.
 
 Lemma rectify_with_live_pred_sets_pred :
@@ -938,6 +952,7 @@ Lemma rectify_with_live_pred_sets_pred :
             has_pred (occ_gst occ) dst (Some (make_pointer h))))
       ex.
 Proof.
+(* USELESS *)
 Admitted.
 
 Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
@@ -958,6 +973,9 @@ Definition merge_point_dec :
   forall gst a b j,
     {merge_point gst a b j} + {~ merge_point gst a b j}.
 Proof.
+  unfold merge_point.
+  unfold has_first_succ.
+(* USELESS *)
 Admitted.
 
 Lemma merge_point_wf :
@@ -990,6 +1008,12 @@ Lemma better_pred_eventually_improves_succ :
                            has_pred (occ_gst occ) (addr_of s) (Some p'))) ex ->
       eventually (pred_or_succ_improves (make_pointer h)) ex.
 Proof.
+(*
+This is a problem and needs to be reduced to something less big.
+
+DIFFICULTY: Ryan
+USED: In phase two.
+*)
 Admitted.
 
 Lemma open_stabilize_request_until_response :
@@ -1015,6 +1039,12 @@ Lemma open_stabilize_request_until_response :
                   has_pred (occ_gst occ) (addr_of j) p)))
       ex.
 Proof.
+(*
+This is a problem and needs to be reduced to something less big.
+
+DIFFICULTY: Ryan
+USED: In phase two.
+*)
 Admitted.
 
 Lemma open_stabilize_request_eventually_gets_response :
@@ -1052,6 +1082,13 @@ Lemma live_successor_changed_improves :
     s' <> s ->
     ptr_between (make_pointer h) s' s.
 Proof using.
+(*
+This says that a new live successor at a host has to be between the host and its
+old successor, provided the old one is live.
+
+DIFFICULTY: 3
+USED: In phase two (a_before_pred_merge_point).
+*)
 Admitted.
 
 Lemma has_pred_eq :
@@ -1125,6 +1162,14 @@ Section MergePoint.
       eventually (now (fun o => has_pred (occ_gst o) h p')) ex ->
       eventually (pred_or_succ_improves (make_pointer h)) ex.
   Proof.
+  (*
+  If the predecessor changed, the pred or successor improved.
+  Pretty obvious given earlier admits about predecessors changing, but I'm not
+  sure how much work the proof actually is.
+
+  DIFFICULTY: 3
+  USED: In phase two.
+  *)
   Admitted.
 
   Lemma pred_same_until_improvement :
@@ -1140,6 +1185,12 @@ Section MergePoint.
       weak_until (now (fun o => has_pred (occ_gst o) h p))
                  (pred_improves (make_pointer h)) ex.
   Proof.
+  (*
+  This should be a consequence of pred_changing_suffices or at least a similar argument.
+
+  DIFFICULTY: 4
+  USED: In phase two.
+  *)
   Admitted.
 
   Lemma first_succ_same_until_improvement :
@@ -1155,6 +1206,12 @@ Section MergePoint.
       weak_until (now (fun o => has_first_succ (occ_gst o) h p))
                  (first_succ_improves (make_pointer h)) ex.
   Proof.
+  (*
+  This should be a consequence of first_succ_improvement_suffices or at least a similar argument.
+
+  DIFFICULTY: 4
+  USED: In phase two.
+  *)
   Admitted.
 
   Lemma counting_opt_error_depends_on_live_addrs :
@@ -1198,6 +1255,7 @@ Section MergePoint.
         a <=? p = true ->
         eventually (pred_or_succ_improves a) ex.
   Proof.
+  (* USELESS *)
   Admitted.
 
   Lemma ptr_between_ptr_between_bool :
@@ -1508,6 +1566,13 @@ Section MergePoint.
       a <=? p = true ->
       always (pred_not_worse j a) ex.
   Proof using a j.
+  (*
+  I don't understand how to prove this but I think it should be a consequence of
+  other facts about how predecessor pointers are allowed to change.
+
+  DIFFICULTY: Ryan
+  USED: In phase two.
+  *)
   Admitted.
 
   Ltac eapply_prop' P :=
@@ -1526,6 +1591,13 @@ Section MergePoint.
       has_first_succ gst h s ->
       live_node gst (addr_of s).
   Proof using.
+  (*
+  This won't be inductive as written. We'll have to generalize to all nodes in
+  successor lists and possibly do some accounting for how joining works.
+
+  DIFFICULTY: Ryan.
+  USED: In phase two.
+  *)
   Admitted.
 
   Lemma a_before_pred_merge_point :
@@ -1853,6 +1925,14 @@ Section MergePoint.
       live_node gst h ->
       ~ client_addr h.
   Proof.
+  (*
+  This is an easy invariant because of the constraint
+    ~ client_addr h
+  in the Start rule.
+
+  DIFFICULTY: 1
+  USED: In phase two.
+  *)
   Admitted.
 
   Lemma occurred_is_step :
@@ -1883,6 +1963,10 @@ Section MergePoint.
                  pred_or_succ_improves_abj
                  ex.
   Proof.
+  (*
+  I'm really not sure how to prove this.
+  DIFFICULTY: Ryan
+  *)
   Admitted.
 
   Lemma merge_point_gone_improved_something :
@@ -1977,6 +2061,16 @@ Section MergePoint.
       open_request_to gst' src dst req /\
       In res (channel gst' dst src).
   Proof.
+  (*
+  If there's a response to a request on the wire, we'll either recieve the
+  response or the situation will stay the same.
+
+  This still needs some set-up to be proved easily since it relies on the
+  assumption that there's only ever one request.
+
+  DIFFICULTY: Ryan.
+  USED: In phase two.
+  *)
   Admitted.
 
   Lemma incoming_GotPredAndSuccs_with_a_after_p_causes_improvement :
@@ -2025,6 +2119,7 @@ Section MergePoint.
       apply E_next, IHeventually; simpl; invar_eauto.
       (* branch on label *)
       all:admit.
+  (* This might not be provable??? *)
   Admitted.
 
   Lemma recv_GotPredAndSuccs_with_pred_None_causes_improvement :
@@ -2342,6 +2437,12 @@ Lemma not_between_between_bool_equiv :
     between_bool x y z = false <->
     ~ between x y z.
 Proof.
+(*
+This is easy.
+
+DIFFICULTY: 1
+USED: In unroll_between_neq_swap_false and phase two.
+*)
 Admitted.
 
 Lemma unroll_between_neq_swap_false :
@@ -2447,6 +2548,12 @@ Lemma succ_error_means_merge_point :
     exists a b j,
       merge_point gst a b j.
 Proof.
+(*
+This leans on the entire ring invariant. Try reducing it to that first.
+
+DIFFICULTY: Ryan
+USED: Crucially in phase two.
+*)
 Admitted.
 
 Definition wrong_pred (gst : global_state) (h : pointer) : Prop :=
@@ -2538,6 +2645,13 @@ Lemma correct_pred_exists :
       live_node gst (addr_of p) /\
       pred_correct gst h (Some p).
 Proof.
+(*
+This is mostly a fact about the definition of pred_correct and shouldn't require
+any invariants besides "there are at least 2 live joined nodes in the network".
+
+DIFFICULTY: 3
+USED: In phase two.
+*)
 Admitted.
 
 Lemma correct_pred_unique :
@@ -2549,6 +2663,13 @@ Lemma correct_pred_unique :
     pred_correct gst h (Some p') ->
     p = p'.
 Proof.
+(*
+This is mostly a fact about the definition of pred_correct and shouldn't require
+any tricky invariants.
+
+DIFFICULTY: 3
+USED: In phase two.
+*)
 Admitted.
 
 Lemma correct_first_succ_unique :
@@ -2560,6 +2681,13 @@ Lemma correct_first_succ_unique :
     first_succ_correct gst h (Some s') ->
     s = s'.
 Proof.
+(*
+This is mostly a fact about the definition of first_succ_correct and shouldn't
+require any tricky invariants.
+
+DIFFICULTY: 3
+USED: In phase two.
+*)
 Admitted.
 
 Lemma first_succs_correct_succ_right :
@@ -2572,6 +2700,13 @@ Lemma first_succs_correct_succ_right :
     first_succ_correct gst h (Some s) ->
     has_first_succ gst (addr_of h) s.
 Proof.
+(*
+This is really a proof about first_succ_correct and has_first_succ and shouldn't
+require any invariants.
+
+DIFFICULTY: 2
+USED: In phase two.
+*)
 Admitted.
 
 Lemma all_first_succs_correct_finds_pred :
@@ -2713,6 +2848,12 @@ Lemma error_means_merge_point_or_wrong_pred :
     exists a b j,
       merge_point gst a b j.
 Proof.
+(*
+This should follow from first_succ_error_means_merge_point.
+
+DIFFICULTY: 2
+USED: In phase two.
+*)
 Admitted.
 
 Lemma always_zero_phase_two_error_phase_two :
