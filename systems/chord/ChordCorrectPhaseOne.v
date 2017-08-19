@@ -783,6 +783,19 @@ Lemma open_stabilize_request_until_timeout :
                 now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
                ex.
 Proof.
+(*
+This needs to be reduced to a lemma of the (approximate) form
+   reachable_st gst ->
+   labeled_step_dynamic gst l gst'
+   P gst ->
+   P gst' \/ Q gst'.
+as is the case for all weak_until proofs.
+
+It will likely require some other invariants about open requests.
+
+DIFFICULTY: Ryan
+USED: In phase one.
+*)
 Admitted.
 
 Lemma open_stabilize_request_eventually_decreases_error :
@@ -940,6 +953,16 @@ Theorem phase_one_error_continuously_nonincreasing :
     always (~_ (now circular_wait)) ex ->
     continuously (local_measures_nonincreasing leading_failed_succs) ex.
 Proof.
+(*
+This needs to be reduced to an invariant proof showing that:
+if the predecessor of h is p,
+and it changes to p' in one step,
+then either p is dead
+     or between p p' h.
+
+DIFFICULTY: Ryan
+USED: In phase one.
+*)
 Admitted.
 
 Theorem phase_one_continuously :

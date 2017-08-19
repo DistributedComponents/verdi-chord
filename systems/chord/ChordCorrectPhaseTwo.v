@@ -102,6 +102,17 @@ Lemma length_filter_by_cmp_same_eq :
     length (filter (cmp x) l) = length (filter (cmp y) l) ->
     x = y.
 Proof.
+(*
+If we filter a list by comparing to two different elements, both of which are in
+the list, and get two lists of the same length, then the elements are the same.
+
+This is probably not that hard but it's not worth doing until
+counting_opt_error_inj is done.
+
+DIFFICULTY: 2
+USED: In the proof of counting_opt_error_inj, which isn't currently used
+      anywhere else.
+*)
 Admitted.
 
 Lemma counting_opt_error_inj :
@@ -201,10 +212,7 @@ Lemma pred_between_improves_error :
     counting_opt_error gst (Some p') (better_pred_bool (make_pointer h)) <
     counting_opt_error gst (Some p) (better_pred_bool (make_pointer h)).
 Proof.
-  intros.
-  simpl.
-  repeat break_if; try congruence.
-  unfold better_pred_bool.
+(* USELESS *)
 Admitted.
 
 Lemma succ_between_improves_error :
@@ -219,6 +227,7 @@ Lemma succ_between_improves_error :
     counting_opt_error gst' (Some s') (better_succ_bool (make_pointer h)) <
     counting_opt_error gst (Some s) (better_succ_bool (make_pointer h)).
 Proof.
+(* USELESS *)
 Admitted.
 
 (** First successor and predecessor combined phase two definitions *)
@@ -499,6 +508,15 @@ Proof.
       try eapply better_first_succ_bool_antisymmetric.
     all:assert (wf_ptr x /\ live_node gst (addr_of x)) by admit; break_and; eauto.
     eapply better_succ_bool_true_better_succ; simpl in *; tauto.
+
+(*
+This is an admit because it's missing an invariant saying predecessors and
+successors are well-formed and live. This kind of bookkeeping is something Ryan
+should take care of.
+
+DIFFICULTY: Ryan
+USED: Crucial to the phase 2 argument.
+*)
 Admitted.
 
 Lemma phase_two_zero_error_correct :
@@ -528,6 +546,14 @@ Theorem joins_stop :
     strong_local_fairness ex ->
     continuously (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex.
 Proof.
+(*
+Since nodes only set joined=true some time after they are added to the network
+and no new nodes are added to the network in an lb_execution, joins have to
+eventually stop. That implies this lemma.
+
+DIFFICULTY: Ryan
+USED: In phase two.
+*)
 Admitted.
 
 Lemma pred_error_nonincreasing :
@@ -538,6 +564,12 @@ Lemma pred_error_nonincreasing :
     In h (active_nodes gst) ->
     pred_error h gst' <= pred_error h gst.
 Proof.
+(*
+This needs to be connected to a safety property on predecessors.
+
+DIFFICULTY: Ryan
+USED: In phase two
+*)
 Admitted.
 
 Lemma pred_error_always_nonincreasing :
@@ -569,6 +601,12 @@ Lemma first_succ_error_nonincreasing :
     In h (active_nodes gst) ->
     first_succ_error h gst' <= first_succ_error h gst.
 Proof.
+(*
+This needs to be connected to a safety property on first successors.
+
+DIFFICULTY: Ryan
+USED: In phase two
+*)
 Admitted.
 
 Lemma first_succ_error_always_nonincreasing :
@@ -662,6 +700,7 @@ Lemma pred_error_bound :
     pred_error h (occ_gst (hd ex)) = n ->
     always (now (fun occ => pred_error h (occ_gst occ) <= n)) ex.
 Proof.
+(* USELESS *)
 Admitted.
 
 Lemma first_succ_error_bound :
@@ -672,6 +711,7 @@ Lemma first_succ_error_bound :
     first_succ_error h (occ_gst (hd ex)) = n ->
     always (now (fun occ => first_succ_error h (occ_gst occ) <= n)) ex.
 Proof.
+(* USELESS *)
 Admitted.
 
 Ltac find_always_and_tl :=
