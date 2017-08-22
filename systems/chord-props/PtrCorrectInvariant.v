@@ -79,7 +79,24 @@ Proof.
       repeat break_match; subst; simpl in *;
         find_inversion; auto.
     + find_inversion. auto.
-  -
+  - intros. invcs H0; auto.
+    + update_destruct; subst; rewrite_update; auto.
+      now find_inversion.
+    + update_destruct; subst; rewrite_update; auto.
+      find_inversion.
+      unfold timeout_handler, timeout_handler_eff in *.
+      break_match.
+      * unfold tick_handler in *. break_match; simpl in *; try solve_by_inversion.
+        break_if; simpl in *; try solve_by_inversion.
+        unfold add_tick, start_query in *.
+        repeat break_let.
+        subst. find_inversion.
+        break_match; simpl in *; try solve_by_inversion.
+        repeat break_let. find_inversion. simpl. auto.
+      * unfold do_rectify in *. simpl in *.
+        
+        
+        
 
 (*
 This is a very good and easy invariant.  At a node h, ptr st is a copy
