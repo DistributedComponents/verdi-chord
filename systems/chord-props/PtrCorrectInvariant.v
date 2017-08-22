@@ -87,6 +87,14 @@ Proof.
     unfold start_query in *; repeat (break_match; simpler).
 Qed.
 
+(*
+This is a very good and easy invariant.  At a node h, ptr st is a copy
+of a pointer to h. It's set when the node starts up and never changed
+anywhere.
+
+DIFFICULTY: 1
+USED: In phase two.
+*)
 Lemma ptr_correct :
   forall gst h st,
     reachable_st gst ->
@@ -142,12 +150,3 @@ Proof.
       find_apply_lem_hyp handle_msg_ptr.
       repeat find_rewrite. auto.
 Qed.
-(*
-This is a very good and easy invariant.  At a node h, ptr st is a copy
-of a pointer to h. It's set when the node starts up and never changed
-anywhere.
-
-DIFFICULTY: 1
-USED: In phase two.
-*)
-Admitted.
