@@ -887,7 +887,15 @@ Proof using.
   repeat break_match;
     try tuple_inversion;
     eauto using joined_preserved_by_tick_handler, joined_preserved_by_handle_query_timeout, joined_preserved_by_do_rectify.
-Admitted.
+  - apply keepalive_handler_definition in H; expand_def; auto.
+  - find_apply_lem_hyp request_timeout_handler_definition; expand_def; try reflexivity.
+    find_apply_lem_hyp handle_query_timeout_definition;
+      expand_def;
+      try find_apply_lem_hyp end_query_definition;
+      try find_apply_lem_hyp start_query_definition;
+      expand_def;
+      reflexivity.
+Qed.
 
 Lemma apply_handler_result_updates_sigma :
   forall h st ms nts cts e gst gst',
