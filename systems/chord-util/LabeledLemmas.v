@@ -228,7 +228,11 @@ Lemma recv_implies_node_in :
 Proof using.
   intros.
   invc_labeled_step.
-Admitted.
+  destruct m as [? [? ?]].
+  find_apply_lem_hyp define_msg_from_recv_step_equality.
+  break_and.
+  congruence.
+Qed.
 
 Lemma recv_implies_node_not_failed :
   forall gst gst' src dst p,
