@@ -521,6 +521,21 @@ Lemma valid_ptrs_global_timeout_handler :
     timeout_handler h st t = (st', ms, nts, cts) ->
     In t0 nts ->
     valid_ptr_timeout gst t0.
+Proof using.
+  intros.
+  destruct t0; try constructor.
+  - Fail constructor. (* missing RectifyTick case in valid_ptr_timeout *)
+    admit.
+  - (* need to dissect timeout_handler here *)
+    admit.
+(*
+This proof is a grind through the definition of timeout_handler. It might not go
+through until definition of valid_ptr_timeout gets fixed. (It's missing a case
+for RectifyTick.)
+
+DIFFICULTY: 2
+USED: In ValidPointersInvariant.v for an invariant.
+*)
 Admitted.
 
 Lemma lift_pred_opt_Some_elim :
@@ -546,6 +561,12 @@ Lemma valid_ptrs_global_recv_handler :
     forall t, In t newts ->
          valid_ptr_timeout gst t.
 Proof using.
+(*
+This proof is a grind through the definition of recv_handler.
+
+DIFFICULTY: 2
+USED: In valid_ptrs_global_timeouts below.
+*)
 Admitted.
 
 Lemma apply_handler_result_In_timeouts :
@@ -553,6 +574,14 @@ Lemma apply_handler_result_In_timeouts :
     In t (timeouts (apply_handler_result h0 (st, ms, nts, cts) e gst) h) ->
     In t nts \/
     In t (timeouts gst h) /\ (~ In t cts \/ h <> h0).
+Proof using.
+(*
+This is a simple spec lemma for apply_handler_result. The proof should be very
+simple.
+
+DIFFICULTY: 1
+USED: In valid_ptrs_global_timeouts below
+*)
 Admitted.
 
 Lemma valid_ptrs_global_timeouts :
@@ -612,6 +641,12 @@ Proof using.
       valid_ptrs_timeouts_elim.
   - admit.
   - admit.
+(*
+I need to clean this up.
+
+DIFFICULTY: Ryan.
+USED: In ValidPointersInvariant.v for one case of an inductive invariant proof.
+*)
 Admitted.
 
 Lemma valid_ptrs_global_sigma :
@@ -628,6 +663,12 @@ Proof using.
   - admit.
   - admit.
   - admit.
+(*
+I need to break this out into smaller admits.
+
+DIFFICULTY: Ryan.
+USED: In ValidPointersInvariant.v for one case of an inductive invariant proof.
+*)
 Admitted.
 
 Lemma valid_ptrs_global_net :
@@ -642,6 +683,12 @@ Proof using.
   - admit.
   - admit.
   - admit.
+(*
+I need to break this out into smaller admits.
+
+DIFFICULTY: Ryan.
+USED: In ValidPointersInvariant.v for one case of an inductive invariant proof.
+*)
 Admitted.
 
 Lemma valid_ptrs_global_trace :
@@ -656,6 +703,12 @@ Proof using.
   - admit.
   - admit.
   - admit.
+(*
+I need to break this out into smaller admits.
+
+DIFFICULTY: Ryan.
+USED: In ValidPointersInvariant.v for one case of an inductive invariant proof.
+*)
 Admitted.
 
 Lemma valid_ptrs_state_nodes_subset :
@@ -668,6 +721,12 @@ Proof.
   apply valid_ptrs_state_intro;
     find_apply_lem_hyp valid_ptrs_state_elim;
     break_and.
+(*
+This follows from valid_ptr_nodes_subset.
+
+DIFFICULTY: 2
+USED: In ValidPointersInvariant.v
+*)
 Admitted.
 
 Lemma start_handler_valid_ptrs_state :
@@ -679,6 +738,12 @@ Lemma start_handler_valid_ptrs_state :
     valid_ptrs_state gst' st.
 Proof.
   intros.
+(*
+This follows from valid_ptr_nodes_subset.
+
+DIFFICULTY: 2
+USED: In ValidPointersInvariant.v
+*)
 Admitted.
 (*
   find_apply_lem_hyp start_handler_definition; expand_def.

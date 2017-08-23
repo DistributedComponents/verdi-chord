@@ -228,6 +228,15 @@ Theorem queries_always_remote :
       sigma gst h = Some st ->
       cur_request st = Some (dstp, q, p) ->
       h <> (addr_of dstp).
+Proof.
+(*
+This is difficult to prove because we need to know that we're never given our
+own address as a successor by another node. It will require the full Zave
+invariant. Once we have that it shouldn't be so bad.
+
+DIFFICULTY: Ryan.
+USED: In the proof of query_state_net_inductive below.
+*)
 Admitted.
 
 Definition query_state_net_invariant (gst : global_state) : Prop :=
@@ -366,17 +375,6 @@ Ltac break_best_succ :=
     break_and
   end.
 
-Lemma adding_node_preserves_reachable_converse :
-  forall h from to gst gst' st,
-    reachable gst' from to ->
-    ~ In h (nodes gst) ->
-    In from (nodes gst) ->
-    nodes gst' = h :: nodes gst ->
-    failed_nodes gst' = failed_nodes gst ->
-    sigma gst' = update addr_eq_dec (sigma gst) h st ->
-    reachable gst from to.
-Admitted.
-
 Definition fail_step_preserves (P : global_state -> Prop) : Prop :=
   forall gst gst' h,
     inductive_invariant gst ->
@@ -458,6 +456,12 @@ Proof using.
       admit.
     + (* receive case *)
       admit.
+(*
+This seems important to prove but...
+
+DIFFICULTY: Ryan
+USED: nowhere at all!
+*)
 Admitted.
 
 Definition chord_init_invariant (P : global_state -> Prop) :=

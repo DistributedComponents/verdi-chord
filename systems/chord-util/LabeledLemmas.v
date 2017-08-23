@@ -911,8 +911,6 @@ Proof.
     eapply lb_execution_invar; eauto.
 Qed.
 
-(* This might need additional hypotheses or changes to `label` before it becomes
-   provable. *)
 Lemma Tick_eventually_enabled :
   forall ex h,
     reachable_st (occ_gst (hd ex)) ->
@@ -920,6 +918,8 @@ Lemma Tick_eventually_enabled :
     live_node (occ_gst (hd ex)) h ->
     eventually (now (fun occ => exists eff, l_enabled (Timeout h Tick eff) occ)) ex.
 Proof.
+(* This might need additional hypotheses or changes to `label` before it becomes
+   provable. *)
 Admitted.
 
 Definition enabled_Tick_with_effect (h : addr) (eff : timeout_effect) (gst : global_state) : Prop :=
@@ -970,7 +970,7 @@ Proof.
       * subst. firstorder.
       * firstorder.
 Admitted.
-   
+
 
 Lemma step_preserves_timeout_constraint :
   forall st l st' h t,
@@ -1017,8 +1017,6 @@ Proof.
   assert (~ In t clearedts).
   {
     unfold timeout_handler_eff, tick_handler, keepalive_handler, request_timeout_handler, handle_query_timeout, do_rectify, add_tick, start_query, cur_request, clear_rectify_with, make_request
-      
-                                                                                   
       in *.
     repeat break_match; repeat tuple_inversion; simpl in *; in_crush; try congruence; admit.
     }
