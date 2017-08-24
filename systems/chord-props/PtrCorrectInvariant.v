@@ -92,7 +92,6 @@ This is a very good and easy invariant.  At a node h, ptr st is a copy
 of a pointer to h. It's set when the node starts up and never changed
 anywhere.
 
-DIFFICULTY: 1
 USED: In phase two.
 *)
 Lemma ptr_correct :
