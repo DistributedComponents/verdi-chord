@@ -1,16 +1,18 @@
-categories (topic)
-1. if pointers change, they must improve...
-   - preds
-   - first succs
-   - other succs
-2. changing one thing suffices to improve merge point
-3. how first
+Admits are grouped by file and by a rough priority measure.
 
-categories (difficulty)
-1. needs a more general invariant
-2. needs to be reduced to safety properties
-3. needs some ltl facts about sub-operations
-4. easily proven by induction or by using existing facts
+1. The "useless" heading means the lemma is never used in the phase *n*
+   arguments or is only used in proofs of facts that are themselves useless.
+
+2. The "straightforward" heading means that the admitted fact is likely provable
+   using a straightforward inductive argument and crank-turning. It doesn't mean
+   the right spec lemmas already exist to do that crank turning.
+
+3. The "some intervention" heading means that the lemma might be a consequence
+   of a larger invariant or requires being broken down into smaller admits
+   before it's straightforward to prove.
+
+4. The "complicated" heading means it's my problem and needs a lot of new lemmas
+   or reformulation of definitions before it's provable.
 
 # ChordCorrectPhaseOne: 2 admits
 
