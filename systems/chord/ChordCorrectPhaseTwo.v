@@ -204,17 +204,6 @@ Definition first_succ_error (h : addr) (gst : global_state) : nat :=
     S (length (active_nodes gst))
   end.
 
-Lemma pred_between_improves_error :
-  forall h gst p p',
-    ptr_between p p' (make_pointer h) ->
-    live_node gst (addr_of p) ->
-    live_node gst (addr_of p') ->
-    counting_opt_error gst (Some p') (better_pred_bool (make_pointer h)) <
-    counting_opt_error gst (Some p) (better_pred_bool (make_pointer h)).
-Proof.
-(* USELESS *)
-Admitted.
-
 Lemma succ_between_improves_error :
   forall h gst gst' st st' s s',
     sigma gst h = Some st ->
@@ -227,7 +216,6 @@ Lemma succ_between_improves_error :
     counting_opt_error gst' (Some s') (better_succ_bool (make_pointer h)) <
     counting_opt_error gst (Some s) (better_succ_bool (make_pointer h)).
 Proof.
-(* USELESS *)
 Admitted.
 
 (** First successor and predecessor combined phase two definitions *)
@@ -692,28 +680,6 @@ Proof.
     apply IHeventually; invar_eauto.
 Qed.
 
-Lemma pred_error_bound :
-  forall ex h st n,
-    lb_execution ex ->
-    reachable_st (occ_gst (infseq.hd ex)) ->
-    sigma (occ_gst (hd ex)) h = Some st ->
-    pred_error h (occ_gst (hd ex)) = n ->
-    always (now (fun occ => pred_error h (occ_gst occ) <= n)) ex.
-Proof.
-(* USELESS *)
-Admitted.
-
-Lemma first_succ_error_bound :
-  forall ex h st n,
-    lb_execution ex ->
-    reachable_st (occ_gst (infseq.hd ex)) ->
-    sigma (occ_gst (hd ex)) h = Some st ->
-    first_succ_error h (occ_gst (hd ex)) = n ->
-    always (now (fun occ => first_succ_error h (occ_gst occ) <= n)) ex.
-Proof.
-(* USELESS *)
-Admitted.
-
 Theorem phase_two_error_always_nonincreasing :
   forall ex,
     lb_execution ex ->
@@ -903,58 +869,6 @@ USED: in phase two
 *)
 Admitted.
 
-Lemma notify_causes_rectify :
-  forall ex h dst st p,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    always (~_ (now circular_wait)) ex ->
-
-    live_node (occ_gst (hd ex)) h ->
-    live_node (occ_gst (hd ex)) dst ->
-    sigma (occ_gst (hd ex)) dst = Some st ->
-    pred st = Some p ->
-
-    ptr_between p (make_pointer h) (make_pointer dst) ->
-    In Notify (channel (occ_gst (hd ex)) h dst) ->
-
-    eventually
-      (now
-         (fun occ =>
-            exists h',
-              wf_ptr h' /\
-              live_node (occ_gst occ) (addr_of h') /\
-              better_pred (occ_gst occ) (make_pointer dst) (make_pointer h) h' /\
-              open_request_to (occ_gst (hd ex)) dst (addr_of h') Ping))
-      ex.
-Proof.
-(* USELESS *)
-Admitted.
-
-Lemma rectify_with_live_pred_sets_pred :
-  forall ex h dst st,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    always (~_ (now circular_wait)) ex ->
-
-    live_node (occ_gst (hd ex)) h ->
-    live_node (occ_gst (hd ex)) dst ->
-    sigma (occ_gst (hd ex)) dst = Some st ->
-
-    (forall p,
-        pred st = Some p ->
-        better_pred (occ_gst (hd ex)) (make_pointer dst) (make_pointer h) p) ->
-    open_request_to (occ_gst (hd ex)) dst h Ping ->
-    In Notify (channel (occ_gst (hd ex)) h dst) ->
-
-    eventually
-      (now
-         (fun occ =>
-            has_pred (occ_gst occ) dst (Some (make_pointer h))))
-      ex.
-Proof.
-(* USELESS *)
-Admitted.
-
 Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
   ptr_between a b j /\
   has_first_succ gst (addr_of a) j /\
@@ -968,15 +882,6 @@ Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
   live_node gst (addr_of a) /\
   live_node gst (addr_of b) /\
   live_node gst (addr_of j).
-
-Definition merge_point_dec :
-  forall gst a b j,
-    {merge_point gst a b j} + {~ merge_point gst a b j}.
-Proof.
-  unfold merge_point.
-  unfold has_first_succ.
-(* USELESS *)
-Admitted.
 
 Lemma merge_point_wf :
   forall gst a b j,
