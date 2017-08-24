@@ -430,40 +430,6 @@ Proof using.
   exfalso; auto with *.
 Qed.
 
-Lemma query_state_net_invariant_inductive :
-  forall gst,
-    reachable_st gst ->
-    query_state_net_invariant gst.
-Proof using.
-  intros.
-  induct_reachable_st.
-  { admit. } (* have to define valid initial states *)
-  assert (reachable_st gst') by eauto using reachableStep.
-  pose proof (query_state_net_invariant_elim gst IHreachable_st).
-  intros until 3.
-  split.
-  - eapply queries_always_remote; eauto.
-  - break_step.
-    + (* start case *)
-      destruct (addr_eq_dec src h).
-      * (* source of query is the joining node *)
-        admit.
-      * (* it's unrelated *)
-        admit.
-    + (* fail case *)
-      admit.
-    + (* timeout case *)
-      admit.
-    + (* receive case *)
-      admit.
-(*
-This seems important to prove but...
-
-DIFFICULTY: Ryan
-USED: nowhere at all!
-*)
-Admitted.
-
 Definition chord_init_invariant (P : global_state -> Prop) :=
   P initial_st.
 
