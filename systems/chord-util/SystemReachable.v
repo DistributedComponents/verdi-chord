@@ -430,7 +430,7 @@ Proof using.
   exfalso; auto with *.
 Qed.
 
-Definition query_state_net_invariant_inductive :
+Lemma query_state_net_invariant_inductive :
   forall gst,
     reachable_st gst ->
     query_state_net_invariant gst.
