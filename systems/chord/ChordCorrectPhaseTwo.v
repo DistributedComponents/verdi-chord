@@ -216,6 +216,19 @@ Lemma succ_between_improves_error :
     counting_opt_error gst' (Some s') (better_succ_bool (make_pointer h)) <
     counting_opt_error gst (Some s) (better_succ_bool (make_pointer h)).
 Proof.
+(*
+if a node's first successor is s and then s',
+and both s and s' are live,
+and h < s' < s,
+then the error measure of s' is less than that of s.
+
+This requires reasoning about counting_opt_error, which is something I haven't
+really figured out yet. I don't think it's going to be super involved since we
+know so much about s and s'.
+
+DIFFICULTY: Ryan.
+USED: in a_before_pred_merge_point below
+*)
 Admitted.
 
 (** First successor and predecessor combined phase two definitions *)

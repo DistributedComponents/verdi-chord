@@ -33,6 +33,7 @@ Admits are grouped by file and by a rough priority measure.
 - merge_points_preserved_until_error_drops
 - incoming_GotPredAndSuccs_with_a_after_p_causes_improvement
 - error_decreases_when_succs_right
+- succ_between_improves_error
 
 ## some intervention
 
@@ -65,7 +66,6 @@ Admits are grouped by file and by a rough priority measure.
 ## useless
 
 - pred_between_improves_error
-- succ_between_improves_error
 - pred_error_bound
 - first_succ_error_bound
 - notify_causes_rectify
