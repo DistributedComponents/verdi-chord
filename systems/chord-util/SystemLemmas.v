@@ -657,3 +657,59 @@ Proof using.
       by destruct x, p; subst. }
     now find_reverse_rewrite.
 Qed.
+
+
+Lemma sigma_apply_handler_result_same :
+  forall h res es gst,
+    sigma (apply_handler_result h res es gst) h =
+    Some (fst (fst (fst res))).
+Proof.
+  intros. unfold apply_handler_result.
+  repeat break_match. subst. simpl.
+  now rewrite_update.
+Qed.
+
+Lemma sigma_apply_handler_result_diff :
+  forall h h' res es gst,
+    h <> h' ->
+    sigma (apply_handler_result h res es gst) h' =
+    sigma gst h'.
+Proof.
+  intros. unfold apply_handler_result.
+  repeat break_match. subst. simpl.
+  now rewrite_update.
+Qed.
+
+Lemma initial_st_start_handler' :
+  forall l h init,
+    sigma (fold_left run_init_for l init) h = sigma (run_init_for init h) h \/
+    sigma (fold_left run_init_for l init) h = sigma init h.
+Proof.
+  induction l; intros; simpl in *; auto.
+  specialize (IHl h (run_init_for init a)).
+  intuition.
+  - repeat find_rewrite.
+    unfold run_init_for.
+    repeat rewrite sigma_apply_handler_result_same. auto.
+  - repeat find_rewrite. unfold run_init_for.
+    destruct (addr_eq_dec a h); subst.
+    + repeat rewrite sigma_apply_handler_result_same. auto.
+    + rewrite sigma_apply_handler_result_diff; auto.
+Qed.
+
+
+Lemma initial_st_start_handler :
+  forall h st,
+    sigma initial_st h = Some st ->
+    st = fst (fst (start_handler h initial_nodes)).
+Proof.
+  intros. unfold initial_st in *.
+  match goal with
+    H : sigma (fold_left run_init_for initial_nodes ?init) ?h = _ |- _ =>
+    pose proof (initial_st_start_handler' initial_nodes h init)
+  end.
+  simpl in *. intuition; repeat find_rewrite; try discriminate.
+  unfold run_init_for in *.
+  simpl in *. repeat break_let. simpl in *.
+  rewrite_update. congruence.
+Qed.
