@@ -349,6 +349,19 @@ Section LocalMeasure.
     auto with arith.
   Qed.
 
+  Lemma fold_left_max_comm :
+    forall a l,
+      fold_left Nat.max l a = Nat.max a (fold_left Nat.max l 0).
+  Proof.
+    intros.
+    generalize a.
+    induction l; intros.
+    - simpl; zify; omega.
+    - simpl.
+      rewrite IHl; symmetry; rewrite IHl.
+      zify; omega.
+  Qed.
+
   Lemma sum_cons :
     forall n l,
       sum (n :: l) = n + sum l.
@@ -466,6 +479,40 @@ Section LocalMeasure.
     symmetry.
     apply le_n_0_eq.
     eapply sum_of_nats_bounds_addends; eauto.
+  Qed.
+
+  Lemma max_of_nats_bounds_list :
+    forall l n,
+      max l = n ->
+      forall x,
+        In x l ->
+        x <= n.
+  Proof.
+    unfold max.
+    induction l using list_strong_ind; destruct l as [|a l].
+    - easy.
+    - intros.
+      find_apply_lem_hyp in_inv; break_or_hyp.
+      + simpl.
+        rewrite fold_left_max_comm.
+        zify; omega.
+      + assert (x <= fold_left Nat.max l 0)
+          by firstorder.
+        simpl. rewrite fold_left_max_comm.
+        zify; omega.
+  Qed.
+
+  Lemma max_of_nats_zero_means_zero :
+    forall l,
+      max l = 0 ->
+      forall x,
+        In x l ->
+        x = 0.
+  Proof.
+    intros.
+    symmetry.
+    apply le_n_0_eq.
+    eapply max_of_nats_bounds_list; eauto.
   Qed.
 
   Lemma sum_of_zeros_is_zero :
@@ -642,6 +689,22 @@ Section LocalMeasure.
       assumption || apply sum_map_mono; auto with datatypes.
   Qed.
 
+  Lemma local_dropping_makes_max_drop :
+    forall h o o',
+      active_nodes (occ_gst o) = active_nodes (occ_gst o') ->
+      (forall h', In h' (active_nodes (occ_gst o)) ->
+             measure_nonincreasing (local_measure h') o o') ->
+      In h (active_nodes (occ_gst o)) ->
+      measure_decreasing (local_measure h) o o' ->
+      measure_decreasing max_measure o o'.
+  Proof.
+    unfold measure_decreasing, measure_nonincreasing, max_measure.
+    intros.
+    find_apply_lem_hyp in_split; break_exists.
+    repeat find_rewrite.
+    rewrite !map_app.
+  Admitted.
+
   Lemma local_dropping_makes_global_drop_ex :
     forall h ex,
       lb_execution ex ->
@@ -683,6 +746,31 @@ Section LocalMeasure.
       now repeat find_reverse_rewrite.
   Qed.
 
+  Definition nonzero_error_causes_max_measure_drop (ex : infseq occurrence) :=
+     max_measure (occ_gst (hd ex)) > 0 ->
+     some_local_measure_drops ex.
+
+  Lemma local_measure_causes_eventual_max_drop :
+    forall ex,
+      lb_execution ex ->
+      always local_measures_nonincreasing ex ->
+      nonzero_error_causes_max_measure_drop ex ->
+      zero_or_eventually_decreasing max_measure ex.
+  Proof.
+    intros.
+    destruct (max_measure (occ_gst (hd ex))) as [| err] eqn:?H;
+      [left|right].
+    - destruct ex; assumption.
+    - pose proof (gt_Sn_O err); repeat find_reverse_rewrite.
+      assert (some_local_measure_drops ex) by auto.
+      unfold some_local_measure_drops in *; break_exists_name h; break_and.
+      (* lift_eventually (local_dropping_makes_max_drop_ex h); *)
+      (*   firstorder using lb_execution_invar, always_invar. *)
+      (* inv_prop lb_execution; simpl. *)
+      (* find_copy_apply_lem_hyp labeled_step_dynamic_preserves_active_nodes. *)
+      (* now repeat find_reverse_rewrite. *)
+  Admitted.
+
   Lemma local_measure_always_causes_eventual_drop :
     forall ex,
       lb_execution ex ->
@@ -710,14 +798,81 @@ Section LocalMeasure.
       apply always_and_tl; eauto using always_inv, lb_execution_invar.
   Qed.
 
-  Lemma something :
-    forall ex,
+  (* TODO(ryan) move to infseq *)
+  Lemma continuously_forall_list_comm :
+    forall (A B : Type) (P : A -> infseq B -> Prop) l ex,
+      (forall x, In x l -> (continuously (P x) ex)) ->
+      continuously (fun ex' => forall x, In x l -> P x ex') ex.
+  Proof.
+    induction l as [| a l].
+    - intros.
+      apply E0.
+      eapply always_monotonic; try eapply always_true; intros.
+      exfalso; auto.
+    - intros.
+      pose proof (IHl ex).
+      forwards. auto with datatypes. concludes.
+      assert (continuously (P a) ex)
+        by auto with datatypes.
+      cut (continuously ((fun ex' => forall x, In x l -> P x ex') /\_ P a) ex).
+      {
+        apply continuously_monotonic.
+        intros.
+        unfold and_tl in *; break_and.
+        find_apply_lem_hyp in_inv; break_or_hyp; auto.
+      }
+      apply continuously_and_tl; eauto.
+  Qed.
+
+  Lemma measure_eventually_bounded_continuously_bounded :
+    forall ex h n,
+      always (local_measure_nonincreasing h) ex ->
+      eventually (fun ex' => |h in occ_gst (hd ex')| <= n) ex ->
+      continuously (fun ex' => |h in occ_gst (hd ex') | <= n) ex.
+  Proof.
+    intros.
+    induction H0.
+    - apply E0.
+      apply nonincreasing_preserves_bound in H0; eauto.
+      unfold measure_bounded in *.
+      eapply always_monotonic; eauto.
+      intros [o s']; auto.
+    - apply E_next.
+      unfold continuously in *.
+      find_apply_lem_hyp always_Cons; tauto.
+  Qed.
+
+  Lemma all_nodes_eventually_bounded_max_bounded :
+    forall ex n,
       lb_execution ex ->
       always local_measures_nonincreasing ex ->
-      max_measure_nonzero_all_measures_drop ex ->
-      zero_or_eventually_decreasing max_measure ex.
+      (forall h,
+          In h (active_nodes (occ_gst (hd ex))) ->
+          eventually (fun ex' => |h in occ_gst (hd ex')| <= n) ex) ->
+      continuously (fun ex' => max_measure (occ_gst (hd ex')) <= n) ex.
   Proof.
-  Abort.
+    intros.
+    assert (continuously (fun ex' => forall h, In h (active_nodes (occ_gst (hd ex))) -> |h in (occ_gst (hd ex'))| <= n) ex).
+    {
+      apply continuously_forall_list_comm.
+      intros.
+      apply measure_eventually_bounded_continuously_bounded; eauto.
+      unfold local_measures_nonincreasing in *.
+      match goal with
+      | H: forall h, In h _ -> eventually _ _ |- _ => clear H
+      end.
+      generalize dependent ex.
+      cofix c; intros; destruct ex; constructor.
+      - find_apply_lem_hyp always_now.
+        auto.
+      - simpl.
+        find_apply_lem_hyp always_Cons; break_and.
+        eapply c; eauto using lb_execution_invar.
+        inv_prop lb_execution.
+        erewrite <- labeled_step_dynamic_preserves_active_nodes; eauto.
+    }
+    admit.
+  Admitted.
 
   Theorem local_measure_causes_max_measure_zero :
     forall ex,
@@ -728,11 +883,18 @@ Section LocalMeasure.
   Proof.
     intros.
     eapply measure_decreasing_to_zero.
-    -     unfold max_measure_nonzero_all_measures_drop.
-    intros.
-    eapply measure_decreasing_to_zero.
-    - unfold zero_or_eventually_decreasing.
-      admit.
+    - unfold max_measure_nonzero_all_measures_drop in *.
+      repeat match goal with [H : _ |- _] => revert H end.
+      cofix c.
+      intros.
+      constructor; destruct ex.
+      + destruct (max_measure (occ_gst o)) eqn:?;
+          try (left; tauto).
+        find_eapply_lem_hyp always_Cons.
+        break_and.
+        right.
+        admit.
+      + admit.
     - admit.
   Admitted.
 
