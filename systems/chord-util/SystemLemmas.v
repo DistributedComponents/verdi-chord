@@ -658,7 +658,6 @@ Proof using.
     now find_reverse_rewrite.
 Qed.
 
-
 Lemma sigma_apply_handler_result_same :
   forall h res es gst,
     sigma (apply_handler_result h res es gst) h =
@@ -680,36 +679,52 @@ Proof.
   now rewrite_update.
 Qed.
 
-Lemma initial_st_start_handler' :
-  forall l h init,
-    sigma (fold_left run_init_for l init) h = sigma (run_init_for init h) h \/
-    sigma (fold_left run_init_for l init) h = sigma init h.
+Lemma fold_left_for_each_not_in :
+  forall A B C (f : A -> B -> A) (e : A -> B -> C),
+    (forall a b b',
+        b <> b' ->
+        e (f a b') b = e a b) ->
+    forall l a0 b,
+      ~ In b l ->
+      e (fold_left f l a0) b = e a0 b.
 Proof.
-  induction l; intros; simpl in *; auto.
-  specialize (IHl h (run_init_for init a)).
-  intuition.
-  - repeat find_rewrite.
-    unfold run_init_for.
-    repeat rewrite sigma_apply_handler_result_same. auto.
-  - repeat find_rewrite. unfold run_init_for.
-    destruct (addr_eq_dec a h); subst.
-    + repeat rewrite sigma_apply_handler_result_same. auto.
-    + rewrite sigma_apply_handler_result_diff; auto.
+  induction l as [| b' l']; simpl in *; auto.
+  - intros. intuition.
+    rewrite IHl'; auto.
 Qed.
 
+Lemma fold_left_for_each_in :
+  forall A B C (f : A -> B -> A) (e : A -> B -> C) (B_eq_dec : forall x y : B, {x = y} + {x <> y}),
+    (forall a b b',
+        b <> b' ->
+        e (f a b') b = e a b) ->
+    forall l a0 b,
+      In b l ->
+      exists a',
+        e (fold_left f l a0) b = e (f a' b) b.
+Proof.
+  induction l as [|b' l']; simpl in *; intuition; subst.
+  destruct (in_dec B_eq_dec b l'); intuition.
+  find_eapply_lem_hyp fold_left_for_each_not_in; eauto.
+Qed.
 
-Lemma initial_st_start_handler :
+Lemma sigma_initial_st_start_handler :
   forall h st,
     sigma initial_st h = Some st ->
     st = fst (fst (start_handler h initial_nodes)).
 Proof.
   intros. unfold initial_st in *.
-  match goal with
-    H : sigma (fold_left run_init_for initial_nodes ?init) ?h = _ |- _ =>
-    pose proof (initial_st_start_handler' initial_nodes h init)
-  end.
-  simpl in *. intuition; repeat find_rewrite; try discriminate.
-  unfold run_init_for in *.
-  simpl in *. repeat break_let. simpl in *.
-  rewrite_update. congruence.
+  destruct (in_dec addr_eq_dec h initial_nodes).
+  - find_eapply_lem_hyp (fold_left_for_each_in _ _ _ run_init_for sigma); eauto.
+    + break_exists. erewrite H0 in H. clear H0.
+      unfold run_init_for in *. find_rewrite_lem sigma_apply_handler_result_same.
+      simpl in *. congruence.
+    + apply addr_eq_dec.
+    + intros. unfold run_init_for.
+      auto using sigma_apply_handler_result_diff.
+  - find_eapply_lem_hyp (fold_left_for_each_not_in _ _ _ run_init_for sigma); eauto.
+    + erewrite n in H. clear n. simpl in *. discriminate.
+    + intros. unfold run_init_for.
+      auto using sigma_apply_handler_result_diff.
+Qed.
 Qed.

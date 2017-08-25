@@ -55,7 +55,7 @@ Proof.
   intros. induct_reachable_st.
   - intros.
     unfold initial_st in *.
-    find_apply_lem_hyp initial_st_start_handler; simpl in *; auto. subst.
+    find_apply_lem_hyp sigma_initial_st_start_handler; simpl in *; auto. subst.
     unfold start_handler in *. repeat break_match; simpl; auto.
   - intros. invcs H0; auto.
     + update_destruct; subst; rewrite_update; auto.
