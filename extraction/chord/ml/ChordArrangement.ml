@@ -94,26 +94,12 @@ module type ChordConfig = sig
   val debug : bool
 end
 
-type chord_config =
-  { tick_timeout : float
-  ; keepalive_timeout : float
-  ; request_timeout : float
-  ; debug : bool
-  }
-
-let make_config_module cc =
-  (module struct
-     let tick_timeout = cc.tick_timeout
-     let keepalive_timeout = cc.keepalive_timeout
-     let request_timeout = cc.request_timeout
-     let debug = cc.debug
-   end : ChordConfig)
-
-module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = struct
+module ChordArrangement (C : ChordConfig) = struct
   type name = addr
   type state = _data
   type msg = payload
   type timeout = ExtractedChord.ChordSystem._timeout
+  type addr = string * int
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let addr_of_name n =
     let (a :: p :: _) = split (regexp ":") (Util.bytes_of_char_list n) in
@@ -123,10 +109,14 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
   let start_handler n ks =
     Random.self_init ();
     rebracket3 (init n ks)
-  let recv_handler s d m st =
+  let msg_handler s d m st =
     rebracket4 (handleNet s d m st)
   let timeout_handler n s t =
     rebracket4 (handleTimeout n s t)
+
+  let deserialize_msg b = Marshal.from_bytes b 0
+
+  let serialize_msg msg = Marshal.to_bytes msg []
 
   let fuzzy_timeout t =
     let fuzz = max (t /. 5.0) 2.0 in
@@ -154,8 +144,19 @@ module ChordArrangement (C : ChordConfig) : DynamicShim.DYNAMIC_ARRANGEMENT = st
     flush_all ()
 end
 
+type chord_config =
+  { tick_timeout : float
+  ; keepalive_timeout : float
+  ; request_timeout : float
+  ; debug : bool
+  }
+
 let run cc nm knowns =
-  let (module Conf) = make_config_module cc in
-  let (module Shim : DynamicShim.ShimSig) =
-    (module DynamicShim.Shim(ChordArrangement(Conf))) in
+  let module Conf = struct
+     let tick_timeout = cc.tick_timeout
+     let keepalive_timeout = cc.keepalive_timeout
+     let request_timeout = cc.request_timeout
+     let debug = cc.debug
+  end in
+  let module Shim = DynamicShim.Shim(ChordArrangement(Conf)) in
   Shim.main nm knowns
