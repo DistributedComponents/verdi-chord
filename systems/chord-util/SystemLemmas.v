@@ -727,4 +727,29 @@ Proof.
     + intros. unfold run_init_for.
       auto using sigma_apply_handler_result_diff.
 Qed.
+
+
+Lemma timeouts_apply_handler_result_diff :
+  forall h h' res es gst,
+    h <> h' ->
+    timeouts (apply_handler_result h res es gst) h' =
+    timeouts gst h'.
+Proof.
+  intros. unfold apply_handler_result.
+  repeat break_match. subst. simpl.
+  now rewrite_update.
 Qed.
+
+Lemma timeouts_initial_st_start_handler :
+  forall h,
+    In h initial_nodes ->
+    exists gst,
+      timeouts initial_st h =
+      timeouts (apply_handler_result h (start_handler h initial_nodes, []) [] gst) h.
+Proof.
+  intros.
+  unfold initial_st in H.
+  find_eapply_lem_hyp (fold_left_for_each_in _ _ _ run_init_for timeouts);
+    eauto using addr_eq_dec.
+  intros. unfold run_init_for. auto using timeouts_apply_handler_result_diff.
+Qed.  
