@@ -7,16 +7,21 @@
 # server "example.com", user: "deploy", roles: %w{app web}, other_property: :other_value
 # server "db.example.com", user: "deploy", roles: %w{db}
 
-server 'discoberry01.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.17',  name: '17',  succs: %w(41 108), preds: %w(155)
-server 'discoberry02.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.155', name: '155', succs: %w(17 41),  preds: %w(79)
-server 'discoberry03.duckdns.org', user: 'pi', roles: %w{node}, ip: '172.28.7.79',   name: '79',  succs: %w(155 17), preds: %w(99)
-server 'discoberry04.duckdns.org', user: 'pi', roles: %w{node}, ip: '172.28.7.99',   name: '99',  succs: %w(79 155), preds: %w(183)
-server 'discoberry05.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.183', name: '183', succs: %w(99 79),  preds: %w(91)
-server 'discoberry06.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.91',  name: '91',  succs: %w(183 99), preds: %w(20)
-server 'discoberry07.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.20',  name: '20',  succs: %w(91 183), preds: %w(18)
-server 'discoberry08.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.18',  name: '18',  succs: %w(20 91),  preds: %w(108)
-server 'discoberry09.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.108', name: '108', succs: %w(18 20),  preds: %w(41)
-server 'discoberry10.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.41',  name: '41',  succs: %w(108 18), preds: %w(17)
+#server 'discoberry01.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.17',  name: '17',  succs: %w(41 108), preds: %w(155)
+#server 'discoberry02.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.155', name: '155', succs: %w(17 41),  preds: %w(79)
+#server 'discoberry03.duckdns.org', user: 'pi', roles: %w{node}, ip: '172.28.7.79',   name: '79',  succs: %w(155 17), preds: %w(99)
+#server 'discoberry04.duckdns.org', user: 'pi', roles: %w{node}, ip: '172.28.7.99',   name: '99',  succs: %w(79 155), preds: %w(183)
+#server 'discoberry05.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.183', name: '183', succs: %w(99 79),  preds: %w(91)
+#server 'discoberry06.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.91',  name: '91',  succs: %w(183 99), preds: %w(20)
+#server 'discoberry07.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.20',  name: '20',  succs: %w(91 183), preds: %w(18)
+#server 'discoberry08.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.18',  name: '18',  succs: %w(20 91),  preds: %w(108)
+#server 'discoberry09.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.108', name: '108', succs: %w(18 20),  preds: %w(41)
+#server 'discoberry10.duckdns.org', user: 'pi', roles: %w{node}, ip: '128.208.7.41',  name: '41',  succs: %w(108 18), preds: %w(17)
+
+server '128.208.2.23',                   user: 'pi', roles: %w{node}, name: "23", succs: %w(13 216), preds: %w(211), ip: '128.208.2.23'
+server 'discoberry02.cs.washington.edu', user: 'pi', roles: %w{node}, name: "211", succs: %w(23 13), preds: %w(216), ip: '128.208.2.211'
+server 'discoberry03.cs.washington.edu', user: 'pi', roles: %w{node}, name: "13", succs: %w(216 211), preds: %w(23), ip: '128.208.2.13'
+server 'discoberry04.cs.washington.edu', user: 'pi', roles: %w{node}, name: "216", succs: %w(211 23), preds: %w(13), ip: '128.208.2.216'
 
 # role-based syntax
 # ==================
