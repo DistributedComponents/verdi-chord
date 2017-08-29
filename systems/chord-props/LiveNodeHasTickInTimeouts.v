@@ -25,6 +25,88 @@ Qed.
   
 Ltac simpler := repeat (repeat find_inversion; subst; simpl in *; repeat rewrite_update); auto.
 
+Lemma do_delayed_queries_never_clears_tick :
+  forall (h : addr) (st st' : data) (ms : list (addr * payload))
+    (nts cts : list timeout),
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    ~ In Tick cts.
+Proof.
+  intros.
+  unfold do_delayed_queries in *.
+  break_match; simpl in *; subst; find_inversion; simpl in *; intuition; congruence.
+Qed.
+
+Lemma tick_not_in_timeouts_in :
+  forall st,
+    ~ In Tick (timeouts_in st).
+Proof.
+  intros.
+  unfold timeouts_in.
+  repeat break_match; in_crush.
+  discriminate.
+Qed.
+
+Lemma handle_msg_never_clears_tick :
+  forall (h h' : addr) (st st' : data) m (ms : list (addr * payload))
+    (nts cts : list timeout),
+    handle_msg h h' st m = (st', ms, nts, cts) ->
+    ~ In Tick cts.
+Proof.
+  intros.
+  unfold handle_msg in *.
+  repeat (break_match; simpler);
+    unfold handle_query_res in *; repeat (break_match; simpler);
+    unfold handle_query_req_busy in *; repeat (break_match; simpler);
+    unfold handle_stabilize in *; repeat (break_match; simpler);
+    unfold schedule_rectify_with in *; repeat (break_match; simpler);
+    unfold end_query in *; repeat (break_match; simpler);
+    unfold handle_rectify in *; repeat (break_match; simpler);
+    unfold start_query in *; repeat (break_match; simpler);
+      eauto using tick_not_in_timeouts_in;
+      in_crush; eauto using tick_not_in_timeouts_in; try discriminate;
+        eapply tick_not_in_timeouts_in; eauto.
+Qed.
+
+Lemma handle_msg_adds_tick_when_setting_joined :
+  forall (h h' : addr) (st st' : data) m (ms : list (addr * payload))
+    (nts cts : list timeout),
+    joined st = false ->
+    joined st' = true ->
+    handle_msg h h' st m = (st', ms, nts, cts) ->
+    In Tick nts.
+Proof.
+  intros.
+  unfold handle_msg in *.
+  repeat (break_match; simpler);
+    unfold handle_query_res in *; repeat (break_match; simpler);
+    unfold handle_query_req_busy in *; repeat (break_match; simpler);
+    unfold handle_stabilize in *; repeat (break_match; simpler);
+    unfold schedule_rectify_with in *; repeat (break_match; simpler);
+    unfold end_query in *; repeat (break_match; simpler);
+    unfold handle_rectify in *; repeat (break_match; simpler);
+    unfold start_query in *; repeat (break_match; simpler); congruence.
+Qed.
+
+Lemma fold_left_constant_eliminator :
+  forall A B C (e : A -> C) (f : A -> B -> A) (l : list B) (x : A),
+    (forall x' y,
+        e (f x' y) = e x') ->
+    e (fold_left f l x) = e x.
+Proof.
+  induction l; intros; simpl in *; auto.
+  rewrite IHl; auto.
+Qed.
+
+Lemma initial_st_nodes :
+  nodes initial_st = initial_nodes.
+Proof.
+  unfold initial_st.
+  rewrite fold_left_constant_eliminator; simpl in *; auto.
+  intros.
+  unfold run_init_for. unfold apply_handler_result.
+  repeat break_let; simpl; auto.
+Qed.
+
 Lemma live_node_has_Tick_in_timeouts' :
   forall gst h,
     reachable_st gst ->
@@ -35,7 +117,7 @@ Proof.
   - intros. unfold live_node in *.
     intuition. break_exists. intuition.
     find_copy_apply_lem_hyp sigma_initial_st_start_handler.
-    assert (In h initial_nodes) by admit.
+    assert (In h initial_nodes) by (rewrite <- initial_st_nodes; auto).
     find_apply_lem_hyp timeouts_initial_st_start_handler.
     break_exists.
     repeat find_rewrite.
@@ -91,16 +173,57 @@ Proof.
         repeat (break_match; simpler);
           try solve [apply remove_preserve; simpler; congruence].
         unfold handle_query_timeout in *.
- (*
+        in_crush. right.
+        unfold start_query in *.
+        repeat (break_match; simpler);
+          try solve [apply remove_preserve; simpler; congruence];
+          apply in_remove_all_preserve;
+          try solve [match goal with
+          | |- ~ In _ _ =>
+            unfold timeouts_in; repeat break_match; in_crush; congruence
+                     end];
+          try solve [apply remove_preserve; simpler; congruence].
+    + subst. simpl in *.
+      update_destruct; subst;
+        unfold live_node in *; simpl in *; repeat rewrite_update; auto.
+      intuition. break_exists. intuition. find_inversion.
+      assert (joined d = true -> In Tick (timeouts gst (fst (snd m)))) by
+          (intros; apply IHreachable_st; intuition; eauto).
+      unfold recv_handler in *. repeat break_let.
+      find_copy_apply_lem_hyp do_delayed_queries_never_clears_tick.
+      repeat find_inversion. in_crush.
+      match goal with
+      | |- In Tick (?new_do_delayed
+                    ++ remove_all ?dec ?cleared_do_delayed ?new_handle_msg)
+          \/ In Tick (remove_all _ (?cleared_handle_msg ++ ?cleared_do_delayed) ?old) =>
+        cut (In Tick new_handle_msg \/ In Tick (remove_all dec cleared_handle_msg old))
+      end.
+      { intros. intuition.
+        - left. in_crush. right.
+          eauto using in_remove_all_preserve.
+        - right. rewrite remove_all_app_l.
+          rewrite remove_all_del_comm.
+          eauto using in_remove_all_preserve.
+      }
+      find_copy_apply_lem_hyp handle_msg_never_clears_tick.
+      match goal with
+      | H : context [joined] |- _ =>
+        erewrite <- HandlerLemmas.joined_preserved_by_do_delayed_queries in H by eauto
+      end.
+      destruct (joined d) eqn:?; auto.
+      * concludes. eauto using in_remove_all_preserve.
+      * left.
+        eauto using handle_msg_adds_tick_when_setting_joined.
+    + subst. simpl in *. auto.
+    + subst. simpl in *. auto.
+Qed.        
+
+(*
 New nodes have no Tick.
 A node with no Tick sets joined = true iff it also registers a Tick.
 Having a Tick is preserved by the step.
-DIFFICULTY: 3
 USED: In phase one.
 *)
-
-Admitted.
-
 
 Lemma live_node_has_Tick_in_timeouts :
   forall ex h,
