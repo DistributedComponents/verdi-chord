@@ -55,6 +55,9 @@ Definition succs_error (h : addr) (gst : global_state) :=
     Chord.SUCC_LIST_LEN + 1
   end.
 
+Definition phase_three_error : global_state -> nat :=
+  max_measure succs_error.
+
 Definition correct_succs (gst : global_state) (h : pointer) (st : data) : Prop :=
   forall s xs ys s',
     wf_ptr h ->
@@ -71,105 +74,86 @@ Definition all_succs_correct (gst : global_state) : Prop :=
     correct_succs gst h st /\
     length (succ_list st) = Chord.SUCC_LIST_LEN.
 
+Lemma phase_three_error_sound :
+  forall occ,
+    measure_zero phase_three_error occ ->
+    all_succs_correct (occ_gst occ).
+Proof.
+Admitted.
+
+Lemma all_measures_drop_when_succs_error_nonzero :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    phase_three_error (occ_gst (hd ex)) > 0 ->
+    forall h,
+      In h (active_nodes (occ_gst (hd ex))) ->
+      eventually (consecutive (measure_decreasing (succs_error h))) ex.
+Proof.
+Admitted.
+
+Lemma always_all_measures_drop_when_succs_error_nonzero :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (max_measure_nonzero_all_measures_drop succs_error) ex.
+Proof.
+  cofix c; intros.
+  constructor; destruct ex.
+  - unfold max_measure_nonzero_all_measures_drop.
+    eauto using all_measures_drop_when_succs_error_nonzero.
+  - eapply c; invar_eauto.
+Qed.
+Hint Resolve always_all_measures_drop_when_succs_error_nonzero.
+
+Lemma succs_error_nonincreasing :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_two) ex ->
+    always (local_measures_nonincreasing succs_error) ex.
+Proof.
+Admitted.
+Hint Resolve succs_error_nonincreasing.
+
+Lemma phase_three_error_to_zero :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_two) ex ->
+    continuously (now (measure_zero phase_three_error)) ex.
+Proof.
+  intros.
+  eapply local_measure_causes_max_measure_zero; auto.
+Qed.
+
+Theorem phase_three_with_phase_two :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_two) ex ->
+    continuously (now (fun occ => all_succs_correct (occ_gst occ))) ex.
+Proof.
+  intros.
+  find_copy_apply_lem_hyp phase_three_error_to_zero; auto.
+Admitted.
+
 Theorem phase_three :
   forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    continuously (lift_gpred_to_ex all_succs_correct) ex.
+    continuously (now (fun occ => all_succs_correct (occ_gst occ))) ex.
 Proof.
 Admitted.
-
-Definition ideal (gst : global_state) : Prop :=
-  forall h st,
-    live_node gst (addr_of h) ->
-    wf_ptr h ->
-    sigma gst (addr_of h) = Some st ->
-    correct_succs gst h st /\
-    length (succ_list st) = Chord.SUCC_LIST_LEN /\
-    pred_correct gst h (pred st).
-
-Theorem phases_locally_sufficient :
-  forall gst,
-    preds_and_first_succs_correct gst ->
-    all_succs_correct gst ->
-    ideal gst.
-Proof.
-  intros gst H_preds H_succs.
-  unfold ideal; intros h st.
-  destruct H_preds as [H_preds _].
-  specialize (H_preds h st).
-  specialize (H_succs h st).
-  tauto.
-Qed.
-
-Definition gpred_and (P Q : global_state -> Prop) (gst : global_state) : Prop :=
-  P gst /\ Q gst.
-
-Lemma and_tl_gpred_and_comm :
-  forall (P Q : global_state -> Prop) ex,
-    lift_gpred_to_ex (gpred_and P Q) ex <->
-    (and_tl (lift_gpred_to_ex P) (lift_gpred_to_ex Q)) ex.
-Proof.
-  unfold lift_gpred_to_ex, lift_gpred_to_occ, gpred_and, and_tl.
-  split; intros; destruct ex; simpl in *; tauto.
-Qed.
-
-Theorem phases_sufficient :
-  forall ex,
-    lift_gpred_to_ex
-      (gpred_and preds_and_first_succs_correct
-                 all_succs_correct)
-      ex ->
-    lift_gpred_to_ex ideal ex.
-Proof.
-  unfold lift_gpred_to_ex, lift_gpred_to_occ.
-  eapply now_monotonic.
-  intros.
-  match goal with
-  | [ H : gpred_and _ _ _ |- _ ] =>
-    destruct H
-  end.
-  now auto using phases_locally_sufficient.
-Qed.
-
-Lemma phase_two_without_phase_one :
-  forall ex : infseq occurrence,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    always (~_ now circular_wait) ex ->
-    continuously (now phase_two) ex.
-Proof.
-  intros.
-  find_copy_eapply_lem_hyp phase_one_continuously; eauto.
-  apply eventually_idempotent.
-  lift_eventually phase_two_continuously.
-  - intros.
-    unfold and_tl in *; break_and.
-    repeat (split; invar_eauto).
-  - firstorder.
-Qed.
-
-Theorem chord_stabilization :
-  forall ex : infseq.infseq occurrence,
-    reachable_st (occ_gst (infseq.hd ex)) ->
-    lb_execution ex ->
-    strong_local_fairness ex ->
-    always (~_ (now circular_wait)) ex ->
-    continuously
-      (lift_gpred_to_ex ideal)
-      ex.
-Proof.
-  intros.
-  find_copy_eapply_lem_hyp phase_two_without_phase_one; eauto.
-  find_copy_eapply_lem_hyp phase_three; eauto.
-  eapply continuously_monotonic.
-  eapply phases_sufficient.
-  eapply continuously_monotonic.
-  - intros.
-    rewrite and_tl_gpred_and_comm.
-    eauto.
-  - apply continuously_and_tl; eauto.
-Qed.
