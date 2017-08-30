@@ -2870,3 +2870,21 @@ Proof.
   apply local_measure_causes_measure_zero_continuosly;
     auto using phase_two_error_continuously_nonincreasing, phase_two_nonzero_error_continuous_drop.
 Qed.
+
+Lemma phase_two_without_phase_one :
+  forall ex : infseq occurrence,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ now circular_wait) ex ->
+    continuously (now phase_two) ex.
+Proof.
+  intros.
+  find_copy_eapply_lem_hyp phase_one_continuously; eauto.
+  apply eventually_idempotent.
+  lift_eventually phase_two_continuously.
+  - intros.
+    unfold and_tl in *; break_and.
+    repeat (split; invar_eauto).
+  - firstorder.
+Qed.

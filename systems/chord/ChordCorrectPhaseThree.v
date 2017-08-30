@@ -75,10 +75,29 @@ Definition all_succs_correct (gst : global_state) : Prop :=
 
 Lemma phase_three_error_sound :
   forall occ,
+    reachable_st (occ_gst occ) ->
     measure_zero phase_three_error occ ->
     all_succs_correct (occ_gst occ).
 Proof.
 Admitted.
+
+Lemma phase_three_error_continuously_zero_sound :
+  forall ex,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    continuously (now (measure_zero phase_three_error)) ex ->
+    continuously (now (fun occ => all_succs_correct (occ_gst occ))) ex.
+Proof.
+  intros.
+  induction 0.
+  - apply E0.
+    generalize dependent s.
+    cofix c; intros; constructor; destruct s; cbn in *.
+    + find_apply_lem_hyp always_Cons; break_and.
+      auto using phase_three_error_sound.
+    + apply c; invar_eauto.
+  - apply E_next, IHeventually; invar_eauto.
+Qed.
 
 Lemma all_measures_drop_when_succs_error_nonzero :
   forall ex,
@@ -145,7 +164,8 @@ Theorem phase_three_with_phase_two :
 Proof.
   intros.
   find_copy_apply_lem_hyp phase_three_error_to_zero; auto.
-Admitted.
+  apply phase_three_error_continuously_zero_sound; auto.
+Qed.
 
 Theorem phase_three :
   forall ex,
@@ -155,4 +175,9 @@ Theorem phase_three :
     always (~_ (now circular_wait)) ex ->
     continuously (now (fun occ => all_succs_correct (occ_gst occ))) ex.
 Proof.
-Admitted.
+  intros.
+  find_copy_apply_lem_hyp phase_two_without_phase_one; auto.
+  induction 0.
+  - now apply phase_three_with_phase_two.
+  - apply E_next, IHeventually; invar_eauto.
+Qed.

@@ -55,24 +55,6 @@ Proof.
   now auto using phases_locally_sufficient.
 Qed.
 
-Lemma phase_two_without_phase_one :
-  forall ex : infseq occurrence,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    always (~_ now circular_wait) ex ->
-    continuously (now phase_two) ex.
-Proof.
-  intros.
-  find_copy_eapply_lem_hyp phase_one_continuously; eauto.
-  apply eventually_idempotent.
-  lift_eventually phase_two_continuously.
-  - intros.
-    unfold and_tl in *; break_and.
-    repeat (split; invar_eauto).
-  - firstorder.
-Qed.
-
 Theorem chord_stabilization :
   forall ex : infseq.infseq occurrence,
     reachable_st (occ_gst (infseq.hd ex)) ->
