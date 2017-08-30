@@ -2,7 +2,6 @@ Require Import List.
 Import ListNotations.
 Require Import Omega.
 
-Require Verdi.Coqlib.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 
