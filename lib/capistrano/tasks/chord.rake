@@ -29,6 +29,15 @@ namespace :chord do
     end
   end
 
+  desc 'print entire chord log'
+  task :get_log do
+    on roles(:node) do
+      execute 'cat',
+        "#{shared_path}/extraction/chord/log/chord.log"
+    end
+  end
+
+
   desc 'tail chord log'
   task :tail_log do
     on roles(:node) do

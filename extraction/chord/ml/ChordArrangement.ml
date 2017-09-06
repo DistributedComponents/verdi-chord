@@ -2,6 +2,8 @@ open ExtractedChord
 open Printf
 open Str
 
+let chord_default_port = 7000
+
 let show_id i =
   Digest.to_hex (Util.bytes_of_char_list (id_to_ascii i))
 
@@ -87,7 +89,6 @@ let rebracket4 (((a, b), c), d) = (a, b, c, d)
 let rebracket3 ((a, b), c) = (a, b, c)
 
 module type ChordConfig = sig
-  val port : int
   val tick_timeout : float
   val keepalive_timeout : float
   val request_timeout : float
@@ -95,17 +96,18 @@ module type ChordConfig = sig
 end
 
 module ChordArrangement (C : ChordConfig) = struct
-  type addr = string * int
+  type addr = string
   type name = ChordSystem.addr
   type state = ChordSystem._data
   type msg = ChordSystem.payload
   type timeout = ExtractedChord.ChordSystem._timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
+  let port = chord_default_port
   let addr_of_name n =
     let (a :: p :: _) = split (regexp ":") (Util.bytes_of_char_list n) in
-    (a, C.port)
-  let name_of_addr (s, p) =
-    Util.char_list_of_string (s ^ ":" ^ string_of_int p)
+    a
+  let name_of_addr s =
+    Util.char_list_of_string s
   let start_handler n ks =
     Random.self_init ();
     rebracket3 (init n ks)
@@ -152,9 +154,7 @@ type chord_config =
   }
 
 let run cc nm knowns =
-  let port = snd nm in
   let module Conf = struct
-     let port = port
      let tick_timeout = cc.tick_timeout
      let keepalive_timeout = cc.keepalive_timeout
      let request_timeout = cc.request_timeout

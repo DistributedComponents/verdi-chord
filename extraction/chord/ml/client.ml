@@ -4,14 +4,14 @@ open ExtractedChord.ChordIDSpace
 
 module type ClientSig = sig
   exception Wrong_response of string
-  val lookup : string -> string * int -> id -> pointer
-  val get_pred_and_succs : string -> string * int -> pointer option * pointer list
+  val lookup : string -> string -> id -> pointer
+  val get_pred_and_succs : string -> string -> pointer option * pointer list
 end
 
 module Client : ClientSig = struct
 
   let connect_and_send me addr msg =
-    let remote = Util.mk_addr_inet addr in
+    let remote = Util.mk_addr_inet (addr, ChordArrangement.chord_default_port) in
     let self = Util.mk_addr_inet (me, 0) in
     let conn = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     Unix.setsockopt conn Unix.SO_REUSEADDR true;
