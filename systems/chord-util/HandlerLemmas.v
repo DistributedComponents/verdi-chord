@@ -241,6 +241,24 @@ Proof using.
     [left; eexists|]; tauto.
 Qed.
 
+Lemma succ_list_preserved_by_do_delayed_queries :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    succ_list st = succ_list st'.
+Proof.
+  intros.
+  find_apply_lem_hyp do_delayed_queries_definition; expand_def; reflexivity.
+Qed.
+
+Lemma pred_preserved_by_do_delayed_queries :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    pred st = pred st'.
+Proof.
+  intros.
+  find_apply_lem_hyp do_delayed_queries_definition; expand_def; reflexivity.
+Qed.
+
 Lemma end_query_definition :
   forall st ms newts clearedts st' ms' newts' clearedts',
     end_query (st, ms, newts, clearedts) = (st', ms', newts', clearedts') ->
@@ -991,4 +1009,38 @@ Qed.
 Lemma initial_nodes_length : length initial_nodes = Chord.SUCC_LIST_LEN + 1.
 Proof.
   apply make_initial_nodes_length.
+Qed.
+
+Lemma handle_msg_stabilize_response_pred_worse_sets_succs :
+  forall s h st p succs,
+    cur_request st = Some (make_pointer s, Stabilize, GetPredAndSuccs) ->
+    ptr_between_bool (ptr st) p (make_pointer s) = false ->
+    forall st' ms nts cts,
+      handle_msg s h st (GotPredAndSuccs (Some p) succs) = (st', ms, nts, cts) ->
+      succ_list st' = make_succs (make_pointer s) succs.
+Proof.
+  intros until 2.
+  unfold handle_msg.
+  find_rewrite; simpl.
+  repeat (break_if; try congruence).
+  intros.
+  find_injection.
+  reflexivity.
+Qed.
+
+Lemma recv_handler_stabilize_response_pred_worse_sets_succs :
+  forall s h st p succs,
+    cur_request st = Some (make_pointer s, Stabilize, GetPredAndSuccs) ->
+    ptr_between_bool (ptr st) p (make_pointer s) = false ->
+    forall st' ms nts cts,
+      recv_handler s h st (GotPredAndSuccs (Some p) succs) = (st', ms, nts, cts) ->
+      succ_list st' = make_succs (make_pointer s) succs.
+Proof.
+  intros until 2.
+  unfold recv_handler.
+  repeat break_let.
+  intros.
+  find_injection.
+  erewrite <- succ_list_preserved_by_do_delayed_queries; eauto.
+  eapply handle_msg_stabilize_response_pred_worse_sets_succs; eauto.
 Qed.

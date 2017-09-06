@@ -1015,41 +1015,6 @@ Section LocalMeasure.
     find_apply_lem_hyp continuously_bound_on_local_measures_bounds_max; auto.
   Qed.
 
-  Lemma all_eventually_decreasing_max_decreasing :
-    forall ex,
-      lb_execution ex ->
-      max_measure (occ_gst (hd ex)) > 0 ->
-      always local_measures_nonincreasing ex ->
-      (forall h : addr,
-          In h (active_nodes (occ_gst (hd ex))) ->
-          eventually (consecutive (measure_decreasing (local_measure h))) ex) ->
-      eventually (consecutive (measure_decreasing max_measure)) ex.
-  Proof.
-    intros.
-    destruct (max_measure (occ_gst (hd ex))) as [|n] eqn:?; try omega.
-    assert (forall h,
-               In h (active_nodes (occ_gst (hd ex))) ->
-               continuously (fun ex' => |h in (occ_gst (hd ex'))| <= n) ex).
-    {
-      intros.
-      eapply local_drops_below_bound; eauto.
-      unfold max_measure in *.
-      eapply max_of_nats_bounds_list; eauto.
-      match goal with
-      | |- In ?val (?map ?f ?l) =>
-        change val with (f h)
-      end.
-      auto using in_map.
-    }
-    find_copy_apply_lem_hyp nonincreasing_global; eauto.
-    clear H0.
-    find_apply_lem_hyp continuously_forall_list_comm.
-    eapply bound_decreased_measure_decreased; try eassumption.
-    eapply continuously_bound_on_local_measures_max_measure_bounded; eauto.
-    omega.
-    try eapply local_nonincreasing_causes_max_nonincreasing.
-  Admitted.
-
   Lemma local_measure_causes_eventual_max_drop :
     forall ex,
       lb_execution ex ->

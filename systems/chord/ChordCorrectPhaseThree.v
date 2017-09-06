@@ -19,7 +19,10 @@ Require Import Chord.SystemPointers.
 Require Import Chord.LabeledMeasures.
 
 Require Import Chord.ValidPointersInvariant.
+Require Import Chord.PredNeverSelfInvariant.
+Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.QueriesEventuallyStop.
+Require Import Chord.QueryInvariant.
 
 Require Import Chord.ChordCorrectPhaseOne.
 Require Import Chord.ChordCorrectPhaseTwo.
@@ -99,17 +102,109 @@ Proof.
   - apply E_next, IHeventually; invar_eauto.
 Qed.
 
+Definition has_succs (gst : global_state) (h : addr) (succs : list pointer) :=
+  exists st,
+    sigma gst h = Some st /\
+    succ_list st = succs.
+
+Lemma has_succs_intro :
+  forall gst h succs st,
+    sigma gst h = Some st ->
+    succ_list st = succs ->
+    has_succs gst h succs.
+Proof.
+  eexists; eauto.
+Qed.
+
+Lemma p_before_a_stabilization_adopts_succ_list :
+  forall ex h s succs,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    always (now phase_two) ex ->
+    has_first_succ (occ_gst (hd ex)) h s ->
+    has_succs (occ_gst (hd ex)) (addr_of s) succs ->
+    open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
+    eventually (now (fun occ => has_succs (occ_gst occ) h (make_succs s succs))) ex.
+Proof.
+Admitted.
+
+Lemma adopting_succs_decrements_error :
+  forall gst h s succs err,
+    reachable_st gst ->
+    wf_ptr s ->
+    wf_ptr h ->
+    succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN = err ->
+    succs_error_helper gst h [] (make_succs s succs) Chord.SUCC_LIST_LEN = err - 1.
+Proof.
+Admitted.
+
+Lemma adopting_succs_decreases_error_bound :
+  forall gst h s succs err,
+    reachable_st gst ->
+    wf_ptr s ->
+    wf_ptr h ->
+    succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN <= err ->
+    succs_error_helper gst h [] (make_succs s succs) Chord.SUCC_LIST_LEN <= err - 1.
+Proof.
+  intros.
+  erewrite adopting_succs_decrements_error by eauto.
+  omega.
+Qed.
+
 Lemma all_measures_drop_when_succs_error_nonzero :
-  forall ex,
+  forall ex err,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    phase_three_error (occ_gst (hd ex)) > 0 ->
+    always (now phase_two) ex ->
+    phase_three_error (occ_gst (hd ex)) = S err ->
     forall h,
-      In h (active_nodes (occ_gst (hd ex))) ->
-      eventually (consecutive (measure_decreasing (succs_error h))) ex.
+      live_node (occ_gst (hd ex)) h ->
+      eventually (now (fun occ => succs_error h (occ_gst occ) <= err)) ex.
 Proof.
+  intros.
+  find_copy_apply_lem_hyp start_stabilize_with_first_successor_eventually; auto.
+  induction 0 as [[o ex]|].
+  - simpl in *.
+    assert (first_succ_is_best_succ (occ_gst o) h).
+    {
+      admit.
+    }
+    unfold first_succ_is_best_succ in *.
+    break_exists_name st_h.
+    break_exists_name s.
+    break_exists_name old_succs.
+    break_and.
+    assert (first_succ_is_best_succ (occ_gst o) (addr_of s)).
+    {
+      admit.
+    }
+    break_exists_name st_s.
+    break_exists_name s'.
+    break_exists_name succs.
+    break_and.
+    pose proof (p_before_a_stabilization_adopts_succ_list (Cons o ex) h s succs) as Hadopts.
+    specialize (Hadopts ltac:(eauto) H).
+    forwards; eauto; concludes.
+    forwards.
+    eapply has_first_succ_intro; eauto.
+    find_rewrite. reflexivity.
+    concludes.
+    forwards.
+    eapply has_succs_intro; eauto.
+    kjkj
+    forwards; auto; concludes.
+
+    forwards; auto; concludes.
+    assert (succs_error 
+    unfold open_stabilize_request_to_first_succ in *.
+    find_copy_apply_lem_hyp live_node_means_state_exists.
+    inv_prop live_node; expand_def.
+    concludes.
+  find_copy_apply_lem_hyp 
+  find_copy_apply_lem_hyp (loaded_Tick_inf_often ex h); auto.
+
 Admitted.
 
 Lemma always_all_measures_drop_when_succs_error_nonzero :
