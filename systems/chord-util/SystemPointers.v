@@ -777,3 +777,10 @@ Lemma wf_ptr_hash_eq :
 Proof.
   auto.
 Qed.
+
+Lemma make_pointer_wf :
+  forall h,
+    wf_ptr (make_pointer h).
+Proof.
+  constructor.
+Qed.
