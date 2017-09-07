@@ -23,6 +23,7 @@ Require Import Chord.PredNeverSelfInvariant.
 Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.QueryInvariant.
+Require Import Chord.NodesHaveState.
 
 Require Import Chord.ChordCorrectPhaseOne.
 Require Import Chord.ChordCorrectPhaseTwo.
@@ -320,7 +321,8 @@ Proof.
   constructor; destruct ex.
   - unfold max_measure_nonzero_eventually_all_locals_below in *.
     intros.
-    find_copy_apply_lem_hyp active_nodes_have_state; invar_eauto.
+    find_copy_apply_lem_hyp in_active_in_nodes.
+    find_eapply_lem_hyp nodes_have_state; invar_eauto.
     break_exists_name st.
     destruct (joined st) eqn:?.
     + eapply all_measures_drop_when_succs_error_nonzero; invar_eauto.
