@@ -237,20 +237,18 @@ Proof.
   find_copy_apply_lem_hyp start_stabilize_with_first_successor_eventually; auto.
   induction 0 as [[o ex]|o [o' ex]].
   - simpl in *.
-    assert (first_succ_is_best_succ (occ_gst o) h).
+    assert (exists st_h s os, sigma (occ_gst o) h = Some st_h /\ succ_list st_h = s :: os).
     {
       admit.
     }
-    unfold first_succ_is_best_succ in *.
     break_exists_name st_h.
     break_exists_name s.
     break_exists_name old_succs.
     break_and.
-    assert (first_succ_is_best_succ (occ_gst o) (addr_of s)).
+    assert (exists st_s s' succs, sigma (occ_gst o) (addr_of s) = Some st_s /\ succ_list st_s = s' :: succs).
     {
       admit.
     }
-    unfold first_succ_is_best_succ in *.
     break_exists_name st_s.
     break_exists_name s'.
     break_exists_name succs.
