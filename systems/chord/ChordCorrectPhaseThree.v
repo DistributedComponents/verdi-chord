@@ -293,16 +293,6 @@ Proof.
     omega.
 Admitted.
 
-(* TODO(ryan) move to chord-util/SystemLemmas *)
-Lemma active_nodes_have_state :
-  forall gst h,
-    reachable_st gst ->
-    In h (active_nodes gst) ->
-    exists st,
-      sigma gst h = Some st.
-Proof.
-Admitted.
-
 Lemma not_joined_zero_succs_error :
   forall gst h st,
     sigma gst h = Some st ->

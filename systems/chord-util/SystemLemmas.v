@@ -10,6 +10,8 @@ Set Bullet Behavior "Strict Subproofs".
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 
+Require Import InfSeqExt.infseq.
+
 Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 
@@ -203,51 +205,6 @@ Definition best_succ_of (gst : global_state) (h : addr) : option addr :=
   | Some st => head (filter (live_node_bool gst) (map addr_of (succ_list st)))
   | None => None
   end.
-
-Definition live_nodes_have_state (gst : global_state) : Prop :=
-  forall h,
-    In h (nodes gst) ->
-    exists st,
-      sigma gst h = Some st.
-
-Theorem nodes_have_state :
-  forall gst gst',
-    live_nodes_have_state gst ->
-    step_dynamic gst gst' ->
-    live_nodes_have_state gst'.
-Proof using.
-  unfold live_nodes_have_state.
-  move => gst gst' H_st H_step n H_in.
-  break_step.
-  - destruct (addr_eq_dec h n).
-    + subst_max.
-      apply update_for_start_sigma_h_exists.
-    + find_rewrite_lem update_for_start_nodes_eq.
-      find_apply_lem_hyp in_inv.
-      break_or_hyp; try (exfalso; eauto; fail).
-      find_apply_lem_hyp H_st.
-      break_exists_exists.
-      eapply update_for_start_sigma_h_n; eauto.
-  - eauto.
-  - destruct (addr_eq_dec h n).
-    * eexists.
-      now apply update_eq.
-    * find_apply_lem_hyp H_st.
-      break_exists_exists.
-      find_reverse_rewrite.
-      now apply update_diff.
-  - (*simpl in *.*)
-    destruct (addr_eq_dec (fst (snd m)) n).
-    * eexists.
-      now apply update_eq.
-    * simpl.
-      find_apply_lem_hyp H_st.
-      break_exists_exists.
-      repeat find_reverse_rewrite.
-      now apply update_diff.
-  - admit.
-  - admit.
-Admitted.
 
 Lemma live_node_specificity :
   forall gst gst',
@@ -679,35 +636,6 @@ Proof.
   now rewrite_update.
 Qed.
 
-Lemma fold_left_for_each_not_in :
-  forall A B C (f : A -> B -> A) (e : A -> B -> C),
-    (forall a b b',
-        b <> b' ->
-        e (f a b') b = e a b) ->
-    forall l a0 b,
-      ~ In b l ->
-      e (fold_left f l a0) b = e a0 b.
-Proof.
-  induction l as [| b' l']; simpl in *; auto.
-  - intros. intuition.
-    rewrite IHl'; auto.
-Qed.
-
-Lemma fold_left_for_each_in :
-  forall A B C (f : A -> B -> A) (e : A -> B -> C) (B_eq_dec : forall x y : B, {x = y} + {x <> y}),
-    (forall a b b',
-        b <> b' ->
-        e (f a b') b = e a b) ->
-    forall l a0 b,
-      In b l ->
-      exists a',
-        e (fold_left f l a0) b = e (f a' b) b.
-Proof.
-  induction l as [|b' l']; simpl in *; intuition; subst.
-  destruct (in_dec B_eq_dec b l'); intuition.
-  find_eapply_lem_hyp fold_left_for_each_not_in; eauto.
-Qed.
-
 Lemma sigma_initial_st_start_handler :
   forall h st,
     sigma initial_st h = Some st ->
@@ -715,19 +643,18 @@ Lemma sigma_initial_st_start_handler :
 Proof.
   intros. unfold initial_st in *.
   destruct (in_dec addr_eq_dec h initial_nodes).
-  - find_eapply_lem_hyp (fold_left_for_each_in _ _ _ run_init_for sigma); eauto.
+  - find_eapply_lem_hyp fold_left_for_each_in; eauto.
     + break_exists. erewrite H0 in H. clear H0.
       unfold run_init_for in *. find_rewrite_lem sigma_apply_handler_result_same.
       simpl in *. congruence.
     + apply addr_eq_dec.
     + intros. unfold run_init_for.
       auto using sigma_apply_handler_result_diff.
-  - find_eapply_lem_hyp (fold_left_for_each_not_in _ _ _ run_init_for sigma); eauto.
+  - find_eapply_lem_hyp fold_left_for_each_not_in; eauto.
     + erewrite n in H. clear n. simpl in *. discriminate.
     + intros. unfold run_init_for.
       auto using sigma_apply_handler_result_diff.
 Qed.
-
 
 Lemma timeouts_apply_handler_result_diff :
   forall h h' res es gst,
@@ -748,8 +675,35 @@ Lemma timeouts_initial_st_start_handler :
       timeouts (apply_handler_result h (start_handler h initial_nodes, []) [] gst) h.
 Proof.
   intros.
-  unfold initial_st in H.
-  find_eapply_lem_hyp (fold_left_for_each_in _ _ _ run_init_for timeouts);
-    eauto using addr_eq_dec.
-  intros. unfold run_init_for. auto using timeouts_apply_handler_result_diff.
-Qed.  
+  find_eapply_lem_hyp (fold_left_for_each_in run_init_for timeouts addr_eq_dec);
+    eauto.
+  intros. unfold run_init_for in *. auto using timeouts_apply_handler_result_diff.
+Qed.
+
+Definition active_nodes (gst : global_state) :=
+  RemoveAll.remove_all addr_eq_dec (failed_nodes gst) (nodes gst).
+
+Lemma labeled_step_dynamic_preserves_active_nodes :
+  forall gst l gst',
+    labeled_step_dynamic gst l gst' ->
+    active_nodes gst = active_nodes gst'.
+Proof.
+  intros; unfold active_nodes.
+  erewrite labeled_step_dynamic_preserves_failed_nodes; eauto.
+  erewrite labeled_step_dynamic_preserves_nodes; eauto.
+Qed.
+
+Lemma active_nodes_always_identical :
+  forall l ex,
+    lb_execution ex ->
+    active_nodes (occ_gst (hd ex)) = l ->
+    always (fun ex' => l = active_nodes (occ_gst (hd ex'))) ex.
+Proof.
+  cofix c. intros.
+  constructor; destruct ex.
+  - easy.
+  - apply c; eauto using lb_execution_invar.
+    inv_prop lb_execution.
+    find_apply_lem_hyp labeled_step_dynamic_preserves_active_nodes.
+    cbn; congruence.
+Qed.

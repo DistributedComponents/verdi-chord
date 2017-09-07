@@ -20,7 +20,6 @@ Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
-Require Import Chord.LabeledMeasures.
 
 Require Import Chord.LiveNodesStayLive.
 Require Import Chord.QueryInvariant.
@@ -1372,6 +1371,34 @@ Proof.
       * rewrite_update. intuition. repeat eexists; eauto.
   - auto.
   - auto.
+Qed.
+
+Definition active_nodes (gst : global_state) :=
+  RemoveAll.remove_all addr_eq_dec (failed_nodes gst) (nodes gst).
+
+Lemma labeled_step_dynamic_preserves_active_nodes :
+  forall gst l gst',
+    labeled_step_dynamic gst l gst' ->
+    active_nodes gst = active_nodes gst'.
+Proof.
+  intros; unfold active_nodes.
+  erewrite labeled_step_dynamic_preserves_failed_nodes; eauto.
+  erewrite labeled_step_dynamic_preserves_nodes; eauto.
+Qed.
+
+Lemma active_nodes_always_identical :
+  forall l ex,
+    lb_execution ex ->
+    active_nodes (occ_gst (hd ex)) = l ->
+    always (fun ex' => l = active_nodes (occ_gst (hd ex'))) ex.
+Proof.
+  cofix c. intros.
+  constructor; destruct ex.
+  - easy.
+  - apply c; eauto using lb_execution_invar.
+    inv_prop lb_execution.
+    find_apply_lem_hyp labeled_step_dynamic_preserves_active_nodes.
+    cbn; congruence.
 Qed.
 
 Lemma in_active_in_nodes :
