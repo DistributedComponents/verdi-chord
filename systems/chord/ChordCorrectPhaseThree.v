@@ -293,6 +293,27 @@ Proof.
     omega.
 Admitted.
 
+(* TODO(ryan) move to chord-util/SystemLemmas *)
+Lemma active_nodes_have_state :
+  forall gst h,
+    reachable_st gst ->
+    In h (active_nodes gst) ->
+    exists st,
+      sigma gst h = Some st.
+Proof.
+Admitted.
+
+Lemma not_joined_zero_succs_error :
+  forall gst h st,
+    sigma gst h = Some st ->
+    joined st = false ->
+    succs_error h gst = 0.
+Proof.
+  unfold succs_error.
+  intros.
+  now repeat find_rewrite.
+Qed.
+
 Lemma always_all_measures_drop_when_succs_error_nonzero :
   forall ex,
     lb_execution ex ->
@@ -309,10 +330,16 @@ Proof.
   constructor; destruct ex.
   - unfold max_measure_nonzero_eventually_all_locals_below in *.
     intros.
-    eapply all_measures_drop_when_succs_error_nonzero; invar_eauto.
-    admit.
+    find_copy_apply_lem_hyp active_nodes_have_state; invar_eauto.
+    break_exists_name st.
+    destruct (joined st) eqn:?.
+    + eapply all_measures_drop_when_succs_error_nonzero; invar_eauto.
+      eapply live_node_characterization; eauto using in_active_in_nodes, in_active_not_failed.
+    + apply E0; simpl.
+      replace (succs_error _ _) with 0;
+        eauto using not_joined_zero_succs_error, eq_sym with arith.
   - eapply c; invar_eauto.
-Admitted.
+Qed.
 
 Lemma succs_error_nonincreasing :
   forall ex,
