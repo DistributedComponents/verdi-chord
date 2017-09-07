@@ -316,7 +316,6 @@ Lemma succs_error_nonincreasing :
     always (local_measures_nonincreasing succs_error) ex.
 Proof.
 Admitted.
-Hint Resolve succs_error_nonincreasing.
 
 Lemma phase_three_error_to_zero :
   forall ex,
@@ -329,7 +328,8 @@ Lemma phase_three_error_to_zero :
 Proof.
   intros.
   eapply local_measure_causes_max_measure_zero;
-    auto using always_all_measures_drop_when_succs_error_nonzero.
+    auto using always_all_measures_drop_when_succs_error_nonzero,
+               succs_error_nonincreasing.
 Qed.
 
 Theorem phase_three_with_phase_two :
