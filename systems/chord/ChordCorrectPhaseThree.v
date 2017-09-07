@@ -52,7 +52,9 @@ Fixpoint succs_error_helper (gst : global_state) (h : pointer) (xs ys : list poi
 Definition succs_error (h : addr) (gst : global_state) :=
   match sigma gst h with
   | Some st =>
-    succs_error_helper gst (make_pointer h) [] (succ_list st) Chord.SUCC_LIST_LEN
+    if joined st
+    then succs_error_helper gst (make_pointer h) [] (succ_list st) Chord.SUCC_LIST_LEN
+    else 0
   | None =>
     Chord.SUCC_LIST_LEN + 1
   end.
@@ -155,6 +157,7 @@ Lemma adopting_succs_decreases_succs_error :
   forall gst h s succs err,
     reachable_st gst ->
     wf_ptr s ->
+    live_node gst h ->
     succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN <= S err ->
     has_succs gst h (make_succs s succs) ->
     succs_error h gst <= err.
@@ -164,6 +167,8 @@ Proof.
   inv_prop has_succs; break_and.
   unfold succs_error.
   repeat find_rewrite.
+  find_apply_lem_hyp live_node_joined; expand_def.
+  find_rewrite; find_injection; find_rewrite.
   apply adopting_succs_decreases_succs_error_helper; eauto.
   apply make_pointer_wf.
 Qed.
@@ -196,6 +201,7 @@ Lemma succs_eventually_adopted_error_eventually_bounded :
     lb_execution ex ->
     always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
     wf_ptr s ->
+    live_node (occ_gst (hd ex)) h ->
     first_succ_correct (occ_gst (hd ex)) (make_pointer h) (Some s) ->
     succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err ->
     eventually (now (fun occ => has_succs (occ_gst occ) h (make_succs s succs))) ex ->
@@ -276,6 +282,9 @@ Proof.
       rewrite <- wf_ptr_eq in * by auto.
       repeat find_rewrite.
       simpl (occ_gst (hd (Cons o ex))).
+      replace (joined st_s) with true in *
+        by (symmetry; eauto using nonempty_succ_list_implies_joined).
+      find_apply_lem_hyp live_node_joined; expand_def.
       omega.
   - apply E_next, IHeventually; invar_eauto.
     find_apply_lem_hyp local_always_nonincreasing_causes_max_always_nonincreasing; invar_eauto.
