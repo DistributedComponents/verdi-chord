@@ -138,7 +138,7 @@ Lemma adopting_succs_decrements_error :
 Proof.
 Admitted.
 
-Lemma adopting_succs_decreases_error_bound :
+Lemma adopting_succs_decreases_succs_error_helper :
   forall gst h s succs err,
     reachable_st gst ->
     wf_ptr s ->
@@ -151,6 +151,66 @@ Proof.
   omega.
 Qed.
 
+Lemma adopting_succs_decreases_succs_error :
+  forall gst h s succs err,
+    reachable_st gst ->
+    wf_ptr s ->
+    succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN <= S err ->
+    has_succs gst h (make_succs s succs) ->
+    succs_error h gst <= err.
+Proof.
+  intros.
+  cut (succs_error h gst <= S err - 1); try (intros; omega).
+  inv_prop has_succs; break_and.
+  unfold succs_error.
+  repeat find_rewrite.
+  apply adopting_succs_decreases_succs_error_helper; eauto.
+  apply make_pointer_wf.
+Qed.
+
+Lemma first_succ_correct_invar :
+  forall o ex h s,
+    lb_execution (Cons o ex) ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+    first_succ_correct (occ_gst o) h (Some s) ->
+    first_succ_correct (occ_gst (hd ex)) h (Some s).
+Proof.
+  (* relies on the fact that when nodes aren't joining, better_succ is preserved *)
+Admitted.
+
+Lemma succs_error_helper_invar :
+  forall o ex h succs,
+    lb_execution (Cons o ex) ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+
+    forall k,
+      succs_error_helper (occ_gst o) h [] succs Chord.SUCC_LIST_LEN = k ->
+      succs_error_helper (occ_gst (hd ex)) h [] succs Chord.SUCC_LIST_LEN = k.
+Proof.
+  (* relies on the fact that (live_ptrs gst) won't change *)
+Admitted.
+
+Lemma succs_eventually_adopted_error_eventually_bounded :
+  forall h s ex succs err,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+    wf_ptr s ->
+    first_succ_correct (occ_gst (hd ex)) (make_pointer h) (Some s) ->
+    succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err ->
+    eventually (now (fun occ => has_succs (occ_gst occ) h (make_succs s succs))) ex ->
+    eventually (now (fun occ => succs_error h (occ_gst occ) <= err)) ex.
+Proof.
+  intros.
+  induction 0 as [[o ex]|? ex].
+  - simpl in *.
+    apply E0.
+    eapply adopting_succs_decreases_succs_error; eauto.
+  - apply E_next, IHeventually; invar_eauto.
+    + eapply first_succ_correct_invar; invar_eauto.
+    + erewrite succs_error_helper_invar; invar_eauto.
+Qed.
+
 Lemma all_measures_drop_when_succs_error_nonzero :
   forall ex err,
     lb_execution ex ->
@@ -158,14 +218,18 @@ Lemma all_measures_drop_when_succs_error_nonzero :
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
     always (now phase_two) ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+    always (local_measures_nonincreasing succs_error) ex ->
+
     phase_three_error (occ_gst (hd ex)) = S err ->
     forall h,
       live_node (occ_gst (hd ex)) h ->
       eventually (now (fun occ => succs_error h (occ_gst occ) <= err)) ex.
 Proof.
   intros.
+  find_apply_lem_hyp Nat.eq_le_incl.
   find_copy_apply_lem_hyp start_stabilize_with_first_successor_eventually; auto.
-  induction 0 as [[o ex]|].
+  induction 0 as [[o ex]|o [o' ex]].
   - simpl in *.
     assert (first_succ_is_best_succ (occ_gst o) h).
     {
@@ -180,31 +244,46 @@ Proof.
     {
       admit.
     }
+    unfold first_succ_is_best_succ in *.
     break_exists_name st_s.
     break_exists_name s'.
     break_exists_name succs.
     break_and.
-    pose proof (p_before_a_stabilization_adopts_succ_list (Cons o ex) h s succs) as Hadopts.
-    specialize (Hadopts ltac:(eauto) H).
-    forwards; eauto; concludes.
-    forwards.
-    eapply has_first_succ_intro; eauto.
-    find_rewrite. reflexivity.
-    concludes.
-    forwards.
-    eapply has_succs_intro; eauto.
-    kjkj
-    forwards; auto; concludes.
-
-    forwards; auto; concludes.
-    assert (succs_error 
-    unfold open_stabilize_request_to_first_succ in *.
-    find_copy_apply_lem_hyp live_node_means_state_exists.
-    inv_prop live_node; expand_def.
-    concludes.
-  find_copy_apply_lem_hyp 
-  find_copy_apply_lem_hyp (loaded_Tick_inf_often ex h); auto.
-
+    assert (eventually (now (fun occ : occurrence => has_succs (occ_gst occ) h (make_succs s (s' :: succs)))) (Cons o ex)).
+    {
+      apply p_before_a_stabilization_adopts_succ_list; auto.
+      - eapply has_first_succ_intro; eauto.
+        find_rewrite; auto.
+      - eauto using has_succs_intro.
+      - unfold open_stabilize_request_to_first_succ, open_stabilize_request_to in *.
+        simpl.
+        cut (In GetPredAndSuccs (channel (occ_gst o) h (addr_of s)) /\
+             open_request_to (occ_gst o) h (addr_of s) GetPredAndSuccs);
+          tauto || eauto.
+    }
+    assert (wf_ptr s) by admit.
+    eapply succs_eventually_adopted_error_eventually_bounded;
+      eauto using has_succs_intro.
+    + inv_prop phase_two.
+      simpl in *.
+      inv_prop (phase_two o).
+      unfold first_succs_correct in *.
+      replace (Some s) with (hd_error (succ_list st_h)) by (find_rewrite; reflexivity).
+      eauto using make_pointer_wf.
+    + remember (succs_error (addr_of s) (occ_gst o)) as e eqn:He; symmetry in He.
+      assert (e <= S err) by admit.
+      unfold succs_error in *.
+      rewrite <- wf_ptr_eq in * by auto.
+      repeat find_rewrite.
+      simpl (occ_gst (hd (Cons o ex))).
+      omega.
+  - apply E_next, IHeventually; invar_eauto.
+    find_apply_lem_hyp local_always_nonincreasing_causes_max_always_nonincreasing; invar_eauto.
+    find_apply_lem_hyp always_now.
+    unfold measure_nonincreasing in *.
+    cbn in *.
+    unfold phase_three_error in *.
+    omega.
 Admitted.
 
 Lemma always_all_measures_drop_when_succs_error_nonzero :
@@ -213,15 +292,19 @@ Lemma always_all_measures_drop_when_succs_error_nonzero :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    always (max_measure_nonzero_all_measures_drop succs_error) ex.
+    always (now phase_two) ex ->
+    always (local_measures_nonincreasing succs_error) ex ->
+    always (max_measure_nonzero_eventually_all_locals_below succs_error) ex.
 Proof.
   cofix c; intros.
   constructor; destruct ex.
-  - unfold max_measure_nonzero_all_measures_drop.
-    eauto using all_measures_drop_when_succs_error_nonzero.
+  - unfold max_measure_nonzero_eventually_all_locals_below in *.
+    intros.
+    eapply all_measures_drop_when_succs_error_nonzero; invar_eauto.
+    admit.
+    admit.
   - eapply c; invar_eauto.
-Qed.
-Hint Resolve always_all_measures_drop_when_succs_error_nonzero.
+Admitted.
 
 Lemma succs_error_nonincreasing :
   forall ex,
@@ -245,7 +328,8 @@ Lemma phase_three_error_to_zero :
     continuously (now (measure_zero phase_three_error)) ex.
 Proof.
   intros.
-  eapply local_measure_causes_max_measure_zero; auto.
+  eapply local_measure_causes_max_measure_zero;
+    auto using always_all_measures_drop_when_succs_error_nonzero.
 Qed.
 
 Theorem phase_three_with_phase_two :
