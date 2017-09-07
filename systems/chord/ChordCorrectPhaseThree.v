@@ -293,6 +293,8 @@ Lemma always_all_measures_drop_when_succs_error_nonzero :
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
     always (now phase_two) ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+
     always (local_measures_nonincreasing succs_error) ex ->
     always (max_measure_nonzero_eventually_all_locals_below succs_error) ex.
 Proof.
@@ -301,7 +303,6 @@ Proof.
   - unfold max_measure_nonzero_eventually_all_locals_below in *.
     intros.
     eapply all_measures_drop_when_succs_error_nonzero; invar_eauto.
-    admit.
     admit.
   - eapply c; invar_eauto.
 Admitted.
@@ -324,6 +325,7 @@ Lemma phase_three_error_to_zero :
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
     always (now phase_two) ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
     continuously (now (measure_zero phase_three_error)) ex.
 Proof.
   intros.
@@ -332,13 +334,14 @@ Proof.
                succs_error_nonincreasing.
 Qed.
 
-Theorem phase_three_with_phase_two :
+Theorem phase_three_with_extra_hyps :
   forall ex,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
     always (now phase_two) ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
     continuously (now (fun occ => all_succs_correct (occ_gst occ))) ex.
 Proof.
   intros.
@@ -356,7 +359,12 @@ Theorem phase_three :
 Proof.
   intros.
   find_copy_apply_lem_hyp phase_two_without_phase_one; auto.
+  find_copy_apply_lem_hyp joins_stop; auto.
+  find_continuously_and_tl.
   induction 0.
-  - now apply phase_three_with_phase_two.
-  - apply E_next, IHeventually; invar_eauto.
+  - find_apply_lem_hyp always_and_tl_eq.
+    unfold and_tl in *.
+    now apply phase_three_with_extra_hyps.
+  - apply E_next, IHeventually;
+      invar_eauto.
 Qed.
