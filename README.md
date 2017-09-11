@@ -46,7 +46,7 @@ query *N* with `client.native` as follows.
 client.native -bind 127.0.0.1 -node 127.0.0.2:6000 -query get_ptrs
 ```
 This will print out the predecessor and successor pointers of *N*. The following
-query will ask *N* for its successor closest to the ID `md5("rdoenges").
+query will ask *N* for its successor closest to the ID `md5("rdoenges")`.
 ```
 client.native -bind 127.0.0.1 -node 127.0.0.2:6000 -query lookup 66e3ec3f16c5a8071d00b917ce3cc992
 ```
