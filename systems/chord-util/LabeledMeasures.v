@@ -604,6 +604,20 @@ Section LocalMeasure.
   Definition max_measure (gst : global_state) : nat :=
     max (map (fun h => |h in gst|) (active_nodes gst)).
 
+  Lemma max_measure_bounds_measures :
+    forall gst e,
+      max_measure gst = e ->
+      forall h,
+        In h (active_nodes gst) ->
+        |h in gst| <= e.
+  Proof.
+    intros.
+    unfold max_measure in *.
+    eapply max_of_nats_bounds_list; eauto.
+    rewrite in_map_iff.
+    eauto.
+  Qed.
+
   Definition max_measure_nonzero_eventually_all_locals_below (ex : infseq occurrence) : Prop :=
     forall err,
       max_measure (occ_gst (hd ex)) = S err ->

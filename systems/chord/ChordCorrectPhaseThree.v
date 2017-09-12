@@ -3,7 +3,7 @@ Import ListNotations.
 Require Import Omega.
 
 Require Import StructTact.StructTactics.
-Require Import StructTact.Update.
+Require Import StructTact.Util.
 
 Require Import InfSeqExt.infseq.
 
@@ -24,6 +24,8 @@ Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.QueryInvariant.
 Require Import Chord.NodesHaveState.
+Require Import Chord.SuccessorNodesAlwaysValid.
+Require Import Chord.WfPtrSuccListInvariant.
 
 Require Import Chord.ChordCorrectPhaseOne.
 Require Import Chord.ChordCorrectPhaseTwo.
@@ -131,29 +133,6 @@ Lemma p_before_a_stabilization_adopts_succ_list :
 Proof.
 Admitted.
 
-Lemma adopting_succs_decrements_error :
-  forall gst h s succs err,
-    reachable_st gst ->
-    wf_ptr s ->
-    wf_ptr h ->
-    succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN = err ->
-    succs_error_helper gst h [] (make_succs s succs) Chord.SUCC_LIST_LEN = err - 1.
-Proof.
-Admitted.
-
-Lemma adopting_succs_decreases_succs_error_helper :
-  forall gst h s succs err,
-    reachable_st gst ->
-    wf_ptr s ->
-    wf_ptr h ->
-    succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN <= err ->
-    succs_error_helper gst h [] (make_succs s succs) Chord.SUCC_LIST_LEN <= err - 1.
-Proof.
-  intros.
-  erewrite adopting_succs_decrements_error by eauto.
-  omega.
-Qed.
-
 Lemma adopting_succs_decreases_succs_error :
   forall gst h s succs err,
     reachable_st gst ->
@@ -170,9 +149,7 @@ Proof.
   repeat find_rewrite.
   find_apply_lem_hyp live_node_joined; expand_def.
   find_rewrite; find_injection; find_rewrite.
-  apply adopting_succs_decreases_succs_error_helper; eauto.
-  apply make_pointer_wf.
-Qed.
+Admitted.
 
 Lemma first_succ_correct_invar :
   forall o ex h s,
@@ -218,6 +195,36 @@ Proof.
     + erewrite succs_error_helper_invar; invar_eauto.
 Qed.
 
+
+Lemma first_succs_correct_succs_nonempty :
+  forall gst,
+    first_succs_correct gst ->
+    forall h,
+      live_node gst h ->
+      exists st_h s os,
+        sigma gst h = Some st_h /\
+        succ_list st_h = s :: os.
+Proof.
+  intros.
+  assert (exists st, sigma gst h = Some st)
+    by eauto using live_node_means_state_exists.
+  break_exists_name st.
+  assert (first_succ_correct gst (make_pointer h) (hd_error (succ_list st)))
+    by auto using make_pointer_wf.
+  inv_prop first_succ_correct; break_and.
+  find_copy_apply_lem_hyp hd_error_tl_exists.
+  break_exists.
+  eauto.
+Qed.
+
+Lemma phase_two_first_succs_correct :
+  forall o,
+    phase_two o ->
+    first_succs_correct (occ_gst o).
+Proof.
+  now unfold phase_two, preds_and_first_succs_correct.
+Qed.
+
 Lemma all_measures_drop_when_succs_error_nonzero :
   forall ex err,
     lb_execution ex ->
@@ -225,6 +232,7 @@ Lemma all_measures_drop_when_succs_error_nonzero :
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
     always (now phase_two) ex ->
+    always (now phase_one) ex ->
     always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
     always (local_measures_nonincreasing succs_error) ex ->
 
@@ -240,15 +248,31 @@ Proof.
   - simpl in *.
     assert (exists st_h s os, sigma (occ_gst o) h = Some st_h /\ succ_list st_h = s :: os).
     {
-      admit.
+      repeat find_apply_lem_hyp always_Cons;
+        simpl in *.
+      apply first_succs_correct_succs_nonempty;
+        intuition eauto using always_Cons, phase_two_first_succs_correct.
     }
     break_exists_name st_h.
     break_exists_name s.
     break_exists_name old_succs.
     break_and.
+    assert (has_first_succ (occ_gst o) h s).
+    {
+        eapply has_first_succ_intro; eauto.
+        now repeat find_rewrite.
+    }
+    assert (live_node (occ_gst o) (addr_of s)).
+    {
+      repeat find_apply_lem_hyp always_Cons;
+        simpl in *.
+      intuition eauto using successors_are_live_nodes, phase_two_first_succs_correct.
+    }
     assert (exists st_s s' succs, sigma (occ_gst o) (addr_of s) = Some st_s /\ succ_list st_s = s' :: succs).
     {
-      admit.
+      repeat find_apply_lem_hyp always_Cons;
+        simpl in *.
+      intuition eauto using phase_two_first_succs_correct, first_succs_correct_succs_nonempty.
     }
     break_exists_name st_s.
     break_exists_name s'.
@@ -257,8 +281,6 @@ Proof.
     assert (eventually (now (fun occ : occurrence => has_succs (occ_gst occ) h (make_succs s (s' :: succs)))) (Cons o ex)).
     {
       apply p_before_a_stabilization_adopts_succ_list; auto.
-      - eapply has_first_succ_intro; eauto.
-        find_rewrite; auto.
       - eauto using has_succs_intro.
       - unfold open_stabilize_request_to_first_succ, open_stabilize_request_to in *.
         simpl.
@@ -266,7 +288,7 @@ Proof.
              open_request_to (occ_gst o) h (addr_of s) GetPredAndSuccs);
           tauto || eauto.
     }
-    assert (wf_ptr s) by admit.
+    assert (wf_ptr s) by eauto using wf_ptr_succ_list_invariant.
     eapply succs_eventually_adopted_error_eventually_bounded;
       eauto using has_succs_intro.
     + inv_prop phase_two.
@@ -276,7 +298,13 @@ Proof.
       replace (Some s) with (hd_error (succ_list st_h)) by (find_rewrite; reflexivity).
       eauto using make_pointer_wf.
     + remember (succs_error (addr_of s) (occ_gst o)) as e eqn:He; symmetry in He.
-      assert (e <= S err) by admit.
+      assert (e <= S err).
+      {
+        remember (phase_three_error (occ_gst o)) as k.
+        cut (e <= k); [omega|].
+        repeat find_reverse_rewrite.
+        eauto using max_measure_bounds_measures, live_node_is_active.
+      }
       unfold succs_error in *.
       rewrite <- wf_ptr_eq in * by auto.
       repeat find_rewrite.
@@ -292,7 +320,7 @@ Proof.
     cbn in *.
     unfold phase_three_error in *.
     omega.
-Admitted.
+Qed.
 
 Lemma not_joined_zero_succs_error :
   forall gst h st,
@@ -311,6 +339,7 @@ Lemma always_all_measures_drop_when_succs_error_nonzero :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
     always (now phase_two) ex ->
     always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
 
@@ -350,6 +379,7 @@ Lemma phase_three_error_to_zero :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
     always (now phase_two) ex ->
     always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
     continuously (now (measure_zero phase_three_error)) ex.
@@ -366,6 +396,7 @@ Theorem phase_three_with_extra_hyps :
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
     always (now phase_two) ex ->
     always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
     continuously (now (fun occ => all_succs_correct (occ_gst occ))) ex.
@@ -384,12 +415,15 @@ Theorem phase_three :
     continuously (now (fun occ => all_succs_correct (occ_gst occ))) ex.
 Proof.
   intros.
+  find_copy_apply_lem_hyp phase_one_continuously; auto.
   find_copy_apply_lem_hyp phase_two_without_phase_one; auto.
   find_copy_apply_lem_hyp joins_stop; auto.
-  find_continuously_and_tl.
+  repeat find_continuously_and_tl.
   induction 0.
-  - find_apply_lem_hyp always_and_tl_eq.
-    unfold and_tl in *.
+  - repeat (rewrite -> !always_and_tl_eq in *;
+            match goal with
+            | H: (_ /\_ always _) _ |- _ => destruct H
+            end).
     now apply phase_three_with_extra_hyps.
   - apply E_next, IHeventually;
       invar_eauto.
