@@ -6,7 +6,7 @@ PADIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 SYNC="rsync --exclude '.*' --chmod=ug=rwX --chmod=o=rX --recursive"
 WEB_MACH="uwplse.org"
-WEB_PATH="/var/www/verdi/dash/"
+WEB_PATH="/var/www/verdi/chord-dash/"
 RDASH="${WEB_MACH}:${WEB_PATH}"
 LDASH="${PADIR}/dash/"
 HOST="$([ "$TRAVIS_BRANCH" != "" ] && \
