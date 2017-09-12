@@ -122,13 +122,13 @@ Proof.
 Qed.
 
 Lemma p_before_a_stabilization_adopts_succ_list :
-  forall ex h s succs,
+  forall ex h s p succs,
     reachable_st (occ_gst (hd ex)) ->
     lb_execution ex ->
     always (now phase_two) ex ->
     has_first_succ (occ_gst (hd ex)) h s ->
-    has_succs (occ_gst (hd ex)) (addr_of s) succs ->
     open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
+    In (GotPredAndSuccs p succs) (channel (occ_gst (hd ex)) (addr_of s) h) ->
     eventually (now (fun occ => has_succs (occ_gst occ) h (make_succs s succs))) ex.
 Proof.
 Admitted.
