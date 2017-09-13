@@ -1030,6 +1030,22 @@ Ltac find_has_pred_eq :=
     [|clear H; now eauto]
   end.
 
+Lemma live_nodes_not_clients :
+  forall gst h,
+    reachable_st gst ->
+    live_node gst h ->
+    ~ client_addr h.
+Proof.
+(*
+This is an easy invariant because of the constraint
+  ~ client_addr h
+in the Start rule.
+
+DIFFICULTY: 1
+USED: In phase two.
+*)
+Admitted.
+
 Section MergePoint.
   Variables j a b : pointer.
 
@@ -1837,21 +1853,6 @@ Section MergePoint.
     by rewrite (wf_ptr_hash_eq a).
   Qed.
 
-  Lemma live_nodes_not_clients :
-    forall gst h,
-      reachable_st gst ->
-      live_node gst h ->
-      ~ client_addr h.
-  Proof.
-  (*
-  This is an easy invariant because of the constraint
-    ~ client_addr h
-  in the Start rule.
-
-  DIFFICULTY: 1
-  USED: In phase two.
-  *)
-  Admitted.
 
   Lemma occurred_is_step :
     forall l o o' ex,
@@ -1968,28 +1969,6 @@ Section MergePoint.
     unfold pred_or_succ_improves_abj, or_tl.
     intuition auto using first_succ_improves_pred_and_succ_improves.
   Qed.
-
-  Lemma open_request_with_response_on_wire_closed_or_preserved :
-    forall gst l gst' src dst req res,
-      labeled_step_dynamic gst l gst' ->
-      open_request_to gst src dst req ->
-      request_response_pair req res ->
-      In res (channel gst dst src) ->
-      RecvMsg dst src res = l \/
-      open_request_to gst' src dst req /\
-      In res (channel gst' dst src).
-  Proof.
-  (*
-  If there's a response to a request on the wire, we'll either recieve the
-  response or the situation will stay the same.
-
-  This still needs some set-up to be proved easily since it relies on the
-  assumption that there's only ever one request.
-
-  DIFFICULTY: Ryan.
-  USED: In phase two.
-  *)
-  Admitted.
 
   Lemma incoming_GotPredAndSuccs_with_a_after_p_causes_improvement :
     forall ex,

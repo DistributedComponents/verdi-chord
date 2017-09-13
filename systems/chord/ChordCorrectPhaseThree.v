@@ -18,13 +18,15 @@ Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.LabeledMeasures.
 
-Require Import Chord.ValidPointersInvariant.
-Require Import Chord.PredNeverSelfInvariant.
 Require Import Chord.FirstSuccNeverSelf.
+Require Import Chord.LiveNodesStayLive.
+Require Import Chord.NodesHaveState.
+Require Import Chord.PredNeverSelfInvariant.
+Require Import Chord.PtrCorrectInvariant.
 Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.QueryInvariant.
-Require Import Chord.NodesHaveState.
 Require Import Chord.SuccessorNodesAlwaysValid.
+Require Import Chord.ValidPointersInvariant.
 Require Import Chord.WfPtrSuccListInvariant.
 
 Require Import Chord.ChordCorrectPhaseOne.
@@ -152,33 +154,64 @@ Lemma stabilize_res_on_wire_eventually_adopt_succs :
   forall s h p succs ex,
     reachable_st (occ_gst (hd ex)) ->
     lb_execution ex ->
+    weak_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    ~ ptr_between (make_pointer h) p (make_pointer s) ->
     open_request_to (occ_gst (hd ex)) h s GetPredAndSuccs ->
     In (GotPredAndSuccs (Some p) succs) (channel (occ_gst (hd ex)) s h) ->
-    eventually
+    until
+      (now (fun o =>
+              open_request_to (occ_gst o) h s GetPredAndSuccs /\
+              In (GotPredAndSuccs (Some p) succs) (channel (occ_gst o) s h)))
       (now (fun o =>
               exists st',
                 sigma (occ_gst o) h = Some st' /\
                 succ_list st' = make_succs (make_pointer s) succs))
       ex.
 Proof.
-Abort.
-
-Lemma p_before_a_stabilization_adopts_succ_list :
-  forall ex,
-    reachable_st (occ_gst (hd ex)) ->
-    lb_execution ex ->
-    weak_local_fairness ex ->
-    always (now phase_two) ex ->
-    forall h s p succs,
-      live_node (occ_gst (hd ex)) h ->
-      has_first_succ (occ_gst (hd ex)) h s ->
-      open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
-      In (GotPredAndSuccs p succs) (channel (occ_gst (hd ex)) (addr_of s) h) ->
-      eventually (now (fun occ => has_succs (occ_gst occ) h (make_succs s succs))) ex.
-Proof.
   intros.
-  find_eapply_lem_hyp RecvMsg_eventually_occurred;
-    eauto using live_node_in_nodes, live_node_not_in_failed_nodes, live_nodes_not_clients.
+  find_copy_apply_lem_hyp live_node_means_state_exists.
+  find_copy_eapply_lem_hyp channel_contents.
+  match goal with
+  | H: exists _, sigma (occ_gst (hd ex)) h = Some _ |- _ =>
+    destruct H as [x Hst];
+      find_copy_eapply_lem_hyp RecvMsg_eventually_occurred;
+      eauto using live_node_in_nodes, live_node_not_in_failed_nodes, live_nodes_not_clients;
+      assert (exists st, sigma (occ_gst (hd ex)) h = Some st) by eauto;
+      clear x Hst
+  end.
+  match goal with
+  | H: eventually _ _ |- _ =>
+    induction H as [[o [o' s']]|o [o' s']]
+  end.
+  - break_exists.
+    apply U_next, U0; simpl in *; try tauto.
+    assert (live_node (occ_gst o') h) by admit.
+    inv_prop occurred.
+    inv_prop lb_execution.
+    find_reverse_rewrite.
+    find_copy_apply_lem_hyp live_node_means_state_exists.
+    break_exists_exists; intuition.
+    eapply stabilize_adopt_succs; eauto.
+    erewrite ptr_correct; eauto.
+  - inv_prop lb_execution.
+    destruct (label_eq_dec (occ_label o) (RecvMsg s h (GotPredAndSuccs (Some p) succs))).
+    + repeat find_rewrite.
+      break_exists.
+      apply U_next, U0; simpl in *; try tauto.
+      assert (live_node (occ_gst o') h) by admit.
+      find_copy_apply_lem_hyp live_node_means_state_exists.
+      break_exists_exists; intuition.
+      eapply stabilize_adopt_succs; eauto.
+      erewrite ptr_correct; eauto.
+    + apply U_next; simpl; eauto.
+      apply IHeventually; simpl; invar_eauto.
+      * eapply weak_local_fairness_invar; eauto.
+      * admit.
+      * admit.
+      * admit.
+      * apply live_node_means_state_exists.
+        eapply live_node_invariant; eauto.
 Admitted.
 
 Lemma adopting_succs_decreases_succs_error :
