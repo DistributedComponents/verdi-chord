@@ -39,7 +39,7 @@ Proof.
 Qed.
 
 Definition valid_ptr (gst : global_state) (p : pointer) : Prop :=
-  id_of p = hash (addr_of p) /\
+  wf_ptr p /\
   In (addr_of p) (nodes gst).
 
 Lemma valid_ptr_intro :

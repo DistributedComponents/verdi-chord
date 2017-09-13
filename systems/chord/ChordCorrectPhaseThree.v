@@ -121,6 +121,33 @@ Proof.
   eexists; eauto.
 Qed.
 
+Lemma stabilize_adopt_succs :
+  forall s h st p succs gst,
+    reachable_st gst ->
+    open_request_to gst h s GetPredAndSuccs ->
+    sigma gst h = Some st ->
+    ~ ptr_between (ptr st) p (make_pointer s) ->
+    forall gst' st',
+      labeled_step_dynamic gst (RecvMsg s h (GotPredAndSuccs (Some p) succs)) gst' ->
+      sigma gst' h = Some st' ->
+      succ_list st' = make_succs (make_pointer s) succs.
+Proof.
+  intros.
+  inv_prop open_request_to; expand_def.
+  find_copy_eapply_lem_hyp cur_request_valid; eauto.
+  unfold valid_ptr in *.
+  inv_prop request_msg_for_query.
+  rewrite <- wf_ptr_eq in * |- by tauto.
+  invc_labeled_step.
+  recover_msg_from_recv_step_equality.
+  find_apply_lem_hyp recv_handler_labeling.
+  repeat (find_rewrite; try find_injection).
+  find_rewrite_lem sigma_ahr_updates; find_injection.
+  eapply recv_handler_stabilize_response_pred_worse_sets_succs;
+    try erewrite <- wf_ptr_eq by tauto;
+    eauto using not_ptr_between.
+Qed.
+
 Lemma p_before_a_stabilization_adopts_succ_list :
   forall ex h s p succs,
     reachable_st (occ_gst (hd ex)) ->
