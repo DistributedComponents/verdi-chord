@@ -32,6 +32,7 @@ function main {
   cp *.ticks "$REPDIR"
 
   mkindex > "${LDASH}index.html"
+  echo $(date) $(cat admit-count.txt) >> ${LDASH}admit-log.txt
 
   echo "SYNC local  -> remote"
   $SYNC "$LDASH" "$RDASH"
