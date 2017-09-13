@@ -148,16 +148,37 @@ Proof.
     eauto using not_ptr_between.
 Qed.
 
-Lemma p_before_a_stabilization_adopts_succ_list :
-  forall ex h s p succs,
+Lemma stabilize_res_on_wire_eventually_adopt_succs :
+  forall s h p succs ex,
     reachable_st (occ_gst (hd ex)) ->
     lb_execution ex ->
-    always (now phase_two) ex ->
-    has_first_succ (occ_gst (hd ex)) h s ->
-    open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
-    In (GotPredAndSuccs p succs) (channel (occ_gst (hd ex)) (addr_of s) h) ->
-    eventually (now (fun occ => has_succs (occ_gst occ) h (make_succs s succs))) ex.
+    open_request_to (occ_gst (hd ex)) h s GetPredAndSuccs ->
+    In (GotPredAndSuccs (Some p) succs) (channel (occ_gst (hd ex)) s h) ->
+    eventually
+      (now (fun o =>
+              exists st',
+                sigma (occ_gst o) h = Some st' /\
+                succ_list st' = make_succs (make_pointer s) succs))
+      ex.
 Proof.
+Abort.
+
+Lemma p_before_a_stabilization_adopts_succ_list :
+  forall ex,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    weak_local_fairness ex ->
+    always (now phase_two) ex ->
+    forall h s p succs,
+      live_node (occ_gst (hd ex)) h ->
+      has_first_succ (occ_gst (hd ex)) h s ->
+      open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
+      In (GotPredAndSuccs p succs) (channel (occ_gst (hd ex)) (addr_of s) h) ->
+      eventually (now (fun occ => has_succs (occ_gst occ) h (make_succs s succs))) ex.
+Proof.
+  intros.
+  find_eapply_lem_hyp RecvMsg_eventually_occurred;
+    eauto using live_node_in_nodes, live_node_not_in_failed_nodes, live_nodes_not_clients.
 Admitted.
 
 Lemma adopting_succs_decreases_succs_error :
@@ -307,13 +328,14 @@ Proof.
     break_and.
     assert (eventually (now (fun occ : occurrence => has_succs (occ_gst occ) h (make_succs s (s' :: succs)))) (Cons o ex)).
     {
-      apply p_before_a_stabilization_adopts_succ_list; auto.
-      - eauto using has_succs_intro.
-      - unfold open_stabilize_request_to_first_succ, open_stabilize_request_to in *.
-        simpl.
-        cut (In GetPredAndSuccs (channel (occ_gst o) h (addr_of s)) /\
-             open_request_to (occ_gst o) h (addr_of s) GetPredAndSuccs);
-          tauto || eauto.
+      admit.
+      (* apply p_before_a_stabilization_adopts_succ_list; auto. *)
+      (* - eauto using has_succs_intro. *)
+      (* - unfold open_stabilize_request_to_first_succ, open_stabilize_request_to in *. *)
+      (*   simpl. *)
+      (*   cut (In GetPredAndSuccs (channel (occ_gst o) h (addr_of s)) /\ *)
+      (*        open_request_to (occ_gst o) h (addr_of s) GetPredAndSuccs); *)
+      (*     tauto || eauto. *)
     }
     assert (wf_ptr s) by eauto using wf_ptr_succ_list_invariant.
     eapply succs_eventually_adopted_error_eventually_bounded;
@@ -347,7 +369,7 @@ Proof.
     cbn in *.
     unfold phase_three_error in *.
     omega.
-Qed.
+Admitted.
 
 Lemma not_joined_zero_succs_error :
   forall gst h st,
