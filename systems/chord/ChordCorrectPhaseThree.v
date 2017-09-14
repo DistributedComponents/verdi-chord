@@ -150,6 +150,19 @@ Proof.
     eauto using not_ptr_between.
 Qed.
 
+Lemma open_request_not_removed_with_res_on_wire_unless_msg_delivered :
+  forall gst l gst',
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    forall src dst req res,
+      open_request_to gst src dst req ->
+      request_response_pair req res ->
+      In res (channel gst dst src) ->
+      l = RecvMsg dst src res \/
+      open_request_to gst' src dst req.
+Proof.
+Admitted.
+
 Lemma stabilize_res_on_wire_eventually_adopt_succs :
   forall s h p succs ex,
     reachable_st (occ_gst (hd ex)) ->
@@ -205,13 +218,22 @@ Proof.
       eapply stabilize_adopt_succs; eauto.
       erewrite ptr_correct; eauto.
     + apply U_next; simpl; eauto.
+      assert (open_request_to (occ_gst o') h s GetPredAndSuccs).
+      {
+        cbn in *.
+        find_eapply_lem_hyp open_request_not_removed_with_res_on_wire_unless_msg_delivered;
+          eauto; try now constructor.
+        break_or_hyp; congruence.
+      }
+      assert (In (GotPredAndSuccs (Some p) succs) (channel (occ_gst o') s h)).
+      {
+        find_eapply_lem_hyp RecvMsg_enabled_until_occurred.
+        admit.
+      }
       apply IHeventually; simpl; invar_eauto.
-      * eapply weak_local_fairness_invar; eauto.
-      * admit.
-      * admit.
-      * admit.
-      * apply live_node_means_state_exists.
-        eapply live_node_invariant; eauto.
+      * apply channel_contents; eauto.
+      * inv_prop open_request_to; expand_def.
+        eauto.
 Admitted.
 
 Lemma adopting_succs_decreases_succs_error :

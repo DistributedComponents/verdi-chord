@@ -1463,6 +1463,7 @@ Ltac invar_eauto :=
         always_invar,
         lb_execution_invar,
         strong_local_fairness_invar,
+        weak_local_fairness_invar,
         live_node_invariant,
         labeled_step_is_unlabeled_step,
         reachableStep,
