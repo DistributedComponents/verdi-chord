@@ -151,19 +151,6 @@ Proof.
     eauto using not_ptr_between.
 Qed.
 
-Lemma open_request_not_removed_with_res_on_wire_unless_msg_delivered :
-  forall gst l gst',
-    reachable_st gst ->
-    labeled_step_dynamic gst l gst' ->
-    forall src dst req res,
-      open_request_to gst src dst req ->
-      request_response_pair req res ->
-      In res (channel gst dst src) ->
-      l = RecvMsg dst src res \/
-      open_request_to gst' src dst req.
-Proof.
-Admitted.
-
 Lemma stabilize_res_on_wire_eventually_adopt_succs :
   forall s h p succs ex,
     reachable_st (occ_gst (hd ex)) ->
@@ -224,9 +211,9 @@ Proof.
       assert (open_request_to (occ_gst o') h s GetPredAndSuccs).
       {
         cbn in *.
-        find_eapply_lem_hyp open_request_not_removed_with_res_on_wire_unless_msg_delivered;
+        find_eapply_lem_hyp open_request_with_response_on_wire_closed_or_preserved;
           eauto; try now constructor.
-        break_or_hyp; congruence.
+        expand_def; congruence.
       }
       assert (In (GotPredAndSuccs (Some p) succs) (channel (occ_gst o') s h)).
       {
