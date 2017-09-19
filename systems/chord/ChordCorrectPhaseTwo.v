@@ -22,6 +22,7 @@ Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.LabeledMeasures.
 
+Require Import Chord.LiveNodesNotClients.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.QueryInvariant.
 Require Import Chord.NodesAlwaysHaveLiveSuccs.
@@ -1030,22 +1031,6 @@ Ltac find_has_pred_eq :=
     [|clear H; now eauto]
   end.
 
-Lemma live_nodes_not_clients :
-  forall gst h,
-    reachable_st gst ->
-    live_node gst h ->
-    ~ client_addr h.
-Proof.
-(*
-This is an easy invariant because of the constraint
-  ~ client_addr h
-in the Start rule.
-
-DIFFICULTY: 1
-USED: In phase two.
-*)
-Admitted.
-
 Section MergePoint.
   Variables j a b : pointer.
 
@@ -1997,7 +1982,7 @@ Section MergePoint.
     inv_prop (live_node (occ_gst (hd ex)) (addr_of a)).
     expand_def.
     find_eapply_lem_hyp RecvMsg_eventually_occurred; invar_eauto;
-      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists, live_nodes_not_clients.
+      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists.
     induction 0 as [[o [o' ex]] | o [o' ex]].
     - find_copy_apply_lem_hyp pred_same_until_improvement; auto.
       find_apply_lem_hyp weak_until_Cons.
@@ -2075,7 +2060,7 @@ Section MergePoint.
     find_copy_eapply_lem_hyp (first_succ_error_always_nonincreasing ex (addr_of j));
       eauto using live_node_in_active.
     find_eapply_lem_hyp RecvMsg_eventually_occurred; invar_eauto;
-      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists, live_nodes_not_clients.
+      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists.
     clear dependent st.
     repeat match goal with
            | H : context[In (addr_of a)] |- _ => clear H

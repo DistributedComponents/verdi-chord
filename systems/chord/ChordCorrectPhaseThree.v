@@ -20,6 +20,7 @@ Require Import Chord.LabeledMeasures.
 
 Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.LiveNodesStayLive.
+Require Import Chord.LiveNodesNotClients.
 Require Import Chord.NodesHaveState.
 Require Import Chord.PredNeverSelfInvariant.
 Require Import Chord.PtrCorrectInvariant.
@@ -199,7 +200,8 @@ Proof.
   end.
   - break_exists.
     apply U_next, U0; simpl in *; try tauto.
-    assert (live_node (occ_gst o') h) by admit.
+    assert (live_node (occ_gst o') h)
+      by (eapply live_node_invariant; invar_eauto).
     inv_prop occurred.
     inv_prop lb_execution.
     find_reverse_rewrite.
@@ -212,7 +214,8 @@ Proof.
     + repeat find_rewrite.
       break_exists.
       apply U_next, U0; simpl in *; try tauto.
-      assert (live_node (occ_gst o') h) by admit.
+      assert (live_node (occ_gst o') h)
+        by (eapply live_node_invariant; invar_eauto).
       find_copy_apply_lem_hyp live_node_means_state_exists.
       break_exists_exists; intuition.
       eapply stabilize_adopt_succs; eauto.
@@ -227,14 +230,15 @@ Proof.
       }
       assert (In (GotPredAndSuccs (Some p) succs) (channel (occ_gst o') s h)).
       {
-        find_eapply_lem_hyp RecvMsg_enabled_until_occurred.
-        admit.
+        find_eapply_lem_hyp RecvMsg_stays_enabled_after_other_label;
+          eauto using when_RecvMsg_enabled.
+        inv_prop enabled.
+        apply channel_contents.
+        eauto using recv_implies_msg_in_before.
       }
       apply IHeventually; simpl; invar_eauto.
-      * apply channel_contents; eauto.
-      * inv_prop open_request_to; expand_def.
-        eauto.
-Admitted.
+      apply channel_contents; eauto.
+Qed.
 
 Lemma adopting_succs_decreases_succs_error :
   forall gst h s succs err,

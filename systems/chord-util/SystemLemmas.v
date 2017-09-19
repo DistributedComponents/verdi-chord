@@ -238,6 +238,7 @@ Proof using.
   intuition.
     by break_live_node.
 Qed.
+Hint Resolve live_node_in_nodes.
 
 Lemma live_node_not_in_failed_nodes :
   forall gst h,
@@ -247,6 +248,7 @@ Proof using.
   intuition.
     by break_live_node.
 Qed.
+Hint Resolve live_node_not_in_failed_nodes.
 
 Lemma live_node_equivalence :
   forall gst gst' h st st',
@@ -279,6 +281,7 @@ Proof using.
   break_exists_exists.
     by break_and.
 Qed.
+Hint Resolve live_node_means_state_exists.
 
 Lemma coarse_live_node_characterization :
   forall gst gst' h,

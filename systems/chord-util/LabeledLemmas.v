@@ -344,6 +344,15 @@ Proof using.
   - eauto using recv_implies_message_exists_after_timeout.
 Qed.
 
+Lemma RecvMsg_stays_enabled_after_other_label :
+  forall gst src dst m l' gst',
+    enabled (RecvMsg src dst m) gst ->
+    l' <> RecvMsg src dst m ->
+    labeled_step_dynamic gst l' gst' ->
+    enabled (RecvMsg src dst m) gst'.
+Proof.
+Admitted.
+
 Lemma RecvMsg_enabled_until_occurred :
   forall s,
     lb_execution s ->
