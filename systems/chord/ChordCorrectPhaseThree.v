@@ -119,6 +119,28 @@ Proof.
   - apply E_next, IHeventually; invar_eauto.
 Qed.
 
+Lemma succs_error_nonincreasing :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_two) ex ->
+    always (local_measures_nonincreasing succs_error) ex.
+Proof.
+Admitted.
+
+Lemma phase_three_error_nonincreasing_Cons :
+  forall o ex,
+    lb_execution (Cons o ex) ->
+    reachable_st (occ_gst o) ->
+    always (now phase_one) (Cons o ex) ->
+    always (now phase_two) (Cons o ex) ->
+    phase_three_error (occ_gst (hd ex)) <= phase_three_error (occ_gst o).
+Proof.
+  (* use succs_error_nonincreasing *)
+Admitted.
+
 Lemma stabilize_adopt_succs :
   forall s h st p succs gst,
     reachable_st gst ->
@@ -330,6 +352,56 @@ Lemma has_succ_has_pred_inv :
 Proof.
 Admitted.
 
+Lemma stabilize_res_after_phase_two_now :
+  forall gst err,
+    reachable_st gst ->
+    phase_three_error gst <= err ->
+    preds_and_first_succs_correct gst ->
+    forall h s,
+      live_node gst (addr_of s) ->
+      wf_ptr s ->
+      has_first_succ gst h s ->
+      open_request_to gst h (addr_of s) GetPredAndSuccs ->
+      forall p succs,
+        In (GotPredAndSuccs p succs) (channel gst (addr_of s) h) ->
+        has_pred gst (addr_of s) p ->
+        has_succs gst (addr_of s) succs ->
+        exists succs,
+          succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN <= err /\
+          open_request_to gst h (addr_of s) GetPredAndSuccs /\
+          In (GotPredAndSuccs (Some (make_pointer h)) succs) (channel gst (addr_of s) h).
+Proof.
+  intros.
+  simpl in *; expand_def.
+  repeat find_apply_lem_hyp always_Cons; break_and.
+  unfold phase_two in *; simpl in *.
+  match goal with
+  | H : has_first_succ _ h _ |- _ =>
+    change h with (addr_of (make_pointer h)) in H;
+      copy_eapply has_succ_has_pred_inv H;
+      eauto using make_pointer_wf
+  end.
+  find_has_pred_eq; subst; simpl.
+  eexists; intuition eauto.
+  assert (succs_error (addr_of s) gst <= phase_three_error gst)
+    by auto using live_node_in_active, phase_three_error_bounds_node_err.
+  unfold succs_error in *.
+  inv_prop live_node; expand_def.
+  invcs_prop has_succs; expand_def.
+  repeat (find_rewrite; try find_injection).
+  rewrite <- !(wf_ptr_eq s) in * by assumption.
+  omega.
+Qed.
+
+Lemma has_first_succ_stable :
+  forall gst l gst' h s,
+    preds_and_first_succs_correct gst ->
+    labeled_step_dynamic gst l gst' ->
+    has_first_succ gst h s ->
+    has_first_succ gst' h s.
+Proof.
+Admitted.
+
 Lemma stabilize_res_after_phase_two :
   forall ex,
     reachable_st (occ_gst (hd ex)) ->
@@ -359,30 +431,30 @@ Lemma stabilize_res_after_phase_two :
         ex.
 Proof.
   intros.
-  find_copy_apply_lem_hyp open_stabilize_request_eventually_gets_response; eauto.
-  induction 0 as [[o ex]|o ex].
-  - simpl in *; expand_def.
-    repeat find_apply_lem_hyp always_Cons; break_and.
-    unfold phase_two in *; simpl in *.
-    match goal with
-    | H : has_first_succ _ h _ |- _ =>
-      change h with (addr_of (make_pointer h)) in H;
-        copy_eapply has_succ_has_pred_inv H;
-        eauto using make_pointer_wf
-    end.
-    find_has_pred_eq; subst.
-    apply E0; simpl.
-    eexists; intuition eauto.
-    assert (succs_error (addr_of s) (occ_gst o) <= S err)
-      by auto using live_node_in_active, phase_three_error_bounds_node_err.
-    unfold succs_error in *.
-    inv_prop live_node; expand_def.
-    invcs_prop has_succs; expand_def.
-    repeat (find_rewrite; try find_injection).
-    rewrite <- !(wf_ptr_eq s) in * by assumption.
-    congruence.
-  - admit.
-Admitted.
+  find_copy_apply_lem_hyp open_stabilize_request_until_response; eauto.
+  (* set up induction *)
+  find_apply_lem_hyp Nat.eq_le_incl.
+  match goal with
+  | H: In GetPredAndSuccs _ |- _ => clear H
+  end.
+  induction 0 as [[o ex]|o [o' ex]].
+  - apply E0.
+    simpl in *; expand_def.
+    eapply stabilize_res_after_phase_two_now; eauto.
+  - find_apply_lem_hyp until_Cons;
+      expand_def.
+    + apply E_next, E0.
+      simpl in *; expand_def.
+      eapply stabilize_res_after_phase_two_now; invar_eauto.
+      find_apply_lem_hyp phase_three_error_nonincreasing_Cons; auto.
+      simpl in *; omega.
+    + apply E_next, IHuntil; invar_eauto.
+      * eapply has_first_succ_stable; invar_eauto.
+      * simpl in *; break_and.
+        eauto using get_open_request_to_from_open_stabilize_request.
+      * find_apply_lem_hyp phase_three_error_nonincreasing_Cons; invar_eauto.
+        simpl in *; omega.
+Qed.
 
 Lemma first_succs_correct_succs_nonempty :
   forall gst,
@@ -550,17 +622,6 @@ Proof.
         eauto using not_joined_zero_succs_error, eq_sym with arith.
   - eapply c; invar_eauto.
 Qed.
-
-Lemma succs_error_nonincreasing :
-  forall ex,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    always (~_ (now circular_wait)) ex ->
-    always (now phase_two) ex ->
-    always (local_measures_nonincreasing succs_error) ex.
-Proof.
-Admitted.
 
 Lemma phase_three_error_to_zero :
   forall ex,

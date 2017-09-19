@@ -277,6 +277,18 @@ Qed.
 Definition phase_two (o : occurrence) : Prop :=
   preds_and_first_succs_correct (occ_gst o).
 
+Lemma preds_and_first_succs_correct_from_phase_two_Cons :
+  forall o ex,
+    always (now phase_two) (Cons o ex) ->
+    preds_and_first_succs_correct (occ_gst o).
+Proof.
+  unfold phase_two.
+  intros.
+  find_apply_lem_hyp always_Cons.
+  tauto.
+Qed.
+Hint Resolve preds_and_first_succs_correct_from_phase_two_Cons.
+
 Lemma phase_two_zero_error_has_pred :
   forall gst h st,
     live_node gst (addr_of h) ->
