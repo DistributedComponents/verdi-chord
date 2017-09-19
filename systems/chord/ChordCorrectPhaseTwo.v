@@ -955,7 +955,8 @@ Lemma open_stabilize_request_until_response :
               (exists p succs,
                   In (GotPredAndSuccs p succs)
                      (channel (occ_gst occ) (addr_of j) h) /\
-                  has_pred (occ_gst occ) (addr_of j) p)))
+                  has_pred (occ_gst occ) (addr_of j) p /\
+                  has_succs (occ_gst occ) (addr_of j) succs)))
       ex.
 Proof.
 (*
@@ -983,7 +984,8 @@ Lemma open_stabilize_request_eventually_gets_response :
               (exists p succs,
                   In (GotPredAndSuccs p succs)
                      (channel (occ_gst occ) (addr_of j) h) /\
-                  has_pred (occ_gst occ) (addr_of j) p)))
+                  has_pred (occ_gst occ) (addr_of j) p /\
+                  has_succs (occ_gst occ) (addr_of j) succs)))
       ex.
 Proof.
   intros.

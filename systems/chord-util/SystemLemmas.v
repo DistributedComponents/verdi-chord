@@ -728,3 +728,17 @@ Proof.
     find_apply_lem_hyp labeled_step_dynamic_preserves_active_nodes.
     cbn; congruence.
 Qed.
+
+Definition has_succs (gst : global_state) (h : addr) (succs : list pointer) :=
+  exists st,
+    sigma gst h = Some st /\
+    succ_list st = succs.
+
+Lemma has_succs_intro :
+  forall gst h succs st,
+    sigma gst h = Some st ->
+    succ_list st = succs ->
+    has_succs gst h succs.
+Proof.
+  eexists; eauto.
+Qed.
