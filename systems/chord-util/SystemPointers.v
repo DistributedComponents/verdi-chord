@@ -39,7 +39,7 @@ Proof.
 Qed.
 
 Definition valid_ptr (gst : global_state) (p : pointer) : Prop :=
-  id_of p = hash (addr_of p) /\
+  wf_ptr p /\
   In (addr_of p) (nodes gst).
 
 Lemma valid_ptr_intro :
@@ -776,4 +776,11 @@ Lemma wf_ptr_hash_eq :
     hash (addr_of p) = id_of p.
 Proof.
   auto.
+Qed.
+
+Lemma make_pointer_wf :
+  forall h,
+    wf_ptr (make_pointer h).
+Proof.
+  constructor.
 Qed.

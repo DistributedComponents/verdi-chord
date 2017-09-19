@@ -22,6 +22,7 @@ Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.LabeledMeasures.
 
+Require Import Chord.LiveNodesNotClients.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.QueryInvariant.
 Require Import Chord.NodesAlwaysHaveLiveSuccs.
@@ -275,6 +276,18 @@ Qed.
 
 Definition phase_two (o : occurrence) : Prop :=
   preds_and_first_succs_correct (occ_gst o).
+
+Lemma preds_and_first_succs_correct_from_phase_two_Cons :
+  forall o ex,
+    always (now phase_two) (Cons o ex) ->
+    preds_and_first_succs_correct (occ_gst o).
+Proof.
+  unfold phase_two.
+  intros.
+  find_apply_lem_hyp always_Cons.
+  tauto.
+Qed.
+Hint Resolve preds_and_first_succs_correct_from_phase_two_Cons.
 
 Lemma phase_two_zero_error_has_pred :
   forall gst h st,
@@ -954,7 +967,8 @@ Lemma open_stabilize_request_until_response :
               (exists p succs,
                   In (GotPredAndSuccs p succs)
                      (channel (occ_gst occ) (addr_of j) h) /\
-                  has_pred (occ_gst occ) (addr_of j) p)))
+                  has_pred (occ_gst occ) (addr_of j) p /\
+                  has_succs (occ_gst occ) (addr_of j) succs)))
       ex.
 Proof.
 (*
@@ -982,7 +996,8 @@ Lemma open_stabilize_request_eventually_gets_response :
               (exists p succs,
                   In (GotPredAndSuccs p succs)
                      (channel (occ_gst occ) (addr_of j) h) /\
-                  has_pred (occ_gst occ) (addr_of j) p)))
+                  has_pred (occ_gst occ) (addr_of j) p /\
+                  has_succs (occ_gst occ) (addr_of j) succs)))
       ex.
 Proof.
   intros.
@@ -1837,21 +1852,6 @@ Section MergePoint.
     by rewrite (wf_ptr_hash_eq a).
   Qed.
 
-  Lemma live_nodes_not_clients :
-    forall gst h,
-      reachable_st gst ->
-      live_node gst h ->
-      ~ client_addr h.
-  Proof.
-  (*
-  This is an easy invariant because of the constraint
-    ~ client_addr h
-  in the Start rule.
-
-  DIFFICULTY: 1
-  USED: In phase two.
-  *)
-  Admitted.
 
   Lemma occurred_is_step :
     forall l o o' ex,
@@ -1969,28 +1969,6 @@ Section MergePoint.
     intuition auto using first_succ_improves_pred_and_succ_improves.
   Qed.
 
-  Lemma open_request_with_response_on_wire_closed_or_preserved :
-    forall gst l gst' src dst req res,
-      labeled_step_dynamic gst l gst' ->
-      open_request_to gst src dst req ->
-      request_response_pair req res ->
-      In res (channel gst dst src) ->
-      RecvMsg dst src res = l \/
-      open_request_to gst' src dst req /\
-      In res (channel gst' dst src).
-  Proof.
-  (*
-  If there's a response to a request on the wire, we'll either recieve the
-  response or the situation will stay the same.
-
-  This still needs some set-up to be proved easily since it relies on the
-  assumption that there's only ever one request.
-
-  DIFFICULTY: Ryan.
-  USED: In phase two.
-  *)
-  Admitted.
-
   Lemma incoming_GotPredAndSuccs_with_a_after_p_causes_improvement :
     forall ex,
       lb_execution ex ->
@@ -2018,7 +1996,7 @@ Section MergePoint.
     inv_prop (live_node (occ_gst (hd ex)) (addr_of a)).
     expand_def.
     find_eapply_lem_hyp RecvMsg_eventually_occurred; invar_eauto;
-      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists, live_nodes_not_clients.
+      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists.
     induction 0 as [[o [o' ex]] | o [o' ex]].
     - find_copy_apply_lem_hyp pred_same_until_improvement; auto.
       find_apply_lem_hyp weak_until_Cons.
@@ -2096,7 +2074,7 @@ Section MergePoint.
     find_copy_eapply_lem_hyp (first_succ_error_always_nonincreasing ex (addr_of j));
       eauto using live_node_in_active.
     find_eapply_lem_hyp RecvMsg_eventually_occurred; invar_eauto;
-      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists, live_nodes_not_clients.
+      eauto using strong_local_fairness_weak, live_node_in_nodes, live_node_means_state_exists.
     clear dependent st.
     repeat match goal with
            | H : context[In (addr_of a)] |- _ => clear H

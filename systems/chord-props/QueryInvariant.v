@@ -213,3 +213,25 @@ Definition Request_payload_has_response (gst : global_state) : Prop :=
     In (Request dst p) (timeouts gst src) ->
     exists m,
       request_response_pair p m.
+
+Lemma open_request_with_response_on_wire_closed_or_preserved :
+  forall gst l gst' src dst req res,
+    labeled_step_dynamic gst l gst' ->
+    open_request_to gst src dst req ->
+    request_response_pair req res ->
+    In res (channel gst dst src) ->
+    RecvMsg dst src res = l \/
+    open_request_to gst' src dst req /\
+    In res (channel gst' dst src).
+Proof.
+(*
+If there's a response to a request on the wire, we'll either recieve the
+response or the situation will stay the same.
+
+This still needs some set-up to be proved easily since it relies on the
+assumption that there's only ever one request.
+
+DIFFICULTY: Ryan.
+USED: In phase two.
+ *)
+Admitted.

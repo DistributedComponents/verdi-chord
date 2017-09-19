@@ -17,6 +17,7 @@ Require Import Chord.SystemPointers.
 Require Import Chord.LabeledLemmas.
 Require Import Chord.LabeledMeasures.
 
+Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodesStayLive.
 Require Import Chord.DeadNodesGoQuiet.
@@ -325,6 +326,22 @@ Definition open_stabilize_request_to_first_succ (gst : global_state) (h : addr) 
     succ_list st = dst :: rest ->
     open_stabilize_request_to gst h (addr_of dst).
 
+Lemma open_stabilize_request_to_first_succ_intro :
+  forall gst h s,
+    has_first_succ gst h s ->
+    In GetPredAndSuccs (channel gst h (addr_of s)) ->
+    open_request_to gst h (addr_of s) GetPredAndSuccs ->
+    open_stabilize_request_to_first_succ gst h.
+Proof.
+  intros.
+  inv_prop has_first_succ. break_and.
+  find_apply_lem_hyp hd_error_tl_exists.
+  break_exists.
+  unfold open_stabilize_request_to_first_succ, open_stabilize_request_to.
+  intuition congruence.
+Qed.
+Hint Resolve open_stabilize_request_to_first_succ_intro.
+
 Lemma timeout_handler_eff_StartStabilize :
   forall h st r eff,
     timeout_handler_eff h st Tick = (r, eff) ->
@@ -475,6 +492,41 @@ Proof.
   intros.
   now repeat (find_injection || find_rewrite).
 Qed.
+
+Lemma open_stabilize_request_to_first_succ_elim :
+  forall gst h s,
+    open_stabilize_request_to_first_succ gst h ->
+    has_first_succ gst h s ->
+    In GetPredAndSuccs (channel gst h (addr_of s)) /\
+    open_request_to gst h (addr_of s) GetPredAndSuccs.
+Proof.
+  unfold has_first_succ.
+  intros.
+  break_exists; break_and.
+  find_apply_lem_hyp hd_error_tl_exists.
+  firstorder.
+Qed.
+
+Lemma open_stabilize_request_to_first_succ_res_on_wire :
+  forall gst h s,
+    open_stabilize_request_to_first_succ gst h ->
+    has_first_succ gst h s ->
+    In GetPredAndSuccs (channel gst h (addr_of s)).
+Proof.
+  apply open_stabilize_request_to_first_succ_elim.
+Qed.
+Hint Resolve open_stabilize_request_to_first_succ_res_on_wire.
+
+
+Lemma get_open_request_to_from_open_stabilize_request :
+  forall gst h s,
+    open_stabilize_request_to_first_succ gst h ->
+    has_first_succ gst h s ->
+    open_request_to gst h (addr_of s) GetPredAndSuccs.
+Proof.
+  apply open_stabilize_request_to_first_succ_elim.
+Qed.
+Hint Resolve get_open_request_to_from_open_stabilize_request.
 
 Lemma option_map_Some :
   forall A B (f : A -> B) a b,
