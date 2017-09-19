@@ -493,18 +493,40 @@ Proof.
   now repeat (find_injection || find_rewrite).
 Qed.
 
+Lemma open_stabilize_request_to_first_succ_elim :
+  forall gst h s,
+    open_stabilize_request_to_first_succ gst h ->
+    has_first_succ gst h s ->
+    In GetPredAndSuccs (channel gst h (addr_of s)) /\
+    open_request_to gst h (addr_of s) GetPredAndSuccs.
+Proof.
+  unfold has_first_succ.
+  intros.
+  break_exists; break_and.
+  find_apply_lem_hyp hd_error_tl_exists.
+  firstorder.
+Qed.
+
+Lemma open_stabilize_request_to_first_succ_res_on_wire :
+  forall gst h s,
+    open_stabilize_request_to_first_succ gst h ->
+    has_first_succ gst h s ->
+    In GetPredAndSuccs (channel gst h (addr_of s)).
+Proof.
+  apply open_stabilize_request_to_first_succ_elim.
+Qed.
+Hint Resolve open_stabilize_request_to_first_succ_res_on_wire.
+
+
 Lemma get_open_request_to_from_open_stabilize_request :
   forall gst h s,
     open_stabilize_request_to_first_succ gst h ->
     has_first_succ gst h s ->
     open_request_to gst h (addr_of s) GetPredAndSuccs.
 Proof.
-  unfold has_first_succ, open_stabilize_request_to_first_succ, open_stabilize_request_to.
-  intros.
-  break_exists; break_and.
-  find_apply_lem_hyp hd_error_tl_exists.
-  firstorder.
+  apply open_stabilize_request_to_first_succ_elim.
 Qed.
+Hint Resolve get_open_request_to_from_open_stabilize_request.
 
 Lemma option_map_Some :
   forall A B (f : A -> B) a b,
