@@ -595,27 +595,45 @@ Definition channel (gst : global_state) (src dst : addr) : list payload :=
        else None)
     (msgs gst).
 
-(* note: this doesn't really tell you anything about repeated messages *)
+Lemma in_msgs_in_channel :
+  forall gst src dst p,
+    In (src, (dst, p)) (msgs gst) ->
+    In p (channel gst src dst).
+Proof.
+  unfold channel.
+  intros.
+  eapply filterMap_In; eauto.
+  by case addr_eq_dec, addr_eq_dec.
+Qed.
+Hint Resolve in_msgs_in_channel.
+
+Lemma in_channel_in_msgs :
+  forall gst src dst p,
+    In p (channel gst src dst) ->
+    In (src, (dst, p)) (msgs gst).
+Proof.
+  unfold channel.
+  intros.
+  find_eapply_lem_hyp In_filterMap; eauto.
+  break_exists.
+  break_and.
+  assert (x = (src, (dst, p))).
+  { break_if; try discriminate.
+    find_apply_lem_hyp Bool.andb_true_iff; break_and.
+    repeat find_apply_lem_hyp addr_eqb_true.
+    find_injection.
+    move: H1 H2.
+    case addr_eq_dec, addr_eq_dec => H_a H_a' //=.
+    by destruct x, p; subst. }
+  now find_reverse_rewrite.
+Qed.
+Hint Resolve in_channel_in_msgs.
+
 Lemma channel_contents :
   forall gst src dst p,
     In (src, (dst, p)) (msgs gst) <-> In p (channel gst src dst).
 Proof using.
-  unfold channel.
   intuition.
-  - eapply filterMap_In; eauto.
-    by case addr_eq_dec, addr_eq_dec.
-  - find_eapply_lem_hyp In_filterMap; eauto.
-    break_exists.
-    break_and.
-    assert (x = (src, (dst, p))).
-    { break_if; try discriminate.
-      find_apply_lem_hyp Bool.andb_true_iff; break_and.
-      repeat find_apply_lem_hyp addr_eqb_true.
-      find_injection.
-      move: H1 H2.
-      case addr_eq_dec, addr_eq_dec => H_a H_a' //=.
-      by destruct x, p; subst. }
-    now find_reverse_rewrite.
 Qed.
 
 Lemma sigma_apply_handler_result_same :

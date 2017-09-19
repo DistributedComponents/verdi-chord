@@ -151,6 +151,46 @@ Proof.
     eauto using not_ptr_between.
 Qed.
 
+Lemma adopting_succs_decreases_succs_error :
+  forall gst h s succs err,
+    reachable_st gst ->
+    wf_ptr s ->
+    live_node gst h ->
+    succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN <= S err ->
+    has_succs gst h (make_succs s succs) ->
+    succs_error h gst <= err.
+Proof.
+  intros.
+  cut (succs_error h gst <= S err - 1); try (intros; omega).
+  inv_prop has_succs; break_and.
+  unfold succs_error.
+  repeat find_rewrite.
+  find_apply_lem_hyp live_node_joined; expand_def.
+  find_rewrite; find_injection; find_rewrite.
+Admitted.
+
+Lemma first_succ_correct_invar :
+  forall o ex h s,
+    lb_execution (Cons o ex) ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+    first_succ_correct (occ_gst o) h (Some s) ->
+    first_succ_correct (occ_gst (hd ex)) h (Some s).
+Proof.
+  (* relies on the fact that when nodes aren't joining, better_succ is preserved *)
+Admitted.
+
+Lemma succs_error_helper_invar :
+  forall o ex h succs,
+    lb_execution (Cons o ex) ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+
+    forall k,
+      succs_error_helper (occ_gst o) h [] succs Chord.SUCC_LIST_LEN = k ->
+      succs_error_helper (occ_gst (hd ex)) h [] succs Chord.SUCC_LIST_LEN = k.
+Proof.
+  (* relies on the fact that (live_ptrs gst) won't change *)
+Admitted.
+
 Lemma stabilize_res_on_wire_eventually_adopt_succs :
   forall s h p succs ex,
     reachable_st (occ_gst (hd ex)) ->
@@ -165,14 +205,11 @@ Lemma stabilize_res_on_wire_eventually_adopt_succs :
               open_request_to (occ_gst o) h s GetPredAndSuccs /\
               In (GotPredAndSuccs (Some p) succs) (channel (occ_gst o) s h)))
       (now (fun o =>
-              exists st',
-                sigma (occ_gst o) h = Some st' /\
-                succ_list st' = make_succs (make_pointer s) succs))
+              has_succs (occ_gst o) h (make_succs (make_pointer s) succs)))
       ex.
 Proof.
   intros.
   find_copy_apply_lem_hyp live_node_means_state_exists.
-  find_copy_eapply_lem_hyp channel_contents.
   match goal with
   | H: exists _, sigma (occ_gst (hd ex)) h = Some _ |- _ =>
     destruct H as [x Hst];
@@ -220,52 +257,10 @@ Proof.
         find_eapply_lem_hyp RecvMsg_stays_enabled_after_other_label;
           eauto using when_RecvMsg_enabled.
         inv_prop enabled.
-        apply channel_contents.
         eauto using recv_implies_msg_in_before.
       }
       apply IHeventually; simpl; invar_eauto.
-      apply channel_contents; eauto.
 Qed.
-
-Lemma adopting_succs_decreases_succs_error :
-  forall gst h s succs err,
-    reachable_st gst ->
-    wf_ptr s ->
-    live_node gst h ->
-    succs_error_helper gst s [] succs Chord.SUCC_LIST_LEN <= S err ->
-    has_succs gst h (make_succs s succs) ->
-    succs_error h gst <= err.
-Proof.
-  intros.
-  cut (succs_error h gst <= S err - 1); try (intros; omega).
-  inv_prop has_succs; break_and.
-  unfold succs_error.
-  repeat find_rewrite.
-  find_apply_lem_hyp live_node_joined; expand_def.
-  find_rewrite; find_injection; find_rewrite.
-Admitted.
-
-Lemma first_succ_correct_invar :
-  forall o ex h s,
-    lb_execution (Cons o ex) ->
-    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
-    first_succ_correct (occ_gst o) h (Some s) ->
-    first_succ_correct (occ_gst (hd ex)) h (Some s).
-Proof.
-  (* relies on the fact that when nodes aren't joining, better_succ is preserved *)
-Admitted.
-
-Lemma succs_error_helper_invar :
-  forall o ex h succs,
-    lb_execution (Cons o ex) ->
-    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
-
-    forall k,
-      succs_error_helper (occ_gst o) h [] succs Chord.SUCC_LIST_LEN = k ->
-      succs_error_helper (occ_gst (hd ex)) h [] succs Chord.SUCC_LIST_LEN = k.
-Proof.
-  (* relies on the fact that (live_ptrs gst) won't change *)
-Admitted.
 
 Lemma succs_eventually_adopted_error_eventually_bounded :
   forall h s ex succs err,
@@ -289,6 +284,65 @@ Proof.
     + erewrite succs_error_helper_invar; invar_eauto.
 Qed.
 
+Lemma stabilize_res_on_wire_eventually_err_bounded :
+  forall ex,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    weak_local_fairness ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+
+    forall h p s err succs,
+      live_node (occ_gst (hd ex)) h ->
+      wf_ptr s ->
+
+      (* for adoption of succ pointer to happen *)
+      ~ ptr_between (make_pointer h) p s ->
+      open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
+      In (GotPredAndSuccs (Some p) succs) (channel (occ_gst (hd ex)) (addr_of s) h) ->
+
+      (* for doing that to actually improve things *)
+      first_succ_correct (occ_gst (hd ex)) (make_pointer h) (Some s) ->
+      succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err ->
+
+      eventually (now (fun occ => succs_error h (occ_gst occ) <= err)) ex.
+Proof.
+  intros.
+  find_apply_lem_hyp stabilize_res_on_wire_eventually_adopt_succs; eauto;
+    rewrite <- !wf_ptr_eq in *; auto.
+  eapply succs_eventually_adopted_error_eventually_bounded;
+    eauto using until_eventually.
+Qed.
+
+Lemma stabilize_res_after_phase_two :
+  forall ex,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    strong_local_fairness ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+    always (now phase_one) ex ->
+    always (now phase_two) ex ->
+    always (~_ now circular_wait) ex ->
+
+    forall h s err succs,
+      live_node (occ_gst (hd ex)) h ->
+      wf_ptr s ->
+      has_first_succ (occ_gst (hd ex)) h s ->
+
+      open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
+      In GetPredAndSuccs (channel (occ_gst (hd ex)) h (addr_of s)) ->
+      phase_three_error (occ_gst (hd ex)) = S err ->
+
+      eventually
+        (fun ex =>
+           succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err /\
+           open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs /\
+           In (GotPredAndSuccs (Some (make_pointer h)) succs) (channel (occ_gst (hd ex)) (addr_of s) h))
+        ex.
+Proof.
+  intros.
+  find_copy_apply_lem_hyp open_stabilize_request_eventually_gets_response; eauto.
+  induction 0.
+Admitted.
 
 Lemma first_succs_correct_succs_nonempty :
   forall gst,

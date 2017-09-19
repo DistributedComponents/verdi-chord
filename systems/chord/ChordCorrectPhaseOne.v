@@ -17,6 +17,7 @@ Require Import Chord.SystemPointers.
 Require Import Chord.LabeledLemmas.
 Require Import Chord.LabeledMeasures.
 
+Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodesStayLive.
 Require Import Chord.DeadNodesGoQuiet.
@@ -324,6 +325,22 @@ Definition open_stabilize_request_to_first_succ (gst : global_state) (h : addr) 
     sigma gst h = Some st ->
     succ_list st = dst :: rest ->
     open_stabilize_request_to gst h (addr_of dst).
+
+Lemma open_stabilize_request_to_first_succ_intro :
+  forall gst h s,
+    has_first_succ gst h s ->
+    In GetPredAndSuccs (channel gst h (addr_of s)) ->
+    open_request_to gst h (addr_of s) GetPredAndSuccs ->
+    open_stabilize_request_to_first_succ gst h.
+Proof.
+  intros.
+  inv_prop has_first_succ. break_and.
+  find_apply_lem_hyp hd_error_tl_exists.
+  break_exists.
+  unfold open_stabilize_request_to_first_succ, open_stabilize_request_to.
+  intuition congruence.
+Qed.
+Hint Resolve open_stabilize_request_to_first_succ_intro.
 
 Lemma timeout_handler_eff_StartStabilize :
   forall h st r eff,
