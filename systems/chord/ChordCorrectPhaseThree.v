@@ -68,6 +68,15 @@ Definition succs_error (h : addr) (gst : global_state) :=
 Definition phase_three_error : global_state -> nat :=
   max_measure succs_error.
 
+Lemma phase_three_error_bounds_node_err :
+  forall gst h k,
+    In h (active_nodes gst) ->
+    phase_three_error gst = k ->
+    succs_error h gst <= k.
+Proof.
+  auto using max_measure_bounds_measures.
+Qed.
+
 Definition correct_succs (gst : global_state) (h : pointer) (st : data) : Prop :=
   forall s xs ys s',
     wf_ptr h ->
@@ -108,20 +117,6 @@ Proof.
       auto using phase_three_error_sound.
     + apply c; invar_eauto.
   - apply E_next, IHeventually; invar_eauto.
-Qed.
-
-Definition has_succs (gst : global_state) (h : addr) (succs : list pointer) :=
-  exists st,
-    sigma gst h = Some st /\
-    succ_list st = succs.
-
-Lemma has_succs_intro :
-  forall gst h succs st,
-    sigma gst h = Some st ->
-    succ_list st = succs ->
-    has_succs gst h succs.
-Proof.
-  eexists; eauto.
 Qed.
 
 Lemma stabilize_adopt_succs :
@@ -313,6 +308,28 @@ Proof.
     eauto using until_eventually.
 Qed.
 
+Lemma has_pred_has_succ_inv :
+  forall gst h s,
+    reachable_st gst ->
+    preds_and_first_succs_correct gst ->
+    wf_ptr h ->
+    wf_ptr s ->
+    has_pred gst (addr_of h) (Some s) ->
+    has_first_succ gst (addr_of s) h.
+Proof.
+Admitted.
+
+Lemma has_succ_has_pred_inv :
+  forall gst h s,
+    reachable_st gst ->
+    preds_and_first_succs_correct gst ->
+    wf_ptr h ->
+    wf_ptr s ->
+    has_first_succ gst (addr_of s) h ->
+    has_pred gst (addr_of h) (Some s).
+Proof.
+Admitted.
+
 Lemma stabilize_res_after_phase_two :
   forall ex,
     reachable_st (occ_gst (hd ex)) ->
@@ -323,8 +340,9 @@ Lemma stabilize_res_after_phase_two :
     always (now phase_two) ex ->
     always (~_ now circular_wait) ex ->
 
-    forall h s err succs,
+    forall h s err,
       live_node (occ_gst (hd ex)) h ->
+      live_node (occ_gst (hd ex)) (addr_of s) ->
       wf_ptr s ->
       has_first_succ (occ_gst (hd ex)) h s ->
 
@@ -334,14 +352,36 @@ Lemma stabilize_res_after_phase_two :
 
       eventually
         (fun ex =>
-           succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err /\
-           open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs /\
-           In (GotPredAndSuccs (Some (make_pointer h)) succs) (channel (occ_gst (hd ex)) (addr_of s) h))
+           exists succs,
+             succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err /\
+             open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs /\
+             In (GotPredAndSuccs (Some (make_pointer h)) succs) (channel (occ_gst (hd ex)) (addr_of s) h))
         ex.
 Proof.
   intros.
   find_copy_apply_lem_hyp open_stabilize_request_eventually_gets_response; eauto.
-  induction 0.
+  induction 0 as [[o ex]|o ex].
+  - simpl in *; expand_def.
+    repeat find_apply_lem_hyp always_Cons; break_and.
+    unfold phase_two in *; simpl in *.
+    match goal with
+    | H : has_first_succ _ h _ |- _ =>
+      change h with (addr_of (make_pointer h)) in H;
+        copy_eapply has_succ_has_pred_inv H;
+        eauto using make_pointer_wf
+    end.
+    find_has_pred_eq; subst.
+    apply E0; simpl.
+    eexists; intuition eauto.
+    assert (succs_error (addr_of s) (occ_gst o) <= S err)
+      by auto using live_node_in_active, phase_three_error_bounds_node_err.
+    unfold succs_error in *.
+    inv_prop live_node; expand_def.
+    invcs_prop has_succs; expand_def.
+    repeat (find_rewrite; try find_injection).
+    rewrite <- !(wf_ptr_eq s) in * by assumption.
+    congruence.
+  - admit.
 Admitted.
 
 Lemma first_succs_correct_succs_nonempty :
