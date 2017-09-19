@@ -403,6 +403,87 @@ Proof.
 Admitted.
 
 Lemma stabilize_res_after_phase_two :
+  forall ex h s err,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    strong_local_fairness ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+    always (now phase_one) ex ->
+    always (now phase_two) ex ->
+    always (~_ now circular_wait) ex ->
+
+    live_node (occ_gst (hd ex)) h ->
+    live_node (occ_gst (hd ex)) (addr_of s) ->
+    wf_ptr s ->
+    has_first_succ (occ_gst (hd ex)) h s ->
+
+    open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
+    In GetPredAndSuccs (channel (occ_gst (hd ex)) h (addr_of s)) ->
+    phase_three_error (occ_gst (hd ex)) <= S err ->
+
+    until
+      (fun ex =>
+         open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs /\
+         In GetPredAndSuccs (channel (occ_gst (hd ex)) h (addr_of s)))
+      (fun ex =>
+         exists succs,
+           succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err /\
+           open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs /\
+           In (GotPredAndSuccs (Some (make_pointer h)) succs) (channel (occ_gst (hd ex)) (addr_of s) h))
+      ex.
+Proof.
+  intros.
+  find_copy_apply_lem_hyp open_stabilize_request_until_response; eauto.
+  match goal with
+  | H: In GetPredAndSuccs _ |- _ => clear H
+  end.
+  induction 0 as [[o ex]|o [o' ex]].
+  - apply U0.
+    simpl in *; expand_def.
+    eapply stabilize_res_after_phase_two_now; eauto.
+  - assert (In GetPredAndSuccs (channel (occ_gst o) h (addr_of s)) /\
+            open_request_to (occ_gst o) h (addr_of s) GetPredAndSuccs).
+    {
+      simpl in *.
+      unfold has_first_succ, open_stabilize_request_to_first_succ, open_stabilize_request_to in *.
+      break_exists; break_and.
+      find_apply_lem_hyp hd_error_tl_exists; expand_def; eauto.
+    }
+    apply U_next; [tauto|].
+    match goal with
+    | H : until _ _ _ |- _ =>
+      apply until_Cons in H;
+        expand_def
+    end.
+    + apply U0.
+      simpl in *; expand_def.
+      eapply stabilize_res_after_phase_two_now; invar_eauto.
+      find_apply_lem_hyp phase_three_error_nonincreasing_Cons; auto.
+      simpl in *; omega.
+    + apply IHuntil; invar_eauto.
+      * eapply has_first_succ_stable; invar_eauto.
+      * simpl in *; break_and.
+        eauto using get_open_request_to_from_open_stabilize_request.
+      * find_apply_lem_hyp phase_three_error_nonincreasing_Cons; invar_eauto.
+        simpl in *; omega.
+Qed.
+
+Lemma first_succ_correct_phase_two :
+  forall o h s,
+    phase_two o ->
+    has_first_succ (occ_gst o) h s ->
+    live_node (occ_gst o) h ->
+    first_succ_correct (occ_gst o) (make_pointer h) (Some s).
+Proof.
+  unfold phase_two, preds_and_first_succs_correct, first_succs_correct.
+  intros.
+  break_and.
+  inv_prop has_first_succ; expand_def.
+  find_reverse_rewrite.
+  auto using make_pointer_wf.
+Qed.
+
+Lemma stabilize_res_after_phase_two_to_err_drop :
   forall ex,
     reachable_st (occ_gst (hd ex)) ->
     lb_execution ex ->
@@ -411,6 +492,7 @@ Lemma stabilize_res_after_phase_two :
     always (now phase_one) ex ->
     always (now phase_two) ex ->
     always (~_ now circular_wait) ex ->
+    weak_local_fairness ex ->
 
     forall h s err,
       live_node (occ_gst (hd ex)) h ->
@@ -422,36 +504,28 @@ Lemma stabilize_res_after_phase_two :
       In GetPredAndSuccs (channel (occ_gst (hd ex)) h (addr_of s)) ->
       phase_three_error (occ_gst (hd ex)) = S err ->
 
-      eventually
-        (fun ex =>
-           exists succs,
-             succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err /\
-             open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs /\
-             In (GotPredAndSuccs (Some (make_pointer h)) succs) (channel (occ_gst (hd ex)) (addr_of s) h))
-        ex.
+      eventually (now (fun occ => succs_error h (occ_gst occ) <= err)) ex.
 Proof.
   intros.
-  find_copy_apply_lem_hyp open_stabilize_request_until_response; eauto.
-  (* set up induction *)
   find_apply_lem_hyp Nat.eq_le_incl.
-  match goal with
-  | H: In GetPredAndSuccs _ |- _ => clear H
-  end.
+  find_copy_apply_lem_hyp (stabilize_res_after_phase_two ex h s); auto.
   induction 0 as [[o ex]|o [o' ex]].
-  - apply E0.
-    simpl in *; expand_def.
-    eapply stabilize_res_after_phase_two_now; eauto.
-  - find_apply_lem_hyp until_Cons;
-      expand_def.
-    + apply E_next, E0.
-      simpl in *; expand_def.
-      eapply stabilize_res_after_phase_two_now; invar_eauto.
-      find_apply_lem_hyp phase_three_error_nonincreasing_Cons; auto.
-      simpl in *; omega.
-    + apply E_next, IHuntil; invar_eauto.
+  - expand_def.
+    eapply stabilize_res_on_wire_eventually_err_bounded;
+      eauto using not_between_xxy.
+    apply first_succ_correct_phase_two; eauto.
+    change _ with (now phase_two (Cons o ex)).
+    apply always_Cons; eauto.
+  - apply E_next.
+    find_apply_lem_hyp until_Cons; expand_def.
+    + eapply stabilize_res_on_wire_eventually_err_bounded;
+        eauto using not_between_xxy; invar_eauto.
+      apply first_succ_correct_phase_two; invar_eauto.
+      * change _ with (now phase_two (Cons o' ex)).
+        apply always_Cons; invar_eauto.
       * eapply has_first_succ_stable; invar_eauto.
-      * simpl in *; break_and.
-        eauto using get_open_request_to_from_open_stabilize_request.
+    + apply IHuntil; invar_eauto.
+      * eapply has_first_succ_stable; invar_eauto.
       * find_apply_lem_hyp phase_three_error_nonincreasing_Cons; invar_eauto.
         simpl in *; omega.
 Qed.
