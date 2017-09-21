@@ -996,6 +996,9 @@ Fixpoint fake_name (k : nat) :=
   | 0 => ":^)"
   | S k' => String.append ":^) " (fake_name k')
   end.
+Axiom clients_not_fake :
+  forall k,
+    ~ client_addr (fake_name k).
 
 Fixpoint make_initial_nodes (num_nodes : nat) : list addr :=
   match num_nodes with
