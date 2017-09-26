@@ -70,48 +70,6 @@ Proof.
         eapply tick_not_in_timeouts_in; eauto.
 Qed.
 
-Lemma initial_nodes_large :
-  forall gst,
-    initial_st gst ->
-    3 <= length (nodes gst).
-Proof.
-  unfold initial_st.
-  intros.
-  break_and.
-  assert (2 <= Chord.SUCC_LIST_LEN)
-    by apply Chord.succ_list_len_lower_bound.
-  omega.
-Qed.
-
-Lemma Tick_in_initial_st :
-  forall gst h,
-    initial_st gst ->
-    In h (nodes gst) ->
-    timeouts gst h = [Tick].
-Proof.
-  intros.
-  find_copy_eapply_lem_hyp initial_nodes_large.
-  unfold initial_st in *.
-  break_and.
-  destruct (start_handler h (nodes gst)) as [[? ?] nts] eqn:?.
-  assert ([Tick] = nts).
-  {
-    pose proof (sort_by_between_permutes h (map make_pointer (nodes gst)) _ eq_refl).
-    find_copy_apply_lem_hyp Permutation.Permutation_length.
-    rewrite map_length in * by auto.
-    destruct (sort_by_between h (map make_pointer (nodes gst))) as [| ? [|? ?]] eqn:? in *;
-      change ChordIDParams.name with addr in *;
-      simpl in *; try omega.
-    unfold start_handler in *.
-    change ChordIDParams.name with addr in *;
-      repeat find_rewrite.
-    now find_inversion.
-  }
-  find_rewrite.
-  eapply_prop_hyp start_handler start_handler; auto.
-  tauto.
-Qed.
-
 Lemma handle_msg_adds_tick_when_setting_joined :
   forall (h h' : addr) (st st' : data) m (ms : list (addr * payload))
     (nts cts : list timeout),

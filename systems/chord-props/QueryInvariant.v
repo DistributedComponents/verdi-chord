@@ -1,6 +1,7 @@
 Require Import List.
 Require Import Omega.
 Require Import StructTact.StructTactics.
+Require Import StructTact.Util.
 
 Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
@@ -9,11 +10,51 @@ Require Import Chord.SystemReachable.
 
 Set Bullet Behavior "Strict Subproofs".
 
+Ltac start_cases :=
+  match goal with
+  | [H : ?h' = ?h \/ _,
+     H' : update _ (timeouts ?gst) ?h' _ ?h = _ ++ _ :: _
+     |- _] =>
+    destruct H
+  end.
+
+Ltac fail_cases :=
+  idtac.
+
+Ltac timeout_cases :=
+  idtac.
+
+Ltac recv_cases :=
+  idtac.
+
+Ltac input_cases :=
+  idtac.
+
+Ltac client_cases :=
+  idtac.
+
+Ltac step_dynamic_cases :=
+  match goal with
+  | H : step_dynamic ?gst ?gst' |- _ =>
+    invcs H;
+    [ start_cases
+    | fail_cases
+    | timeout_cases
+    | recv_cases
+    | input_cases
+    | client_cases
+    ];
+    subst_max;
+    rewrite_update;
+    try find_injection
+  end.
+
 Definition at_most_one_request_timeout (gst : global_state) (h : addr) :=
   forall xs ys dst p,
     timeouts gst h = xs ++ Request dst p :: ys ->
     forall dst' p',
       ~ In (Request dst' p') (xs ++ ys).
+Hint Unfold at_most_one_request_timeout.
 
 Lemma at_most_one_request_timeout_uniqueness :
   forall gst h dst dst' p p',
@@ -41,13 +82,6 @@ Proof.
     intuition eauto.
   - easy.
 Qed.
-
-Theorem at_most_one_request_timeout_invariant :
-  forall gst h,
-    reachable_st gst ->
-    at_most_one_request_timeout gst h.
-Proof.
-Admitted.
 
 Definition at_most_one_request (gst : global_state) (src : addr) :=
   forall dst msg xs ys,
