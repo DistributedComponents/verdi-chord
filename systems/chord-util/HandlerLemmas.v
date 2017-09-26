@@ -1237,11 +1237,19 @@ Inductive possible_nts (st : data) : list timeout -> Prop :=
     possible_nts st [RectifyTick]
 | KeepaliveTickPossible :
     possible_nts st [KeepaliveTick]
-| RequestPossible :
-    forall h p,
-      request_payload p ->
-      possible_nts st [Request h p]
-| CurRequestPossible :
+| Stabilize2RequestPossible :
+    forall h dstp p,
+      cur_request st = Some (dstp, Stabilize, p) ->
+      possible_nts st [Request h GetSuccList]
+| JoinGSLRequestPossible :
+    forall h j dstp p,
+      cur_request st = Some (dstp, Join j, p) ->
+      possible_nts st [Request h GetSuccList]
+| JoinGBPRequestPossible :
+    forall h j dstp p,
+      cur_request st = Some (dstp, Join j, p) ->
+      possible_nts st [Request h (GetBestPredecessor (ptr st))]
+| RefreshRequestPossible :
     forall dstp q p,
       cur_request st = Some (dstp, q, p) ->
       possible_nts st [Request (addr_of dstp) p].
@@ -1320,6 +1328,7 @@ Lemma recv_handler_sets_cur_request_when_adding_new_timeout :
       ~ In (Request dst req) cts ->
       exists dstp q,
         addr_of dstp = dst /\
+        query_request q req /\
         cur_request st' = Some (dstp, q, req).
 Proof.
   intros.
@@ -1352,7 +1361,15 @@ Lemma split_eq_singleton :
     xs = [] /\
     ys = [].
 Proof.
-Admitted.
+  destruct xs; destruct ys;
+    intros; simpl in *.
+  - intuition congruence.
+  - find_inversion.
+  - find_inversion;
+      exfalso; eapply app_cons_not_nil; eauto.
+  - find_inversion;
+      exfalso; eapply app_cons_not_nil; eauto.
+Qed.
 
 Lemma recv_handler_sends_request_when_adding_new_timeout :
   forall src h st p st' ms nts cts,

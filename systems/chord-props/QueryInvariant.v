@@ -164,29 +164,10 @@ Proof.
   - intros.
 Abort.
 
-Inductive request_msg_for_query : query -> payload -> Prop :=
-| RectifyMsg :
-    forall p,
-      request_msg_for_query (Rectify p) Ping
-| StabilizeMsg :
-    request_msg_for_query Stabilize GetPredAndSuccs
-| Stabilize2Msg :
-    forall p,
-      request_msg_for_query (Stabilize2 p) GetSuccList
-| JoinGetBestPredecessor :
-    forall k p,
-      request_msg_for_query (Join k) (GetBestPredecessor p)
-| JoinGetSuccList :
-    forall k,
-      request_msg_for_query (Join k) GetSuccList
-| Join2Msg :
-    forall s,
-      request_msg_for_query (Join2 s) GetSuccList.
-
 Definition open_request_to (gst : global_state) (h : addr) (dst : addr) (m : payload) : Prop :=
   In (Request dst m) (timeouts gst h) /\
   exists q st dstp,
-    request_msg_for_query q m /\
+    query_request q m /\
     sigma gst h = Some st /\
     addr_of dstp = dst /\
     cur_request st = Some (dstp, q, m).
@@ -227,6 +208,22 @@ Theorem at_most_one_request_timeout_invariant :
     at_most_one_request_timeout gst h.
 Proof.
 Admitted.
+
+Lemma recv_msg_not_right_response_preserves_cur_request :
+  forall src dst st p st' ms nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    forall dstp q req,
+      cur_request st = Some (dstp, q, req) ->
+      ~ query_response q p ->
+      cur_request st' = cur_request st.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl);
+    repeat find_rewrite;
+    find_injection;
+    find_false;
+    intuition.
+Qed.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
