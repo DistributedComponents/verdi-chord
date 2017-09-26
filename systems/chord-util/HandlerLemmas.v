@@ -2,6 +2,7 @@ Require Import List.
 Import ListNotations.
 
 Require Import Arith.
+Require Import Omega.
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
@@ -50,12 +51,14 @@ Lemma handle_query_res_definition :
     (request_payload p /\
      st' = delay_query st src p /\
      clearedts = [] /\
+     ms = [] /\
      ((delayed_queries st = [] /\
       newts = [KeepaliveTick]) \/
      (delayed_queries st <> [] /\
       newts = []))) \/
     (p = Busy /\
      st' = st /\
+     ms = [] /\
      newts = timeouts_in st /\
      clearedts = timeouts_in st) \/
     (exists n,
@@ -1113,10 +1116,23 @@ Qed.
 (* Hints for reasoning about handlers *)
 Hint Unfold clear_delayed_queries.
 Hint Unfold next_msg_for_join.
+Hint Constructors request_payload.
+Hint Constructors response_payload.
 Hint Constructors NoDup.
 Hint Resolve NoDup_disjoint_append.
 Hint Resolve NoDup_two_diff.
 Hint Extern 1 (_ <> _) => congruence.
+
+(* TODO(ryan) move to structtact! *)
+Lemma in_singleton_eq :
+  forall A (x y : A),
+    In x [y] ->
+    x = y.
+Proof.
+  intros.
+  simpl in *.
+  intuition.
+Qed.
 
 Ltac handler_def :=
   match goal with
@@ -1150,9 +1166,10 @@ Ltac handler_simpl :=
   match goal with
   | |- _ => progress subst
   | H: _ = _ |- _ => injc H
+  | H: In _ [_] |- _ => apply in_singleton_eq in H
   | |- _ => progress simpl in *
   | |- _ => progress autounfold in *
-  | |- _ => progress autorewrite with list core
+  | |- _ => progress autorewrite with list core in *
   | H: cur_request ?st = Some _ |- context[timeouts_in ?st] =>
     erewrite timeouts_in_Some; [|eassumption]
   | H: cur_request ?st = None |- context[timeouts_in ?st] =>
@@ -1211,10 +1228,69 @@ Proof.
   intros; handler_def; reflexivity.
 Qed.
 
+Inductive possible_nts (st : data) : list timeout -> Prop :=
+| NilPossible :
+    possible_nts st []
+| TickPossible :
+    possible_nts st [Tick]
+| RectifyTickPossible :
+    possible_nts st [RectifyTick]
+| KeepaliveTickPossible :
+    possible_nts st [KeepaliveTick]
+| RequestPossible :
+    forall h p,
+      request_payload p ->
+      possible_nts st [Request h p]
+| CurRequestPossible :
+    forall dstp q p,
+      cur_request st = Some (dstp, q, p) ->
+      possible_nts st [Request (addr_of dstp) p].
+Hint Constructors possible_nts.
+
+Lemma recv_handler_possible_nts :
+  forall src dst st p st' ms nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    possible_nts st nts.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl).
+Qed.
+Hint Resolve recv_handler_possible_nts.
+
+Print Ltac find_inversion.
+
 Lemma recv_handler_nodup_nts :
   forall src dst st p st' ms nts cts,
     recv_handler src dst st p = (st', ms, nts, cts) ->
     NoDup nts.
+Proof.
+  intros.
+  assert (possible_nts st nts) by eauto.
+  invcs_prop possible_nts; eauto.
+Qed.
+
+Inductive possible_cts (st : data) : list timeout -> Prop :=
+| NilClearedPossible :
+    possible_cts st []
+| KeepaliveTickClearedPossible :
+    possible_cts st [KeepaliveTick]
+| CurRequestClearedPossible :
+    forall dstp q p,
+      cur_request st = Some (dstp, q, p) ->
+      possible_cts st [Request (addr_of dstp) p]
+| CurRequestAndKeepaliveTickClearedPossible :
+    forall dstp q p,
+      cur_request st = Some (dstp, q, p) ->
+      possible_cts st [Request (addr_of dstp) p; KeepaliveTick]
+| GetBestPredClearedPossible :
+    forall src,
+      possible_cts st [Request src (GetBestPredecessor (ptr st))].
+Hint Constructors possible_cts.
+
+Lemma recv_handler_possible_cts :
+  forall src dst st p st' ms nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    possible_cts st cts.
 Proof.
   intros.
   repeat (handler_def || handler_simpl).
@@ -1229,51 +1305,125 @@ Proof.
   repeat (handler_def || handler_simpl).
 Qed.
 
-Lemma recv_handler_only_sets_cur_request_if_already_set :
+Lemma recv_handler_small_cts :
   forall src dst st p st' ms nts cts,
     recv_handler src dst st p = (st', ms, nts, cts) ->
-    forall dstp q req,
-      cur_request st <> cur_request st' ->
-      cur_request st' = Some (dstp, q, req) ->
-
-      (exists dstp succs,
-          nts = [Request (addr_of dstp) GetSuccList] /\
-          cts = timeouts_in st /\
-          q = Stabilize /\
-          p = GotPredAndSuccs (Some dstp) succs /\
-          cur_request st' = Some (dstp, Stabilize2 dstp, GetSuccList) /\
-          ptr_between (ptr st) dstp (make_pointer src)) \/
-
-      (exists j dstp,
-          nts = [Request (addr_of dstp) GetSuccList] /\
-          cts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
-          q = Join j /\
-          p = GotBestPredecessor dstp /\
-          addr_of dstp = src /\
-          cur_request st' = Some (dstp, Join j, GetSuccList)) \/
-
-      (exists j dstp,
-          nts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
-          cts = [Request src (GetBestPredecessor (ptr st))] /\
-          q = Join j /\
-          p = GotBestPredecessor dstp /\
-          addr_of dstp <> src /\
-          cur_request st' = Some (dstp, Join j, GetBestPredecessor (ptr st))) \/
-
-      exists j dstp rest,
-        nts = [Request (addr_of dstp) GetSuccList] /\
-        cts = timeouts_in st /\
-        q = Join j /\
-        p = GotSuccList (dstp :: rest) /\
-        cur_request st' = Some (dstp, Join2 dstp, GetSuccList).
+    length cts <= 2.
 Proof.
   intros.
-  handler_def.
-  find_copy_apply_lem_hyp cur_request_preserved_by_do_delayed_queries.
-  repeat find_rewrite.
-  handler_def; handler_simpl.
-  - repeat handler_def.
-  - repeat handler_def.
-  - find_eapply_lem_hyp handle_query_res_info_from_changed_set_cur_request;
-      eauto; try congruence.
-Abort.
+  repeat (handler_def || handler_simpl).
+Qed.
+
+Lemma recv_handler_sets_cur_request_when_adding_new_timeout :
+  forall src h st p st' ms nts cts,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    forall dst req,
+      In (Request dst req) nts ->
+      ~ In (Request dst req) cts ->
+      exists dstp q,
+        addr_of dstp = dst /\
+        cur_request st' = Some (dstp, q, req).
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl || expand_def).
+Qed.
+
+Lemma cur_request_related_when_refreshing_timeout :
+  forall src h st p st' ms nts cts,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    forall dst req,
+      In (Request dst req) nts ->
+      In (Request dst req) cts ->
+      exists dstp q,
+        addr_of dstp = dst /\
+        cur_request st = Some (dstp, q, req).
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl || expand_def);
+    find_erewrite_lem timeouts_in_Some;
+    find_apply_lem_hyp in_singleton_eq;
+    find_injection;
+    repeat find_rewrite;
+    repeat eexists; intuition eauto.
+Qed.
+
+Lemma split_eq_singleton :
+  forall A (x y : A) xs ys,
+    [x] = xs ++ y :: ys ->
+    x = y /\
+    xs = [] /\
+    ys = [].
+Proof.
+Admitted.
+
+Lemma recv_handler_sends_request_when_adding_new_timeout :
+  forall src h st p st' ms nts cts,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    forall dst req,
+      In (Request dst req) nts ->
+      ~ In (Request dst req) cts ->
+      In (dst, req) ms /\
+      request_payload req /\
+      forall dst' req' xs ys,
+        ms = xs ++ (dst, req) :: ys ->
+        request_payload req' ->
+        In (dst', req') (xs ++ ys) ->
+        False.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl || expand_def);
+    intuition;
+    solve [find_copy_apply_lem_hyp split_eq_singleton; expand_def; tauto].
+Qed.
+
+Lemma handle_query_req_only_sends_responses :
+  forall st src p dst res,
+    In (dst, res) (handle_query_req st src p) ->
+    response_payload res.
+Proof.
+  unfold handle_query_req.
+  intros.
+  repeat break_match; simpl in *; intuition; find_injection; auto.
+Qed.
+Hint Resolve handle_query_req_only_sends_responses.
+
+Lemma handle_delayed_query_only_sends_responses :
+  forall h st l dst p,
+    In (dst, p) (concat (map (handle_delayed_query h st) l)) ->
+    response_payload p.
+Proof.
+  intros until 0.
+  rewrite <- flat_map_concat_map.
+  intros.
+  find_apply_lem_hyp in_flat_map; expand_def.
+  unfold handle_delayed_query in *.
+  repeat break_match; eauto.
+Qed.
+Hint Resolve handle_delayed_query_only_sends_responses.
+
+Lemma request_response_mutually_exclusive :
+  forall p,
+    request_payload p ->
+    response_payload p ->
+    False.
+Proof.
+  intros.
+  destruct p;
+    invcs_prop request_payload;
+    invcs_prop response_payload.
+Qed.
+Hint Resolve request_response_mutually_exclusive.
+
+Lemma recv_handler_adds_new_timeout_when_sending_request :
+  forall src h st p st' ms nts cts,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    forall dst req,
+      request_payload req ->
+      In (dst, req) ms ->
+      In (Request dst req) nts.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl || expand_def);
+    repeat (handler_simpl || in_crush);
+    try solve [inv_prop request_payload].
+Qed.
