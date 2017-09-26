@@ -426,16 +426,6 @@ Proof.
   now apply between_between_bool_equiv.
 Qed.
 
-Lemma between_bool_false_not_between :
-  forall x y z,
-    between_bool x y z = false ->
-    ~ between x y z.
-Proof.
-  intuition.
-  find_apply_lem_hyp between_between_bool_equiv.
-  congruence.
-Qed.
-
 Lemma better_succ_bool_false_not_better_succ :
   forall gst h s s',
     better_succ_bool h s s' = false ->
@@ -1190,52 +1180,6 @@ Section MergePoint.
   Proof.
   (* USELESS *)
   Admitted.
-
-  Lemma ptr_between_ptr_between_bool :
-    forall a b c,
-      ptr_between a b c ->
-      ptr_between_bool a b c = true.
-  Proof.
-    unfold ptr_between, ptr_between_bool.
-    intros.
-    now apply between_between_bool_equiv.
-  Qed.
-
-  Ltac find_false :=
-    match goal with
-    | H : _ |- _ => exfalso; apply H
-    end.
-
-  Lemma not_ptr_between :
-    forall a b c,
-      ~ ptr_between a b c ->
-      ptr_between_bool a b c = false.
-  Proof.
-    intros.
-    destruct (ptr_between_bool _ _ _) eqn:?H; [|reflexivity].
-    find_false.
-    now apply between_between_bool_equiv.
-  Qed.
-
-  Lemma ptr_between_bool_false :
-    forall a b c,
-      ptr_between_bool a b c = false ->
-      ~ ptr_between a b c.
-  Proof.
-    unfold ptr_between, ptr_between_bool.
-    intros.
-    now apply between_bool_false_not_between.
-  Qed.
-
-  Lemma ptr_between_bool_true :
-    forall a b c,
-      ptr_between_bool a b c = true ->
-      ptr_between a b c.
-  Proof.
-    unfold ptr_between, ptr_between_bool.
-    intros.
-    now apply between_bool_between.
-  Qed.
 
   Lemma handle_stabilize_sends_Notify_None :
     forall h src srcp st q new_succ succs st' ms nts cts,

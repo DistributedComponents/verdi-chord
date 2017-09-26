@@ -85,7 +85,7 @@ Lemma handle_query_res_definition :
               addr_of bestpred = src /\
               ms = [(src, GetSuccList)] /\
               newts = [Request src GetSuccList]) \/
-             (st' = update_query st bestpred (Join k) (GetBestPredecessor (ptr st')) /\
+             (st' = update_query st bestpred (Join k) (GetBestPredecessor (ptr st)) /\
               addr_of bestpred <> src /\
               ms = [(addr_of bestpred, (GetBestPredecessor (ptr st')))] /\
               newts = [Request (addr_of bestpred) (GetBestPredecessor (ptr st'))]))) \/
@@ -814,7 +814,6 @@ Proof.
     try (find_eapply_lem_hyp joined_preserved_by_end_query; simpl in *; congruence).
   - find_eapply_lem_hyp joined_preserved_by_end_query_handle_rectify; congruence.
   - find_eapply_lem_hyp joined_preserved_by_handle_stabilize; congruence.
-  - find_rewrite; simpl; congruence.
   - find_eapply_lem_hyp joined_preserved_by_start_query; simpl in *; congruence.
 Qed.
 
@@ -983,3 +982,208 @@ Proof.
   erewrite <- succ_list_preserved_by_do_delayed_queries; eauto.
   eapply handle_msg_stabilize_response_pred_worse_sets_succs; eauto.
 Qed.
+
+Lemma ptr_between_ptr_between_bool :
+  forall a b c,
+    ptr_between a b c ->
+    ptr_between_bool a b c = true.
+Proof.
+  unfold ptr_between, ptr_between_bool.
+  intros.
+  now apply between_between_bool_equiv.
+Qed.
+Hint Resolve ptr_between_ptr_between_bool.
+
+Lemma not_ptr_between :
+  forall a b c,
+    ~ ptr_between a b c ->
+    ptr_between_bool a b c = false.
+Proof.
+  intros.
+  destruct (ptr_between_bool _ _ _) eqn:?H; [|reflexivity].
+  find_apply_lem_hyp between_between_bool_equiv.
+  exfalso; eauto.
+Qed.
+Hint Resolve not_ptr_between.
+
+Lemma between_bool_false_not_between :
+  forall x y z,
+    between_bool x y z = false ->
+    ~ between x y z.
+Proof.
+  intuition.
+  find_apply_lem_hyp between_between_bool_equiv.
+  congruence.
+Qed.
+Hint Resolve between_bool_false_not_between.
+
+Lemma ptr_between_bool_false :
+  forall a b c,
+    ptr_between_bool a b c = false ->
+    ~ ptr_between a b c.
+Proof.
+  unfold ptr_between, ptr_between_bool.
+  intros.
+  now apply between_bool_false_not_between.
+Qed.
+Hint Resolve ptr_between_bool_false.
+
+Lemma ptr_between_bool_true :
+  forall a b c,
+    ptr_between_bool a b c = true ->
+    ptr_between a b c.
+Proof.
+  unfold ptr_between, ptr_between_bool.
+  intros.
+  now apply between_bool_between.
+Qed.
+Hint Resolve ptr_between_bool_true.
+
+Lemma handle_stabilize_definition :
+  forall h src st q ns succs result,
+    handle_stabilize h src st q ns succs = result ->
+    (exists new_succ,
+        ns = Some new_succ /\
+        (ptr_between (ptr st) new_succ src /\
+         start_query h (update_succ_list st (make_succs src succs)) (Stabilize2 new_succ) = result \/
+         ~ ptr_between (ptr st) new_succ src /\
+         end_query (update_succ_list st (make_succs src succs), [(addr_of src, Notify)], [], []) = result)) \/
+    ns = None /\
+    end_query (update_succ_list st (make_succs src succs), [(addr_of src, Notify)], [], []) = result.
+Proof.
+  unfold handle_stabilize.
+  intros; repeat break_match;
+    solve [left; econstructor; eauto | right; eauto].
+Qed.
+
+Hint Unfold clear_delayed_queries.
+Hint Unfold next_msg_for_join.
+
+Ltac handler_def :=
+  match goal with
+  | H: recv_handler _ _ _ _ = _ |- _ =>
+    apply recv_handler_definition_existential in H; expand_def
+  | H: handle_msg _ _ _ _ = _ |- _ =>
+    apply handle_msg_definition in H; expand_def
+  | H: end_query (_, _, _, _) = _ |- _ =>
+    apply end_query_definition in H; expand_def
+  | H: end_query (?arg) = _ |- _ =>
+    destruct arg as [[[? ?] ?] ?] eqn:?
+  | H: handle_query_res _ _ _ _ _ = _ |- _ =>
+    apply handle_query_res_definition in H; expand_def
+  | H: handle_query_req_busy _ _ _ = _ |- _ =>
+    apply handle_query_req_busy_definition in H; expand_def
+  | H: handle_stabilize _ _ _ _ _ _ = _ |- _ =>
+    apply handle_stabilize_definition in H; expand_def
+  | H: start_query _ _ _ = _ |- _ =>
+    apply start_query_definition in H; expand_def
+  | H: start_query ?h ?st ?q = _ |- _ =>
+    destruct (start_query ?h ?st ?q) as [[[? ?] ?] ?] eqn:?
+  | H: do_delayed_queries _ _ = _ |- _ =>
+    apply do_delayed_queries_definition in H; expand_def
+  | H: schedule_rectify_with _ _ = _ |- _ =>
+    apply schedule_rectify_with_definition in H; expand_def
+  end.
+
+Ltac handler_simpl :=
+  match goal with
+  | |- _ => progress subst
+  | H: _ = _ |- _ => injc H
+  | |- _ => progress simpl in *
+  | |- _ => progress autounfold in *
+  | |- _ => congruence
+  | |- _ => solve [eauto]
+  end.
+
+Lemma handle_query_res_info_from_changed_set_cur_request :
+  forall src dst st q p st' ms nts cts,
+    handle_query_res src dst st q p = (st', ms, nts, cts) ->
+    forall dstp q' req,
+      cur_request st <> cur_request st' ->
+      cur_request st' = Some (dstp, q', req) ->
+
+      cts = timeouts_in st /\
+      (exists dstp succs,
+          nts = [Request (addr_of dstp) GetSuccList] /\
+          q = Stabilize /\
+          p = GotPredAndSuccs (Some dstp) succs /\
+          cur_request st' = Some (dstp, Stabilize2 dstp, GetSuccList) /\
+          ptr_between (ptr st) dstp (make_pointer src)) \/
+
+      (exists j dstp,
+          nts = [Request (addr_of dstp) GetSuccList] /\
+          q = Join j /\
+          p = GotBestPredecessor dstp /\
+          addr_of dstp = src /\
+          cur_request st' = Some (dstp, Join j, GetSuccList)) \/
+
+      (exists j dstp,
+          nts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
+          q = Join j /\
+          p = GotBestPredecessor dstp /\
+          addr_of dstp <> src /\
+          cur_request st' = Some (dstp, Join j, GetBestPredecessor (ptr st))) \/
+
+      exists j dstp rest,
+        nts = [Request (addr_of dstp) GetSuccList] /\
+        q = Join j /\
+        p = GotSuccList (dstp :: rest) /\
+        cur_request st' = Some (dstp, Join2 dstp, GetSuccList).
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl);
+    intuition (repeat eexists; eauto).
+Qed.
+
+Lemma cur_request_preserved_by_do_delayed_queries :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    cur_request st = cur_request st'.
+Proof.
+  intros; handler_def; reflexivity.
+Qed.
+
+Lemma recv_handler_only_sets_cur_request_if_already_set :
+  forall src dst st p st' ms nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    forall dstp q req,
+      cur_request st <> cur_request st' ->
+      cur_request st' = Some (dstp, q, req) ->
+
+      cts = timeouts_in st /\
+      (exists dstp succs,
+          nts = [Request (addr_of dstp) GetSuccList] /\
+          q = Stabilize /\
+          p = GotPredAndSuccs (Some dstp) succs /\
+          cur_request st' = Some (dstp, Stabilize2 dstp, GetSuccList) /\
+          ptr_between (ptr st) dstp (make_pointer src)) \/
+
+      (exists j dstp,
+          nts = [Request (addr_of dstp) GetSuccList] /\
+          q = Join j /\
+          p = GotBestPredecessor dstp /\
+          addr_of dstp = src /\
+          cur_request st' = Some (dstp, Join j, GetSuccList)) \/
+
+      (exists j dstp,
+          nts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
+          q = Join j /\
+          p = GotBestPredecessor dstp /\
+          addr_of dstp <> src /\
+          cur_request st' = Some (dstp, Join j, GetBestPredecessor (ptr st))) \/
+
+      exists j dstp rest,
+        nts = [Request (addr_of dstp) GetSuccList] /\
+        q = Join j /\
+        p = GotSuccList (dstp :: rest) /\
+        cur_request st' = Some (dstp, Join2 dstp, GetSuccList).
+Proof.
+  intros.
+  handler_def.
+  find_copy_apply_lem_hyp cur_request_preserved_by_do_delayed_queries.
+  repeat find_rewrite.
+  handler_def; handler_simpl.
+  - repeat handler_def.
+  - repeat handler_def.
+  - admit.
+Admitted.
