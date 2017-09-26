@@ -624,7 +624,7 @@ Proof.
     repeat split;
       try apply channel_contents; simpl in *;
       rewrite_update; repeat eexists;
-        eauto using StabilizeMsg with datatypes.
+        eauto with datatypes.
   - simpl in *.
     find_rewrite.
     find_injection.
@@ -770,7 +770,7 @@ Proof.
   find_injection.
 
   inv_prop open_request_to; expand_def.
-  inv_prop request_msg_for_query.
+  inv_prop query_request.
   simpl in *.
 
   find_apply_lem_hyp request_timeout_handler_definition; expand_def; try congruence.

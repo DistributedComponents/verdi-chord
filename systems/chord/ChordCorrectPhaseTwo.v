@@ -1297,7 +1297,7 @@ Section MergePoint.
     find_copy_apply_lem_hyp recv_handler_definition_existential; break_exists; break_and.
     eapply sent_by_handle_msg_sent_by_recv_handler; eauto.
     repeat find_rewrite; repeat find_injection.
-    inv_prop request_msg_for_query.
+    inv_prop query_request.
     break_or_hyp.
     - break_exists; break_and.
       find_apply_lem_hyp (wf_ptr_eq s).

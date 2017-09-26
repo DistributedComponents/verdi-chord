@@ -156,7 +156,7 @@ Proof.
   inv_prop open_request_to; expand_def.
   find_copy_eapply_lem_hyp cur_request_valid; eauto.
   unfold valid_ptr in *.
-  inv_prop request_msg_for_query.
+  inv_prop query_request.
   rewrite <- wf_ptr_eq in * |- by tauto.
   invc_labeled_step.
   recover_msg_from_recv_step_equality.

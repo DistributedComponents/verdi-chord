@@ -826,6 +826,25 @@ Ltac request_payload_inversion :=
   | H : request_payload _ |- _ => inv H
   end.
 
+(* this is not quite what it sounds like, since Chord.start_query will sometimes not send anything *)
+Inductive query_request : query -> payload -> Prop :=
+| QReq_RectifyPing : forall n, query_request (Rectify n) Ping
+| QReq_StabilizeGetPredAndSuccs : query_request Stabilize GetPredAndSuccs
+| QReq_Stabilize2 : forall p, query_request (Stabilize2 p) GetSuccList
+| QReq_JoinGetBestPredecessor : forall k a, query_request (Join k) (GetBestPredecessor a)
+| QReq_JoinGetSuccList : forall k, query_request (Join k) GetSuccList
+| QReq_Join2 : forall n, query_request (Join2 n) GetSuccList.
+Hint Constructors query_request.
+
+Inductive query_response : query -> payload -> Prop :=
+| QRes_RectifyPong : forall n, query_response (Rectify n) Pong
+| QRes_StabilizeGetPredAndSuccs : forall p l, query_response Stabilize (GotPredAndSuccs p l)
+| QRes_Stabilize2 : forall p l, query_response (Stabilize2 p) (GotSuccList l)
+| QRes_JoinGotBestPredecessor : forall k p, query_response (Join k) (GotBestPredecessor p)
+| QRes_JoinGotSuccList : forall k l, query_response (Join k) (GotSuccList l)
+| QRes_Join2 : forall n l, query_response (Join2 n) (GotSuccList l).
+Hint Constructors query_response.
+
 Inductive response_payload : payload -> Prop :=
 | res_GotBestPredecessor : forall p, response_payload (GotBestPredecessor p)
 | res_GotSuccList : forall l, response_payload (GotSuccList l)
