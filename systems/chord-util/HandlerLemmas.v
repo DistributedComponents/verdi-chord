@@ -1056,8 +1056,67 @@ Proof.
     solve [left; econstructor; eauto | right; eauto].
 Qed.
 
+Lemma timeouts_in_None :
+  forall st,
+    cur_request st = None ->
+    timeouts_in st = [].
+Proof.
+  unfold timeouts_in.
+  intros; find_rewrite; reflexivity.
+Qed.
+
+Lemma timeouts_in_Some :
+  forall st dst q m,
+    cur_request st = Some (dst, q, m) ->
+    timeouts_in st = [Request (addr_of dst) m].
+Proof.
+  unfold timeouts_in.
+  intros; find_rewrite; reflexivity.
+Qed.
+
+Lemma timeouts_in_update_pred :
+  forall st p,
+    timeouts_in (update_pred st p) = timeouts_in st.
+Proof.
+  easy.
+Qed.
+Hint Rewrite timeouts_in_update_pred.
+
+Lemma timeouts_in_update_succ_list :
+  forall st sl,
+    timeouts_in (update_succ_list st sl) = timeouts_in st.
+Proof.
+  easy.
+Qed.
+Hint Rewrite timeouts_in_update_succ_list.
+
+Lemma timeouts_in_update_for_join :
+  forall st sl,
+    timeouts_in (update_for_join st sl) = timeouts_in st.
+Proof.
+  easy.
+Qed.
+Hint Rewrite timeouts_in_update_for_join.
+
+
+Lemma NoDup_two_diff :
+  forall A (a b : A),
+    a <> b ->
+    NoDup [a; b].
+Proof.
+  intros.
+  constructor.
+  - intro; find_apply_lem_hyp In_cons_neq; auto.
+  - repeat constructor; auto.
+Qed.
+
+(* Hints for reasoning about handlers *)
 Hint Unfold clear_delayed_queries.
 Hint Unfold next_msg_for_join.
+Hint Constructors NoDup.
+Hint Resolve NoDup_disjoint_append.
+Hint Resolve NoDup_two_diff.
+Hint Extern 1 (_ <> _) => congruence.
 
 Ltac handler_def :=
   match goal with
@@ -1073,6 +1132,8 @@ Ltac handler_def :=
     apply handle_query_res_definition in H; expand_def
   | H: handle_query_req_busy _ _ _ = _ |- _ =>
     apply handle_query_req_busy_definition in H; expand_def
+  | H: handle_rectify _ _ _ = _ |- _ =>
+    apply handle_rectify_definition in H; expand_def
   | H: handle_stabilize _ _ _ _ _ _ = _ |- _ =>
     apply handle_stabilize_definition in H; expand_def
   | H: start_query _ _ _ = _ |- _ =>
@@ -1091,8 +1152,12 @@ Ltac handler_simpl :=
   | H: _ = _ |- _ => injc H
   | |- _ => progress simpl in *
   | |- _ => progress autounfold in *
-  | |- _ => congruence
-  | |- _ => solve [eauto]
+  | |- _ => progress autorewrite with list core
+  | H: cur_request ?st = Some _ |- context[timeouts_in ?st] =>
+    erewrite timeouts_in_Some; [|eassumption]
+  | H: cur_request ?st = None |- context[timeouts_in ?st] =>
+    erewrite timeouts_in_None; [|eassumption]
+  | |- _ => solve [assumption | congruence | eauto ]
   end.
 
 Lemma handle_query_res_info_from_changed_set_cur_request :
@@ -1102,9 +1167,9 @@ Lemma handle_query_res_info_from_changed_set_cur_request :
       cur_request st <> cur_request st' ->
       cur_request st' = Some (dstp, q', req) ->
 
-      cts = timeouts_in st /\
       (exists dstp succs,
           nts = [Request (addr_of dstp) GetSuccList] /\
+          cts = timeouts_in st /\
           q = Stabilize /\
           p = GotPredAndSuccs (Some dstp) succs /\
           cur_request st' = Some (dstp, Stabilize2 dstp, GetSuccList) /\
@@ -1112,6 +1177,7 @@ Lemma handle_query_res_info_from_changed_set_cur_request :
 
       (exists j dstp,
           nts = [Request (addr_of dstp) GetSuccList] /\
+          cts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
           q = Join j /\
           p = GotBestPredecessor dstp /\
           addr_of dstp = src /\
@@ -1119,6 +1185,7 @@ Lemma handle_query_res_info_from_changed_set_cur_request :
 
       (exists j dstp,
           nts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
+          cts = [Request src (GetBestPredecessor (ptr st))] /\
           q = Join j /\
           p = GotBestPredecessor dstp /\
           addr_of dstp <> src /\
@@ -1126,6 +1193,7 @@ Lemma handle_query_res_info_from_changed_set_cur_request :
 
       exists j dstp rest,
         nts = [Request (addr_of dstp) GetSuccList] /\
+        cts = timeouts_in st /\
         q = Join j /\
         p = GotSuccList (dstp :: rest) /\
         cur_request st' = Some (dstp, Join2 dstp, GetSuccList).
@@ -1143,6 +1211,24 @@ Proof.
   intros; handler_def; reflexivity.
 Qed.
 
+Lemma recv_handler_nodup_nts :
+  forall src dst st p st' ms nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    NoDup nts.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl).
+Qed.
+
+Lemma recv_handler_nodup_cts :
+  forall src dst st p st' ms nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    NoDup cts.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl).
+Qed.
+
 Lemma recv_handler_only_sets_cur_request_if_already_set :
   forall src dst st p st' ms nts cts,
     recv_handler src dst st p = (st', ms, nts, cts) ->
@@ -1150,9 +1236,9 @@ Lemma recv_handler_only_sets_cur_request_if_already_set :
       cur_request st <> cur_request st' ->
       cur_request st' = Some (dstp, q, req) ->
 
-      cts = timeouts_in st /\
       (exists dstp succs,
           nts = [Request (addr_of dstp) GetSuccList] /\
+          cts = timeouts_in st /\
           q = Stabilize /\
           p = GotPredAndSuccs (Some dstp) succs /\
           cur_request st' = Some (dstp, Stabilize2 dstp, GetSuccList) /\
@@ -1160,6 +1246,7 @@ Lemma recv_handler_only_sets_cur_request_if_already_set :
 
       (exists j dstp,
           nts = [Request (addr_of dstp) GetSuccList] /\
+          cts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
           q = Join j /\
           p = GotBestPredecessor dstp /\
           addr_of dstp = src /\
@@ -1167,6 +1254,7 @@ Lemma recv_handler_only_sets_cur_request_if_already_set :
 
       (exists j dstp,
           nts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
+          cts = [Request src (GetBestPredecessor (ptr st))] /\
           q = Join j /\
           p = GotBestPredecessor dstp /\
           addr_of dstp <> src /\
@@ -1174,6 +1262,7 @@ Lemma recv_handler_only_sets_cur_request_if_already_set :
 
       exists j dstp rest,
         nts = [Request (addr_of dstp) GetSuccList] /\
+        cts = timeouts_in st /\
         q = Join j /\
         p = GotSuccList (dstp :: rest) /\
         cur_request st' = Some (dstp, Join2 dstp, GetSuccList).
@@ -1185,5 +1274,6 @@ Proof.
   handler_def; handler_simpl.
   - repeat handler_def.
   - repeat handler_def.
-  - admit.
-Admitted.
+  - find_eapply_lem_hyp handle_query_res_info_from_changed_set_cur_request;
+      eauto; try congruence.
+Abort.
