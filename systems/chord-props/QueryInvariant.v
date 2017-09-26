@@ -221,6 +221,13 @@ Definition Request_payload_has_response (gst : global_state) : Prop :=
     exists m,
       request_response_pair p m.
 
+Theorem at_most_one_request_timeout_invariant :
+  forall gst h,
+    reachable_st gst ->
+    at_most_one_request_timeout gst h.
+Proof.
+Admitted.
+
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
     labeled_step_dynamic gst l gst' ->

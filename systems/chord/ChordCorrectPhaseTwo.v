@@ -355,6 +355,7 @@ Proof.
   unfold better_pred.
   tauto.
 Qed.
+
 Lemma better_pred_bool_true_better_pred :
   forall gst h p p',
     wf_ptr h ->
@@ -365,9 +366,7 @@ Lemma better_pred_bool_true_better_pred :
     better_pred gst h p p'.
 Proof.
   unfold better_pred_bool.
-  intros.
-  apply better_pred_intro; auto.
-  now apply between_between_bool_equiv.
+  auto using better_pred_intro.
 Qed.
 
 Lemma better_pred_better_pred_bool_true :
@@ -407,9 +406,7 @@ Lemma better_succ_bool_true_better_succ :
     better_succ gst h s s'.
 Proof.
   unfold better_succ_bool.
-  intros.
-  apply better_succ_intro; auto.
-  now apply between_between_bool_equiv.
+  auto using better_succ_intro.
 Qed.
 
 Lemma better_succ_better_succ_bool_true :
@@ -1650,7 +1647,7 @@ Section MergePoint.
     pose proof (Chord.ChordIDSpace.lt_total y z).
     pose proof (Chord.ChordIDSpace.lt_total z x).
     repeat break_or_hyp;
-      solve [tauto | id_auto |  congruence | find_false; id_auto].
+      intuition solve [tauto | id_auto |  congruence | find_false; id_auto].
   Qed.
 
   Lemma unrolled_not_between_rot :
@@ -1683,7 +1680,7 @@ Section MergePoint.
       pose proof (Chord.ChordIDSpace.lt_total x y).
       pose proof (Chord.ChordIDSpace.lt_total y z).
       repeat break_or_hyp;
-        solve [id_auto | congruence | find_false; id_auto].
+        intuition solve [id_auto | congruence | find_false; id_auto].
   Qed.
 
   Lemma not_between_between :
@@ -1696,9 +1693,8 @@ Section MergePoint.
     repeat break_if; subst; try congruence.
     - now apply between_xyx.
     - apply between_rot_r; auto.
-      apply between_rot_r; auto.
-      apply not_between_swap; auto.
-      now apply between_bool_false_not_between.
+      apply between_rot_r;
+        auto using not_between_swap.
   Qed.
 
   Lemma recv_GotPredAndSuccs_with_a_after_p_causes_Notify :
