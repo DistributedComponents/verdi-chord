@@ -1257,8 +1257,6 @@ Proof.
 Qed.
 Hint Resolve recv_handler_possible_nts.
 
-Print Ltac find_inversion.
-
 Lemma recv_handler_nodup_nts :
   forall src dst st p st' ms nts cts,
     recv_handler src dst st p = (st', ms, nts, cts) ->
