@@ -1,5 +1,8 @@
 Require Import List.
 Import ListNotations.
+
+Require Import Omega.
+
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
 Require Import StructTact.Util.
@@ -67,6 +70,48 @@ Proof.
         eapply tick_not_in_timeouts_in; eauto.
 Qed.
 
+Lemma initial_nodes_large :
+  forall gst,
+    initial_st gst ->
+    3 <= length (nodes gst).
+Proof.
+  unfold initial_st.
+  intros.
+  break_and.
+  assert (2 <= Chord.SUCC_LIST_LEN)
+    by apply Chord.succ_list_len_lower_bound.
+  omega.
+Qed.
+
+Lemma Tick_in_initial_st :
+  forall gst h,
+    initial_st gst ->
+    In h (nodes gst) ->
+    timeouts gst h = [Tick].
+Proof.
+  intros.
+  find_copy_eapply_lem_hyp initial_nodes_large.
+  unfold initial_st in *.
+  break_and.
+  destruct (start_handler h (nodes gst)) as [[? ?] nts] eqn:?.
+  assert ([Tick] = nts).
+  {
+    pose proof (sort_by_between_permutes h (map make_pointer (nodes gst)) _ eq_refl).
+    find_copy_apply_lem_hyp Permutation.Permutation_length.
+    rewrite map_length in * by auto.
+    destruct (sort_by_between h (map make_pointer (nodes gst))) as [| ? [|? ?]] eqn:? in *;
+      change ChordIDParams.name with addr in *;
+      simpl in *; try omega.
+    unfold start_handler in *.
+    change ChordIDParams.name with addr in *;
+      repeat find_rewrite.
+    now find_inversion.
+  }
+  find_rewrite.
+  eapply_prop_hyp start_handler start_handler; auto.
+  tauto.
+Qed.
+
 Lemma handle_msg_adds_tick_when_setting_joined :
   forall (h h' : addr) (st st' : data) m (ms : list (addr * payload))
     (nts cts : list timeout),
@@ -87,49 +132,16 @@ Proof.
     unfold start_query in *; repeat (break_match; simpler); congruence.
 Qed.
 
-Lemma fold_left_constant_eliminator :
-  forall A B C (e : A -> C) (f : A -> B -> A) (l : list B) (x : A),
-    (forall x' y,
-        e (f x' y) = e x') ->
-    e (fold_left f l x) = e x.
-Proof.
-  induction l; intros; simpl in *; auto.
-  rewrite IHl; auto.
-Qed.
-
-Lemma initial_st_nodes :
-  nodes initial_st = initial_nodes.
-Proof.
-  unfold initial_st.
-  rewrite fold_left_constant_eliminator; simpl in *; auto.
-  intros.
-  unfold run_init_for. unfold apply_handler_result.
-  repeat break_let; simpl; auto.
-Qed.
-
 Lemma live_node_has_Tick_in_timeouts' :
   forall gst h,
     reachable_st gst ->
     live_node gst h ->
     In Tick (timeouts gst h).
 Proof.
-  intros. induct_reachable_st.
-  - intros. unfold live_node in *.
-    intuition. break_exists. intuition.
-    find_copy_apply_lem_hyp sigma_initial_st_start_handler.
-    assert (In h initial_nodes) by (rewrite <- initial_st_nodes; auto).
-    find_apply_lem_hyp timeouts_initial_st_start_handler.
-    break_exists.
-    repeat find_rewrite.
-    simpl in *.
-    subst. unfold start_handler in *.
-    repeat break_match; simpl in *; try discriminate.
-    + subst. unfold empty_start_res in *. find_inversion.
-      simpl in *. discriminate.
-    + subst. find_inversion. simpl in *. discriminate.
-    + find_inversion. rewrite_update. in_crush.
-  - intros.
-    inversion H0.
+  intros. induct_reachable_st; intros.
+  - unfold live_node in *.
+    rewrite Tick_in_initial_st; eauto with datatypes.
+  - inv_prop step_dynamic.
     + subst. simpl in *.
       unfold live_node in *. simpl in *.
       intuition.
@@ -216,7 +228,7 @@ Proof.
         eauto using handle_msg_adds_tick_when_setting_joined.
     + subst. simpl in *. auto.
     + subst. simpl in *. auto.
-Qed.        
+Qed.
 
 (*
 New nodes have no Tick.

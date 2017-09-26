@@ -658,23 +658,20 @@ Proof.
 Qed.
 
 Lemma sigma_initial_st_start_handler :
-  forall h st,
-    sigma initial_st h = Some st ->
-    st = fst (fst (start_handler h initial_nodes)).
+  forall gst h st,
+    initial_st gst ->
+    sigma gst h = Some st ->
+    st = fst (fst (start_handler h (nodes gst))).
 Proof.
-  intros. unfold initial_st in *.
-  destruct (in_dec addr_eq_dec h initial_nodes).
-  - find_eapply_lem_hyp fold_left_for_each_in; eauto.
-    + break_exists. erewrite H0 in H. clear H0.
-      unfold run_init_for in *. find_rewrite_lem sigma_apply_handler_result_same.
-      simpl in *. congruence.
-    + apply addr_eq_dec.
-    + intros. unfold run_init_for.
-      auto using sigma_apply_handler_result_diff.
-  - find_eapply_lem_hyp fold_left_for_each_not_in; eauto.
-    + erewrite n in H. clear n. simpl in *. discriminate.
-    + intros. unfold run_init_for.
-      auto using sigma_apply_handler_result_diff.
+  intros.
+  inv_prop initial_st.
+  break_and.
+  destruct (start_handler _ _) as [[d ?] ?] eqn:?.
+  simpl.
+  destruct (In_dec addr_eq_dec h (nodes gst)).
+  - apply_prop_hyp sigma start_handler;
+      intuition congruence.
+  - find_higher_order_rewrite; congruence.
 Qed.
 
 Lemma timeouts_apply_handler_result_diff :
@@ -686,19 +683,6 @@ Proof.
   intros. unfold apply_handler_result.
   repeat break_match. subst. simpl.
   now rewrite_update.
-Qed.
-
-Lemma timeouts_initial_st_start_handler :
-  forall h,
-    In h initial_nodes ->
-    exists gst,
-      timeouts initial_st h =
-      timeouts (apply_handler_result h (start_handler h initial_nodes, []) [] gst) h.
-Proof.
-  intros.
-  find_eapply_lem_hyp (fold_left_for_each_in run_init_for timeouts addr_eq_dec);
-    eauto.
-  intros. unfold run_init_for in *. auto using timeouts_apply_handler_result_diff.
 Qed.
 
 Definition active_nodes (gst : global_state) :=

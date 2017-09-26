@@ -989,36 +989,33 @@ Module ChordSemantics := DynamicSemantics(ConstrainedChord).
 Export ChordSemantics.
 Export ConstrainedChord.
 
-Open Scope string_scope.
+Definition hash_injective_on (gst : global_state) : Prop :=
+  forall n m,
+    In n (nodes gst) ->
+    In m (nodes gst) ->
+    hash n <> hash m.
 
-Fixpoint fake_name (k : nat) :=
-  match k with
-  | 0 => ":^)"
-  | S k' => String.append ":^) " (fake_name k')
-  end.
-Axiom clients_not_fake :
-  forall k,
-    ~ client_addr (fake_name k).
-
-Fixpoint make_initial_nodes (num_nodes : nat) : list addr :=
-  match num_nodes with
-  | 0 => []
-  | S k => fake_name k :: make_initial_nodes k
-  end.
-
-Definition initial_nodes : list addr :=
-  make_initial_nodes (SUCC_LIST_LEN + 1).
-
-Definition run_init_for (gst : global_state) (h : addr) : global_state :=
-  let res := start_handler h initial_nodes in
-  apply_handler_result h (res, []) [] gst.
-Hint Unfold run_init_for.
-
-Definition initial_st : global_state :=
-  fold_left run_init_for initial_nodes
-            {| nodes := initial_nodes;
-               failed_nodes := [];
-               timeouts := fun h => [];
-               sigma := fun h => None;
-               msgs := [];
-               trace := [] |}.
+Definition initial_st (gst : global_state) : Prop :=
+  (* at least N+1 nodes *)
+  length (nodes gst) >= SUCC_LIST_LEN + 1 /\
+  (* no duplicate addresses *)
+  NoDup (nodes gst) /\
+  (* all addresses hash to distinct IDs *)
+  hash_injective_on gst /\
+  (* nodes aren't clients *)
+  (forall h, In h (nodes gst) -> ~client_addr h) /\
+  (* no messages, failed nodes, or events *)
+  failed_nodes gst = [] /\
+  msgs gst = [] /\
+  trace gst = [] /\
+  (* start handler has been run at all nodes *)
+  (forall h,
+      In h (nodes gst) ->
+      forall st ms nts,
+        start_handler h (nodes gst) = (st, ms, nts) ->
+        ms = [] /\
+        timeouts gst h = nts /\
+        sigma gst h = Some st) /\
+  (* no other timeouts or state *)
+  (forall h, ~ In h (nodes gst) -> timeouts gst h = []) /\
+  (forall h, ~ In h (nodes gst) -> sigma gst h = None).

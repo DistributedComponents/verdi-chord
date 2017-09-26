@@ -44,8 +44,12 @@ Definition query_delayed_at (dst : addr) (st : data) (src : addr) (msg : payload
   In (src, msg) (delayed_queries st).
 
 Inductive reachable_st : global_state -> Prop :=
-| reachableInit : reachable_st initial_st
-| reachableStep : forall gst gst',
+| reachableInit :
+    forall gst,
+      initial_st gst ->
+      reachable_st gst
+| reachableStep :
+    forall gst gst',
     reachable_st gst ->
     step_dynamic gst gst' ->
     reachable_st gst'.
@@ -57,7 +61,9 @@ Ltac induct_reachable_st :=
 
 Inductive intermediate_reachable_st : global_state -> Prop :=
 | intReachableInit :
-    intermediate_reachable_st initial_st
+    forall gst,
+      initial_st gst ->
+      intermediate_reachable_st gst
 | intReachableStep :
     forall gst gst',
       intermediate_reachable_st gst ->
@@ -87,7 +93,7 @@ Lemma reachable_intermediate_reachable :
     intermediate_reachable_st gst.
 Proof using.
   intros.
-  induct_reachable_st; econstructor; eauto.
+  induct_reachable_st; econstructor; now eauto.
 Qed.
 
 (* transitive closure of best_succ *)
@@ -431,7 +437,9 @@ Proof using.
 Qed.
 
 Definition chord_init_invariant (P : global_state -> Prop) :=
-  P initial_st.
+  forall gst,
+    initial_st gst ->
+    P gst.
 
 Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
   forall h gst gst' res k,
@@ -602,7 +610,7 @@ Proof using.
   match goal with
   | [H : reachable_st net |- _] => induction H
   end.
-  - eapply_prop chord_init_invariant.
+  - eapply_prop chord_init_invariant; eauto.
   - break_step.
     + eapply_prop chord_start_invariant; eauto.
     + eapply_prop chord_fail_invariant; eauto.

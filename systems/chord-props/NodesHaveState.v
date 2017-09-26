@@ -12,54 +12,6 @@ Require Import Chord.LabeledLemmas.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Lemma run_init_for_creates_st :
-  forall l h gst,
-    NoDup l ->
-    In h l ->
-    In h (nodes (fold_left run_init_for l gst)) ->
-    exists st,
-      sigma (fold_left run_init_for l gst) h = Some st.
-Proof.
-  induction l; intros.
-  - easy.
-  - simpl in *.
-    break_or_hyp.
-    + unfold run_init_for.
-      assert (~ In h l)
-        by now apply NoDup_cons_iff.
-      rewrite fold_left_for_each_not_in;
-        eauto using sigma_apply_handler_result_diff.
-      destruct (start_handler h initial_nodes) as [[? ?] ?].
-      eauto using apply_handler_result_updates_sigma.
-    + eapply IHl; eauto.
-      eapply NoDup_cons_iff; eauto.
-Qed.
-
-Lemma in_run_init_for_nodes_in_l_or_acc :
-  forall l h gst,
-    In h (nodes (fold_left run_init_for l gst)) ->
-    In h l \/ In h (nodes gst).
-Proof.
-  induction l; intros.
-  - tauto.
-  - simpl in *.
-    find_apply_lem_hyp IHl.
-    unfold run_init_for in *.
-    erewrite <- apply_handler_result_preserves_nodes in * by eauto.
-    tauto.
-Qed.
-
-Lemma initial_st_node_in_initial_nodes :
-  forall h,
-    In h (nodes initial_st) ->
-    In h initial_nodes.
-Proof.
-  unfold initial_st.
-  intros.
-  find_apply_lem_hyp in_run_init_for_nodes_in_l_or_acc.
-  tauto.
-Qed.
-
 Theorem nodes_have_state_preserved :
   forall gst gst',
     (forall h, In h (nodes gst) -> exists st, sigma gst h = Some st) ->
@@ -106,8 +58,9 @@ Proof.
   intros.
   generalize dependent h.
   induct_reachable_st; intros.
-  - unfold initial_st in *.
-    apply run_init_for_creates_st;
-      eauto using initial_nodes_NoDup, initial_st_node_in_initial_nodes.
+  - unfold initial_st in *; break_and.
+    destruct (start_handler h (nodes gst)) as [[? ?] ?] eqn:?.
+    eapply_prop_hyp start_handler start_handler; auto.
+    break_and; eauto.
   - eapply nodes_have_state_preserved; eauto.
 Qed.

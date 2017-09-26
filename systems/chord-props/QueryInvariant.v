@@ -106,34 +106,6 @@ Proof.
       exfalso; eapply gt_irrefl; eauto.
 Qed.
 
-Lemma msgs_initial_st_empty :
-  msgs initial_st = nil.
-Proof.
-  unfold initial_st.
-  cut (forall l gst, msgs (fold_left run_init_for l gst) = msgs gst);
-    [intros; now find_higher_order_rewrite|].
-  induction l; [easy|].
-  intros; simpl.
-  rewrite IHl.
-  autounfold in *.
-  simpl.
-  repeat break_let.
-  rewrite start_handler_init_state_preset in *;
-    [| pose proof initial_nodes_length;
-       pose proof Chord.succ_list_len_lower_bound;
-       omega].
-  solve_by_inversion.
-Qed.
-
-Lemma no_msg_in_initial_st :
-  forall src dst msg,
-    ~ In (src, (dst, msg)) (msgs initial_st).
-Proof.
-  intros.
-  rewrite msgs_initial_st_empty.
-  apply in_nil.
-Qed.
-
 Lemma send_definition :
   forall src dst msg,
     send src (dst, msg) = (src, (dst, msg)).
@@ -152,9 +124,10 @@ Proof.
   induction H_reachable.
   - intros; simpl in *.
     unfold at_most_one_request; intros.
-    pose proof msgs_initial_st_empty.
+    inv_prop initial_st; break_and.
     repeat find_rewrite; find_apply_lem_hyp app_eq_nil; break_and.
     discriminate.
+  - intros.
 Abort.
 
 Inductive request_msg_for_query : query -> payload -> Prop :=
