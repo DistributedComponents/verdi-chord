@@ -1565,7 +1565,6 @@ Section MergePoint.
              eapply live_successor_changed_improves; invar_eauto.
              eapply has_first_succ_intro; eauto.
              eapply has_first_succ_intro; eauto.
-             congruence.
         * exfalso.
           find_apply_lem_hyp hd_error_None.
           eapply (nodes_have_nonempty_succ_lists (occ_gst o')); invar_eauto.
@@ -2642,12 +2641,10 @@ Proof.
       all:eauto.
       * unfold better_pred in *. intuition auto.
       * find_apply_lem_hyp (first_succ_never_self (occ_gst o) (addr_of p) h); auto.
-        congruence.
       * inv_prop better_pred. expand_def.
         cut (Some x <> Some p); [congruence|].
         eapply wrong_pred_not_correct_pred; eauto.
       * find_apply_lem_hyp pred_never_self; auto.
-        congruence.
       * unfold pred_correct in *.
         break_exists; intuition find_injection.
         unfold better_pred in *.
