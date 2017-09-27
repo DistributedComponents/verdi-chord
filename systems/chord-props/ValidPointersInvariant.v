@@ -17,8 +17,6 @@ Theorem valid_ptrs_global_start_invariant :
 Proof.
   unfold chord_start_invariant.
   intros.
-  destruct (start_handler _ _) as [[?st ?ms] ?newts] eqn:?H; subst res0.
-  find_eapply_lem_hyp update_for_start_definition; expand_def.
   find_copy_eapply_lem_hyp valid_ptrs_global_elim; break_and.
   apply valid_ptrs_global_intro; try intro h'; intros; subst_max.
   - eapply valid_ptrs_timeouts_preserved; eauto.

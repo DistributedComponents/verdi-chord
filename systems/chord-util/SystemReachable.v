@@ -425,54 +425,130 @@ Definition chord_init_invariant (P : global_state -> Prop) :=
     P gst.
 
 Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
-  forall h gst gst' res k,
-    res = start_handler h [k] ->
-    gst' = update_for_start gst h res ->
-    P gst ->
+  forall h gst gst' k st ms nts,
+    reachable_st gst ->
+
     ~ In h (nodes gst) ->
     In k (nodes gst) ->
     ~ In k (failed_nodes gst) ->
+    start_handler h [k] = (st, ms, nts) ->
+
+    nodes gst' = h :: nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h nts ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st) ->
+    msgs gst' = map (send h) ms ++ msgs gst ->
+    trace gst' = trace gst ++ map e_send (map (send h) ms) ->
+
+    P gst ->
     P gst'.
 
 Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
   forall h gst gst',
-    failure_constraint gst h gst' ->
-    gst' = fail_node gst h ->
-    P gst ->
+    reachable_st gst ->
+
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
+    failure_constraint gst h gst' ->
+
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = h :: failed_nodes  gst ->
+    timeouts gst' = timeouts gst ->
+    sigma gst' = sigma gst ->
+    msgs gst' = msgs gst ->
+    trace gst' = trace gst ->
+
+    P gst ->
     P gst'.
 
 Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
-  forall gst gst' h st st' ms newts clearedts eff,
+  forall gst gst' h st st' ms nts cts eff,
+    reachable_st gst ->
+
     In Tick (timeouts gst h) ->
-    tick_handler h st = (st', ms, newts, clearedts, eff) ->
-    P gst ->
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
     sigma gst h = Some st ->
-    gst' = apply_handler_result
-             h
-             (st', ms, newts, Tick :: clearedts)
-             [e_timeout h Tick]
-             gst ->
-    timeout_constraint gst h Tick ->
+    tick_handler h st = (st', ms, nts, cts, eff) ->
+
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h
+                           (nts ++ remove_all timeout_eq_dec cts
+                                (remove timeout_eq_dec Tick (timeouts gst h))) ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    msgs gst' = (map (send h) ms) ++ msgs gst ->
+    trace gst' = trace gst ++ [e_timeout h Tick] ->
+
+    P gst ->
     P gst'.
 
 Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
-  forall gst gst' h st st' ms newts clearedts eff,
+  forall gst gst' h st st' ms nts cts eff,
+    reachable_st gst ->
+
     In KeepaliveTick (timeouts gst h) ->
-    keepalive_handler st = (st', ms, newts, clearedts, eff) ->
-    P gst ->
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
     sigma gst h = Some st ->
-    gst' = apply_handler_result
-             h
-             (st', ms, newts, KeepaliveTick :: clearedts)
-             [e_timeout h KeepaliveTick]
-             gst ->
-    timeout_constraint gst h KeepaliveTick ->
+    keepalive_handler st = (st', ms, nts, cts, eff) ->
+
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h
+                           (nts ++ remove_all timeout_eq_dec cts
+                                (remove timeout_eq_dec KeepaliveTick (timeouts gst h))) ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    msgs gst' = (map (send h) ms) ++ msgs gst ->
+    trace gst' = trace gst ++ [e_timeout h KeepaliveTick] ->
+
+    P gst ->
+    P gst'.
+
+Definition chord_rectify_invariant (P : global_state -> Prop) :=
+  forall gst gst' h st st' ms nts cts eff,
+    reachable_st gst ->
+
+    In RectifyTick (timeouts gst h) ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    sigma gst h = Some st ->
+    do_rectify h st = (st', ms, nts, cts, eff) ->
+
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h
+                           (nts ++ remove_all timeout_eq_dec cts
+                                (remove timeout_eq_dec RectifyTick (timeouts gst h))) ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    msgs gst' = (map (send h) ms) ++ msgs gst ->
+    trace gst' = trace gst ++ [e_timeout h RectifyTick] ->
+
+    P gst ->
+    P gst'.
+
+Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
+  forall gst gst' h st st' ms nts cts eff t dst req,
+    reachable_st gst ->
+
+    t = Request dst req ->
+    timeout_constraint gst h t ->
+    In t (timeouts gst h) ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    sigma gst h = Some st ->
+    request_timeout_handler h st dst req = (st', ms, nts, cts, eff) ->
+
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h
+                           (nts ++ remove_all timeout_eq_dec cts
+                                (remove timeout_eq_dec t (timeouts gst h))) ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    msgs gst' = (map (send h) ms) ++ msgs gst ->
+    trace gst' = trace gst ++ [e_timeout h t] ->
+
+    P gst ->
     P gst'.
 
 Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
@@ -493,49 +569,23 @@ Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
 
     P gst ->
     P gst'.
-Hint Unfold chord_recv_handler_invariant.
-
-Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
-  forall gst gst' h req dst t d st ms newts clearedts eff,
-    reachable_st gst ->
-    P gst ->
-    request_timeout_handler h d dst req = (st, ms, newts, clearedts, eff) ->
-    t = Request dst req ->
-    sigma gst h = Some d ->
-    gst' = apply_handler_result
-             h
-             (st, ms, newts, t :: clearedts)
-             [e_timeout h t]
-             gst ->
-    timeout_constraint gst h t ->
-    P gst'.
-
-Definition chord_rectify_invariant (P : global_state -> Prop) :=
-  forall gst h st st' ms newts clearedts eff,
-    reachable_st gst ->
-    P gst ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst) ->
-    sigma gst h = Some st ->
-    In RectifyTick (timeouts gst h) ->
-    do_rectify h st = (st', ms, newts, clearedts, eff) ->
-    P (apply_handler_result h (st', ms, newts, RectifyTick :: clearedts)
-                            [e_timeout h RectifyTick] gst).
 
 Definition chord_input_invariant (P : global_state -> Prop) :=
   forall gst h i to m,
     reachable_st gst ->
-    P gst ->
     client_addr h ->
     client_payload i ->
     m = send h (to, i) ->
+    P gst ->
     P (update_msgs_and_trace gst (m :: msgs gst) (e_send m)).
 
 Definition chord_output_invariant (P : global_state -> Prop) :=
   forall gst h xs m ys,
+    reachable_st gst ->
     client_addr h ->
     msgs gst = xs ++ m :: ys ->
     h = fst (snd m) ->
+    P gst ->
     P (update_msgs_and_trace gst (xs ++ ys) (e_recv m)).
 
 Lemma app_eq_l :
@@ -543,8 +593,7 @@ Lemma app_eq_l :
     ys = zs ->
     xs ++ ys = xs ++ zs.
 Proof using.
-  intros.
-  now find_rewrite.
+  congruence.
 Qed.
 
 Lemma app_eq_r :
@@ -552,29 +601,44 @@ Lemma app_eq_r :
     xs = ys ->
     xs ++ zs = ys ++ zs.
 Proof using.
-  intros.
-  now find_rewrite.
+  congruence.
 Qed.
 
 Theorem chord_net_invariant :
-  forall P net,
+  forall P,
     chord_init_invariant P ->
 
     chord_start_invariant P ->
     chord_fail_invariant P ->
+
     chord_tick_invariant P ->
     chord_keepalive_invariant P ->
     chord_rectify_invariant P ->
     chord_request_invariant P ->
 
+    chord_recv_handler_invariant P ->
     chord_input_invariant P ->
     chord_output_invariant P ->
 
-    reachable_st net ->
-    P net.
+    forall gst,
+      reachable_st gst ->
+      P gst.
 Proof using.
   intros.
   match goal with
-  | [H : reachable_st net |- _] => induction H
+  | [H : reachable_st _ |- _] => induction H
   end.
-Abort.
+  - now eapply_prop chord_init_invariant.
+  - invc_prop step_dynamic; eauto.
+    + destruct (start_handler _ _) as [[? ?] ?] eqn:?; eauto.
+    + destruct t; unfold timeout_handler, timeout_handler_eff in *.
+      * destruct (tick_handler _ _) as [[[? ?] ?] ?] eqn:?.
+        simpl in *; tuple_inversion; eauto.
+      * destruct (do_rectify _ _) as [[[? ?] ?] ?] eqn:?.
+        simpl in *; tuple_inversion; eauto.
+      * destruct (keepalive_handler _) as [[[? ?] ?] ?] eqn:?.
+        simpl in *; tuple_inversion; eauto.
+      * destruct (request_timeout_handler _ _ _ _) as [[[? ?] ?] ?] eqn:?.
+        simpl in *; tuple_inversion; eauto.
+    + destruct m as [? [? ?]]; eauto.
+Qed.
