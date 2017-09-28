@@ -1255,6 +1255,24 @@ Inductive possible_nts (st : data) : list timeout -> Prop :=
       possible_nts st [Request (addr_of dstp) p].
 Hint Constructors possible_nts.
 
+Inductive possible_cts (st : data) : list timeout -> Prop :=
+| NilClearedPossible :
+    possible_cts st []
+| KeepaliveTickClearedPossible :
+    possible_cts st [KeepaliveTick]
+| CurRequestClearedPossible :
+    forall dstp q p,
+      cur_request st = Some (dstp, q, p) ->
+      possible_cts st [Request (addr_of dstp) p]
+| CurRequestAndKeepaliveTickClearedPossible :
+    forall dstp q p,
+      cur_request st = Some (dstp, q, p) ->
+      possible_cts st [Request (addr_of dstp) p; KeepaliveTick]
+| GetBestPredClearedPossible :
+    forall src,
+      possible_cts st [Request src (GetBestPredecessor (ptr st))].
+Hint Constructors possible_cts.
+
 Lemma recv_handler_possible_nts :
   forall src dst st p st' ms nts cts,
     recv_handler src dst st p = (st', ms, nts, cts) ->
@@ -1274,24 +1292,6 @@ Proof.
   assert (possible_nts st nts) by eauto.
   invcs_prop possible_nts; eauto.
 Qed.
-
-Inductive possible_cts (st : data) : list timeout -> Prop :=
-| NilClearedPossible :
-    possible_cts st []
-| KeepaliveTickClearedPossible :
-    possible_cts st [KeepaliveTick]
-| CurRequestClearedPossible :
-    forall dstp q p,
-      cur_request st = Some (dstp, q, p) ->
-      possible_cts st [Request (addr_of dstp) p]
-| CurRequestAndKeepaliveTickClearedPossible :
-    forall dstp q p,
-      cur_request st = Some (dstp, q, p) ->
-      possible_cts st [Request (addr_of dstp) p; KeepaliveTick]
-| GetBestPredClearedPossible :
-    forall src,
-      possible_cts st [Request src (GetBestPredecessor (ptr st))].
-Hint Constructors possible_cts.
 
 Lemma recv_handler_possible_cts :
   forall src dst st p st' ms nts cts,
