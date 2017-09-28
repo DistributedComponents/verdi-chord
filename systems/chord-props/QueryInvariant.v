@@ -10,11 +10,15 @@ Require Import Chord.SystemReachable.
 
 Set Bullet Behavior "Strict Subproofs".
 
-Definition at_most_one_request_timeout (gst : global_state) (h : addr) :=
+Definition at_most_one_request_timeout' (ts : list timeout) :=
   forall xs ys dst p,
-    timeouts gst h = xs ++ Request dst p :: ys ->
+    ts = xs ++ Request dst p :: ys ->
     forall dst' p',
       ~ In (Request dst' p') (xs ++ ys).
+Hint Unfold at_most_one_request_timeout'.
+
+Definition at_most_one_request_timeout (gst : global_state) (h : addr) :=
+  at_most_one_request_timeout' (timeouts gst h).
 Hint Unfold at_most_one_request_timeout.
 
 Lemma at_most_one_request_timeout_uniqueness :
@@ -24,7 +28,6 @@ Lemma at_most_one_request_timeout_uniqueness :
     In (Request dst' p') (timeouts gst h) ->
     Request dst p = Request dst' p'.
 Proof.
-  unfold at_most_one_request_timeout.
   intros.
   find_apply_lem_hyp (in_split (Request dst p)).
   break_exists_name xs.
@@ -40,9 +43,34 @@ Proof.
   }
   break_or_hyp.
   - exfalso.
+    autounfold in *.
     intuition eauto.
   - easy.
 Qed.
+
+Lemma at_most_one_request_timeout'_cons_neq :
+  forall t ts,
+    (forall dst p, t <> Request dst p) ->
+    at_most_one_request_timeout' ts ->
+    at_most_one_request_timeout' (t :: ts).
+Proof.
+  autounfold.
+  intros.
+  destruct xs; simpl in *; try congruence.
+  find_injection.
+  intuition eauto.
+Qed.
+Hint Resolve at_most_one_request_timeout'_cons_neq.
+
+Lemma at_most_one_request_timeout'_swap :
+  forall t ts dst p,
+    at_most_one_request_timeout' ts ->
+    In (Request dst p) ts ->
+    at_most_one_request_timeout' (t :: (remove timeout_eq_dec (Request dst p) ts)).
+Proof.
+Admitted.
+Hint Resolve at_most_one_request_timeout'_swap.
+
 
 Definition at_most_one_request (gst : global_state) (src : addr) :=
   forall dst msg xs ys,
@@ -216,9 +244,10 @@ Inductive cur_request_timeouts_ok (cr : option (pointer * query * payload)) (ts 
     cur_request_timeouts_ok cr ts
 | QSTRequest :
     forall dstp q req,
-      query_request q req ->
       In (Request (addr_of dstp) req) ts ->
       cr = Some (dstp, q, req) ->
+      at_most_one_request_timeout' ts ->
+      query_request q req ->
       cur_request_timeouts_ok cr ts.
 Hint Constructors cur_request_timeouts_ok.
 
@@ -229,6 +258,19 @@ Definition all_nodes_cur_request_timeouts_related (gst : global_state) : Prop :=
     sigma gst h = Some st ->
     cur_request_timeouts_ok (cur_request st) (timeouts gst h).
 Hint Unfold all_nodes_cur_request_timeouts_related.
+
+Lemma remove_comm :
+  forall A A_eq_dec (l : list A) x y,
+    remove A_eq_dec x (remove A_eq_dec y l) = remove A_eq_dec y (remove A_eq_dec x l).
+Proof.
+  induction l; intros.
+  - reflexivity.
+  - simpl; repeat break_if.
+    + now rewrite IHl.
+    + simpl; break_if; congruence.
+    + simpl; break_if; congruence.
+    + simpl; repeat break_if; congruence.
+Qed.
 
 Lemma cur_request_timeouts_related_recv_invariant :
   chord_recv_handler_invariant all_nodes_cur_request_timeouts_related.
@@ -274,25 +316,38 @@ Proof.
              repeat (find_rewrite || find_injection || rewrite_update);
              eauto using remove_preserve with datatypes.
         -- repeat (handler_def || handler_simpl).
-           repeat find_rewrite; rewrite_update; auto.
+           repeat find_rewrite; rewrite_update; eauto.
         -- find_copy_apply_lem_hyp timeouts_in_Some.
+           (* repeat find_rewrite; find_injection. *)
            repeat (handler_def || handler_simpl || expand_def);
              repeat (find_rewrite || find_injection || rewrite_update);
-             eauto with datatypes.
-           (* can't prove these! need to know there's only one request in (timeouts gst h) *)
+             try inv_prop query_response;
+             autorewrite with list;
+             eauto using remove_In with datatypes.
+           ++ simpl; rewrite remove_comm; econstructor; intros; eauto using remove_In.
+              admit.
+           ++ simpl; rewrite remove_comm; econstructor; intros; eauto using remove_In.
+              admit.
+           ++ simpl; rewrite remove_comm; econstructor; intros; eauto using remove_In.
+              admit.
+           ++ simpl; econstructor 2; try apply at_most_one_request_timeout'_swap; eauto with datatypes.
            ++ admit.
            ++ admit.
            ++ admit.
            ++ admit.
            ++ admit.
            ++ admit.
-           ++ admit.
-           ++ admit.
+           ++ simpl; econstructor 2; try apply at_most_one_request_timeout'_swap; eauto with datatypes.
+           ++ simpl; rewrite remove_comm; econstructor; intros; eauto using remove_In.
+              admit. (* tick in front *)
         -- repeat (handler_def || handler_simpl).
       * find_copy_eapply_lem_hyp recv_msg_not_right_response_preserves_cur_request; eauto.
         find_eapply_lem_hyp recv_msg_not_right_response_never_removes_request_timeout; eauto.
         repeat find_rewrite; rewrite_update.
-        intuition eauto using in_remove_all_preserve with datatypes.
+        break_or_hyp.
+        -- admit.
+        -- admit.
+        (* intuition eauto using in_remove_all_preserve with datatypes. *)
   - repeat find_rewrite; rewrite_update; eauto.
 Admitted.
 
