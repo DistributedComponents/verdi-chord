@@ -423,6 +423,7 @@ Definition chord_init_invariant (P : global_state -> Prop) :=
   forall gst,
     initial_st gst ->
     P gst.
+Hint Unfold chord_init_invariant.
 
 Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
   forall h gst gst' k st ms nts,
@@ -443,6 +444,7 @@ Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
 
     P gst ->
     P gst'.
+Hint Unfold chord_start_invariant.
 
 Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
   forall h gst gst',
@@ -462,6 +464,7 @@ Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
 
     P gst ->
     P gst'.
+Hint Unfold chord_fail_invariant.
 
 Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff,
@@ -485,6 +488,7 @@ Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
 
     P gst ->
     P gst'.
+Hint Unfold chord_tick_invariant.
 
 Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff,
@@ -508,6 +512,7 @@ Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
 
     P gst ->
     P gst'.
+Hint Unfold chord_keepalive_invariant.
 
 Definition chord_rectify_invariant (P : global_state -> Prop) :=
   forall gst gst' h st st' ms nts cts eff,
@@ -531,6 +536,7 @@ Definition chord_rectify_invariant (P : global_state -> Prop) :=
 
     P gst ->
     P gst'.
+Hint Unfold chord_rectify_invariant.
 
 Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff t dst req,
@@ -556,6 +562,7 @@ Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
 
     P gst ->
     P gst'.
+Hint Unfold chord_request_invariant.
 
 Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' src h st p xs ys st' ms nts cts,
@@ -577,6 +584,7 @@ Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
 
     P gst ->
     P gst'.
+Hint Unfold chord_recv_handler_invariant.
 
 Definition chord_input_invariant (P : global_state -> Prop) :=
   forall gst gst' h i to m,
@@ -589,6 +597,7 @@ Definition chord_input_invariant (P : global_state -> Prop) :=
     m = send h (to, i) ->
     P gst ->
     P gst'.
+Hint Unfold chord_input_invariant.
 
 Definition chord_output_invariant (P : global_state -> Prop) :=
   forall gst gst' h xs m ys,
@@ -601,6 +610,7 @@ Definition chord_output_invariant (P : global_state -> Prop) :=
     h = fst (snd m) ->
     P gst ->
     P gst'.
+Hint Unfold chord_output_invariant.
 
 Theorem chord_net_invariant :
   forall P,
