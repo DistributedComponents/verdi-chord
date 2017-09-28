@@ -427,6 +427,7 @@ Definition chord_init_invariant (P : global_state -> Prop) :=
 Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
   forall h gst gst' k st ms nts,
     reachable_st gst ->
+    step_dynamic gst gst' ->
 
     ~ In h (nodes gst) ->
     In k (nodes gst) ->
@@ -446,6 +447,7 @@ Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
 Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
   forall h gst gst',
     reachable_st gst ->
+    step_dynamic gst gst' ->
 
     In h (nodes gst) ->
     ~ In h (failed_nodes gst) ->
@@ -464,6 +466,7 @@ Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
 Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff,
     reachable_st gst ->
+    step_dynamic gst gst' ->
 
     In Tick (timeouts gst h) ->
     In h (nodes gst) ->
@@ -486,6 +489,7 @@ Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
 Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff,
     reachable_st gst ->
+    step_dynamic gst gst' ->
 
     In KeepaliveTick (timeouts gst h) ->
     In h (nodes gst) ->
@@ -508,6 +512,7 @@ Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
 Definition chord_rectify_invariant (P : global_state -> Prop) :=
   forall gst gst' h st st' ms nts cts eff,
     reachable_st gst ->
+    step_dynamic gst gst' ->
 
     In RectifyTick (timeouts gst h) ->
     In h (nodes gst) ->
@@ -530,6 +535,7 @@ Definition chord_rectify_invariant (P : global_state -> Prop) :=
 Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff t dst req,
     reachable_st gst ->
+    step_dynamic gst gst' ->
 
     t = Request dst req ->
     timeout_constraint gst h t ->
@@ -554,6 +560,8 @@ Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
 Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
   forall gst gst' src h st p xs ys st' ms nts cts,
     reachable_st gst ->
+    step_dynamic gst gst' ->
+
     recv_handler src h st p = (st', ms, nts, cts) ->
     msgs gst = xs ++ (src, (h, p)) :: ys ->
     In h (nodes gst) ->
@@ -571,38 +579,28 @@ Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
     P gst'.
 
 Definition chord_input_invariant (P : global_state -> Prop) :=
-  forall gst h i to m,
+  forall gst gst' h i to m,
     reachable_st gst ->
+    step_dynamic gst gst' ->
+
+    gst' = update_msgs_and_trace gst (m :: msgs gst) (e_send m) ->
     client_addr h ->
     client_payload i ->
     m = send h (to, i) ->
     P gst ->
-    P (update_msgs_and_trace gst (m :: msgs gst) (e_send m)).
+    P gst'.
 
 Definition chord_output_invariant (P : global_state -> Prop) :=
-  forall gst h xs m ys,
+  forall gst gst' h xs m ys,
     reachable_st gst ->
+    step_dynamic gst gst' ->
+
+    gst' = update_msgs_and_trace gst (xs ++ ys) (e_recv m) ->
     client_addr h ->
     msgs gst = xs ++ m :: ys ->
     h = fst (snd m) ->
     P gst ->
-    P (update_msgs_and_trace gst (xs ++ ys) (e_recv m)).
-
-Lemma app_eq_l :
-  forall A (xs ys zs : list A),
-    ys = zs ->
-    xs ++ ys = xs ++ zs.
-Proof using.
-  congruence.
-Qed.
-
-Lemma app_eq_r :
-  forall A (xs ys zs : list A),
-    xs = ys ->
-    xs ++ zs = ys ++ zs.
-Proof using.
-  congruence.
-Qed.
+    P gst'.
 
 Theorem chord_net_invariant :
   forall P,
@@ -629,7 +627,7 @@ Proof using.
   | [H : reachable_st _ |- _] => induction H
   end.
   - now eapply_prop chord_init_invariant.
-  - invc_prop step_dynamic; eauto.
+  - inv_prop step_dynamic; eauto.
     + destruct (start_handler _ _) as [[? ?] ?] eqn:?; eauto.
     + destruct t; unfold timeout_handler, timeout_handler_eff in *.
       * destruct (tick_handler _ _) as [[[? ?] ?] ?] eqn:?.
