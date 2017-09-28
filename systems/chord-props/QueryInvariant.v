@@ -268,13 +268,33 @@ Proof.
         cut (In (Request dst req) (timeouts gst h)); [eauto|].
         eapply in_remove; eauto.
     + destruct (query_response_dec q p).
-      * admit.
+      * handler_def.
+        handler_def; try solve [invcs_prop query_response].
+        -- repeat (handler_def || handler_simpl);
+             repeat (find_rewrite || find_injection || rewrite_update);
+             eauto using remove_preserve with datatypes.
+        -- repeat (handler_def || handler_simpl).
+           repeat find_rewrite; rewrite_update; auto.
+        -- find_copy_apply_lem_hyp timeouts_in_Some.
+           repeat (handler_def || handler_simpl || expand_def);
+             repeat (find_rewrite || find_injection || rewrite_update);
+             eauto with datatypes.
+           (* can't prove these! need to know there's only one request in (timeouts gst h) *)
+           ++ admit.
+           ++ admit.
+           ++ admit.
+           ++ admit.
+           ++ admit.
+           ++ admit.
+           ++ admit.
+           ++ admit.
+        -- repeat (handler_def || handler_simpl).
       * find_copy_eapply_lem_hyp recv_msg_not_right_response_preserves_cur_request; eauto.
         find_eapply_lem_hyp recv_msg_not_right_response_never_removes_request_timeout; eauto.
         repeat find_rewrite; rewrite_update.
         intuition eauto using in_remove_all_preserve with datatypes.
   - repeat find_rewrite; rewrite_update; eauto.
-Qed.
+Admitted.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
