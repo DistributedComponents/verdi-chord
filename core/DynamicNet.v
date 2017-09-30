@@ -6,30 +6,30 @@ Require Import InfSeqExt.infseq.
 Import ListNotations.
 
 Module Type DynamicSystem.
-  Variable addr : Type. (* must be finite, decidable *)
-  Variable client_addr : addr -> Prop.
-  Variable client_addr_dec : forall a : addr, {client_addr a} + {~ client_addr a}.
-  Variable addr_eq_dec : forall x y : addr, {x = y} + {x <> y}.
-  Variable payload : Type. (* must be serializable *)
-  Variable payload_eq_dec : forall x y : payload, {x = y} + {x <> y}.
-  Variable client_payload : payload -> Prop. (* holds for payloads that clients can send *)
-  Variable client_payload_dec : forall p : payload, {client_payload p} + {~ client_payload p}.
-  Variable data : Type.
-  Variable timeout : Type.
-  Variable timeout_eq_dec : forall x y : timeout, {x = y} + {x <> y}.
-  Variable label : Type.
-  Variable label_eq_dec : forall x y : label, {x = y} + {x <> y}.
+  Parameter addr : Type. (* must be finite, decidable *)
+  Parameter client_addr : addr -> Prop.
+  Parameter client_addr_dec : forall a : addr, {client_addr a} + {~ client_addr a}.
+  Parameter addr_eq_dec : forall x y : addr, {x = y} + {x <> y}.
+  Parameter payload : Type. (* must be serializable *)
+  Parameter payload_eq_dec : forall x y : payload, {x = y} + {x <> y}.
+  Parameter client_payload : payload -> Prop. (* holds for payloads that clients can send *)
+  Parameter client_payload_dec : forall p : payload, {client_payload p} + {~ client_payload p}.
+  Parameter data : Type.
+  Parameter timeout : Type.
+  Parameter timeout_eq_dec : forall x y : timeout, {x = y} + {x <> y}.
+  Parameter label : Type.
+  Parameter label_eq_dec : forall x y : label, {x = y} + {x <> y}.
 
-  Variable start_handler : addr -> list addr -> data * list (addr * payload) * list timeout.
+  Parameter start_handler : addr -> list addr -> data * list (addr * payload) * list timeout.
   Definition res := (data * list (addr * payload) * list timeout * list timeout)%type.
-  Variable recv_handler : addr -> addr -> data -> payload -> res.
-  Variable timeout_handler : addr -> data -> timeout -> res.
-  Variable recv_handler_l : addr -> addr -> data -> payload -> (res * label).
-  Variable timeout_handler_l : addr -> data -> timeout -> (res * label).
-  Variable label_input : addr -> addr -> payload -> label.
-  Variable label_output : addr -> addr -> payload -> label.
+  Parameter recv_handler : addr -> addr -> data -> payload -> res.
+  Parameter timeout_handler : addr -> data -> timeout -> res.
+  Parameter recv_handler_l : addr -> addr -> data -> payload -> (res * label).
+  Parameter timeout_handler_l : addr -> data -> timeout -> (res * label).
+  Parameter label_input : addr -> addr -> payload -> label.
+  Parameter label_output : addr -> addr -> payload -> label.
 
-  Variable recv_handler_labeling :
+  Parameter recv_handler_labeling :
     forall src dst st p r,
       (recv_handler src dst st p = r ->
        exists l,
@@ -38,7 +38,7 @@ Module Type DynamicSystem.
           recv_handler_l src dst st p = (r, l) ->
           recv_handler src dst st p = r).
 
-  Variable timeout_handler_labeling :
+  Parameter timeout_handler_labeling :
     forall h st t r,
       (timeout_handler h st t = r ->
        exists l,
@@ -70,11 +70,11 @@ Module Type ConstrainedDynamicSystem.
       trace : list event
     }.
 
-  Variable timeout_constraint : global_state -> addr -> timeout -> Prop.
+  Parameter timeout_constraint : global_state -> addr -> timeout -> Prop.
   (* failure_constraint is parametrized over an initial state, the
      address of the failing node, and what the state would be after
      the failure. *)
-  Variable failure_constraint : global_state -> addr -> global_state -> Prop.
+  Parameter failure_constraint : global_state -> addr -> global_state -> Prop.
 End ConstrainedDynamicSystem.
 
 Module DynamicSemantics (S : ConstrainedDynamicSystem).
