@@ -31,12 +31,10 @@ proofalytics:
 	$(MAKE) -C proofalytics publish
 
 STDBUF=$(shell [ -x "$$(which gstdbuf)" ] && echo "gstdbuf" || echo "stdbuf")
+BUILDTIMER=$(PWD)/proofalytics/build-timer.sh $(STDBUF) -i0 -o0
 
 proofalytics-aux: Makefile.coq
-	sed "s|^TIMECMD=$$|TIMECMD=$(PWD)/proofalytics/build-timer.sh $(STDBUF) -i0 -o0|" \
-	  Makefile.coq > Makefile.coq_tmp
-	mv Makefile.coq_tmp Makefile.coq
-	$(MAKE) -f Makefile.coq
+	$(MAKE) -f Makefile.coq TIMECMD="$(BUILDTIMER)"
 
 Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq -install none \
