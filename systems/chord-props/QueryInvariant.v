@@ -47,6 +47,7 @@ Proof.
     intuition eauto.
   - easy.
 Qed.
+Hint Resolve at_most_one_request_timeout'_uniqueness.
 
 Lemma at_most_one_request_timeout_uniqueness :
   forall gst h dst dst' p p',
@@ -55,8 +56,9 @@ Lemma at_most_one_request_timeout_uniqueness :
     In (Request dst' p') (timeouts gst h) ->
     Request dst p = Request dst' p'.
 Proof.
-  eauto using at_most_one_request_timeout'_uniqueness.
+  eauto.
 Qed.
+Hint Resolve at_most_one_request_timeout_uniqueness.
 
 Lemma at_most_one_request_timeout'_cons_neq :
   forall t ts,
@@ -72,15 +74,76 @@ Proof.
 Qed.
 Hint Resolve at_most_one_request_timeout'_cons_neq.
 
+Lemma at_most_one_request_timeout'_drop :
+  forall t ts,
+    at_most_one_request_timeout' (t :: ts) ->
+    at_most_one_request_timeout' ts.
+Proof.
+  autounfold; intros t ts Hatm; intros.
+  specialize (Hatm (t::xs) ys).
+  eapply Hatm; simpl.
+  - f_equal; eauto.
+  - right; eauto.
+Qed.
+Hint Resolve at_most_one_request_timeout'_drop.
+
+Lemma at_most_one_request_timeout'_remove :
+  forall ts t,
+    at_most_one_request_timeout' ts ->
+    at_most_one_request_timeout' (remove timeout_eq_dec t ts).
+Proof.
+  induction ts; intros.
+  - easy.
+  - simpl; break_if; destruct a; try eauto.
+    assert (forall t, In t ts -> forall dst p, t <> (Request dst p)).
+    {
+      autounfold in *.
+      intros; subst.
+      eapply H with (xs:=nil) (ys:=ts);
+        simpl; eauto.
+    }
+    assert (Hnoreq: forall t', In t' (remove timeout_eq_dec t ts) -> forall dst p, t' <> (Request dst p))
+      by eauto using in_remove.
+    autounfold; intros.
+    destruct xs.
+    + simpl in *.
+      find_injection.
+      eapply Hnoreq; eauto.
+    + simpl in *; find_injection.
+      eapply Hnoreq; eauto.
+      repeat find_rewrite.
+      eauto with datatypes.
+Qed.
+Hint Resolve at_most_one_request_timeout'_remove.
+
+Lemma at_most_one_request_timeout'_remove_drops_all :
+  forall l dst req dst' req',
+    at_most_one_request_timeout' l ->
+    In (Request dst' req') l ->
+    ~ In (Request dst req) (remove timeout_eq_dec (Request dst' req') l).
+Proof.
+  intros.
+  destruct (timeout_eq_dec (Request dst req) (Request dst' req')).
+  - find_injection; apply remove_In.
+  - eauto using in_remove.
+Qed.
+Hint Resolve at_most_one_request_timeout'_remove_drops_all.
+
 Lemma at_most_one_request_timeout'_swap :
   forall t ts dst p,
     at_most_one_request_timeout' ts ->
     In (Request dst p) ts ->
     at_most_one_request_timeout' (t :: (remove timeout_eq_dec (Request dst p) ts)).
 Proof.
-Admitted.
+  intros.
+  destruct t; eauto.
+  autounfold; intros.
+  destruct xs; simpl in *; find_injection.
+  - eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+  - eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+    find_rewrite; eauto with datatypes.
+Qed.
 Hint Resolve at_most_one_request_timeout'_swap.
-
 
 Definition at_most_one_request (gst : global_state) (src : addr) :=
   forall dst msg xs ys,
@@ -328,89 +391,73 @@ Proof.
         -- repeat (handler_def || handler_simpl).
            repeat find_rewrite; rewrite_update; eauto.
         -- find_copy_apply_lem_hyp timeouts_in_Some.
-           (* repeat find_rewrite; find_injection. *)
            repeat (handler_def || handler_simpl || expand_def);
              repeat (find_rewrite || find_injection || rewrite_update);
              try inv_prop query_response;
              autorewrite with list;
              eauto using remove_In with datatypes.
-           ++ simpl.
-              assert (~ In (Request (addr_of x7) x9) (timeouts gst' h)).
-              {
-                repeat find_rewrite; rewrite_update; simpl.
-                rewrite remove_comm.
-                apply remove_In.
-              }
-              eauto with datatypes.
-              econstructor; intros; eauto.
-              rewrite remove_comm.
-              assert (
-                  forall l dst req dst' req',
-                  at_most_one_request_timeout' l ->
-                  In (Request dst' req') l ->
-                  ~ In (Request dst req) (remove timeout_eq_dec (Request dst' req') l)
-                ).
-              {
-                repeat match goal with | H : _ |- _ => clear H end.
-                intros.
-                destruct (timeout_eq_dec (Request dst req) (Request dst' req')).
-                - find_injection; apply remove_In.
-                - eauto using at_most_one_request_timeout'_uniqueness, in_remove.
-              }
-              assert (
-                forall t ts,
-                  at_most_one_request_timeout' (t :: ts) ->
-                  at_most_one_request_timeout' ts
-              ) by admit.
-              (* { *)
-              (*   repeat match goal with | H : _ |- _ => clear H end. *)
-              (*   autounfold; intros. *)
-              (*   destruct xs as [| a xs]. *)
-              (*   ** specialize (H (t::nil) ys); simpl in *; repeat find_rewrite; eauto with datatypes. *)
-              (*   ** specialize (H (t::a::xs) ys). *)
-              (*     rewrite H0 in H. *)
-              (*     simpl in H. *)
-              (*     eauto with datatypes. *)
-              (* } *)
-              assert (
-                forall t ts,
-                  (forall dst p, t <> Request dst p) ->
-                  at_most_one_request_timeout' ts ->
-                  at_most_one_request_timeout' (remove timeout_eq_dec t ts)
-              ).
-              {
-                induction ts; intros.
-                - easy.
-                - simpl; break_if; subst.
-                  + eapply IHts; eauto.
-                  + eapply at_most_one_request_timeout'_cons_neq; eauto.
-                    admit.
-              }
-
-
-              eauto using remove_preserve.
-           ++ simpl; rewrite remove_comm; econstructor; intros; eauto using remove_In.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ admit.
+           ++ admit.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
               admit.
-           ++ simpl; rewrite remove_comm; econstructor; intros; eauto using remove_In.
-              admit.
-           ++ simpl; econstructor 2; try apply at_most_one_request_timeout'_swap; eauto with datatypes.
-           ++ admit.
-           ++ admit.
-           ++ admit.
-           ++ admit.
-           ++ admit.
-           ++ admit.
-           ++ simpl; econstructor 2; try apply at_most_one_request_timeout'_swap; eauto with datatypes.
-           ++ simpl; rewrite remove_comm; econstructor; intros; eauto using remove_In.
-              admit. (* tick in front *)
         -- repeat (handler_def || handler_simpl).
       * find_copy_eapply_lem_hyp recv_msg_not_right_response_preserves_cur_request; eauto.
         find_eapply_lem_hyp recv_msg_not_right_response_never_removes_request_timeout; eauto.
-        repeat find_rewrite; rewrite_update.
+        inv_prop cur_request_timeouts_ok; try congruence.
+        repeat find_rewrite; rewrite_update; find_injection.
         break_or_hyp.
+        -- econstructor 2; eauto with datatypes.
+           admit.
         -- admit.
-        -- admit.
-        (* intuition eauto using in_remove_all_preserve with datatypes. *)
   - repeat find_rewrite; rewrite_update; eauto.
 Admitted.
 
