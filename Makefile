@@ -39,7 +39,7 @@ proofalytics-aux: Makefile.coq
 	$(MAKE) -f Makefile.coq
 
 Makefile.coq: _CoqProject
-	coq_makefile -f _CoqProject -o Makefile.coq -no-install \
+	coq_makefile -f _CoqProject -o Makefile.coq -install none \
 	  -extra '$(CHORDMLFILES)' \
 	    'extraction/chord/coq/ExtractChord.v systems/chord/Chord.vo' \
 	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v' \
