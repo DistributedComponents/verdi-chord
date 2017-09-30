@@ -79,11 +79,14 @@ Lemma at_most_one_request_timeout'_drop :
     at_most_one_request_timeout' (t :: ts) ->
     at_most_one_request_timeout' ts.
 Proof.
-  autounfold; intros t ts Hatm; intros.
-  specialize (Hatm (t::xs) ys).
-  eapply Hatm; simpl.
-  - f_equal; eauto.
-  - right; eauto.
+  intros.
+  unfold at_most_one_request_timeout', not in *.
+  intros.
+  repeat find_rewrite.
+  rewrite app_comm_cons in *.
+  simple eapply H.
+  - reflexivity.
+  - apply in_cons; eauto.
 Qed.
 Hint Resolve at_most_one_request_timeout'_drop.
 
