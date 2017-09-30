@@ -9,7 +9,7 @@ Verdi framework](http://verdi.uwplse.org/).
 Requirements
 ------------
 
- - [`Coq 8.5`](https://coq.inria.fr/coq-85)
+ - [`Coq 8.6`](https://coq.inria.fr/coq-86)
  - [`Mathematical Components 1.6`](http://math-comp.github.io/math-comp/) (`ssreflect`)
  - [`Verdi`](https://github.com/uwplse/verdi)
  - [`StructTact`](https://github.com/uwplse/StructTact)
