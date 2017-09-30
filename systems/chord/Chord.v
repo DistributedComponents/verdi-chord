@@ -1,13 +1,13 @@
-Require Import List.
 Require Import String.
+Require Import List.
 Import List.ListNotations.
 Require Bvector.
 Require ZArith.
 Require Zdigits.
+Require Import Omega.
 
-Require Import StructTact.Dedup.
-Require Import StructTact.RemoveAll.
 Require Import StructTact.StructTactics.
+Require Import StructTact.Util.
 Require Import Verdi.DynamicNet.
 
 Require Import Chord.Sorting.
@@ -18,6 +18,8 @@ Require Import Chord.Bitvectors.
 
 (* number of successors each node has to track *)
 Variable SUCC_LIST_LEN : nat.
+Variable succ_list_len_lower_bound :
+  SUCC_LIST_LEN >= 2.
 (* byte-width of node identifiers *)
 Variable N : nat.
 (* bit-width of node identifiers *)
@@ -86,10 +88,9 @@ Module ChordIDParams <: IDSpaceParams.
   Definition id_eq_dec := id_eq_dec.
 
   (* useful notations for lt and ltb *)
-  Notation "a < b" := (lt a b) (at level 70).
-  Notation "a < b < c" := (and (lt a b) (lt b c)).
-  Notation "a <? b <? c" := (andb (ltb a b) (ltb b c)) (at level 70).
-  Notation "a <? b" := (ltb a b) (at level 70).
+  Notation "a < b" := (lt a b) : id_scope.
+  Notation "a <? b" := (ltb a b) : id_scope.
+  Open Scope id_scope.
 
   (* ltb is a decision procedure for the lt relation *)
   Definition ltb_correct :
@@ -135,7 +136,7 @@ Module ChordIDParams <: IDSpaceParams.
     eapply BinInt.Z.lt_trans; [|eauto].
     now apply BinInt.Z.ltb_lt.
   Qed.
-  
+
   Definition lt_irrefl :
     forall a,
       ~ a < a.
@@ -146,8 +147,6 @@ Module ChordIDParams <: IDSpaceParams.
     congruence.
   Qed.
 
-  Require Import Omega.
-  
   Lemma plus_2x_inj :
     forall b x y,
       BinInt.Z.add b (2 * x) = BinInt.Z.add b (2 * y) ->
@@ -201,17 +200,25 @@ Module ChordIDParams <: IDSpaceParams.
       + find_apply_lem_hyp binary_value_inj.
         auto.
   Qed.
+
+  Close Scope id_scope.
 End ChordIDParams.
 
 Module ChordIDSpace := IDSpace(ChordIDParams).
-Import ChordIDSpace.
+Export ChordIDSpace.
 
 (* only need this to make client.ml work :/ *)
 Definition forge_pointer (i : id) : ChordIDSpace.pointer :=
   {| ptrAddr := "FAKE"%string;
      ptrId := i |}.
 
-Module Chord <: DynamicSystem.
+Ltac inv_prop P :=
+  match goal with
+  | [ H : context[P] |- _] =>
+    inv H
+  end.
+
+Module ChordSystem <: DynamicSystem.
   Definition addr := addr.
   Definition addr_eq_dec :
     forall a b : addr, {a = b} + {a <> b}
@@ -254,9 +261,12 @@ Module Chord <: DynamicSystem.
 
   Definition payload_eq_dec : forall x y : payload,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, addr_eq_dec.
+    decide equality.
+    - apply pointer_eq_dec.
+    - apply pointer_eq_dec.
+    - apply (list_eq_dec pointer_eq_dec).
+    - apply (list_eq_dec pointer_eq_dec).
+    - apply (option_eq_dec _ pointer_eq_dec).
   Defined.
 
   Inductive _timeout :=
@@ -268,9 +278,10 @@ Module Chord <: DynamicSystem.
 
   Definition timeout_eq_dec : forall x y : timeout,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, addr_eq_dec.
+    decide equality.
+    - subst.
+      apply payload_eq_dec.
+    - apply addr_eq_dec.
   Defined.
 
   Inductive _query :=
@@ -304,15 +315,6 @@ Module Chord <: DynamicSystem.
     | GetPredAndSuccs => true
     | Ping => true
     | _ => false
-    end.
-
-  Definition closes_request (req res : payload) : bool :=
-    match req, res with
-    | GetBestPredecessor _, GotBestPredecessor _ => true
-    | GetSuccList, GotSuccList _ => true
-    | GetPredAndSuccs, GotPredAndSuccs _ _ => true
-    | Ping, Pong => true
-    | _, _ => false
     end.
 
   Definition add_tick (r : res) : res :=
@@ -449,10 +451,11 @@ Module Chord <: DynamicSystem.
   Definition send_eq_dec :
     forall x y : addr * payload,
       {x = y} + {x <> y}.
-  Proof using.
-    repeat decide equality;
-      auto using id_eq_dec, payload_eq_dec.
-  Defined.
+    decide equality.
+    - subst.
+      apply payload_eq_dec.
+    - apply addr_eq_dec.
+   Defined.
 
   Definition delay_query (st : data) (src : addr) (msg : payload) : data :=
     {| ptr := ptr st;
@@ -531,19 +534,21 @@ Module Chord <: DynamicSystem.
     let st' := clear_query st in
     (st', outs, nts, clearreq ++ cts).
 
-  Definition ptrs_to_addrs : list (pointer * payload) -> list (addr * payload) :=
-    map (fun p => (addr_of (fst p), (snd p))).
-
   Definition handle_rectify (st : data) (my_pred : pointer) (notifier : pointer) : res :=
     if ptr_between_bool my_pred notifier (ptr st)
     then (update_pred st notifier, [], [], [])
     else (st, [], [], []).
 
-  Definition handle_stabilize (h : addr) (src : pointer) (st : data) (q : query) (new_succ : pointer) (succs : list pointer) : res :=
+  Definition handle_stabilize (h : addr) (src : pointer) (st : data) (q : query) (new_succ : option pointer) (succs : list pointer) : res :=
     let new_st := update_succ_list st (make_succs src succs) in
-    if ptr_between_bool (ptr st) new_succ src
-    then start_query h new_st (Stabilize2 new_succ)
-    else end_query (new_st, [(addr_of src, Notify)], [], []).
+    match new_succ with
+    | Some new_succ =>
+      if ptr_between_bool (ptr st) new_succ src
+      then start_query h new_st (Stabilize2 new_succ)
+      else end_query (new_st, [(addr_of src, Notify)], [], [])
+    | None =>
+      end_query (new_st, [(addr_of src, Notify)], [], [])
+    end.
 
   Definition next_msg_for_join (self : pointer) (src best_pred : addr) : payload :=
     if addr_eq_dec best_pred src
@@ -558,10 +563,7 @@ Module Chord <: DynamicSystem.
       | None => end_query (update_pred st notifier, [], [], [])
       end
     | Stabilize, GotPredAndSuccs new_succ succs =>
-      match new_succ with
-      | Some ns => (handle_stabilize h (make_pointer src) st q ns succs)
-      | None => end_query (st, [], [], [])
-      end
+      handle_stabilize h (make_pointer src) st q new_succ succs
     | Stabilize2 new_succ, GotSuccList succs =>
       end_query (update_succ_list st (make_succs new_succ succs),
                  [(addr_of new_succ, Notify)],
@@ -603,7 +605,10 @@ Module Chord <: DynamicSystem.
     | Notify, _, _ => schedule_rectify_with st (make_pointer src)
     | Ping, _, _ => (st, [(src, Pong)], [], [])
     | _, Some (query_dst, q, _), true => handle_query_req_busy src st msg
-    | _, Some (query_dst, q, _), false => handle_query_res src dst st q msg
+    | _, Some (query_dst, q, _), false =>
+      if addr_eq_dec (addr_of query_dst) src
+      then handle_query_res src dst st q msg
+      else (st, [], [], [])
     | _, None, _ => (st, handle_query_req st src msg, [], [])
     end.
 
@@ -616,9 +621,19 @@ Module Chord <: DynamicSystem.
   Definition pi {A B C D : Type} (t : A * B * C * D) : A * B * C :=
     let '(a, b, c, d) := t in (a, b, c).
 
-
   Definition sort_by_between (h : addr) : list pointer -> list pointer :=
     sort pointer (unroll_between_ptr h).
+
+  Lemma sort_by_between_permutes :
+    forall h l l',
+      l' = sort_by_between h l ->
+      Permutation.Permutation l l'.
+  Proof.
+    unfold sort_by_between, unroll_between_ptr.
+    intro.
+    apply sort_permutes;
+      eauto using unrolling_reflexive, unrolling_transitive, unrolling_total.
+  Qed.
 
   Fixpoint find_succs (h : addr) (sorted_ring : list pointer) : list pointer :=
     match sorted_ring with
@@ -796,4 +811,230 @@ Module Chord <: DynamicSystem.
       reflexivity.
   Qed.
 
-End Chord.
+End ChordSystem.
+Export ChordSystem.
+
+(* Requests and responses *)
+Inductive request_payload : payload -> Prop :=
+| req_GetBestPredecessor : forall p, request_payload (GetBestPredecessor p)
+| req_GetSuccList : request_payload GetSuccList
+| req_GetPredAndSuccs : request_payload GetPredAndSuccs
+| req_Ping : request_payload Ping.
+
+Ltac request_payload_inversion :=
+  match goal with
+  | H : request_payload _ |- _ => inv H
+  end.
+
+(* this is not quite what it sounds like, since Chord.start_query will sometimes not send anything *)
+Inductive query_request : query -> payload -> Prop :=
+| QReq_RectifyPing : forall n, query_request (Rectify n) Ping
+| QReq_StabilizeGetPredAndSuccs : query_request Stabilize GetPredAndSuccs
+| QReq_Stabilize2 : forall p, query_request (Stabilize2 p) GetSuccList
+| QReq_JoinGetBestPredecessor : forall k a, query_request (Join k) (GetBestPredecessor a)
+| QReq_JoinGetSuccList : forall k, query_request (Join k) GetSuccList
+| QReq_Join2 : forall n, query_request (Join2 n) GetSuccList.
+Hint Constructors query_request.
+
+Inductive query_response : query -> payload -> Prop :=
+| QRes_RectifyPong : forall n, query_response (Rectify n) Pong
+| QRes_StabilizeGetPredAndSuccs : forall p l, query_response Stabilize (GotPredAndSuccs p l)
+| QRes_Stabilize2 : forall p l, query_response (Stabilize2 p) (GotSuccList l)
+| QRes_JoinGotBestPredecessor : forall k p, query_response (Join k) (GotBestPredecessor p)
+| QRes_JoinGotSuccList : forall k l, query_response (Join k) (GotSuccList l)
+| QRes_Join2 : forall n l, query_response (Join2 n) (GotSuccList l).
+Hint Constructors query_response.
+
+Inductive response_payload : payload -> Prop :=
+| res_GotBestPredecessor : forall p, response_payload (GotBestPredecessor p)
+| res_GotSuccList : forall l, response_payload (GotSuccList l)
+| res_GotPredAndSuccs : forall p l, response_payload (GotPredAndSuccs p l)
+| res_Pong : response_payload Pong
+| res_Busy : response_payload Busy.
+
+Inductive request_response_pair : payload -> payload -> Prop :=
+| pair_GetBestPredecessor : forall n p, request_response_pair (GetBestPredecessor n) (GotBestPredecessor p)
+| pair_GetSuccList : forall l, request_response_pair GetSuccList (GotSuccList l)
+| pair_GetPredAndSuccs : forall p l, request_response_pair GetPredAndSuccs (GotPredAndSuccs p l)
+| pair_Ping : request_response_pair Ping Pong.
+
+Lemma is_request_same_as_request_payload : forall msg : payload,
+    is_request msg = true <-> request_payload msg.
+Proof.
+  unfold is_request.
+  intuition.
+  - break_match;
+      discriminate || eauto using req_GetBestPredecessor, req_GetSuccList, req_GetPredAndSuccs, req_Ping.
+  - now request_payload_inversion.
+Qed.
+
+(* Safe messages (Notify and Ping) *)
+Lemma safe_msgs :
+  forall msg,
+    is_safe msg = true ->
+    msg = Ping \/ msg = Notify.
+Proof.
+  unfold is_safe.
+  intuition.
+  break_match; auto || discriminate.
+Qed.
+
+Module ConstrainedChord <: ConstrainedDynamicSystem.
+  Include ChordSystem.
+
+  Definition msg : Type := (addr * (addr * payload))%type.
+
+  Inductive event : Type :=
+  | e_send : msg -> event
+  | e_recv : msg -> event
+  | e_timeout : addr -> timeout -> event
+  | e_fail : addr -> event.
+
+  Record global_state :=
+    { nodes : list addr;
+      failed_nodes : list addr;
+      timeouts : addr -> list timeout;
+      sigma : addr -> option data;
+      msgs : list msg;
+      trace : list event
+    }.
+
+  Inductive _timeout_constraint : global_state -> addr -> timeout -> Prop :=
+  | Tick_unconstrained : forall gst h,
+      _timeout_constraint gst h Tick
+  | KeepaliveTick_unconstrained : forall gst h,
+      _timeout_constraint gst h KeepaliveTick
+  | RectifyTick_unconstrained : forall gst h,
+      _timeout_constraint gst h RectifyTick
+  | Request_needs_dst_dead_and_no_msgs : forall gst dst h p,
+      In dst (failed_nodes gst) ->
+      (forall m, request_response_pair p m -> ~ In (dst, (h, m)) (msgs gst)) ->
+      _timeout_constraint gst h (Request dst p).
+  Definition timeout_constraint := _timeout_constraint.
+
+  (* TODO: move this to core *)
+  Definition timeouts_detect_failure (gst : global_state) : Prop :=
+    forall xs t ys h dead req,
+      (trace gst) = xs ++ t :: ys ->
+      (* if a request timeout occurs at some point in the trace... *)
+      t = (e_timeout h (Request dead req)) ->
+      (* then it corresponds to an earlier node failure. *)
+      In (e_fail dead) xs.
+
+  (* tip: treat this as opaque and use lemmas: it never gets stopped except by failure *)
+  Definition live_node (gst : global_state) (h : addr) : Prop :=
+    In h (nodes gst) /\
+    ~ In h (failed_nodes gst) /\
+    exists st,
+      sigma gst h = Some st /\
+      joined st = true.
+
+  Definition dead_node (gst : global_state) (h : addr) : Prop :=
+    In h (nodes gst) /\
+    In h (failed_nodes gst) /\
+    exists st,
+      sigma gst h = Some st.
+
+  Definition joining_node (gst : global_state) (h : addr) : Prop :=
+    exists st,
+      sigma gst h = Some st /\
+      joined st = false /\
+      In h (nodes gst) /\
+      ~ In h (failed_nodes gst).
+
+  Definition best_succ (gst : global_state) (h s : addr) : Prop :=
+    exists st xs ys,
+      live_node gst h /\
+      sigma gst h = Some st /\
+      map ChordIDSpace.addr_of (succ_list st) = xs ++ s :: ys /\
+      (forall o, In o xs -> dead_node gst o) /\
+      live_node gst s.
+
+  Definition live_node_in_succ_lists (gst : global_state) : Prop :=
+    forall h st,
+      sigma gst h = Some st ->
+      live_node gst h ->
+      exists s,
+        best_succ gst h s.
+
+  (* This is a way of dealing with succ lists missing entries
+     mid-stabilization that doesn't involve putting artificial entries
+     into the actual successor list. *)
+  Definition ext_succ_list_span_includes (h : id) (succs : list id) (n : id) : Prop.
+  Admitted.
+  (* fix this definition to work with bitvectors.
+    forall n l e,
+      length (h :: succs) = n ->
+      l = last succs h ->
+      e = l + (Chord.SUCC_LIST_LEN - n) ->
+      ChordIDSpace.between h n e.
+   *)
+
+  (* "A principal node is a member that is not skipped by any member's
+     extended successor list" *)
+  Definition principal (gst : global_state) (p : addr) : Prop :=
+    forall h st succs pid,
+      live_node gst h ->
+      sigma gst h = Some st ->
+      succs = map ChordIDSpace.id_of (succ_list st) ->
+      pid = hash p ->
+      ext_succ_list_span_includes (hash h) succs pid ->
+      In pid succs.
+
+  Definition principals (gst : global_state) (ps : list addr) : Prop :=
+    NoDup ps /\
+    Forall (principal gst) ps /\
+    forall p, principal gst p -> In p ps.
+
+  Definition sufficient_principals (gst : global_state) : Prop :=
+    exists ps,
+      principals gst ps /\
+      length ps > SUCC_LIST_LEN.
+
+  Definition principal_failure_constraint (gst : global_state) (f : addr) : Prop :=
+    principal gst f ->
+    forall ps,
+      principals gst ps ->
+      length ps > (SUCC_LIST_LEN + 1).
+
+  Definition failure_constraint (gst : global_state) (f : addr) (gst' : global_state) : Prop :=
+    live_node_in_succ_lists gst' /\
+    principal_failure_constraint gst f.
+
+End ConstrainedChord.
+
+Module ChordSemantics := DynamicSemantics(ConstrainedChord).
+
+Export ChordSemantics.
+Export ConstrainedChord.
+
+Definition hash_injective_on (gst : global_state) : Prop :=
+  forall n m,
+    In n (nodes gst) ->
+    In m (nodes gst) ->
+    hash n <> hash m.
+
+Definition initial_st (gst : global_state) : Prop :=
+  (* at least N+1 nodes *)
+  length (nodes gst) >= SUCC_LIST_LEN + 1 /\
+  (* no duplicate addresses *)
+  NoDup (nodes gst) /\
+  (* all addresses hash to distinct IDs *)
+  hash_injective_on gst /\
+  (* nodes aren't clients *)
+  (forall h, In h (nodes gst) -> ~client_addr h) /\
+  (* no messages, failed nodes, or events *)
+  failed_nodes gst = [] /\
+  msgs gst = [] /\
+  trace gst = [] /\
+  (* start handler has been run at all nodes *)
+  (forall h,
+      In h (nodes gst) ->
+      forall st ms nts,
+        start_handler h (nodes gst) = (st, ms, nts) ->
+        ms = [] /\
+        timeouts gst h = nts /\
+        sigma gst h = Some st) /\
+  (* no other timeouts or state *)
+  (forall h, ~ In h (nodes gst) -> timeouts gst h = []) /\
+  (forall h, ~ In h (nodes gst) -> sigma gst h = None).

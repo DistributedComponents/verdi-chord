@@ -1,8 +1,7 @@
 Require Import List.
 Require Import Arith.
 Require Import StructTact.StructTactics.
-Require Import StructTact.Update.
-Require Import StructTact.RemoveAll.
+Require Import StructTact.Util.
 Require Import InfSeqExt.infseq.
 Import ListNotations.
 
@@ -208,7 +207,6 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
         (* hypotheses on the list of known nodes *)
         In k (nodes gst) ->
         ~ In k (failed_nodes gst) ->
-        (* note that clearedts might as well be [] *)
         gst' = update_for_start gst h (start_handler h (k :: nil)) ->
         step_dynamic gst gst'
   | Fail :
@@ -409,14 +407,24 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
       invc H
     end.
 
-  Lemma list_neq_cons :
-    forall A (l : list A) x,
-      x :: l <> l.
-  Proof using.
-    intuition.
-    symmetry in H.
-    induction l;
-      now inversion H.
+  Lemma labeled_step_dynamic_preserves_nodes :
+    forall gst l gst',
+      labeled_step_dynamic gst l gst' ->
+      nodes gst = nodes gst'.
+  Proof.
+    intros.
+    inv_prop labeled_step_dynamic;
+      simpl; reflexivity.
+  Qed.
+
+  Lemma labeled_step_dynamic_preserves_failed_nodes :
+    forall gst l gst',
+      labeled_step_dynamic gst l gst' ->
+      failed_nodes gst = failed_nodes gst'.
+  Proof.
+    intros.
+    inv_prop labeled_step_dynamic;
+      simpl; reflexivity.
   Qed.
 
   Lemma labeled_step_dynamic_is_step_dynamic_without_churn :

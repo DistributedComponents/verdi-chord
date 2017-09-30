@@ -3,9 +3,9 @@ open Str
 open ChordUtil
 
 type command_line_opts =
-  { bind : (string * int) option ref
-  ; ring : (string * int) list ref
-  ; known : (string * int) option ref
+  { bind : string option ref
+  ; ring : string list ref
+  ; known : string option ref
   ; debug : bool ref
   ; request_timeout : float ref
   ; tick_timeout : float ref
@@ -17,9 +17,9 @@ let mk_default_opts () : command_line_opts =
   ; ring = ref []
   ; known = ref None
   ; debug = ref true
-  ; request_timeout = ref 30.0
-  ; tick_timeout = ref 10.0
-  ; keepalive_timeout = ref 5.0
+  ; request_timeout = ref 120.0
+  ; tick_timeout = ref 30.0
+  ; keepalive_timeout = ref 10.0
   }
 
 let mk_chord_config opts =

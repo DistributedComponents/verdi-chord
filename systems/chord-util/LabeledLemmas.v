@@ -1,30 +1,28 @@
-Require Import StructTact.StructTactics.
-Require Import StructTact.Util.
-Require Import Verdi.DynamicNet.
-Require Chord.Chord.
-Import Chord.Chord.Chord.
-Import Chord.ChordIDSpace.
-Require Import Chord.ChordLocalProps.
-Require Import Chord.ChordProof.
-Require Import Chord.ChordDefinitionLemmas.
 Require Import List.
 Import ListNotations.
-(*Require Import Wf_nat.*)
-Require Import InfSeqExt.infseq.
-Require Import InfSeqExt.classical.
+
 Require Import mathcomp.ssreflect.ssreflect.
 Require Import mathcomp.ssreflect.ssrbool.
-
 Set Bullet Behavior "Strict Subproofs".
 
-Require Chord.ChordSemantics.
-Import Chord.ChordSemantics.ChordSemantics.
-Import Chord.ChordSemantics.ConstrainedChord.
-Require Import Chord.ChordDefinitionLemmas.
+Require Import StructTact.StructTactics.
+Require Import StructTact.Util.
 
-(* assuming sigma gst h = Some st *)
-Definition failed_successors (gst : global_state) (st : data) : list pointer :=
-  filter (fun p : pointer => In_dec addr_eq_dec (addr_of p) (failed_nodes gst)) (succ_list st).
+Require Import InfSeqExt.infseq.
+Require Import InfSeqExt.classical.
+
+Require Import Verdi.DynamicNet.
+
+Require Import Chord.InfSeqTactics.
+
+Require Import Chord.Chord.
+
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
+Require Import Chord.SystemReachable.
+
+Require Import Chord.LiveNodesStayLive.
+Require Import Chord.QueryInvariant.
 
 Lemma l_enabled_RecvMsg_In_msgs :
   forall e src dst m d,
@@ -94,29 +92,6 @@ Ltac inv_timeout_constraint :=
     inv H
   end.
 
-Lemma sigma_ahr_updates :
-  forall gst n st ms nts cts e,
-    sigma (apply_handler_result n (st, ms, nts, cts) e gst) n = Some st.
-Proof using.
-  unfold apply_handler_result.
-  simpl.
-  intros.
-  exact: update_eq.
-Qed.
-
-Lemma sigma_ahr_passthrough :
-  forall gst n st ms nts cts e h d,
-    n <> h ->
-    sigma gst h = Some d ->
-    sigma (apply_handler_result n (st, ms, nts, cts) e gst) h = Some d.
-Proof using.
-  unfold apply_handler_result.
-  simpl.
-  intros.
-  find_reverse_rewrite.
-  exact: update_diff.
-Qed.
-
 Lemma labeled_step_preserves_state_existing :
   forall gst gst' l h d,
     sigma gst h = Some d ->
@@ -133,22 +108,6 @@ Proof using.
            subst_max;
            eexists;
            eauto using sigma_ahr_updates, sigma_ahr_passthrough].
-Qed.
-
-Lemma other_elements_remain_after_removal :
-  forall A (l xs ys : list A) (a b : A),
-    l = xs ++ b :: ys ->
-    In a l ->
-    a <> b ->
-    In a (xs ++ ys).
-Proof using.
-  intros.
-  subst_max.
-  do_in_app.
-  break_or_hyp.
-  - auto with datatypes.
-  - find_apply_lem_hyp in_inv.
-    break_or_hyp; auto using in_or_app || congruence.
 Qed.
 
 Lemma define_msg_from_recv_step_equality :
@@ -181,8 +140,10 @@ Proof using.
   apply in_or_app.
   right.
   recover_msg_from_recv_step_equality.
-  eapply other_elements_remain_after_removal; eauto.
-  now repeat find_rewrite.
+  repeat find_reverse_rewrite.
+  eauto with struct_util datatypes.
+  cut (In (from, (to, m)) (xs ++ ys));
+    eauto with struct_util.
 Qed.
 
 Ltac destruct_recv_handler_l :=
@@ -246,33 +207,6 @@ Proof using.
   auto using in_or_app, in_eq.
 Qed.
 
-Lemma recv_implies_msg_in_after :
-  forall gst gst' gst'' dst to src from m p,
-    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-    labeled_step_dynamic gst (RecvMsg src dst m) gst'' ->
-    (src, (dst, m)) <> (from, (to, p)) ->
-    In (src, (dst, m)) (msgs gst').
-Proof using.
-  intros.
-  eapply irrelevant_message_not_removed.
-  - eauto.
-  - admit.
-  - admit.
-(*
-    - invc_labeled_step.
-      invc_labeled_step.
-      recover_msg_from_recv_step_equality_clear.
-      recover_msg_from_recv_step_equality_clear.
-      match goal with
-      | H: msgs ?gst = _ ++ ?packet :: _,
-        H': ?packet = ?tuple
-        |- In ?tuple (msgs ?gst) =>
-        rewrite H; rewrite H'
-      end.
-      auto using in_or_app, in_eq.
-    - congruence. *)
-Admitted.
-
 Ltac construct_gst_RecvMsg :=
   match goal with
   | Hst: sigma ?gst ?d = Some ?st,
@@ -293,7 +227,11 @@ Lemma recv_implies_node_in :
 Proof using.
   intros.
   invc_labeled_step.
-Admitted.
+  destruct m as [? [? ?]].
+  find_apply_lem_hyp define_msg_from_recv_step_equality.
+  break_and.
+  congruence.
+Qed.
 
 Lemma recv_implies_node_not_failed :
   forall gst gst' src dst p,
@@ -304,6 +242,15 @@ Proof using.
   invc_labeled_step.
   recover_msg_from_recv_step_equality_clear.
   now repeat find_reverse_rewrite.
+Qed.
+
+Lemma failed_nodes_eq :
+  forall gst gst' l,
+    labeled_step_dynamic gst l gst' ->
+    failed_nodes gst = failed_nodes gst'.
+Proof using.
+  intros.
+  now invc_labeled_step.
 Qed.
 
 Lemma failed_nodes_never_added :
@@ -336,7 +283,6 @@ Proof using.
   now invc_labeled_step.
 Qed.
 
-
 Lemma nodes_never_removed :
   forall gst gst' l h,
     labeled_step_dynamic gst l gst' ->
@@ -345,60 +291,6 @@ Lemma nodes_never_removed :
 Proof using.
   intros.
   now invc_labeled_step.
-Qed.
-
-Lemma labeled_step_dynamic_neq_payload_enabled :
-  forall gst gst' gst'' to from m p,
-    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-    labeled_step_dynamic gst (RecvMsg from to m) gst'' ->
-    m <> p ->
-    enabled (RecvMsg from to m) gst'.
-Proof using.
-  intros.
-  apply when_RecvMsg_enabled.
-  - eauto using recv_implies_node_in, nodes_never_removed.
-  - eauto using recv_implies_node_not_failed, failed_nodes_never_added.
-  - eauto using recv_implies_state_exists.
-  - eapply irrelevant_message_not_removed.
-    * eauto.
-    * eauto using recv_implies_msg_in_before.
-    * congruence.
-Qed.
-
-Lemma labeled_step_dynamic_neq_src_enabled :
-  forall gst gst' gst'' to src from m p,
-    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-    labeled_step_dynamic gst (RecvMsg src to m) gst'' ->
-    src <> from ->
-    enabled (RecvMsg src to m) gst'.
-Proof using.
-  intros.
-  apply when_RecvMsg_enabled.
-  - eauto using recv_implies_node_in, nodes_never_removed.
-  - eauto using recv_implies_node_not_failed, failed_nodes_never_added.
-  - eauto using recv_implies_state_exists.
-  - eapply irrelevant_message_not_removed.
-    * eauto.
-    * eauto using recv_implies_msg_in_before.
-    * congruence.
-Qed.
-
-Lemma labeled_step_dynamic_neq_dst_enabled :
-  forall gst gst' gst'' dst to src from m p,
-    labeled_step_dynamic gst (RecvMsg from to p) gst' ->
-    labeled_step_dynamic gst (RecvMsg src dst m) gst'' ->
-    dst <> to ->
-    enabled (RecvMsg src dst m) gst'.
-Proof using.
-  intros.
-  apply when_RecvMsg_enabled.
-  - eauto using recv_implies_node_in, nodes_never_removed.
-  - eauto using recv_implies_node_not_failed, failed_nodes_never_added.
-  - eauto using recv_implies_state_exists.
-  - eapply irrelevant_message_not_removed.
-    * eauto.
-    * eauto using recv_implies_msg_in_before.
-    * congruence.
 Qed.
 
 Lemma recv_implies_state_exists_after_timeout :
@@ -452,72 +344,44 @@ Proof using.
   - eauto using recv_implies_message_exists_after_timeout.
 Qed.
 
+Lemma RecvMsg_stays_enabled_after_other_label :
+  forall gst src dst m l' gst',
+    enabled (RecvMsg src dst m) gst ->
+    l' <> RecvMsg src dst m ->
+    labeled_step_dynamic gst l' gst' ->
+    enabled (RecvMsg src dst m) gst'.
+Proof.
+Admitted.
+
 Lemma RecvMsg_enabled_until_occurred :
-  forall s, lb_execution s ->
-            forall src dst m, l_enabled (RecvMsg src dst m) (hd s) ->
-                              weak_until (now (l_enabled (RecvMsg src dst m)))
-                                         (now (occurred (RecvMsg src dst m)))
-                                         s.
+  forall s,
+    lb_execution s ->
+    forall src dst m,
+      l_enabled (RecvMsg src dst m) (hd s) ->
+      ~ client_addr dst ->
+      weak_until (now (l_enabled (RecvMsg src dst m)))
+                 (now (occurred (RecvMsg src dst m)))
+                 s.
 Proof using.
   cofix c.
-  case => /=.
-  case => /= gst.
-  case => [from to p|h t|from to p |from to p].
-  - case.
-    case => /= gst' lb' s H_exec src dst m H_en.
-    inversion H_exec; subst_max.
-    simpl in *.
-    case (addr_eq_dec dst to) => H_dec_dst.
-    case (addr_eq_dec src from) => H_dec_src.
-    case (payload_eq_dec m p) => H_dec_m.
-    subst_max.
-    admit. (* was: exact: W0 *)
-    subst_max.
-    apply: W_tl; first by [].
-    apply: c => //=.
-    unfold l_enabled in *.
-    simpl in *.
-    unfold enabled in H_en.
-    break_exists.
-    move: H1 H H_dec_m.
-    admit.
-    (* exact: labeled_step_dynamic_neq_payload_enabled. *)
-    subst_max.
-    apply: W_tl; first by [].
-    apply: c => //=.
-    unfold l_enabled in *.
-    simpl in *.
-    unfold enabled in H_en.
-    break_exists.
-    move: H1 H H_dec_src.
-    admit.
-    (* exact: labeled_step_dynamic_neq_src_enabled. *)
-    apply: W_tl; first by [].
-    apply: c => //=.
-    unfold l_enabled in *.
-    simpl in *.
-    unfold enabled in H_en.
-    break_exists.
-    move: H1 H H_dec_dst.
-    admit.
-    (* exact: labeled_step_dynamic_neq_dst_enabled. *)
+  intros.
+  destruct s as [o [o' s]].
+  inv_prop lb_execution.
+  destruct (label_eq_dec (RecvMsg src dst m) (occ_label o));
+    try (apply W0; assumption).
+  inv_labeled_step;
+    clean_up_labeled_step_cases.
+  - find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+    eapply W_tl.
+    + repeat find_rewrite.
+      assumption.
+    + apply c; auto.
+      unfold l_enabled in *; simpl in *.
+      repeat find_rewrite.
+      inv_prop (enabled (RecvMsg src dst m)).
+      eapply labeled_step_dynamic_timeout_enabled; eauto.
   - admit.
   - admit.
-    (*
-    case.
-    case => /= gst' lb' s H_exec src dst m H_en.
-    inversion H_exec; subst_max.
-    simpl in *.
-    rewrite /l_enabled /= in H_en.
-    apply: W_tl; first by [].
-    apply: c => //=.
-    unfold l_enabled in *.
-    simpl in *.
-    unfold enabled in H_en.
-    break_exists.
-    move: H1 H.
-    exact: labeled_step_dynamic_eq_enabled.
-     *)
   - admit.
 Admitted.
 
@@ -527,19 +391,22 @@ Lemma RecvMsg_eventually_occurred :
             forall src dst m d,
               In dst (nodes (occ_gst (hd s))) ->
               ~ In dst (failed_nodes (occ_gst (hd s))) ->
+              ~ client_addr dst ->
               In (src, (dst, m)) (msgs (occ_gst (hd s))) ->
               sigma (occ_gst (hd s)) dst = Some d ->
               eventually (now (occurred (RecvMsg src dst m))) s.
 Proof using.
-  move => s H_exec H_fair src dst m d H_in_n H_in_f H_in_m H_s.
-  have H_un := RecvMsg_enabled_until_occurred _ H_exec src dst m.
-  apply weak_until_until_or_always in H_un; last by apply: l_enabled_RecvMsg_In_msgs; eauto.
-  case: H_un; first exact: until_eventually.
-  move => H_al.
-  apply always_continuously in H_al.
-  apply H_fair in H_al.
-  destruct s as [x s].
-    by apply always_now in H_al.
+  intros.
+  pose proof (RecvMsg_enabled_until_occurred _ ltac:(eauto) src dst m).
+  find_copy_apply_lem_hyp weak_until_until_or_always;
+    eauto using l_enabled_RecvMsg_In_msgs.
+  break_or_hyp.
+  - eapply until_eventually; eauto.
+  - destruct s.
+    apply always_now.
+    unfold weak_local_fairness in *.
+    find_eapply_lem_hyp always_continuously.
+    now find_apply_hyp_hyp.
 Qed.
 
 Lemma timeout_step_satisfies_constraint :
@@ -619,8 +486,22 @@ Proof using.
   intros.
   invc_labeled_step.
   find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-  find_apply_lem_hyp timeout_handler_definition; expand_def;
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
     solve_by_inversion' eauto.
+Qed.
+
+Lemma timeout_implies_state_exists_after :
+  forall gst h t eff gst',
+    labeled_step_dynamic gst (Timeout h t eff) gst' ->
+    exists st,
+      sigma gst' h = Some st.
+Proof using.
+  intros.
+  invc_labeled_step.
+  find_apply_lem_hyp timeout_handler_l_definition; expand_def.
+  find_injection.
+  rewrite sigma_ahr_updates.
+  eexists; eauto.
 Qed.
 
 Lemma states_not_removed_by_recv_step :
@@ -647,15 +528,6 @@ Proof using.
     exists st.
     rewrite <- H_st.
     exact: update_diff.
-Qed.
-
-Lemma timeout_step_implies_timeout_exists :
-  forall gst gst' h t eff,
-    labeled_step_dynamic gst (Timeout h t eff) gst' ->
-    In t (timeouts gst h).
-Proof using.
-  intros.
-  invc_labeled_step.
 Qed.
 
 Lemma handle_query_req_busy_never_clears :
@@ -702,7 +574,7 @@ Proof using.
     autorewrite with list.
     apply timeouts_in_never_has_Tick.
   - (* need handle_stabilize_definition *)
-    unfold handle_stabilize in *; break_if.
+    unfold handle_stabilize in *; repeat break_match.
     + find_apply_lem_hyp start_query_definition;
         break_or_hyp; break_exists; break_and; subst_max;
           auto using timeouts_in_never_has_Tick.
@@ -710,10 +582,10 @@ Proof using.
         break_and; subst_max;
           autorewrite with list;
           auto using timeouts_in_never_has_Tick.
-  - find_apply_lem_hyp end_query_definition;
-      break_and; subst_max;
-        autorewrite with list;
-        auto using timeouts_in_never_has_Tick.
+    + find_apply_lem_hyp end_query_definition;
+        break_and; subst_max;
+          autorewrite with list;
+          auto using timeouts_in_never_has_Tick.
   - find_apply_lem_hyp end_query_definition;
       break_and; subst_max;
         autorewrite with list;
@@ -818,7 +690,7 @@ Definition timeout_handler_eff_Tick_adds_Tick :
     In Tick nts.
 Proof using.
   intros.
-  find_apply_lem_hyp timeout_handler_definition; expand_def;
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def;
     try congruence.
   find_apply_lem_hyp tick_handler_definition; expand_def;
     try auto with datatypes.
@@ -833,7 +705,7 @@ Lemma timeout_handler_eff_never_removes_Tick :
     ~ In Tick cts.
 Proof.
   intros.
-  find_apply_lem_hyp timeout_handler_definition; expand_def.
+  find_apply_lem_hyp timeout_handler_eff_definition; expand_def.
   - find_apply_lem_hyp tick_handler_definition; expand_def;
       try auto with datatypes.
     destruct (start_query _ _ _) as [[[?st ?ms] ?nts] ?cts] eqn:H_sq.
@@ -870,47 +742,11 @@ Ltac inv_query_request :=
   | H : query_request _ _ |- _ => inv H
   end.
 
-Lemma pointers_exist :
-  forall a,
-  exists p,
-    addr_of p = a.
-Proof using.
-  move => a.
-    by exists (make_pointer a).
-Qed.
-
 Ltac inv_request_response_pair :=
   match goal with
   | H: request_response_pair _ _ |- _ =>
     inv H
   end.
-
-Lemma handle_query_res_doesnt_remove_constrained_requests :
-  forall h dst gst req st p q st' ms nts cts,
-    timeouts_match_query gst ->
-    (* handle_query_res is only called on responses, so this should hold *)
-    request_response_pair req p ->
-    In h (nodes gst) ->
-    sigma gst h = Some st ->
-    In (Request dst req) (timeouts gst h) ->
-    timeout_constraint gst h (Request dst req) ->
-    In (dst, (h, p)) (msgs gst) ->
-    handle_query_res dst h st q p = (st', ms, nts, cts) ->
-    In (Request dst req) nts \/ ~ In (Request dst req) cts.
-Proof using.
-  unfold handle_query_res.
-  intros.
-  assert (exists q, cur_request st = Some (make_pointer dst, q, req) /\
-               query_request q req)
-    by eauto.
-  break_exists.
-  break_and.
-  inv_request_response_pair;
-    break_match;
-    inv_timeout_constraint;
-    inv_query_request;
-    firstorder with datatypes.
-Qed.
 
 Definition request_response_pair_dec :
   forall p q,
@@ -921,42 +757,6 @@ Proof using.
     try by eauto using pair_GetSuccList, pair_GetBestPredecessor, pair_GetPredAndSuccs, pair_Ping;
     right; intro H; inv H.
 Defined.
-
-Lemma unsafe_not_req_payload_is_response :
-  forall p,
-    is_safe p = false ->
-    is_request p = false ->
-    response_payload p.
-Proof using.
-  intros.
-  destruct p;
-    try (simpl in *; discriminate);
-    auto using res_GotBestPredecessor, res_GotSuccList, res_GotPredAndSuccs, res_Pong, res_Busy.
-Qed.
-
-Lemma responses_come_from_dst_of_timeout :
-  forall gst dst req h src p,
-    reachable_st gst ->
-    In (Request dst req) (timeouts gst h) ->
-    In (src, (h, p)) (msgs gst) ->
-    response_payload p ->
-    src = dst.
-Admitted.
-
-Lemma responses_are_paired_to_requests :
-  forall gst req dst h p,
-    reachable_st gst ->
-    In (Request dst req) (timeouts gst h) ->
-    In (dst, (h, p)) (msgs gst) ->
-    response_payload p ->
-    request_response_pair req p.
-Admitted.
-
-Lemma invariant_implies_timeouts_match_query :
-  forall gst,
-    reachable_st gst ->
-    timeouts_match_query gst.
-Admitted.
 
 Lemma constrained_Request_not_cleared_by_recv_handler :
   forall gst h dst req p src st st' ms nts cts,
@@ -1034,86 +834,6 @@ Proof using.
   move => gst from to m gst' h dst p gst'' q.
 Admitted.
 
-Lemma labeled_step_dynamic_recv_timeout_enabled :
-  forall gst gst' gst'' a b m h t eff,
-    reachable_st gst ->
-    t <> KeepaliveTick ->
-    labeled_step_dynamic gst (RecvMsg a b m) gst' ->
-    labeled_step_dynamic gst (Timeout h t eff) gst'' ->
-    exists eff',
-      enabled (Timeout h t eff') gst'.
-Proof using.
-  move => gst gst' gst'' a b m h t eff H_inv H_notkeepalive H_recv H_timeout.
-  find_copy_apply_lem_hyp timeout_step_satisfies_constraint.
-  find_copy_apply_lem_hyp timeout_implies_state_exists.
-  break_exists_name st.
-  copy_eapply states_not_removed_by_recv_step H_recv; eauto.
-  break_exists_name st'.
-  eapply when_Timeout_enabled.
-  - find_apply_lem_hyp timeout_implies_node_exists.
-    move: H_recv H_timeout.
-    exact: nodes_never_removed.
-  - find_apply_lem_hyp timeout_implies_node_not_failed.
-    move: H_recv H_timeout.
-    exact: failed_nodes_never_added.
-  - by eauto.
-  - invc_labeled_step.
-    inv_labeled_step.
-    eapply recv_handler_keeps_timeouts_satisfying_constraint; eauto.
-    find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-    solve_by_inversion.
-  - inv_timeout_constraint; constructor.
-    + eapply failed_nodes_never_removed; eauto.
-    + move => q H_pair.
-      now eapply request_constraint_prevents_recv_adding_msgs; eauto.
-Qed.
-
-Lemma labeled_step_dynamic_timeout_neq_h_timeout_enabled :
-  forall gst gst' gst'' h h' t t' eff eff',
-    labeled_step_dynamic gst (Timeout h t eff) gst' ->
-    labeled_step_dynamic gst (Timeout h' t' eff') gst'' ->
-    h <> h' ->
-    enabled (Timeout h' t' eff') gst'.
-Admitted.
-
-Lemma labeled_step_dynamic_timeout_neq_timeout_enabled :
-  forall gst gst' gst'' h h' t t' eff eff',
-    labeled_step_dynamic gst (Timeout h t eff) gst' ->
-    labeled_step_dynamic gst (Timeout h' t' eff') gst'' ->
-    t <> t' ->
-    exists eff'',
-      enabled (Timeout h' t' eff'') gst'.
-Admitted.
-
-(* This is true because when nodes set joined = true they also set a Tick
-   timeout, and Tick is preserved by all steps except failures (see
-   enabled_Tick_invariant). *)
-Lemma active_node_eventually_joins :
-  forall ex h,
-    reachable_st (hd ex).(occ_gst) ->
-    weak_local_fairness ex ->
-    lb_execution ex ->
-    In h (nodes (hd ex).(occ_gst)) ->
-    ~ In h (failed_nodes (hd ex).(occ_gst)) ->
-    eventually
-      (consecutive
-         (fun occ occ' =>
-            exists eff eff',
-              ~ live_node occ.(occ_gst) h /\
-              ~ enabled (Timeout h Tick eff) occ.(occ_gst) /\
-              live_node occ'.(occ_gst) h /\
-              enabled (Timeout h Tick eff') occ'.(occ_gst)))
-      ex.
-Proof.
-Admitted.
-
-Lemma live_node_invariant :
-  forall gst l gst' h,
-    labeled_step_dynamic gst l gst' ->
-    live_node gst h ->
-    live_node gst' h.
-Proof.
-Admitted.
 
 Lemma enabled_Tick_invariant :
   forall gst l gst' eff h,
@@ -1199,8 +919,6 @@ Proof.
     eapply lb_execution_invar; eauto.
 Qed.
 
-(* This might need additional hypotheses or changes to `label` before it becomes
-   provable. *)
 Lemma Tick_eventually_enabled :
   forall ex h,
     reachable_st (occ_gst (hd ex)) ->
@@ -1208,26 +926,14 @@ Lemma Tick_eventually_enabled :
     live_node (occ_gst (hd ex)) h ->
     eventually (now (fun occ => exists eff, l_enabled (Timeout h Tick eff) occ)) ex.
 Proof.
+(* This might need additional hypotheses or changes to `label` before it becomes
+   provable. *)
 Admitted.
 
 Definition enabled_Tick_with_effect (h : addr) (eff : timeout_effect) (gst : global_state) : Prop :=
   enabled (Timeout h Tick eff) gst.
-Hint Unfold enabled_Tick_with_effect.
 
-Lemma Tick_continuously_enabled :
-  forall ex h,
-    reachable_st (occ_gst (hd ex)) ->
-    lb_execution ex ->
-    live_node (occ_gst (hd ex)) h ->
-    continuously (now (fun occ => exists eff, l_enabled (Timeout h Tick eff) occ)) ex.
-Proof.
-  intros.
-  find_eapply_lem_hyp Tick_eventually_enabled; eauto.
-  unfold l_enabled.
-  eapply eventual_exists_invariant_always_true with (P:=enabled_Tick_with_effect h); eauto.
-  autounfold.
-  eauto using enabled_Tick_invariant.
-Qed.
+Hint Unfold enabled_Tick_with_effect.
 
 Lemma l_enabled_Timeout_In_timeouts :
   forall h t e st,
@@ -1255,8 +961,28 @@ Proof using.
   eapply LTimeout; eauto.
 Qed.
 
+Lemma clients_not_in_failed :
+  forall st h,
+    reachable_st st ->
+    client_addr h ->
+    ~ In h (nodes st) /\
+    ~ In h (failed_nodes st).
+Proof.
+  intros.
+  induct_reachable_st.
+  - intros. admit (* TODO no failed nodes in initial state *).
+  - intros. inv_prop step_dynamic; simpl; auto.
+    + intuition; try congruence; firstorder.
+    + intuition; try congruence.
+      * firstorder.
+      * subst. firstorder.
+      * firstorder.
+Admitted.
+
+
 Lemma step_preserves_timeout_constraint :
   forall st l st' h t,
+    reachable_st st ->
     labeled_step_dynamic st l st' ->
     timeout_constraint st h t ->
     timeout_constraint st' h t.
@@ -1277,21 +1003,35 @@ Proof.
     + find_apply_hyp_hyp. in_crush.
   - intuition eauto.
     unfold send in *. find_inversion.
-    (* failed nodes can't do client things, right? *)
-    admit.
+    find_apply_lem_hyp clients_not_in_failed; auto.
   - in_crush; find_apply_hyp_hyp; in_crush.
-Admitted.
-  
-Lemma timeout_constraint_invar :
-  forall s,
-    lb_execution s ->
-    forall h t,
-      timeout_constraint (occ_gst (hd s)) h t ->
-      timeout_constraint (occ_gst (hd (tl s))) h t.
-Proof.
-  intros. inv_lb_execution.
-  simpl in *. eauto using step_preserves_timeout_constraint.
 Qed.
+
+Lemma other_timeouts_not_cleared:
+  forall (gst : global_state) (h : addr) (t : timeout) st gst' h' t' st' ms newts clearedts eff,
+    reachable_st gst ->
+    (h, t) <> (h', t') ->
+    In t (timeouts gst h) ->
+    gst' = apply_handler_result h' (st', ms, newts, t' :: clearedts) [e_timeout h' t'] gst ->
+    timeout_handler_eff h' st t' = (st', ms, newts, clearedts, eff) ->
+    In t (timeouts gst' h).
+Proof.
+  intros. subst. simpl in *.
+  assert (h <> h' \/ t <> t') by
+      (destruct (addr_eq_dec h h'); destruct (timeout_eq_dec t t'); intuition; congruence).
+  intuition; [rewrite_update; auto|].
+  update_destruct; subst; rewrite_update; auto.
+  in_crush. right.
+  assert (~ In t clearedts).
+  {
+    unfold timeout_handler_eff, tick_handler, keepalive_handler, request_timeout_handler, handle_query_timeout, do_rectify, add_tick, start_query, cur_request, clear_rectify_with, make_request
+      in *.
+    repeat break_match; repeat tuple_inversion; simpl in *; in_crush; try congruence; admit.
+    }
+  find_apply_lem_hyp timeout_handler_eff_definition. expand_def.
+  - find_apply_lem_hyp tick_handler_definition. expand_def.
+    +
+Admitted.
 
 Lemma weak_until_timeout :
   forall s,
@@ -1312,49 +1052,560 @@ Proof.
   cofix c. destruct s. destruct o.
   simpl. intros.
   inv_lb_execution.
-  simpl in *. find_copy_eapply_lem_hyp step_preserves_timeout_constraint; [|eauto].
+  simpl in *.
+  find_copy_eapply_lem_hyp step_preserves_timeout_constraint; [| eauto |eauto].
+  find_copy_eapply_lem_hyp labeled_step_preserves_state_existing; [|eauto].
+  find_copy_eapply_lem_hyp nodes_never_removed; [|eauto].
+  find_copy_eapply_lem_hyp failed_nodes_never_added; [|eauto].
+  break_exists.
   inv_labeled_step.
-  - admit.
+  - destruct (prod_eq_dec addr_eq_dec timeout_eq_dec
+                          (h, t) (h0, t0)). (* TODO ewwwww *)
+    + clear c. apply W0. tuple_inversion. simpl in *.
+      find_apply_lem_hyp timeout_handler_l_definition.
+      break_exists.  intuition; subst.
+      unfold occurred. simpl.
+      eauto.
+    + apply W_tl.
+      * clear c.
+        simpl. eauto using l_enabled_Timeout_In_timeouts.
+      * simpl.
+        eapply c; clear c;
+          eauto using
+                lb_execution_invar,
+                strong_local_fairness_invar,
+                live_node_invariant,
+                labeled_step_is_unlabeled_step,
+                reachableStep. 
+        find_apply_lem_hyp timeout_handler_l_definition.
+        break_exists. intuition; subst.
+        eauto using other_timeouts_not_cleared.
   - apply W_tl.
     + simpl.
       eapply l_enabled_Timeout_In_timeouts; eauto.
     + simpl in *. 
-      eapply c; clear c; simpl in *; eauto.
-Admitted.      
-  
+      eapply c; clear c; simpl in *; eauto using labeled_step_is_unlabeled_step,
+                                     reachableStep.
+      unfold recv_handler_l in *.
+      find_inversion.
+      eauto using recv_handler_keeps_timeouts_satisfying_constraint.
+  - apply W_tl.
+    + simpl.
+      eapply l_enabled_Timeout_In_timeouts; eauto.
+    + simpl in *. 
+      eapply c; clear c; simpl in *; eauto using labeled_step_is_unlabeled_step,
+                                     reachableStep.
+      now repeat find_rewrite.
+  - apply W_tl.
+    + simpl.
+      eapply l_enabled_Timeout_In_timeouts; eauto.
+    + simpl in *. 
+      eapply c; clear c; simpl in *; eauto using labeled_step_is_unlabeled_step,
+                                     reachableStep.
+      now repeat find_rewrite.
+Qed.
 
-
-Lemma unconstrained_timeout_eventually_occurred :
-  forall s,
-    lb_execution s ->
-    weak_local_fairness s ->
-    reachable_st (hd s).(occ_gst) ->
-    forall h st t,
-      t <> KeepaliveTick ->
-      In t (timeouts (occ_gst (hd s)) h) ->
-      In h (nodes (occ_gst (hd s))) ->
-      ~ In h (failed_nodes (occ_gst (hd s))) ->
-      sigma (occ_gst (hd s)) h = Some st ->
-      timeout_constraint (occ_gst (hd s)) h t ->
-      exists eff,
-        eventually (now (occurred (Timeout h t eff))) s.
-Proof using.
+Lemma Timeout_enabled_when_open_request_to_dead_node :
+  forall occ h st dst req,
+    live_node (occ_gst occ) h ->
+    sigma (occ_gst occ) h = Some st ->
+    open_request_to (occ_gst occ) h dst req ->
+    In dst (failed_nodes (occ_gst occ)) ->
+    (forall res, request_response_pair req res -> ~ In (dst, (h, res)) (msgs (occ_gst occ))) ->
+    l_enabled (Timeout h (Request dst req) DetectFailure) occ.
+Proof.
   intros.
+  break_live_node.
   
-  (* Old proof of this used a lemma Timeout_enabled_until_occurred of the form
+  destruct (timeout_handler_l h st (Request dst req))
+    as [[[[st' ms] nts] cts] l] eqn:H_thl.
+  copy_apply timeout_handler_l_definition H_thl; expand_def.
+  inv_prop open_request_to; expand_def.
+  find_copy_apply_lem_hyp timeout_handler_eff_definition; expand_def; try congruence.
+  find_copy_apply_lem_hyp request_timeout_handler_definition; expand_def; try congruence.
+  repeat find_rewrite.
+  repeat find_injection.
+  eexists; repeat find_rewrite; eapply LTimeout; eauto.
+  eapply Request_needs_dst_dead_and_no_msgs; eauto.
+Qed.
 
-      forall s h t,
-        t <> KeepaliveTick ->
-        reachable_st (hd s).(occ_gst) ->
-        lb_execution s ->
-        l_enabled (Timeout h t) (hd s) ->
-        weak_until (now (l_enabled (Timeout h t)))
-                  (now (occurred (Timeout h t)))
-                  s
+Lemma if_branches_same :
+  forall A (p : bool) (x : A),
+    (if p then x else x) = x.
+Proof.
+  intros.
+  break_if; auto.
+Qed.
 
-    which is not true (or even false) now because of the introduction of
-    timeout_effect in the Timeout label. *)
+Lemma channel_empty_not_in :
+  forall st snd recv p,
+    channel st snd recv = [] ->
+    ~ In (snd, (recv, p)) (msgs st).
+Proof.
+  intros. intro.
+  find_rewrite_lem channel_contents.
+  repeat find_rewrite. solve_by_inversion.
+Qed.
+
+Lemma schedule_rectify_with_cur_request :
+  forall st ptr st' ms nts cts,
+    schedule_rectify_with st ptr = (st', ms, nts, cts) ->
+    cur_request st' = cur_request st.
+Proof.
+  intros.
+  unfold schedule_rectify_with in *.
+  repeat break_match; simpl in *; find_inversion; auto.
+Qed.
+
+Lemma open_request_to_dead_node_preserved_or_times_out :
+  forall gst l gst' h dst req,
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    In dst (failed_nodes gst) ->
+    channel gst dst h = [] ->
+    open_request_to gst h dst req ->
+    open_request_to gst' h dst req \/
+    Timeout h (Request dst req) DetectFailure = l.
+Proof.
+  intros.
+  inv_labeled_step.
+  - find_apply_lem_hyp timeout_handler_l_definition.
+    break_exists; intuition; subst.
+    destruct t.
+    + left. simpl in *.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and.
+      destruct (addr_eq_dec h h0).
+      * subst. repeat find_rewrite. find_inversion.
+        unfold tick_handler in *.
+        repeat find_rewrite. find_inversion.
+        simpl in *. rewrite_update.
+        intuition; [|repeat eexists; intuition; now eauto].
+        in_crush. right. eapply remove_preserve; eauto; congruence.
+      * rewrite_update. intuition.
+        repeat eexists; intuition; now eauto.
+    + left. simpl in *.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and.
+      destruct (addr_eq_dec h h0).
+      * subst. repeat find_rewrite. find_inversion.
+        unfold do_rectify in *.
+        repeat find_rewrite.
+        find_rewrite_lem if_branches_same.
+        find_inversion.
+        simpl in *. rewrite_update.
+        intuition; [|repeat eexists; intuition; now eauto].
+        eapply remove_preserve; eauto; congruence.
+      * rewrite_update. intuition.
+        repeat eexists; intuition; now eauto.
+    + left. simpl in *.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and.
+      destruct (addr_eq_dec h h0).
+      * subst. repeat find_rewrite. find_inversion.
+        unfold keepalive_handler in *.
+        repeat find_rewrite.
+        find_inversion.
+        simpl in *. rewrite_update.
+        intuition; [|repeat eexists; intuition; now eauto].
+        in_crush. right. eapply remove_preserve; eauto; congruence.
+      * rewrite_update. intuition.
+        repeat eexists; intuition; now eauto.
+    + simpl in *.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and.
+      destruct (addr_eq_dec h h0).
+      * subst. repeat find_rewrite. find_inversion.
+        unfold request_timeout_handler in *.
+        repeat find_rewrite. break_if.
+        -- find_inversion. right. f_equal.
+           eauto using at_most_one_request_timeout_uniqueness,
+           at_most_one_request_timeout_invariant.
+        -- left. find_inversion.
+           simpl in *. rewrite_update.
+           intuition; [|repeat eexists; intuition; now eauto].
+           eapply remove_preserve; eauto; congruence.
+      * left. rewrite_update. intuition.
+        repeat eexists; intuition; now eauto.
+  - left. find_apply_lem_hyp recv_handler_labeling.
+    destruct m as [snd [recv pay]]. simpl in *.
+    destruct pay.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        find_apply_lem_hyp handle_query_req_busy_definition.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update; intuition; repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        find_apply_lem_hyp handle_query_req_busy_definition.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update; intuition; repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        find_apply_lem_hyp handle_query_req_busy_definition.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update; intuition; repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        find_copy_apply_lem_hyp schedule_rectify_with_cur_request.
+        find_apply_lem_hyp schedule_rectify_with_never_clears.
+        subst.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite.
+        unfold delay_query, do_delayed_queries in *. break_and. subst.
+        repeat find_rewrite. simpl in *.
+        find_inversion. simpl. split; [in_crush|].
+        repeat eexists; eauto.
+      * rewrite_update; intuition; repeat eexists; eauto.
+    + unfold recv_handler in *. simpl in *.
+      repeat break_let. subst. find_inversion.
+      unfold open_request_to in *; simpl in *.
+      break_and; break_exists; break_and. subst.
+      update_destruct.
+      * subst. rewrite_update. repeat find_rewrite. find_inversion.
+        repeat find_rewrite. break_if.
+        -- subst. exfalso.
+           eapply channel_empty_not_in; eauto.
+           repeat find_rewrite. in_crush.
+        -- find_inversion.
+           unfold do_delayed_queries in *.
+           repeat find_rewrite.
+           find_inversion. simpl in *.
+           intuition. repeat eexists; eauto.
+      * rewrite_update. intuition. repeat eexists; eauto.
+  - auto.
+  - auto.
+Qed.
+
+Definition active_nodes (gst : global_state) :=
+  RemoveAll.remove_all addr_eq_dec (failed_nodes gst) (nodes gst).
+
+Lemma labeled_step_dynamic_preserves_active_nodes :
+  forall gst l gst',
+    labeled_step_dynamic gst l gst' ->
+    active_nodes gst = active_nodes gst'.
+Proof.
+  intros; unfold active_nodes.
+  erewrite labeled_step_dynamic_preserves_failed_nodes; eauto.
+  erewrite labeled_step_dynamic_preserves_nodes; eauto.
+Qed.
+
+Lemma active_nodes_always_identical :
+  forall l ex,
+    lb_execution ex ->
+    active_nodes (occ_gst (hd ex)) = l ->
+    always (fun ex' => l = active_nodes (occ_gst (hd ex'))) ex.
+Proof.
+  cofix c. intros.
+  constructor; destruct ex.
+  - easy.
+  - apply c; eauto using lb_execution_invar.
+    inv_prop lb_execution.
+    find_apply_lem_hyp labeled_step_dynamic_preserves_active_nodes.
+    cbn; congruence.
+Qed.
+
+Lemma in_active_in_nodes :
+  forall h gst,
+    In h (active_nodes gst) ->
+    In h (nodes gst).
+Proof.
+  unfold active_nodes.
+  eauto using RemoveAll.in_remove_all_was_in.
+Qed.
+
+Lemma in_active_not_failed :
+  forall h gst,
+    In h (active_nodes gst) ->
+    ~ In h (failed_nodes gst).
+Proof.
+  unfold active_nodes.
+  eauto using RemoveAll.in_remove_all_not_in.
+Qed.
+
+Lemma in_nodes_not_failed_in_active :
+  forall h gst,
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    In h (active_nodes gst).
+Proof.
+  eauto using RemoveAll.in_remove_all_preserve.
+Qed.
+
+Lemma active_nodes_invar :
+  forall h gst l gst',
+    In h (active_nodes gst) ->
+    labeled_step_dynamic gst l gst' ->
+    In h (active_nodes gst').
+Proof.
+  intros.
+  apply in_nodes_not_failed_in_active;
+    eauto using nodes_never_removed, in_active_in_nodes, failed_nodes_never_added, in_active_not_failed.
+Qed.
+
+Lemma lb_execution_cons_cons :
+  forall o o' ex,
+    lb_execution (Cons o (Cons o' ex)) ->
+    labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst o').
+Proof.
+  intros.
+  now inv_lb_execution.
+Qed.
+
+Lemma lb_execution_step_one_cons :
+  forall o ex,
+    lb_execution (Cons o ex) ->
+    labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst (hd ex)).
+Proof.
+  intros.
+  destruct ex; simpl.
+  eapply lb_execution_cons_cons; eauto.
+Qed.
+
+Ltac invar_eauto :=
+  eauto using
+        always_invar,
+        lb_execution_invar,
+        strong_local_fairness_invar,
+        weak_local_fairness_invar,
+        live_node_invariant,
+        labeled_step_is_unlabeled_step,
+        reachableStep,
+        lb_execution_step_one_cons,
+        lb_execution_cons_cons.
+
+Lemma channel_stays_empty :
+  forall ex src dst,
+    lb_execution ex ->
+    In src (failed_nodes (occ_gst (hd ex))) ->
+    channel (occ_gst (hd ex)) src dst = [] ->
+    channel (occ_gst (hd (tl ex))) src dst = [].
+Proof.
 Admitted.
+
+Lemma open_request_until_timeout :
+  forall h dst req ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+
+    channel (occ_gst (hd ex)) dst h = [] ->
+    In h (active_nodes (occ_gst (hd ex))) ->
+    In dst (failed_nodes (occ_gst (hd ex))) ->
+    open_request_to (occ_gst (hd ex)) h dst req ->
+
+    weak_until (now (fun occ => open_request_to (occ_gst occ) h dst req))
+               (now (occurred (Timeout h (Request dst req) DetectFailure)))
+               ex.
+Proof.
+  intros h dst req.
+  cofix c.
+  destruct ex.
+  intros.
+  inv_prop lb_execution.
+  find_copy_eapply_lem_hyp open_request_to_dead_node_preserved_or_times_out;
+    (* eauto will grab the coinduction hypothesis if we don't do something like this *)
+    match goal with
+    | |- weak_until _ _ _ => idtac
+    | _ => eauto using in_active_in_nodes, in_active_not_failed
+    end.
+  break_or_hyp.
+  - apply W_tl; [assumption|].
+    apply c;
+      invar_eauto;
+      eauto using active_nodes_invar, failed_nodes_never_removed, channel_stays_empty.
+  - now apply W0.
+Qed.
+
+Lemma dead_node_channel_empties_out :
+  forall ex dead h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    In dead (failed_nodes (occ_gst (hd ex))) ->
+    weak_local_fairness ex ->
+    continuously (now (fun occ => channel (occ_gst occ) dead h = [])) ex.
+Proof.
+Admitted.
+
+Lemma live_node_in_active :
+  forall h gst,
+    live_node gst h ->
+    In h (active_nodes gst).
+Proof.
+  intros.
+  inv_prop live_node; expand_def.
+  eapply in_nodes_not_failed_in_active; auto.
+Qed.
+
+Lemma request_eventually_fires :
+  forall h dst req ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    weak_local_fairness ex ->
+
+    live_node (occ_gst (hd ex)) h ->
+    In dst (failed_nodes (occ_gst (hd ex))) ->
+    open_request_to (occ_gst (hd ex)) h dst req ->
+    channel (occ_gst (hd ex)) dst h = [] ->
+
+    eventually (now (occurred (Timeout h (Request dst req) DetectFailure))) ex.
+Proof.
+  intros.
+  find_apply_lem_hyp open_request_until_timeout; auto using live_node_in_active.
+  find_apply_lem_hyp weak_until_until_or_always.
+  break_or_hyp; [eauto using until_eventually|].
+  find_copy_apply_lem_hyp (dead_node_channel_empties_out ex dst h); auto.
+  find_apply_lem_hyp always_continuously.
+  destruct ex. apply always_now.
+  match goal with
+  | H : weak_local_fairness _ |- _ => apply H
+  end.
+  assert (continuously
+            (now (fun occ => open_request_to (occ_gst occ) h dst req) /\_
+             now (fun occ => channel (occ_gst occ) dst h = []) /\_
+             (fun ex => lb_execution ex /\
+                     now (fun occ => live_node (occ_gst occ) h /\
+                                  In dst (failed_nodes (occ_gst occ))) ex))
+            (Cons o ex)).
+  {
+    apply continuously_and_tl; auto.
+    apply continuously_and_tl; auto.
+    apply E0.
+    apply always_inv; [|firstorder].
+    intros.
+    split; break_and; eauto using lb_execution_invar.
+    destruct s.
+    inv_prop lb_execution; simpl in *; break_and.
+    split.
+    - eapply live_node_invariant; eauto.
+    - eapply failed_nodes_never_removed; eauto.
+  }
+  eapply continuously_monotonic; [|eauto].
+  intros.
+  destruct s.
+  do 2 invcs_prop and_tl.
+  repeat break_and.
+  inv_prop live_node; expand_def.
+  eapply Timeout_enabled_when_open_request_to_dead_node; eauto.
+  intros.
+  rewrite channel_contents.
+  find_rewrite.
+  tauto.
+Qed.
+
+Lemma live_node_is_active :
+  forall gst h,
+    live_node gst h ->
+    In h (active_nodes gst).
+Proof.
+  intros.
+  inv_prop live_node; expand_def.
+  apply in_nodes_not_failed_in_active; auto.
+Qed.
 
 Definition res_clears_timeout (r : res) (t : timeout) : Prop :=
   match r with
@@ -1410,20 +1661,6 @@ Lemma msgs_remain_after_timeout :
     In (src, (dst, p)) (msgs gst').
 Admitted.
 
-Definition Request_payload_has_response (gst : global_state) : Prop :=
-  forall src dst p,
-    In (Request dst p) (timeouts gst src) ->
-    exists m,
-      request_response_pair p m.
-
-Definition responses_are_unique (gst : global_state) : Prop :=
-  forall src dst p m m',
-    In (src, (dst, m)) (msgs gst) ->
-    request_response_pair p m ->
-    In (src, (dst, m')) (msgs gst) ->
-    request_response_pair p m' ->
-    m = m'.
-
 Lemma handle_rectify_preserves_timeouts_in :
   forall st my_pred notifier st' ms nts cts,
     handle_rectify st my_pred notifier = (st', ms, nts, cts) ->
@@ -1438,14 +1675,20 @@ Lemma timeout_constraint_lifted_by_clearing :
   forall o o' src dst p,
     responses_are_unique (occ_gst o) ->
     Request_payload_has_response (occ_gst o) ->
-    In (Request dst p) (timeouts (occ_gst o) src) ->
+    open_request_to (occ_gst o) src dst p ->
     labeled_step_dynamic (occ_gst o) (occ_label o) (occ_gst o') ->
     ~ timeout_constraint (occ_gst o) src (Request dst p) ->
     ~ timeout_constraint (occ_gst o') src (Request dst p) \/
     clears_timeout src (Request dst p) o.
 Proof using.
   move => o o' src dst p H_uniqr H_res H_req H_step H_nt.
-  inv_labeled_step.
+  invc H_req.
+  break_exists_name q;
+    break_exists_name st;
+    break_exists_name dstp;
+    break_and.
+  inv_labeled_step;
+    remember (addr_of dstp) as dst.
   - left.
     destruct (addr_eq_dec h src);
       destruct (timeout_eq_dec t (Request dst p));
@@ -1484,7 +1727,7 @@ Proof using.
         repeat find_rewrite.
         find_copy_eapply_lem_hyp msgs_remain_after_timeout;
           intuition eauto.
-  - copy_apply H_res H_req.
+  - find_apply_lem_hyp H_res.
     break_exists_name m'.
     (* should really be: request_response_pair p m is decidable *)
     pose proof (msg_eq_dec (dst, (src, m')) m) as H_eqdec.
@@ -1494,15 +1737,17 @@ Proof using.
       simpl in *.
       unfold recv_handler_l in *; tuple_inversion.
       eapply ct_RecvMsg; eauto.
-      destruct (handle_msg dst src d m') as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
-      destruct (do_delayed_queries dst st') as [[[?st ?ms] ?nts] ?cts] eqn:?H.
+      destruct (handle_msg (addr_of dstp) src d m') as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
+      destruct (do_delayed_queries (addr_of dstp) st') as [[[?st ?ms] ?nts] ?cts] eqn:?H.
       find_copy_eapply_lem_hyp recv_handler_definition; eauto; break_and.
       repeat find_rewrite. simpl.
       find_apply_lem_hyp handle_msg_definition; expand_def.
-      + inversion H0.
-      + inversion H0.
+      + solve_by_inversion.
+      + solve_by_inversion.
       + find_apply_lem_hyp is_request_same_as_request_payload.
-        inversion H11; inversion H0; congruence.
+        inv_prop request_response_pair;
+          solve_by_inversion.
+      + admit.
       + find_apply_lem_hyp handle_query_res_definition; expand_def; simpl;
         try (find_apply_lem_hyp is_request_same_as_request_payload; find_contradiction).
         -- find_copy_eapply_lem_hyp timeouts_in_Request; eauto.
@@ -1515,7 +1760,6 @@ Proof using.
            find_copy_eapply_lem_hyp timeouts_in_Request; eauto.
            find_erewrite_lem handle_rectify_preserves_timeouts_in.
            admit.
-        -- admit.
         -- admit.
         -- admit.
         -- admit.
@@ -1589,21 +1833,51 @@ Lemma reachable_st_lb_execution_cons :
 Proof using.
   intros.
   inv_lb_execution.
-  find_apply_lem_hyp labeled_step_is_unlabeled_step.
-  eauto using reachableStep.
+  eauto using reachableStep, labeled_step_is_unlabeled_step.
 Qed.
+
+Lemma reachable_st_always :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always ((fun ex' => reachable_st (occ_gst (hd ex'))) /\_ lb_execution) ex.
+Proof.
+  intros.
+  eapply always_inv.
+  - intros.
+    destruct s.
+    inv_prop and_tl.
+    split;
+      eauto using lb_execution_invar, reachable_st_lb_execution_cons.
+  - firstorder.
+Qed.
+
+Definition Request_has_open_request_to (gst : global_state) :=
+  forall src dst p,
+    In (Request dst p) (timeouts gst src) ->
+    open_request_to gst src dst p.
+
+Lemma Request_implies_open_request_to :
+  forall dst p gst l gst' src,
+    labeled_step_dynamic gst l gst' ->
+    open_request_to gst src dst p ->
+    In (Request dst p) (timeouts gst' src) ->
+    open_request_to gst' src dst p.
+Proof.
+Admitted.
 
 Lemma queries_now_closed :
   forall s p m dst src,
     lb_execution s ->
     reachable_st (occ_gst (hd s)) ->
     request_response_pair p m ->
+    open_request_to (occ_gst (hd s)) src dst p ->
     In (Request dst p) (timeouts (occ_gst (hd s)) src) ->
     ~ timeout_constraint (occ_gst (hd s)) src (Request dst p) ->
     eventually (now (occurred (RecvMsg dst src m))) s ->
     eventually (now (clears_timeout src (Request dst p))) s.
 Proof using.
-  move => s p m dst src H_exec H_inv H_pair H_t H_const H_recv.
+  move => s p m dst src H_exec H_inv H_pair H_req H_t H_const H_recv.
   induction H_recv as [ | o s'].
   - apply E0.
     unfold now in *.
@@ -1618,24 +1892,10 @@ Proof using.
     copy_eapply request_stays_in H_exec; eauto.
     break_or_hyp; [| by apply E0].
     apply E_next.
-    now apply IHH_recv.
+    apply IHH_recv; auto.
+    inv_prop (lb_execution (Cons o (Cons o' s'))).
+    eapply Request_implies_open_request_to; eauto.
 Qed.
-
-Definition Request_has_message (gst : global_state) : Prop :=
-  forall src dst p m,
-    In (Request dst p) (timeouts gst src) ->
-    request_response_pair p m ->
-    (~ In dst (failed_nodes gst) /\
-     In (src, (dst, p)) (msgs gst)) \/
-    In (dst, (src, m)) (msgs gst).
-
-Definition Request_messages_unique (gst : global_state) : Prop :=
-  forall src dst p m m',
-    In (Request dst p) (timeouts gst src) ->
-    request_response_pair p m ->
-    In (dst, (src, m)) (msgs gst) ->
-    In (dst, (src, m')) (msgs gst) ->
-    m = m'.
 
 Lemma requests_eventually_get_responses :
   forall s,
@@ -1664,15 +1924,15 @@ Lemma requests_eventually_complete :
       In dst (nodes (occ_gst (hd s))) ->
       request_response_pair p m ->
       ~ timeout_constraint (occ_gst (hd s)) src (Request dst p) ->
-      In (Request dst p) (timeouts (occ_gst (hd s)) src) ->
+      open_request_to (occ_gst (hd s)) src dst p ->
       eventually (now (clears_timeout src (Request dst p))) s.
 Proof using.
   intros.
+  inv_prop open_request_to; expand_def.
   find_copy_eapply_lem_hyp requests_eventually_get_responses; eauto.
-  break_exists_name m'.
-  now eapply queries_now_closed with (m:=m').
+  break_exists_name m'; break_and.
+  eapply queries_now_closed with (m:=m'); eauto.
 Qed.
-Print Assumptions requests_eventually_complete.
 
 Lemma constrained_timeout_eventually_cleared :
   forall s,
@@ -1684,6 +1944,8 @@ Lemma constrained_timeout_eventually_cleared :
     Request_goes_to_real_node (occ_gst (hd s)) ->
     Request_payload_has_response (occ_gst (hd s)) ->
     Request_has_message (occ_gst (hd s)) ->
+    Request_has_open_request_to (occ_gst (hd s)) ->
+
     forall h st t,
       In t (timeouts (occ_gst (hd s)) h) ->
       In h (nodes (occ_gst (hd s))) ->
@@ -1692,7 +1954,7 @@ Lemma constrained_timeout_eventually_cleared :
       ~ timeout_constraint (occ_gst (hd s)) h t ->
       eventually (now (clears_timeout h t)) s.
 Proof using.
-  move => s H_exec H_fair H_inv H_tmsg H_reqnode H_res H_uniqm h st t H_t H_node H_live H_st H_constraint.
+  move => s H_exec H_fair H_inv H_tmsg H_reqnode H_res H_uniqm H_openreq h st t H_t H_node H_live H_st H_constraint.
   destruct t.
   - (* Tick case is.. impossible *)
     exfalso.
@@ -1713,34 +1975,4 @@ Proof using.
     * break_exists.
       break_and.
       eapply requests_eventually_complete; eauto.
-Qed.
-
-Lemma always_in_nodes :
-  forall s, lb_execution s ->
-       forall h, In h (nodes (occ_gst (hd s))) ->
-            always (now (fun o => In h (nodes (occ_gst o)))) s.
-Proof using.
-  cofix c.
-  case => /= o; case => o' s H_exec h H_in_f.
-  inversion H_exec; subst.
-  apply: Always; first by [].
-  rewrite /=.
-  apply: c; first by [].
-  rewrite /=.
-    by apply: nodes_never_removed; eauto.
-Qed.
-
-Lemma always_not_failed :
-  forall s, lb_execution s ->
-       forall h, ~ In h (failed_nodes (occ_gst (hd s))) ->
-            always (now (fun o => ~ In h (failed_nodes (occ_gst o)))) s.
-Proof using.
-  cofix c.
-  case => /= o; case => o' s H_exec h H_in_f.
-  inversion H_exec; subst.
-  apply: Always; first by [].
-  rewrite /=.
-  apply: c; first by [].
-  rewrite /=.
-    by apply: failed_nodes_never_added; eauto.
 Qed.

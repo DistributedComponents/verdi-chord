@@ -1,21 +1,21 @@
+Require Import Arith.
+Require FunctionalExtensionality.
 Require Import List.
-Import ListNotations.
+Import List.ListNotations.
+
+Require Import mathcomp.ssreflect.ssreflect.
+Require Import mathcomp.ssreflect.ssrbool.
+Set Bullet Behavior "Strict Subproofs".
+
 Require Import StructTact.StructTactics.
-Require Import StructTact.Update.
+Require Import StructTact.Util.
 
 Require Import Chord.Chord.
-Require Import Chord.ChordSemantics.
-Import Chord.ChordSemantics.ChordSemantics.
-Import Chord.ChordSemantics.ConstrainedChord.
-Import Chord.ChordIDSpace.
-Require Import Chord.ChordProof.
-Require Import Chord.ChordDefinitionLemmas.
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
 
 Notation hash := Chord.hash.
 
-Set Bullet Behavior "Strict Subproofs".
-
-(** Valid pointers *)
 Definition wf_ptr (p : pointer) : Prop :=
   id_of p = hash (addr_of p).
 
@@ -39,7 +39,7 @@ Proof.
 Qed.
 
 Definition valid_ptr (gst : global_state) (p : pointer) : Prop :=
-  id_of p = hash (addr_of p) /\
+  wf_ptr p /\
   In (addr_of p) (nodes gst).
 
 Lemma valid_ptr_intro :
@@ -521,6 +521,21 @@ Lemma valid_ptrs_global_timeout_handler :
     timeout_handler h st t = (st', ms, nts, cts) ->
     In t0 nts ->
     valid_ptr_timeout gst t0.
+Proof using.
+  intros.
+  destruct t0; try constructor.
+  - Fail constructor. (* missing RectifyTick case in valid_ptr_timeout *)
+    admit.
+  - (* need to dissect timeout_handler here *)
+    admit.
+(*
+This proof is a grind through the definition of timeout_handler. It might not go
+through until definition of valid_ptr_timeout gets fixed. (It's missing a case
+for RectifyTick.)
+
+DIFFICULTY: 2
+USED: In ValidPointersInvariant.v for an invariant.
+*)
 Admitted.
 
 Lemma lift_pred_opt_Some_elim :
@@ -546,6 +561,12 @@ Lemma valid_ptrs_global_recv_handler :
     forall t, In t newts ->
          valid_ptr_timeout gst t.
 Proof using.
+(*
+This proof is a grind through the definition of recv_handler.
+
+DIFFICULTY: 2
+USED: In valid_ptrs_global_timeouts below.
+*)
 Admitted.
 
 Lemma apply_handler_result_In_timeouts :
@@ -553,6 +574,14 @@ Lemma apply_handler_result_In_timeouts :
     In t (timeouts (apply_handler_result h0 (st, ms, nts, cts) e gst) h) ->
     In t nts \/
     In t (timeouts gst h) /\ (~ In t cts \/ h <> h0).
+Proof using.
+(*
+This is a simple spec lemma for apply_handler_result. The proof should be very
+simple.
+
+DIFFICULTY: 1
+USED: In valid_ptrs_global_timeouts below
+*)
 Admitted.
 
 Lemma valid_ptrs_global_timeouts :
@@ -612,6 +641,12 @@ Proof using.
       valid_ptrs_timeouts_elim.
   - admit.
   - admit.
+(*
+I need to clean this up.
+
+DIFFICULTY: Ryan.
+USED: In ValidPointersInvariant.v for one case of an inductive invariant proof.
+*)
 Admitted.
 
 Lemma valid_ptrs_global_sigma :
@@ -628,6 +663,12 @@ Proof using.
   - admit.
   - admit.
   - admit.
+(*
+I need to break this out into smaller admits.
+
+DIFFICULTY: Ryan.
+USED: In ValidPointersInvariant.v for one case of an inductive invariant proof.
+*)
 Admitted.
 
 Lemma valid_ptrs_global_net :
@@ -642,6 +683,12 @@ Proof using.
   - admit.
   - admit.
   - admit.
+(*
+I need to break this out into smaller admits.
+
+DIFFICULTY: Ryan.
+USED: In ValidPointersInvariant.v for one case of an inductive invariant proof.
+*)
 Admitted.
 
 Lemma valid_ptrs_global_trace :
@@ -656,6 +703,12 @@ Proof using.
   - admit.
   - admit.
   - admit.
+(*
+I need to break this out into smaller admits.
+
+DIFFICULTY: Ryan.
+USED: In ValidPointersInvariant.v for one case of an inductive invariant proof.
+*)
 Admitted.
 
 Lemma valid_ptrs_state_nodes_subset :
@@ -668,6 +721,12 @@ Proof.
   apply valid_ptrs_state_intro;
     find_apply_lem_hyp valid_ptrs_state_elim;
     break_and.
+(*
+This follows from valid_ptr_nodes_subset.
+
+DIFFICULTY: 2
+USED: In ValidPointersInvariant.v
+*)
 Admitted.
 
 Lemma start_handler_valid_ptrs_state :
@@ -679,6 +738,12 @@ Lemma start_handler_valid_ptrs_state :
     valid_ptrs_state gst' st.
 Proof.
   intros.
+(*
+This follows from valid_ptr_nodes_subset.
+
+DIFFICULTY: 2
+USED: In ValidPointersInvariant.v
+*)
 Admitted.
 (*
   find_apply_lem_hyp start_handler_definition; expand_def.
@@ -692,10 +757,13 @@ Admitted.
 Qed.
 *)
 
-Theorem valid_ptrs_global_start_invariant :
-  chord_start_invariant valid_ptrs_global.
+Lemma live_In_live_ptrs :
+  forall gst h,
+    live_node gst (addr_of h) ->
+    wf_ptr h ->
+    In h (live_ptrs gst).
 Proof.
-  unfold chord_start_invariant.
+  unfold live_ptrs, live_node.
   intros.
   destruct (start_handler _ _) as [[?st ?ms] ?newts] eqn:?H; subst res0.
   find_eapply_lem_hyp update_for_start_definition; expand_def.
@@ -757,20 +825,17 @@ Proof.
   - admit. (* trace case *)
 Admitted.
 
-Theorem valid_ptrs_global_inductive :
-  forall gst,
-    reachable_st gst ->
-    valid_ptrs_global gst.
-Proof using.
-  intros.
-  induction H.
-  - admit.
-  - unfold valid_ptrs_global; repeat break_and_goal.
-    + eapply valid_ptrs_global_timeouts; eauto.
-    + intros;
-        destruct (sigma _ _) eqn:H_st;
-        constructor;
-        eapply valid_ptrs_global_sigma; eauto.
-    + eapply valid_ptrs_global_net; eauto.
-    + eapply valid_ptrs_global_trace; eauto.
-Admitted.
+Lemma wf_ptr_hash_eq :
+  forall p,
+    wf_ptr p ->
+    hash (addr_of p) = id_of p.
+Proof.
+  auto.
+Qed.
+
+Lemma make_pointer_wf :
+  forall h,
+    wf_ptr (make_pointer h).
+Proof.
+  constructor.
+Qed.

@@ -1,17 +1,17 @@
 open ExtractedChord
-open ExtractedChord.Chord
+open ExtractedChord.ChordSystem
 open ExtractedChord.ChordIDSpace
 
 module type ClientSig = sig
   exception Wrong_response of string
-  val lookup : string -> string * int -> id -> pointer
-  val get_pred_and_succs : string -> string * int -> pointer option * pointer list
+  val lookup : string -> string -> id -> pointer
+  val get_pred_and_succs : string -> string -> pointer option * pointer list
 end
 
 module Client : ClientSig = struct
 
   let connect_and_send me addr msg =
-    let remote = Util.mk_addr_inet addr in
+    let remote = Util.mk_addr_inet (addr, ChordArrangement.chord_default_port) in
     let self = Util.mk_addr_inet (me, 0) in
     let conn = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     Unix.setsockopt conn Unix.SO_REUSEADDR true;
@@ -78,8 +78,9 @@ let parse argv =
     [ ChordUtil.ip_spec "-bind" bind "{ip} address to connect from"
     ; ChordUtil.addr_spec "-node" node "{ip:port} node to query"
     ; ( "-query"
-      , Arg.Symbol (["lookup"; "get_pred_and_succs"], set_query_type)
-      , "type of query to run")
+      , Arg.Symbol (["lookup"; "get_ptrs"], set_query_type)
+      , " type of query to run. lookup <ID> asks the node to look up the given ID. get_ptrs \
+         asks the node for its predecessor and successors.")
     ]
   in
   let anonarg a =
@@ -87,14 +88,15 @@ let parse argv =
     then lookup_id := Some (ascii_to_id (Util.char_list_of_string a))
     else raise (Arg.Bad "not a lookup")
   in
-  let usage = "-bind {ip} -node {ip:port} \
-               [ -query lookup {id} | -query get_pred_and_succs ]"
+  let usage = "USAGE:\n\
+      client.native -bind {ip} -node {ip:port} -query [ lookup {id} | get_ptrs ]\n"
   in
   Arg.parse spec anonarg usage;
   try
     validate !bind !node !query_type !lookup_id
   with Invalid_argument msg ->
-    Arg.usage spec msg;
+    let full_usage = msg ^ "\n\n" ^ usage in
+    Arg.usage spec full_usage;
     exit 1
 
 let _ =

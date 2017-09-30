@@ -3,6 +3,7 @@
 *.v.d
 *.buildtime
 _CoqProject
+_CoqProject.tmp
 Makefile.coq
 Makefile.coq.bak
 *~

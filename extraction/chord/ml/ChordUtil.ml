@@ -4,7 +4,7 @@ let parse_addr s =
   match Str.split (Str.regexp ":") s with
   | addr::port::[] ->
      (* this should throw invalid arg when this is broken *)
-     (addr, int_of_string port)
+     addr
   | _ -> invalid_arg s
 
 let parse_addr_arg opt =
@@ -80,14 +80,3 @@ let addrs_spec arg addrs_ref doc =
   let parse opt =
     addrs_ref := !addrs_ref @ [parse_addr_arg opt]
   in (arg, Arg.String parse, doc)
-
-let explode s =
-  let rec exp i l =
-    if i < 0
-    then l
-    else exp (i - 1) (s.[i] :: l) in
-  exp (String.length s - 1) []
-
-let implode cs =
-  let nth_c n = List.nth cs n in
-  Bytes.init (List.length cs) nth_c

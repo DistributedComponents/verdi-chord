@@ -25,10 +25,23 @@ default: Makefile.coq
 quick: Makefile.coq
 	$(MAKE) -f Makefile.coq quick
 
+proofalytics:
+	$(MAKE) -C proofalytics clean
+	$(MAKE) -C proofalytics
+	$(MAKE) -C proofalytics publish
+
+STDBUF=$(shell [ -x "$$(which gstdbuf)" ] && echo "gstdbuf" || echo "stdbuf")
+
+proofalytics-aux: Makefile.coq
+	sed "s|^TIMECMD=$$|TIMECMD=$(PWD)/proofalytics/build-timer.sh $(STDBUF) -i0 -o0|" \
+	  Makefile.coq > Makefile.coq_tmp
+	mv Makefile.coq_tmp Makefile.coq
+	$(MAKE) -f Makefile.coq
+
 Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq -no-install \
 	  -extra '$(CHORDMLFILES)' \
-	    'extraction/chord/coq/ExtractChord.v systems/Chord.vo' \
+	    'extraction/chord/coq/ExtractChord.v systems/chord/Chord.vo' \
 	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v' \
 	  -extra-phony 'distclean' 'clean' \
 	    'rm -f $$(join $$(dir $$(VFILES)),$$(addprefix .,$$(notdir $$(patsubst %.v,%.aux,$$(VFILES)))))'
@@ -38,6 +51,7 @@ clean:
 	  $(MAKE) -f Makefile.coq cleanall; fi
 	rm -f Makefile.coq
 	$(MAKE) -C extraction/chord clean
+	$(MAKE) -C proofalytics clean
 
 chord:
 	+$(MAKE) -C extraction/chord chord.native client.native
@@ -52,4 +66,4 @@ lint:
 distclean: clean
 	rm -f _CoqProject
 
-.PHONY: default quick clean lint distclean chord $(MLFILES)
+.PHONY: default quick clean lint distclean chord $(MLFILES) proofalytics proofalytics-aux

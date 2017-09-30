@@ -36,9 +36,6 @@ Definition fixed_length_string_to_vec {n : nat} (asc : { s : string | String.len
   exact (string_to_vec str).
 Defined.
 
-Definition bvec8_to_list (byte : Bvector.Bvector 8) : list bool :=
-  Vector.to_list byte.
-
 Fixpoint bit_list_to_string (bits : list bool) : string :=
   match bits with
   | b1 :: b2 :: b3 :: b4 :: b5 :: b6 :: b7 :: b8 :: rest =>
