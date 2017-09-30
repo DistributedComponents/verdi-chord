@@ -858,7 +858,7 @@ Section LocalMeasure.
     - intros; eapply always_monotonic; try eapply always_true; intros.
       exfalso; auto.
     - intros.
-      forwards. auto with datatypes. concludes.
+      forward IHl. eauto with datatypes. concludes.
       assert (always (P a) ex)
         by auto with datatypes.
       cut (always ((fun ex' => forall x, In x l -> P x ex') /\_ P a) ex).

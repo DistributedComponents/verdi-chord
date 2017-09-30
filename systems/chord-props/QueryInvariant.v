@@ -107,7 +107,7 @@ Proof.
     }
     assert (Hnoreq: forall t', In t' (remove timeout_eq_dec t ts) -> forall dst p, t' <> (Request dst p))
       by eauto using in_remove.
-    autounfold; intros.
+    autounfold; unfold not; intros.
     destruct xs.
     + simpl in *.
       find_injection.
@@ -140,7 +140,7 @@ Lemma at_most_one_request_timeout'_swap :
 Proof.
   intros.
   destruct t; eauto.
-  autounfold; intros.
+  autounfold; unfold not; intros.
   destruct xs; simpl in *; find_injection.
   - eapply at_most_one_request_timeout'_remove_drops_all; eauto.
   - eapply at_most_one_request_timeout'_remove_drops_all; eauto.
@@ -294,8 +294,7 @@ Proof.
   repeat (handler_def || handler_simpl);
     repeat find_rewrite;
     find_injection;
-    find_false;
-    intuition.
+    exfalso; intuition.
 Qed.
 
 Lemma recv_msg_not_right_response_never_removes_request_timeout :
@@ -310,7 +309,7 @@ Proof.
   intros.
   repeat (handler_def || handler_simpl);
     repeat (find_rewrite || find_injection);
-    solve [tauto | find_false; intuition].
+    solve [tauto | exfalso; intuition].
 Qed.
 
 Inductive cur_request_timeouts_ok (cr : option (pointer * query * payload)) (ts : list timeout) : Prop :=

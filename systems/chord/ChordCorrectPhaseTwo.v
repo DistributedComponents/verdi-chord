@@ -492,7 +492,7 @@ Proof.
     unfold pred_error in *; break_match; try congruence.
     find_injection.
     repeat find_rewrite.
-    find_eapply_lem_hyp counting_opt_error_zero_implies_correct;
+    eapply_lem_prop_hyp counting_opt_error_zero_implies_correct counting_opt_error;
       eauto using better_pred_bool_antisymmetric.
     * assert (wf_ptr x /\ live_node gst (addr_of x)) by admit; try tauto.
       rewrite <- wf_ptr_eq in * by auto.
@@ -505,7 +505,7 @@ Proof.
     find_injection.
     repeat find_rewrite.
     rewrite <- wf_ptr_eq in * by auto.
-    find_eapply_lem_hyp counting_opt_error_zero_implies_correct;
+    eapply_lem_prop_hyp counting_opt_error_zero_implies_correct counting_opt_error;
       try eapply better_first_succ_bool_antisymmetric.
     all:assert (wf_ptr x /\ live_node gst (addr_of x)) by admit; break_and; eauto.
     eapply better_succ_bool_true_better_succ; simpl in *; tauto.
@@ -2646,9 +2646,10 @@ Proof.
         eapply wrong_pred_not_correct_pred; eauto.
       * find_apply_lem_hyp pred_never_self; auto.
       * unfold pred_correct in *.
-        break_exists; intuition find_injection.
-        unfold better_pred in *.
-        apply H18; try by intuition eauto; subst.
+        expand_def.
+        find_injection.
+        unfold better_pred in *; expand_def.
+        apply H17; try by intuition eauto; subst.
         -- break_and.
            unfold ptr_between in *.
            intro; subst.

@@ -12,20 +12,20 @@ Definition injective {A B : Type} (f : A -> B) : Prop :=
     a = b.
 
 Module Type IDSpaceParams.
-  Variable name : Type.
-  Variable id : Type.
-  Variable hash : name -> id.
-  Variable ltb : id -> id -> bool.
-  Variable lt : id -> id -> Prop.
+  Parameter name : Type.
+  Parameter id : Type.
+  Parameter hash : name -> id.
+  Parameter ltb : id -> id -> bool.
+  Parameter lt : id -> id -> Prop.
 
   (* problematic (i.e. untrue) hypothesis, there might be a better way to handle this *)
-  Variable hash_inj : injective hash.
+  Parameter hash_inj : injective hash.
 
   (* name and id have decidable equality *)
-  Variable name_eq_dec :
+  Parameter name_eq_dec :
       forall a b : name,
         {a = b} + {a <> b}.
-  Variable id_eq_dec :
+  Parameter id_eq_dec :
       forall a b : id,
         {a = b} + {a <> b}.
 
@@ -38,24 +38,24 @@ Module Type IDSpaceParams.
   Local Open Scope id_scope.
 
   (* ltb is a decision procedure for the lt relation *)
-  Variable ltb_correct :
+  Parameter ltb_correct :
     forall a b,
       a <? b = true <-> a < b.
 
   (* The lt relation is a strict total order *)
-  Variable lt_asymm :
+  Parameter lt_asymm :
     forall a b,
       a < b ->
       ~ b < a.
-  Variable lt_trans :
+  Parameter lt_trans :
     forall a b c,
       a < b ->
       b < c ->
       a < c.
-  Variable lt_irrefl :
+  Parameter lt_irrefl :
     forall a,
       ~ a < a.
-  Variable lt_total :
+  Parameter lt_total :
     forall a b,
       a < b \/ b < a \/ a = b.
 End IDSpaceParams.

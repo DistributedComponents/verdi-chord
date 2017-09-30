@@ -17,11 +17,11 @@ Require Import Chord.Bitvectors.
 (* Axioms and top-level parameters *)
 
 (* number of successors each node has to track *)
-Variable SUCC_LIST_LEN : nat.
-Variable succ_list_len_lower_bound :
+Parameter SUCC_LIST_LEN : nat.
+Parameter succ_list_len_lower_bound :
   SUCC_LIST_LEN >= 2.
 (* byte-width of node identifiers *)
-Variable N : nat.
+Parameter N : nat.
 (* bit-width of node identifiers *)
 Definition bit_len := 8 * N.
 Definition id := Bvector.Bvector bit_len.
@@ -33,7 +33,7 @@ Definition id_eq_dec :
   := (VectorEq.eq_dec _ Bool.eqb Bool.eqb_true_iff _).
 
 (* hash function from names to our mystery type (it's probably a 16-byte string...) *)
-Variable ocaml_hash : addr -> { s : string | String.length s = N }.
+Parameter ocaml_hash : addr -> { s : string | String.length s = N }.
 
 (* conversions between strings and ids *)
 Definition ascii_to_id (asc : { s : string | String.length s = N }) : id :=
@@ -50,8 +50,8 @@ Definition hash (a : addr) : id :=
  * but remains true "most of the time" *)
 Axiom hash_inj : IDSpace.injective hash.
 
-Variable client_addr : string -> Prop.
-Axiom client_addr_dec :
+Parameter client_addr : string -> Prop.
+Parameter client_addr_dec :
   forall a,
     {client_addr a} + {~ client_addr a}.
 

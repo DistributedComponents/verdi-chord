@@ -1168,6 +1168,7 @@ Ltac handler_simpl :=
   | H: _ = _ |- _ => injc H
   | H: In _ [_] |- _ => apply in_singleton_eq in H
   | |- _ => progress simpl in *
+  | |- _ => progress unfold not in *
   | |- _ => progress autounfold in *
   | |- _ => progress autorewrite with list core in *
   | H: cur_request ?st = Some _ |- context[timeouts_in ?st] =>

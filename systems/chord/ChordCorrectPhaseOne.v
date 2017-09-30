@@ -648,7 +648,10 @@ Proof.
   find_apply_lem_hyp tick_handler_definition; expand_def;
     try congruence.
   destruct (start_query _ _ _) as [[[?st' ?ms] ?nts] ?cts] eqn:?H.
-  find_copy_eapply_lem_hyp succ_list_preserved_by_Tick; eauto.
+  match goal with
+  | H : context[labeled_step_dynamic] |- _ =>
+    copy_eapply succ_list_preserved_by_Tick H; eauto
+  end.
   repeat find_rewrite.
   find_eapply_lem_hyp start_query_definition; expand_def.
   - find_copy_apply_lem_hyp make_request_Stabilize_needs_succ_list; break_exists.
