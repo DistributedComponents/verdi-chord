@@ -590,8 +590,8 @@ Proof using.
       break_and; subst_max;
         autorewrite with list;
         auto using timeouts_in_never_has_Tick.
-  - apply not_in_cons; split; [congruence | by apply in_nil].
-  - apply not_in_cons; split; [congruence | by apply in_nil].
+  - auto using timeouts_in_never_has_Tick.
+  - auto using timeouts_in_never_has_Tick.
   - find_apply_lem_hyp end_query_definition;
       break_and; subst_max;
         autorewrite with list;

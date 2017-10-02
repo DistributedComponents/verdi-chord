@@ -433,8 +433,10 @@ Proof.
                 econstructor; intros; eauto;
                   rewrite remove_comm;
                   eauto using remove_preserve.
-           ++ admit.
-           ++ admit.
+           ++ econstructor 2; try reflexivity;
+                eauto using at_most_one_request_timeout'_swap with datatypes.
+           ++ econstructor 2; try reflexivity;
+                eauto using at_most_one_request_timeout'_swap with datatypes.
            ++ simpl;
                 eauto with datatypes;
                 econstructor; intros; eauto;
@@ -450,17 +452,90 @@ Proof.
                 econstructor; intros; eauto;
                   rewrite remove_comm;
                   eauto using remove_preserve.
-              admit.
+              intro.
+              simpl in *.
+              break_or_hyp; try congruence.
+              rewrite remove_comm in *.
+              find_apply_lem_hyp in_remove.
+              eapply at_most_one_request_timeout'_remove_drops_all; eauto.
         -- repeat (handler_def || handler_simpl).
       * find_copy_eapply_lem_hyp recv_msg_not_right_response_preserves_cur_request; eauto.
-        find_eapply_lem_hyp recv_msg_not_right_response_never_removes_request_timeout; eauto.
+        find_copy_eapply_lem_hyp recv_msg_not_right_response_never_removes_request_timeout; eauto.
         inv_prop cur_request_timeouts_ok; try congruence.
         repeat find_rewrite; rewrite_update; find_injection.
         break_or_hyp.
         -- econstructor 2; eauto with datatypes.
-           admit.
-        -- admit.
+           repeat (handler_def || handler_simpl ||
+                   solve [exfalso; eapply_prop query_response; constructor]).
+           ++ intros.
+              destruct xs0;
+                [simpl in *; find_inversion; congruence|find_inversion].
+              simpl in *; find_injection.
+              break_or_hyp; try congruence.
+              eauto.
+           ++ intros.
+              destruct xs0;
+                [simpl in *; find_inversion; congruence|find_inversion].
+              simpl in *; find_injection.
+              break_or_hyp; try congruence.
+              eauto.
+           ++ intros.
+              destruct xs0;
+                [simpl in *; find_inversion; congruence|find_inversion].
+              simpl in *; find_injection.
+              break_or_hyp; try congruence.
+              eauto.
+           ++ find_copy_eapply_lem_hyp In_timeouts_in; break_exists; break_and.
+              repeat find_rewrite.
+              do 4 find_inversion.
+              intros.
+              destruct xs0; simpl in *; find_injection;
+                inv_prop cur_request_timeouts_ok; try congruence;
+                  find_injection;
+                  eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+              repeat find_rewrite; auto with datatypes.
+        -- assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h))
+            by auto.
+           repeat (handler_def || handler_simpl).
+           ++ simpl in *.
+              repeat find_reverse_rewrite.
+              invcs_prop cur_request_timeouts_ok; try congruence.
+              econstructor 2; eauto using at_most_one_request_timeout'_cons_neq with datatypes.
+           ++ repeat find_reverse_rewrite.
+              invcs_prop cur_request_timeouts_ok; try congruence.
+              econstructor 2; eauto using at_most_one_request_timeout'_cons_neq with datatypes.
+           ++ repeat find_reverse_rewrite.
+              invcs_prop cur_request_timeouts_ok; try congruence.
+              econstructor 2; eauto using at_most_one_request_timeout'_cons_neq with datatypes.
+           ++ exfalso; find_eapply_prop In.
+              unfold timeouts_in; repeat find_rewrite.
+              repeat break_let; simpl; left; congruence.
+           ++ exfalso; find_eapply_prop In.
+              unfold timeouts_in; repeat find_rewrite.
+              repeat break_let; simpl; left; congruence.
+           ++ exfalso; find_eapply_prop In.
+              unfold timeouts_in; repeat find_rewrite.
+              repeat break_let; simpl; left; congruence.
   - repeat find_rewrite; rewrite_update; eauto.
+Qed.
+Hint Resolve cur_request_timeouts_related_recv_invariant.
+
+Lemma cur_request_timeouts_related_invariant :
+  forall gst,
+    reachable_st gst ->
+    all_nodes_cur_request_timeouts_related gst.
+Proof.
+  apply chord_net_invariant.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - eauto.
+  - admit.
+  - admit.
 Admitted.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :

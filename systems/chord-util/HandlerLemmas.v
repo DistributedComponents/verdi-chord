@@ -83,7 +83,7 @@ Lemma handle_query_res_definition :
         q = Join k /\
         ((exists bestpred,
             p = GotBestPredecessor bestpred /\
-            clearedts = [Request src (GetBestPredecessor (ptr st))] /\
+            clearedts = timeouts_in st /\
             ((st' = update_query st bestpred (Join k) GetSuccList /\
               addr_of bestpred = src /\
               ms = [(src, GetSuccList)] /\
@@ -1195,7 +1195,7 @@ Lemma handle_query_res_info_from_changed_set_cur_request :
 
       (exists j dstp,
           nts = [Request (addr_of dstp) GetSuccList] /\
-          cts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
+          cts = timeouts_in st /\
           q = Join j /\
           p = GotBestPredecessor dstp /\
           addr_of dstp = src /\
@@ -1203,7 +1203,7 @@ Lemma handle_query_res_info_from_changed_set_cur_request :
 
       (exists j dstp,
           nts = [Request (addr_of dstp) (GetBestPredecessor (ptr st))] /\
-          cts = [Request src (GetBestPredecessor (ptr st))] /\
+          cts = timeouts_in st /\
           q = Join j /\
           p = GotBestPredecessor dstp /\
           addr_of dstp <> src /\
@@ -1270,8 +1270,7 @@ Inductive possible_cts (st : data) : list timeout -> Prop :=
       cur_request st = Some (dstp, q, p) ->
       possible_cts st [Request (addr_of dstp) p; KeepaliveTick]
 | GetBestPredClearedPossible :
-    forall src,
-      possible_cts st [Request src (GetBestPredecessor (ptr st))].
+    possible_cts st (timeouts_in st).
 Hint Constructors possible_cts.
 
 Lemma recv_handler_possible_nts :
@@ -1334,25 +1333,6 @@ Lemma recv_handler_sets_cur_request_when_adding_new_timeout :
 Proof.
   intros.
   repeat (handler_def || handler_simpl || expand_def).
-Qed.
-
-Lemma cur_request_related_when_refreshing_timeout :
-  forall src h st p st' ms nts cts,
-    recv_handler src h st p = (st', ms, nts, cts) ->
-    forall dst req,
-      In (Request dst req) nts ->
-      In (Request dst req) cts ->
-      exists dstp q,
-        addr_of dstp = dst /\
-        cur_request st = Some (dstp, q, req).
-Proof.
-  intros.
-  repeat (handler_def || handler_simpl || expand_def);
-    find_erewrite_lem timeouts_in_Some;
-    find_apply_lem_hyp in_singleton_eq;
-    find_injection;
-    repeat find_rewrite;
-    repeat eexists; intuition eauto.
 Qed.
 
 Lemma split_eq_singleton :

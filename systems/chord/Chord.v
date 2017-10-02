@@ -575,7 +575,7 @@ Module ChordSystem <: DynamicSystem.
       (update_query st best_pred (Join known) req,
        [(a, req)],
        [Request a req],
-       [Request src (GetBestPredecessor (ptr st))])
+       timeouts_in st)
     | Join known, GotSuccList l =>
       match l with
       | (new_succ :: _) => start_query (addr_of new_succ) st (Join2 new_succ)
