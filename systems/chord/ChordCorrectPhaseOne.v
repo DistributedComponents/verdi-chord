@@ -109,19 +109,6 @@ Proof.
   eauto.
 Qed.
 
-Lemma successor_nodes_valid_live_are_joined :
-  forall gst h st p,
-    live_node gst (addr_of p) ->
-    wf_ptr p ->
-    successor_nodes_valid gst ->
-    sigma gst h = Some st ->
-    In p (succ_list st) ->
-    live_node gst (addr_of p).
-Proof.
-  intros.
-  now inv_prop live_node.
-Qed.
-
 Lemma zero_leading_failed_nodes_leading_node_live :
   forall gst h st s rest,
     succ_list_leading_failed_nodes (failed_nodes gst) (succ_list st) = 0 ->
@@ -193,13 +180,7 @@ Proof.
   intuition.
   - repeat find_rewrite.
     apply map_cons.
-  - eapply successor_nodes_valid_live_are_joined; eauto.
-    + find_copy_eapply_lem_hyp zero_leading_failed_nodes_leading_node_live;
-        eauto; tauto.
-    + apply successor_nodes_always_valid.
-      assumption.
-    + repeat find_rewrite.
-      apply in_eq.
+  - find_copy_eapply_lem_hyp zero_leading_failed_nodes_leading_node_live; eauto; tauto.
 Qed.
 
 Theorem zero_leading_failed_nodes_implies_all_first_succs_best :

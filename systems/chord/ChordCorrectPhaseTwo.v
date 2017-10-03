@@ -30,6 +30,7 @@ Require Import Chord.PtrCorrectInvariant.
 Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.PredNeverSelfInvariant.
+Require Import Chord.PtrsJoined.
 
 Require Import Chord.ChordCorrectPhaseOne.
 
@@ -1457,22 +1458,6 @@ Section MergePoint.
     | H: P _ _ _ _ |- _ => eapply H
     | H: context[P] |- _ => eapply H
     end.
-
-  Lemma successors_are_live_nodes :
-    forall gst h s,
-      reachable_st gst ->
-      all_first_succs_best gst ->
-      has_first_succ gst h s ->
-      live_node gst (addr_of s).
-  Proof using.
-  (*
-  This won't be inductive as written. We'll have to generalize to all nodes in
-  successor lists and possibly do some accounting for how joining works.
-
-  DIFFICULTY: Ryan.
-  USED: In phase two.
-  *)
-  Admitted.
 
   Lemma a_before_pred_merge_point :
     forall ex,

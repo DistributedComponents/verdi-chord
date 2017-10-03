@@ -29,6 +29,7 @@ Require Import Chord.QueryInvariant.
 Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.WfPtrSuccListInvariant.
+Require Import Chord.PtrsJoined.
 
 Require Import Chord.ChordCorrectPhaseOne.
 Require Import Chord.ChordCorrectPhaseTwo.
