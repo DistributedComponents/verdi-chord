@@ -324,7 +324,36 @@ Inductive cur_request_timeouts_ok (cr : option (pointer * query * payload)) (ts 
       at_most_one_request_timeout' ts ->
       query_request q req ->
       cur_request_timeouts_ok cr ts.
-Hint Constructors cur_request_timeouts_ok.
+
+(* whoops, that was a bad definition. here's a better one. *)
+Inductive cur_request_timeouts_ok' : option (pointer * query * payload) -> list timeout -> Prop :=
+| QSTNoRequest' :
+    forall ts,
+      (forall dst req, ~ In (Request dst req) ts) ->
+      cur_request_timeouts_ok' None ts
+| QSTRequest' :
+    forall ts dstp q req,
+      In (Request (addr_of dstp) req) ts ->
+      at_most_one_request_timeout' ts ->
+      query_request q req ->
+      cur_request_timeouts_ok' (Some (dstp, q, req)) ts.
+Hint Constructors cur_request_timeouts_ok'.
+
+Lemma cur_request_timeouts_ok'_sound :
+  forall cr ts,
+    cur_request_timeouts_ok' cr ts ->
+    cur_request_timeouts_ok cr ts.
+Proof.
+Admitted.
+Hint Resolve cur_request_timeouts_ok'_sound.
+
+Lemma cur_request_timeouts_ok'_complete :
+  forall cr ts,
+    cur_request_timeouts_ok cr ts ->
+    cur_request_timeouts_ok' cr ts.
+Proof.
+Admitted.
+Hint Resolve cur_request_timeouts_ok'_complete.
 
 Definition all_nodes_cur_request_timeouts_related (gst : global_state) : Prop :=
   forall h st,
@@ -520,23 +549,210 @@ Proof.
 Qed.
 Hint Resolve cur_request_timeouts_related_recv_invariant.
 
+(* TODO(ryan) move to handlerlemmas *)
+Lemma init_state_preset_definition :
+  forall h p succs st,
+    init_state_preset h p succs = st ->
+    ptr st = make_pointer h /\
+    pred st = p /\
+    succ_list st = succs /\
+    known st = make_pointer h /\
+    joined st = true /\
+    rectify_with st = None /\
+    cur_request st = None /\
+    delayed_queries st = nil.
+Proof.
+  unfold init_state_preset; intros.
+  repeat find_reverse_rewrite; tauto.
+Qed.
+
+Lemma start_handler_with_single_known :
+  forall h k,
+    start_handler h (k :: nil) = pi (start_query h (init_state_join h k) (Join (make_pointer k))).
+Proof.
+  easy.
+Qed.
+Hint Rewrite start_handler_with_single_known.
+
+Lemma open_pi :
+  forall (x : res) a b c,
+    pi x = (a, b, c) ->
+    exists d,
+      x = (a, b, c, d).
+Proof.
+  intros.
+  destruct x as [[[? ?] ?] ?]; simpl in *; tuple_inversion.
+  eauto.
+Qed.
+
+Lemma cur_request_timeouts_related_init :
+  forall gst,
+    initial_st gst ->
+    all_nodes_cur_request_timeouts_related gst.
+Proof.
+  unfold initial_st.
+  autounfold; intros; break_and.
+  pose proof (start_handler_init_state_preset h (nodes gst)).
+  pose proof succ_list_len_lower_bound.
+  forwards. omega. concludes.
+  find_copy_apply_hyp_hyp; break_and.
+  constructor 1.
+  - intros; repeat find_rewrite.
+    simpl; intuition congruence.
+  - match goal with
+    | H : sigma gst h = Some ?stdef |- _ =>
+      let Heq := fresh in
+      assert (Heq: stdef = st) by congruence;
+        apply init_state_preset_definition in Heq;
+        tauto
+    end.
+Qed.
+Hint Resolve cur_request_timeouts_related_init.
+
+Lemma cur_request_timeouts_related_start :
+  chord_start_invariant all_nodes_cur_request_timeouts_related.
+Proof.
+  autounfold; intros.
+  destruct (addr_eq_dec h0 h).
+  - subst.
+    autorewrite with core in *.
+    find_apply_lem_hyp open_pi; expand_def.
+    handler_def;
+      repeat find_rewrite;
+      repeat handler_simpl.
+    repeat rewrite_update; find_injection; simpl.
+    econstructor 2; eauto.
+    + simpl; tauto.
+    + unfold at_most_one_request_timeout'; intros.
+      match goal with
+      | H : context[app] |- _ =>
+        symmetry in H; apply app_eq_unit in H; destruct H; break_and;
+          find_inversion; tauto || congruence
+      end.
+  - repeat find_rewrite; rewrite_update.
+    assert (In h0 (nodes gst))
+      by in_crush.
+    eauto.
+Qed.
+Hint Resolve cur_request_timeouts_related_start.
+
+Lemma cur_request_timeouts_related_fail :
+  chord_fail_invariant all_nodes_cur_request_timeouts_related.
+Proof.
+Admitted.
+Hint Resolve cur_request_timeouts_related_fail.
+
+Lemma cur_request_timeouts_related_tick :
+  chord_tick_invariant all_nodes_cur_request_timeouts_related.
+Proof.
+Admitted.
+Hint Resolve cur_request_timeouts_related_tick.
+
+Lemma cur_request_timeouts_related_keepalive :
+  chord_keepalive_invariant all_nodes_cur_request_timeouts_related.
+Proof.
+Admitted.
+Hint Resolve cur_request_timeouts_related_keepalive.
+
+Lemma cur_request_timeouts_related_rectify :
+  chord_rectify_invariant all_nodes_cur_request_timeouts_related.
+Proof.
+Admitted.
+Hint Resolve cur_request_timeouts_related_rectify.
+
+Lemma make_request_query_request :
+  forall h st q dstp m,
+    make_request h st q = Some (dstp, m) ->
+    query_request q m.
+Proof.
+  unfold make_request, option_map.
+  intros; repeat break_match;
+    solve [congruence | find_injection; eauto].
+Qed.
+Hint Resolve make_request_query_request.
+
+Lemma at_most_one_request_timeout'_cons_new :
+  forall t ts,
+    (forall dst p, ~ In (Request dst p) ts) ->
+    at_most_one_request_timeout' (t :: ts).
+Proof.
+  intros.
+  unfold at_most_one_request_timeout'; intros.
+  destruct xs as [|x xs].
+  - simpl in *; find_injection; auto.
+  - simpl in *; find_injection.
+    exfalso; find_eapply_prop In; in_crush.
+Qed.
+Hint Resolve at_most_one_request_timeout'_cons_new.
+
+Lemma start_query_cur_requests_timeouts_ok' :
+  forall ts h st q st' ms nts cts,
+    cur_request_timeouts_ok' (cur_request st) ts ->
+    start_query h st q = (st', ms, nts, cts) ->
+    cur_request_timeouts_ok' (cur_request st')
+                             (nts ++ remove_all timeout_eq_dec cts ts).
+Proof.
+  intros.
+  handler_def.
+  repeat (handler_def || handler_simpl).
+  - invcs_prop cur_request_timeouts_ok';
+      repeat handler_simpl; eauto with datatypes.
+    constructor; eauto with datatypes.
+    erewrite timeouts_in_Some by eauto.
+    eapply at_most_one_request_timeout'_swap; eauto.
+  - auto.
+Qed.
+
+Lemma cur_request_timeouts_related_request :
+  chord_request_invariant all_nodes_cur_request_timeouts_related.
+Proof.
+  autounfold; intros; subst.
+  destruct (addr_eq_dec h0 h); subst.
+  - repeat find_rewrite.
+    + find_apply_lem_hyp request_timeout_handler_definition; expand_def;
+        repeat (handler_simpl || rewrite_update).
+      * assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h)) by auto.
+        repeat find_rewrite.
+        assert (at_most_one_request_timeout' (timeouts gst h))
+          by (inv_prop cur_request_timeouts_ok; eauto).
+        find_apply_lem_hyp handle_query_timeout_definition; expand_def;
+          try handler_simpl;
+          autorewrite with list core in *; simpl;
+            try solve [constructor; auto;
+                   erewrite timeouts_in_Some by eauto; simpl; intros;
+                   intro;
+                   find_apply_lem_hyp in_remove;
+                   eapply at_most_one_request_timeout'_remove_drops_all; eassumption].
+        apply cur_request_timeouts_ok'_sound.
+        admit.
+      * admit.
+      * admit.
+  - repeat find_rewrite; rewrite_update.
+    assert (In h0 (nodes gst))
+      by in_crush.
+    eauto.
+Admitted.
+Hint Resolve cur_request_timeouts_related_request.
+
+Lemma cur_request_timeouts_related_input :
+  chord_input_invariant all_nodes_cur_request_timeouts_related.
+Proof.
+Admitted.
+Hint Resolve cur_request_timeouts_related_input.
+
+Lemma cur_request_timeouts_related_output :
+  chord_output_invariant all_nodes_cur_request_timeouts_related.
+Proof.
+Admitted.
+Hint Resolve cur_request_timeouts_related_output.
+
 Lemma cur_request_timeouts_related_invariant :
   forall gst,
     reachable_st gst ->
     all_nodes_cur_request_timeouts_related gst.
 Proof.
-  apply chord_net_invariant.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - eauto.
-  - admit.
-  - admit.
-Admitted.
+  apply chord_net_invariant; eauto.
+Qed.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,

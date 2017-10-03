@@ -1067,6 +1067,7 @@ Proof.
   unfold timeouts_in.
   intros; find_rewrite; reflexivity.
 Qed.
+Hint Rewrite timeouts_in_None using congruence.
 
 Lemma timeouts_in_Some :
   forall st dst q m,
@@ -1076,6 +1077,7 @@ Proof.
   unfold timeouts_in.
   intros; find_rewrite; reflexivity.
 Qed.
+Hint Rewrite timeouts_in_Some using congruence.
 
 Lemma timeouts_in_update_pred :
   forall st p,
@@ -1100,7 +1102,6 @@ Proof.
   easy.
 Qed.
 Hint Rewrite timeouts_in_update_for_join.
-
 
 Lemma NoDup_two_diff :
   forall A (a b : A),
