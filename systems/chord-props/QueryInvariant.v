@@ -697,9 +697,10 @@ Proof.
   repeat (handler_def || handler_simpl).
   - invcs_prop cur_request_timeouts_ok';
       repeat handler_simpl; eauto with datatypes.
-    constructor; eauto with datatypes.
-    erewrite timeouts_in_Some by eauto.
-    eapply at_most_one_request_timeout'_swap; eauto.
+    + erewrite timeouts_in_None; eauto with datatypes.
+    + constructor; eauto with datatypes.
+      erewrite timeouts_in_Some by eauto.
+      eapply at_most_one_request_timeout'_swap; eauto.
   - auto.
 Qed.
 
