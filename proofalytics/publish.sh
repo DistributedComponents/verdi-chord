@@ -31,6 +31,7 @@ function main {
   # publish ticks for debugging travis ci
   cp *.ticks "$REPDIR"
 
+  echo "report,count" > "${LDASH}admits.csv"
   mkindex > "${LDASH}index.html"
   echo "$(date) $(cat admit-count.txt)" >> "${LDASH}admit-log.txt"
 
@@ -84,10 +85,51 @@ function mkindex {
     .pa-link:hover {
       font-style: italic;
     }
+    circle {
+      fill:black;
+      stroke:black;
+    }
   </style>
 </head>
 <body>
   <h1>Verdi Chord Proofalytics</h1>
+  <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+  <svg class="chart" id="admits-plot"></svg>
+  <script>
+    var width = 840;
+    var height = 250;
+
+    var chart = d3.select("#admits-plot")
+        .attr("width", width)
+        .attr("height", height)
+      .append("g")
+        .attr("transform", 
+              "translate(" + 10 + "," + 10 + ")");
+
+    var x = d3.scale.ordinal().rangePoints([0, width - 20]);
+    var y = d3.scale.linear().range([height - 20, 0]);
+
+    d3.csv("admits.csv", function(error, data) {
+      console.log("error", error);
+      console.log("data", data);
+      data = data.slice(0, 20);
+
+      var dom = data.map(function(d) { return d.report; });
+      dom.reverse();
+      console.log("domain", dom);
+      x.domain(dom);
+      y.domain(d3.extent(data, function(d) { return d.count; }));
+
+      console.log(data);
+
+      chart.selectAll("circle")
+        .data(data).enter()
+        .append("circle")
+        .attr("cx", function (d) { console.log(d.report, x(d.report), y(d.count)); return x(d.report); })
+        .attr("cy", function (d) { console.log(d.count); return y(d.count); })
+        .attr("r", "2px");
+    });
+  </script>
   <ul>
 EOF
   for rep in $(ls -r | grep 'PA-*'); do
@@ -134,6 +176,8 @@ EOF
       echo "<br> &nbsp;"
       echo "<span class='it'>admits:</span> &nbsp;"
       cat "${rep}/admit-count.txt"
+      echo -n "${rep}," >> "${LDASH}admits.csv"
+      cat "${rep}/admit-count.txt" >> "${LDASH}admits.csv"
     fi
 
     echo "</li>"
