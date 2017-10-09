@@ -993,6 +993,53 @@ Proof.
   eapply open_stabilize_request_until_response; eauto.
 Qed.
 
+(* query invariants for live_successor_changed_improves *)
+Lemma stabilize_query_to_first_succ :
+  forall gst h s st p,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    cur_request st = Some (s, Stabilize, p) ->
+    has_first_succ gst h s.
+Proof.
+Admitted.
+
+Lemma stabilize2_arg_is_dest :
+  forall gst,
+    reachable_st gst ->
+    forall h s s' st p,
+      sigma gst h = Some st ->
+      cur_request st = Some (s, Stabilize2 s', p) ->
+      s = s'.
+Proof.
+  induction 1; intros.
+  - unfold initial_st in *.
+    find_apply_lem_hyp sigma_initial_st_start_handler; eauto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; congruence.
+  - inversion H0; subst; eauto.
+    + subst. simpl in *.
+      update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion. simpl in *. congruence.
+    + admit.
+    + repeat (handler_def || handler_simpl;
+              try (update_destruct; subst; rewrite_update);
+              repeat find_rewrite;
+              repeat find_inversion; simpl in *; eauto; try congruence).
+Admitted.
+
+Lemma stabilize2_query_to_better_succ :
+  forall gst h s s' st p,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    cur_request st = Some (s', Stabilize2 s', p) ->
+    has_first_succ gst h s ->
+    ptr_between (ptr st) s' s.
+Proof.
+Admitted.
+
+
+  
+
 Lemma live_successor_changed_improves :
   forall gst l gst' h s s',
     reachable_st gst ->
@@ -1003,6 +1050,11 @@ Lemma live_successor_changed_improves :
     s' <> s ->
     ptr_between (make_pointer h) s' s.
 Proof using.
+  intros. invcs H0.
+  - simpl in *.
+    unfold timeout_handler_l, timeout_handler_eff in *.
+    
+    
 (*
 This says that a new live successor at a host has to be between the host and its
 old successor, provided the old one is live.
