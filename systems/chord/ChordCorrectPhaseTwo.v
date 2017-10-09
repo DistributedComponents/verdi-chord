@@ -993,14 +993,63 @@ Proof.
   eapply open_stabilize_request_until_response; eauto.
 Qed.
 
+Lemma has_first_succ_sigma :
+  forall gst gst' h s,
+    has_first_succ gst h s ->
+    sigma gst h = sigma gst' h ->
+    has_first_succ gst' h s.
+Proof.
+  intros.
+  unfold has_first_succ in *.
+  break_exists_exists. congruence.
+Qed.
+
+Lemma has_first_succ_succ_list :
+  forall gst gst' h s st st',
+    has_first_succ gst h s ->
+    sigma gst h = Some st ->
+    sigma gst' h = Some st' ->
+    succ_list st = succ_list st' ->
+    has_first_succ gst' h s.
+Proof.
+  intros.
+  unfold has_first_succ in *.
+  break_exists. intuition. repeat find_rewrite.
+  find_inversion. eexists; intuition eauto. congruence.
+Qed.
+
+
 (* query invariants for live_successor_changed_improves *)
 Lemma stabilize_query_to_first_succ :
-  forall gst h s st p,
+  forall gst,
     reachable_st gst ->
-    sigma gst h = Some st ->
-    cur_request st = Some (s, Stabilize, p) ->
-    has_first_succ gst h s.
+    forall h s st p,
+      sigma gst h = Some st ->
+      cur_request st = Some (s, Stabilize, p) ->
+      has_first_succ gst h s.
 Proof.
+  induction 1; intros.
+  - unfold initial_st in *.
+    find_apply_lem_hyp sigma_initial_st_start_handler; eauto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; congruence.
+  - inversion H0; subst; eauto.
+    + subst. simpl in *.
+      update_destruct; subst; rewrite_update; simpl in *; eauto.
+      * find_inversion. simpl in *. congruence.
+      * eapply has_first_succ_sigma; eauto.
+        simpl in *. now rewrite_update.
+    + eapply has_first_succ_sigma; eauto.
+    + admit.
+    + repeat (handler_def || handler_simpl;
+              try (update_destruct; subst; rewrite_update);
+              repeat find_rewrite;
+              repeat find_inversion; simpl in *; eauto; try congruence);
+      try solve [eapply has_first_succ_sigma; eauto; simpl in *;
+                 rewrite_update; congruence];
+      try solve [eapply has_first_succ_succ_list; simpl; rewrite_update; eauto].
+    + eapply has_first_succ_sigma; eauto.
+    + eapply has_first_succ_sigma; eauto.
 Admitted.
 
 Lemma stabilize2_arg_is_dest :
