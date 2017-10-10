@@ -1132,6 +1132,16 @@ induction 1; intros.
         find_rewrite_lem hd_error_make_succs. congruence.
 Admitted.
   
+Lemma has_first_succ_inj :
+  forall gst h s s',
+    has_first_succ gst h s ->
+    has_first_succ gst h s' ->
+    s = s'.
+Proof.
+  intros.
+  unfold has_first_succ in *.
+  break_exists. intuition. congruence.
+Qed.
 
 Lemma live_successor_changed_improves :
   forall gst l gst' h s s',
@@ -1143,9 +1153,71 @@ Lemma live_successor_changed_improves :
     s' <> s ->
     ptr_between (make_pointer h) s' s.
 Proof using.
-  intros. invcs H0.
-  - simpl in *.
-    unfold timeout_handler_l, timeout_handler_eff in *.
+  intros. invcs H0; simpl in *; eauto.
+  - admit.
+  - destruct (addr_eq_dec (fst (snd m)) h);
+      [| find_eapply_lem_hyp has_first_succ_sigma; simpl; rewrite_update;
+         eauto using has_first_succ_inj].
+    subst.
+    repeat (handler_def || handler_simpl;
+              repeat find_rewrite;
+              repeat find_inversion; simpl in *; eauto; try congruence;
+              try solve [eapply_lem_prop_hyp has_first_succ_sigma @update; simpl; rewrite_update;
+                         eauto using has_first_succ_inj];
+              try solve [eapply_lem_prop_hyp has_first_succ_succ_list @update;
+                         simpl; rewrite_update;
+                         eauto using has_first_succ_inj]).
+    + exfalso.
+      find_eapply_lem_hyp stabilize_query_to_first_succ; eauto.
+      eapply_lem_prop_hyp has_first_succ_inj s; [|eauto]; subst.
+      unfold has_first_succ in *.
+      break_exists; simpl in *; rewrite_update; intuition; find_inversion.
+      simpl in *.
+      find_rewrite_lem hd_error_make_succs.
+      find_inversion. repeat find_rewrite. find_inversion.
+      find_apply_lem_hyp hd_error_tl_exists. break_exists.
+      find_eapply_lem_hyp WfPtrSuccListInvariant.wf_ptr_succ_list_invariant; eauto.
+      repeat find_reverse_rewrite.
+      find_apply_lem_hyp wf_ptr_eq. auto.
+    + exfalso.
+      find_eapply_lem_hyp stabilize_query_to_first_succ; eauto.
+      eapply_lem_prop_hyp has_first_succ_inj s; [|eauto]; subst.
+      unfold has_first_succ in *.
+      break_exists; simpl in *; rewrite_update; intuition; find_inversion.
+      simpl in *.
+      find_rewrite_lem hd_error_make_succs.
+      find_inversion. repeat find_rewrite. find_inversion.
+      find_apply_lem_hyp hd_error_tl_exists. break_exists.
+      find_eapply_lem_hyp WfPtrSuccListInvariant.wf_ptr_succ_list_invariant; eauto.
+      repeat find_reverse_rewrite.
+      find_apply_lem_hyp wf_ptr_eq. auto.
+    + exfalso.
+      find_eapply_lem_hyp stabilize_query_to_first_succ; eauto.
+      eapply_lem_prop_hyp has_first_succ_inj s; [|eauto]; subst.
+      unfold has_first_succ in *.
+      break_exists; simpl in *; rewrite_update; intuition; find_inversion.
+      simpl in *.
+      find_rewrite_lem hd_error_make_succs.
+      find_inversion. repeat find_rewrite. find_inversion.
+      find_apply_lem_hyp hd_error_tl_exists. break_exists.
+      find_eapply_lem_hyp WfPtrSuccListInvariant.wf_ptr_succ_list_invariant; eauto.
+      repeat find_reverse_rewrite.
+      find_apply_lem_hyp wf_ptr_eq. auto.
+    + find_copy_eapply_lem_hyp stabilize2_arg_is_dest; eauto. subst.
+      find_eapply_lem_hyp stabilize2_query_to_better_succ; eauto.
+      find_copy_apply_lem_hyp ptr_correct; auto.
+      repeat find_rewrite.
+      unfold has_first_succ in *.
+      break_exists; simpl in *; rewrite_update; intuition; find_inversion.
+      simpl in *. find_rewrite_lem hd_error_make_succs. congruence.
+    + admit. (* need Join2 invariant *)
+      find_eapply_lem_hyp stabilize_query_to_first_succ; eauto.
+  - find_eapply_lem_hyp has_first_succ_sigma; simpl; eauto.
+    find_eapply_lem_hyp has_first_succ_inj; eauto.
+  - find_eapply_lem_hyp has_first_succ_sigma; simpl; eauto.
+    find_eapply_lem_hyp has_first_succ_inj; eauto.
+Admitted. 
+    
     
     
 (*
