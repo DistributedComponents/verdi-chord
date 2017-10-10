@@ -31,7 +31,7 @@ Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.PredNeverSelfInvariant.
 Require Import Chord.PtrsJoined.
-
+Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.ChordCorrectPhaseOne.
 
 Open Scope nat_scope.
@@ -1210,8 +1210,12 @@ Proof using.
       unfold has_first_succ in *.
       break_exists; simpl in *; rewrite_update; intuition; find_inversion.
       simpl in *. find_rewrite_lem hd_error_make_succs. congruence.
-    + admit. (* need Join2 invariant *)
-      find_eapply_lem_hyp stabilize_query_to_first_succ; eauto.
+    + exfalso.
+      find_eapply_lem_hyp cur_request_join2_not_joined; eauto.
+      find_eapply_lem_hyp nodes_not_joined_have_no_successors; eauto.
+      unfold has_first_succ in *. break_exists; intuition.
+      repeat find_rewrite. find_inversion. find_rewrite.
+      simpl in *. discriminate.
   - find_eapply_lem_hyp has_first_succ_sigma; simpl; eauto.
     find_eapply_lem_hyp has_first_succ_inj; eauto.
   - find_eapply_lem_hyp has_first_succ_sigma; simpl; eauto.
