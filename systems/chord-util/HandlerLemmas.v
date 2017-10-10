@@ -1135,6 +1135,10 @@ Qed.
 
 Ltac handler_def :=
   match goal with
+  | H:request_timeout_handler _ _ _ _ = _ |- _ =>
+    apply request_timeout_handler_definition in H; expand_def
+  | H:handle_query_timeout _ _ _ _ = _ |- _ =>
+    apply handle_query_timeout_definition in H; expand_def
   | H: recv_handler _ _ _ _ = _ |- _ =>
     apply recv_handler_definition_existential in H; expand_def
   | H: handle_msg _ _ _ _ = _ |- _ =>

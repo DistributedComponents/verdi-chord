@@ -708,29 +708,6 @@ Proof.
       eauto using at_most_one_request_timeout'_remove_drops_all.
 Qed.
 
-Print Ltac handler_def.
-Ltac handler_def' :=
-  match goal with
-  | H:request_timeout_handler _ _ _ _ = _ |- _ =>
-    apply request_timeout_handler_definition in H; expand_def
-  | H:handle_query_timeout _ _ _ _ = _ |- _ =>
-    apply handle_query_timeout_definition in H; expand_def
-  | H:recv_handler _ _ _ _ = _ |- _ => apply recv_handler_definition_existential in H; expand_def
-  | H:handle_msg _ _ _ _ = _ |- _ => apply handle_msg_definition in H; expand_def
-  | H:end_query (_, _, _, _) = _ |- _ => apply end_query_definition in H; expand_def
-  | H:end_query ?arg = _ |- _ => destruct arg as [[[? ?] ?] ?] eqn:?
-  | H:handle_query_res _ _ _ _ _ = _ |- _ => apply handle_query_res_definition in H; expand_def
-  | H:handle_query_req_busy _ _ _ = _
-    |- _ => apply handle_query_req_busy_definition in H; expand_def
-  | H:handle_rectify _ _ _ = _ |- _ => apply handle_rectify_definition in H; expand_def
-  | H:handle_stabilize _ _ _ _ _ _ = _ |- _ => apply handle_stabilize_definition in H; expand_def
-  | H:start_query _ _ _ = _ |- _ => apply start_query_definition in H; expand_def
-  | H:start_query ?h ?st ?q = _ |- _ => destruct (start_query ?h ?st ?q) as [[[? ?] ?] ?] eqn:?
-  | H:do_delayed_queries _ _ = _ |- _ => apply do_delayed_queries_definition in H; expand_def
-  | H:schedule_rectify_with _ _ = _
-    |- _ => apply schedule_rectify_with_definition in H; expand_def
-  end.
-
 Lemma at_most_one_request_timeout'_cons :
   forall t ts,
     at_most_one_request_timeout' ts ->
@@ -741,7 +718,6 @@ Proof.
   destruct t; eauto.
 Qed.
 Hint Resolve at_most_one_request_timeout'_swap.
-
 
 Lemma remove_idempotent :
   forall A A_eq_dec (x : A) l,
@@ -765,7 +741,7 @@ Proof.
         exfalso; unfold not in *; eauto with datatypes.
       }
       apply cur_request_timeouts_ok'_sound.
-      repeat (handler_def' || handler_simpl || rewrite_update).
+      repeat (handler_def || handler_simpl || rewrite_update).
       * constructor.
         intros.
         rewrite remove_comm.
