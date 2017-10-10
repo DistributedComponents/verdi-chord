@@ -1,9 +1,15 @@
 Require Import List.
 Import ListNotations.
+Require Import StructTact.StructTactics.
+Require Import StructTact.Update.
 
 Require Import Chord.Chord.
 
 Require Import Chord.SystemReachable.
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
+
+Set Bullet Behavior "Strict Subproofs".
 
 Definition joined_for_query (q : query) :=
   match q with
@@ -19,6 +25,21 @@ Theorem cur_request_matches_joined :
       sigma gst h = Some st ->
       cur_request st = Some (p, q, m) ->
       joined st = joined_for_query q.
+Proof.
+  induction 1; intros.
+  - unfold initial_st in *.
+    find_apply_lem_hyp sigma_initial_st_start_handler; eauto.
+    subst.
+    unfold start_handler in *.
+    repeat break_match; simpl in *; try congruence.
+    find_inversion. reflexivity.
+  - invcs H0; simpl in *; eauto.
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion. simpl in *. find_inversion. reflexivity.
+    + admit. (* timeout case *)
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion.
+      repeat (handler_def || handler_simpl).
 Admitted.
 
 Theorem cur_request_join_not_joined :
