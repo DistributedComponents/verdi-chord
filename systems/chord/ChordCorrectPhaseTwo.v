@@ -1220,10 +1220,6 @@ Proof using.
     find_eapply_lem_hyp has_first_succ_inj; eauto.
   - find_eapply_lem_hyp has_first_succ_sigma; simpl; eauto.
     find_eapply_lem_hyp has_first_succ_inj; eauto.
-Admitted. 
-    
-    
-    
 (*
 This says that a new live successor at a host has to be between the host and its
 old successor, provided the old one is live.
@@ -1231,7 +1227,7 @@ old successor, provided the old one is live.
 DIFFICULTY: 3
 USED: In phase two (a_before_pred_merge_point).
 *)
-Admitted.
+Admitted. 
 
 Lemma has_pred_eq :
   forall gst h p q,
