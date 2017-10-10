@@ -1758,6 +1758,8 @@ Proof using.
            apply in_or_app; left.
            apply in_or_app; left.
            find_copy_eapply_lem_hyp timeouts_in_Request; eauto.
+           find_inversion.
+           repeat find_rewrite.
            find_erewrite_lem handle_rectify_preserves_timeouts_in.
            admit.
         -- admit.

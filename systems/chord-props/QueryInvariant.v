@@ -462,7 +462,8 @@ Proof.
                 econstructor; intros; eauto;
                   rewrite remove_comm;
                   eauto using remove_preserve.
-           ++ econstructor 2; try reflexivity;
+           ++ 
+             econstructor 2; try reflexivity; eauto; repeat find_rewrite;
                 eauto using at_most_one_request_timeout'_swap with datatypes.
            ++ econstructor 2; try reflexivity;
                 eauto using at_most_one_request_timeout'_swap with datatypes.
@@ -536,9 +537,6 @@ Proof.
            ++ repeat find_reverse_rewrite.
               invcs_prop cur_request_timeouts_ok; try congruence.
               econstructor 2; eauto using at_most_one_request_timeout'_cons_neq with datatypes.
-           ++ exfalso; find_eapply_prop In.
-              unfold timeouts_in; repeat find_rewrite.
-              repeat break_let; simpl; left; congruence.
            ++ exfalso; find_eapply_prop In.
               unfold timeouts_in; repeat find_rewrite.
               repeat break_let; simpl; left; congruence.
