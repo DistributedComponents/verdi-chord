@@ -27,7 +27,7 @@ function main {
   $SYNC "$RDASH" "$LDASH"
 
   mkdir "$REPDIR"
-  cp index.html admit-count.txt *.csv "$REPDIR"
+  cp index.html admit-count.txt qed-count.txt *.csv "$REPDIR"
   # publish ticks for debugging travis ci
   cp *.ticks "$REPDIR"
 
