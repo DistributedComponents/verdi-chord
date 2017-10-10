@@ -13,6 +13,7 @@ Require Import Chord.Chord.
 
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
+Require Import Chord.HandlerLemmas.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -126,15 +127,11 @@ Proof.
         unfold add_tick in *. repeat break_let.
         subst. find_inversion. in_crush.
       * unfold do_rectify in *.
+        unfold start_query in *.
         repeat (break_match; simpler);
           try solve [apply remove_preserve; simpler; congruence].
-        unfold start_query in *.
-        break_match; simpler;
-          try solve [apply remove_preserve; simpler; congruence].
-        break_let. find_inversion.
-        simpl in *. right.
-        apply in_remove_all_preserve; 
-          [unfold timeouts_in; repeat break_match; in_crush; congruence|].
+        right.
+        rewrite timeouts_in_None; auto.
         apply remove_preserve; simpler; congruence.
       * unfold keepalive_handler in *. simpl in *.
         find_inversion. simpl in *.

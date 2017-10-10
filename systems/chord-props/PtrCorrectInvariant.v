@@ -69,8 +69,8 @@ Proof.
         unfold add_tick, start_query in *.
         repeat break_let.
         subst. find_inversion.
-        break_match; simpl in *; try solve_by_inversion.
-        repeat break_let. find_inversion. simpl. auto.
+        repeat break_match; simpl in *;
+          find_inversion; simpl; auto.
       * unfold do_rectify in *. simpl in *.
         break_match; simpl in *; try solve_by_inversion.
         break_match; simpl in *; try solve_by_inversion.

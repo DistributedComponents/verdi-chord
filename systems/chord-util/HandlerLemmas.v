@@ -215,11 +215,11 @@ Lemma start_query_definition :
         nts = [Request (addr_of dst) msg] /\
         cts = timeouts_in st) \/
     (make_request h st k = None /\
-     st' = st /\
+     st' = clear_query st /\
      ms = [] /\
      ms = [] /\
      nts = [] /\
-     cts = []).
+     cts = timeouts_in st).
 Proof using.
   unfold start_query.
   intros.
