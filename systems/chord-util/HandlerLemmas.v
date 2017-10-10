@@ -148,7 +148,7 @@ Lemma handle_msg_definition :
           handle_query_req_busy src st p = (st', ms, newts, clearedts) \/
           is_request p = false /\
           (addr_of query_dst <> src /\ st' = st /\ clearedts = [] /\ newts = [] /\ ms = [] \/
-          handle_query_res src dst st query p = (st', ms, newts, clearedts)))) \/
+          addr_of query_dst = src /\ handle_query_res src dst st query p = (st', ms, newts, clearedts)))) \/
 
      cur_request st = None /\
      st' = st /\
