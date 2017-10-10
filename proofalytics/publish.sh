@@ -157,13 +157,13 @@ EOF
     echo "<span class='it'>max ltac:</span> &nbsp;"
     cat "${rep}/proof-times.csv" \
       | awk -W lint=fatal -v key=2 -f "${PADIR}/csv-sort.awk" \
-      | awk -W lint=fatal -F "," 'NR == 2 {print $1 " (" $2 " ms)"}'
+      | awk -W lint=fatal -F "," 'NR == 2 {print $1 " (" int($2/1000) " s)"}'
 
     echo "<br> &nbsp;"
     echo "<span class='it'>max qed:</span> &nbsp;"
     cat "${rep}/proof-times.csv" \
       | awk -W lint=fatal -v key=3 -f "${PADIR}/csv-sort.awk" \
-      | awk -W lint=fatal -F "," 'NR == 2 {print $1 " (" $2 " ms)"}'
+      | awk -W lint=fatal -F "," 'NR == 2 {print $1 " (" int($2/1000) " ms)"}'
 
     echo "<br> &nbsp;"
     echo "<span class='it'>build time:</span> &nbsp;"
