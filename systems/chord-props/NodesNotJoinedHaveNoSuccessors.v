@@ -5,6 +5,22 @@ Require Import Chord.Chord.
 
 Require Import Chord.SystemReachable.
 
+Definition joined_for_query (q : query) :=
+  match q with
+  | Join p => false
+  | Join2 p => false
+  | _ => true
+  end.
+
+Theorem cur_request_matches_joined :
+  forall gst,
+    reachable_st gst ->
+    forall h st p q m,
+      sigma gst h = Some st ->
+      cur_request st = Some (p, q, m) ->
+      joined st = joined_for_query q.
+Admitted.
+
 Theorem cur_request_join_not_joined :
   forall gst,
     reachable_st gst ->
@@ -12,7 +28,9 @@ Theorem cur_request_join_not_joined :
       sigma gst h = Some st ->
       cur_request st = Some (p, Join q, m) ->
       joined st = false.
-Admitted.
+Proof.
+  eauto using cur_request_matches_joined.
+Qed.
 
 Theorem cur_request_join2_not_joined :
   forall gst,
@@ -21,7 +39,9 @@ Theorem cur_request_join2_not_joined :
       sigma gst h = Some st ->
       cur_request st = Some (p, Join2 q, m) ->
       joined st = false.
-Admitted.
+Proof.
+  eauto using cur_request_matches_joined.
+Qed.
 
 Theorem nodes_not_joined_have_no_successors :
   forall gst h st,
