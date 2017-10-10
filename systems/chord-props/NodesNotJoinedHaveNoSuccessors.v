@@ -65,12 +65,34 @@ Proof.
 Qed.
 
 Theorem nodes_not_joined_have_no_successors :
-  forall gst h st,
+  forall gst,
     reachable_st gst ->
-    sigma gst h = Some st ->
-    joined st = false ->
-    succ_list st = [].
+    forall h st,
+      sigma gst h = Some st ->
+      joined st = false ->
+      succ_list st = [].
 Proof.
+  induction 1; intros.
+  - unfold initial_st in *.
+    find_apply_lem_hyp sigma_initial_st_start_handler; eauto.
+    subst.
+    unfold start_handler in *.
+    repeat break_match; simpl in *; congruence.
+  - invcs H0; simpl in *; eauto.
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion. reflexivity.
+    + admit. (* timeout case *)
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion.
+      repeat (handler_def || handler_simpl).
+      * find_eapply_lem_hyp cur_request_matches_joined; eauto.
+        simpl in *. congruence.
+      * find_eapply_lem_hyp cur_request_matches_joined; eauto.
+        simpl in *. congruence.
+      * find_eapply_lem_hyp cur_request_matches_joined; eauto.
+        simpl in *. congruence.
+      * find_eapply_lem_hyp cur_request_matches_joined; eauto.
+        simpl in *. congruence.
 (*
 Nodes do not set their successor lists until they finish joining. I don't really
 know what invariants are needed here but they shouldn't be too complicated?
