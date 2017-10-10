@@ -1,4 +1,5 @@
 Require Import List.
+Import ListNotations.
 Require Import Omega.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
@@ -699,8 +700,54 @@ Proof.
     + constructor; eauto with datatypes.
       erewrite timeouts_in_Some by eauto.
       eapply at_most_one_request_timeout'_swap; eauto.
-  - auto.
+  - invcs_prop cur_request_timeouts_ok'.
+      repeat handler_simpl; eauto with datatypes.
+    + erewrite timeouts_in_None; eauto with datatypes.
+    + constructor; eauto with datatypes.
+      erewrite timeouts_in_Some by eauto.
+      eauto using at_most_one_request_timeout'_remove_drops_all.
 Qed.
+
+Print Ltac handler_def.
+Ltac handler_def' :=
+  match goal with
+  | H:request_timeout_handler _ _ _ _ = _ |- _ =>
+    apply request_timeout_handler_definition in H; expand_def
+  | H:handle_query_timeout _ _ _ _ = _ |- _ =>
+    apply handle_query_timeout_definition in H; expand_def
+  | H:recv_handler _ _ _ _ = _ |- _ => apply recv_handler_definition_existential in H; expand_def
+  | H:handle_msg _ _ _ _ = _ |- _ => apply handle_msg_definition in H; expand_def
+  | H:end_query (_, _, _, _) = _ |- _ => apply end_query_definition in H; expand_def
+  | H:end_query ?arg = _ |- _ => destruct arg as [[[? ?] ?] ?] eqn:?
+  | H:handle_query_res _ _ _ _ _ = _ |- _ => apply handle_query_res_definition in H; expand_def
+  | H:handle_query_req_busy _ _ _ = _
+    |- _ => apply handle_query_req_busy_definition in H; expand_def
+  | H:handle_rectify _ _ _ = _ |- _ => apply handle_rectify_definition in H; expand_def
+  | H:handle_stabilize _ _ _ _ _ _ = _ |- _ => apply handle_stabilize_definition in H; expand_def
+  | H:start_query _ _ _ = _ |- _ => apply start_query_definition in H; expand_def
+  | H:start_query ?h ?st ?q = _ |- _ => destruct (start_query ?h ?st ?q) as [[[? ?] ?] ?] eqn:?
+  | H:do_delayed_queries _ _ = _ |- _ => apply do_delayed_queries_definition in H; expand_def
+  | H:schedule_rectify_with _ _ = _
+    |- _ => apply schedule_rectify_with_definition in H; expand_def
+  end.
+
+Lemma at_most_one_request_timeout'_cons :
+  forall t ts,
+    at_most_one_request_timeout' ts ->
+    (forall dst p, ~ In (Request dst p) ts) ->
+    at_most_one_request_timeout' (t :: ts).
+Proof.
+  intros.
+  destruct t; eauto.
+Qed.
+Hint Resolve at_most_one_request_timeout'_swap.
+
+
+Lemma remove_idempotent :
+  forall A A_eq_dec (x : A) l,
+    remove A_eq_dec x (remove A_eq_dec x l) = remove A_eq_dec x l.
+Proof.
+Admitted.
 
 Lemma cur_request_timeouts_related_request :
   chord_request_invariant all_nodes_cur_request_timeouts_related.
@@ -708,29 +755,94 @@ Proof.
   autounfold; intros; subst.
   destruct (addr_eq_dec h0 h); subst.
   - repeat find_rewrite.
-    + find_apply_lem_hyp request_timeout_handler_definition; expand_def;
-        repeat (handler_simpl || rewrite_update).
-      * assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h)) by auto.
+    + assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h))
+        by auto.
+      assert (at_most_one_request_timeout' (timeouts gst h)).
+      {
+        inv_prop cur_request_timeouts_ok; [|eauto].
+        unfold at_most_one_request_timeout'; intros.
         repeat find_rewrite.
-        assert (at_most_one_request_timeout' (timeouts gst h))
-          by (inv_prop cur_request_timeouts_ok; eauto).
-        find_apply_lem_hyp handle_query_timeout_definition; expand_def;
-          try handler_simpl;
-          autorewrite with list core in *; simpl;
-            try solve [constructor; auto;
-                   erewrite timeouts_in_Some by eauto; simpl; intros;
-                   intro;
-                   find_apply_lem_hyp in_remove;
-                   eapply at_most_one_request_timeout'_remove_drops_all; eassumption].
-        apply cur_request_timeouts_ok'_sound.
-        admit.
-      * admit.
-      * admit.
+        exfalso; unfold not in *; eauto with datatypes.
+      }
+      apply cur_request_timeouts_ok'_sound.
+      repeat (handler_def' || handler_simpl || rewrite_update).
+      * constructor.
+        intros.
+        rewrite remove_comm.
+        assert (In (Request (addr_of x) x1) (timeouts gst h))
+          by (inv_prop cur_request_timeouts_ok; congruence).
+        intro. find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      * unfold hd_error in *; break_match; simpl in *; try congruence.
+        find_injection.
+        constructor; eauto with datatypes.
+        eapply at_most_one_request_timeout'_cons.
+        rewrite remove_comm.
+        eapply at_most_one_request_timeout'_remove.
+        eapply at_most_one_request_timeout'_remove; auto.
+        intros; intro.
+        find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      * repeat find_rewrite.
+        inv_prop cur_request_timeouts_ok; try congruence.
+        find_injection.
+        inv_prop query_request.
+        constructor.
+        rewrite remove_comm.
+        intros; intro.
+        find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      * constructor.
+        intros.
+        rewrite remove_comm.
+        assert (In (Request (addr_of x) x1) (timeouts gst h))
+          by (inv_prop cur_request_timeouts_ok; congruence).
+        intro. find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      * constructor.
+        intros.
+        rewrite remove_comm.
+        assert (In (Request (addr_of x) x1) (timeouts gst h))
+          by (inv_prop cur_request_timeouts_ok; congruence).
+        intro. find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      * constructor.
+        intros.
+        rewrite remove_comm.
+        assert (In (Request (addr_of x) x1) (timeouts gst h))
+          by (inv_prop cur_request_timeouts_ok; congruence).
+        intro. find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      * constructor.
+        intros.
+        rewrite remove_comm.
+        assert (In (Request (addr_of x) x1) (timeouts gst h))
+          by (inv_prop cur_request_timeouts_ok; congruence).
+        intro. find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      * constructor.
+        intros.
+        rewrite remove_comm.
+        assert (In (Request (addr_of x) x1) (timeouts gst h))
+          by (inv_prop cur_request_timeouts_ok; congruence).
+        intro. find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      * invcs_prop cur_request_timeouts_ok; try congruence.
+        assert (Request (addr_of dstp) req0 = Request dst req)
+          by eauto.
+        congruence.
+      * find_rewrite.
+        inv_prop cur_request_timeouts_ok; try congruence.
+        repeat find_rewrite.
+        constructor.
+        intros; intro.
+        find_apply_lem_hyp in_remove.
+        intuition eauto.
   - repeat find_rewrite; rewrite_update.
     assert (In h0 (nodes gst))
       by in_crush.
     eauto.
-Admitted.
+Qed.
 Hint Resolve cur_request_timeouts_related_request.
 
 Lemma cur_request_timeouts_related_input :
