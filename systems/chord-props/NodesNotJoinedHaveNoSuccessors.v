@@ -84,15 +84,9 @@ Proof.
     + admit. (* timeout case *)
     + update_destruct; subst; rewrite_update; simpl in *; eauto.
       find_inversion.
-      repeat (handler_def || handler_simpl).
-      * find_eapply_lem_hyp cur_request_matches_joined; eauto.
-        simpl in *. congruence.
-      * find_eapply_lem_hyp cur_request_matches_joined; eauto.
-        simpl in *. congruence.
-      * find_eapply_lem_hyp cur_request_matches_joined; eauto.
-        simpl in *. congruence.
-      * find_eapply_lem_hyp cur_request_matches_joined; eauto.
-        simpl in *. congruence.
+      repeat (handler_def || handler_simpl);
+        find_eapply_lem_hyp cur_request_matches_joined; eauto;
+          simpl in *; congruence.
 (*
 Nodes do not set their successor lists until they finish joining. I don't really
 know what invariants are needed here but they shouldn't be too complicated?
