@@ -17,6 +17,12 @@ NADMIT=$(find "${PADIR}/.." -name '*.v' \
            | wc -l)
 echo "$NADMIT" > "${PADIR}/admit-count.txt"
 
+# save qed count for toplevel index
+NQED=$(find "${PADIR}/.." -name '*.v' \
+           | xargs grep 'Qed.' \
+           | wc -l)
+echo "$NQED" > "${PADIR}/qed-count.txt"
+
 function mkindex {
   cat <<EOF
 <!DOCTYPE html>
@@ -261,6 +267,9 @@ function mkindex {
   </tr><tr>
     <td class='cfg-fld'>Admits</td>
     <td>$NADMIT</td>
+  </tr><tr>
+    <td class='cfg-fld'>Qeds</td>
+    <td>$NQED</td>
   </tr></table>
 EOF
 

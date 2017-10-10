@@ -34,6 +34,7 @@ function main {
   echo "report,count" > "${LDASH}admits.csv"
   mkindex > "${LDASH}index.html"
   echo "$(date) $(cat admit-count.txt)" >> "${LDASH}admit-log.txt"
+  echo "$(date) $(cat qed-count.txt)" >> "${LDASH}qed-log.txt"
 
   echo "SYNC local  -> remote"
   $SYNC "$LDASH" "$RDASH"
@@ -180,6 +181,14 @@ EOF
       cat "${rep}/admit-count.txt" >> "${LDASH}admits.csv"
     fi
 
+    if [ -f "${rep}/qed-count.txt" ]; then
+      echo "<br> &nbsp;"
+      echo "<span class='it'>qeds:</span> &nbsp;"
+      cat "${rep}/qed-count.txt"
+      echo -n "${rep}," >> "${LDASH}qeds.csv"
+      cat "${rep}/qed-count.txt" >> "${LDASH}qeds.csv"
+    fi
+    
     echo "</li>"
   done
   cat <<EOF
