@@ -1044,10 +1044,10 @@ Proof.
     + repeat (handler_def || handler_simpl;
               try (update_destruct; subst; rewrite_update);
               repeat find_rewrite;
-              repeat find_inversion; simpl in *; eauto; try congruence);
-      try solve [eapply has_first_succ_sigma; eauto; simpl in *;
-                 rewrite_update; congruence];
-      try solve [eapply has_first_succ_succ_list; simpl; rewrite_update; eauto].
+              repeat find_inversion; simpl in *; eauto; try congruence;
+              try solve [eapply has_first_succ_sigma; eauto; simpl in *;
+                         rewrite_update; congruence];
+              try solve [eapply has_first_succ_succ_list; simpl; rewrite_update; eauto]).
     + eapply has_first_succ_sigma; eauto.
     + eapply has_first_succ_sigma; eauto.
 Admitted.
@@ -1075,18 +1075,62 @@ Proof.
               repeat find_rewrite;
               repeat find_inversion; simpl in *; eauto; try congruence).
 Admitted.
+        
+Lemma hd_error_make_succs :
+  forall x l,
+    hd_error (make_succs x l) = Some x.
+Proof.
+  intros. unfold make_succs. unfold chop_succs.
+  assert (exists n, SUCC_LIST_LEN = S n). {
+    destruct SUCC_LIST_LEN eqn:?; eauto.
+    pose proof succ_list_len_lower_bound; omega.
+  }
+  break_exists. find_rewrite. auto.
+Qed.
 
 Lemma stabilize2_query_to_better_succ :
-  forall gst h s s' st p,
+  forall gst,
     reachable_st gst ->
-    sigma gst h = Some st ->
-    cur_request st = Some (s', Stabilize2 s', p) ->
-    has_first_succ gst h s ->
-    ptr_between (ptr st) s' s.
+    forall h s s' st p,
+      sigma gst h = Some st ->
+      cur_request st = Some (s', Stabilize2 s', p) ->
+      has_first_succ gst h s ->
+      ptr_between (ptr st) s' s.
 Proof.
+induction 1; intros.
+  - unfold initial_st in *.
+    find_apply_lem_hyp sigma_initial_st_start_handler; eauto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; congruence.
+  - inversion H0; subst; eauto.
+    + subst. simpl in *.
+      update_destruct; subst; rewrite_update; simpl in *; eauto.
+      * find_inversion. simpl in *. congruence.
+      * find_eapply_lem_hyp has_first_succ_sigma; eauto.
+        simpl. now rewrite_update.
+    + admit.
+    + repeat (handler_def || handler_simpl;
+              try (update_destruct; subst; rewrite_update);
+              repeat find_rewrite;
+              repeat find_inversion; simpl in *; eauto; try congruence);
+        try solve [find_eapply_lem_hyp has_first_succ_sigma; eauto;
+                   simpl; now rewrite_update].
+      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
+          simpl in *; rewrite_update; eauto.
+      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
+          simpl in *; rewrite_update; eauto.
+      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
+          simpl in *; rewrite_update; eauto.
+      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
+          simpl in *; rewrite_update; eauto.
+      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
+          simpl in *; rewrite_update; eauto.
+      * unfold has_first_succ in *.
+        break_exists. simpl in *.
+        intuition.  rewrite_update. find_inversion.
+        simpl in *.
+        find_rewrite_lem hd_error_make_succs. congruence.
 Admitted.
-
-
   
 
 Lemma live_successor_changed_improves :
