@@ -497,7 +497,7 @@ Module ChordSystem <: DynamicSystem.
        cst)
     | None =>
       (* only happens if succ_list = [], which is contra protocol assumptions *)
-      (st, [], [], [])
+      (clear_query st, [], [], cst)
     end.
 
   Definition best_predecessor (h : pointer) (succs : list pointer) (them : pointer) : pointer :=
