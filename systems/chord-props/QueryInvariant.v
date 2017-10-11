@@ -75,6 +75,31 @@ Proof.
 Qed.
 Hint Resolve at_most_one_request_timeout'_cons_neq.
 
+Lemma at_most_one_request_timeout'_none :
+  forall ts,
+    (forall dst p, ~ In (Request dst p) ts) ->
+    at_most_one_request_timeout' ts.
+Proof.
+  autounfold; unfold not; intros.
+  find_eapply_prop False; in_crush.
+Qed.
+Hint Resolve at_most_one_request_timeout'_none.
+
+Lemma at_most_one_request_timeout'_cons :
+  forall t ts,
+    (forall dst p, ~ In (Request dst p) ts) ->
+    at_most_one_request_timeout' (t :: ts).
+Proof.
+  intros.
+  destruct t; eauto.
+  autounfold; unfold not in *; intros.
+  destruct xs; simpl in *.
+  - find_injection; eauto.
+  - find_injection.
+    find_eapply_prop False; in_crush.
+Qed.
+Hint Resolve at_most_one_request_timeout'_cons.
+
 Lemma at_most_one_request_timeout'_drop :
   forall t ts,
     at_most_one_request_timeout' (t :: ts) ->
@@ -141,11 +166,6 @@ Lemma at_most_one_request_timeout'_swap :
 Proof.
   intros.
   destruct t; eauto.
-  autounfold; unfold not; intros.
-  destruct xs; simpl in *; find_injection.
-  - eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-  - eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-    find_rewrite; eauto with datatypes.
 Qed.
 Hint Resolve at_most_one_request_timeout'_swap.
 
@@ -463,8 +483,7 @@ Proof.
                 econstructor; intros; eauto;
                   rewrite remove_comm;
                   eauto using remove_preserve.
-           ++ 
-             econstructor 2; try reflexivity; eauto; repeat find_rewrite;
+           ++ econstructor 2; try reflexivity; eauto; repeat find_rewrite;
                 eauto using at_most_one_request_timeout'_swap with datatypes.
            ++ econstructor 2; try reflexivity;
                 eauto using at_most_one_request_timeout'_swap with datatypes.
@@ -622,12 +641,6 @@ Proof.
     repeat rewrite_update; find_injection; simpl.
     econstructor 2; eauto.
     + simpl; tauto.
-    + unfold at_most_one_request_timeout'; intros.
-      match goal with
-      | H : context[app] |- _ =>
-        symmetry in H; apply app_eq_unit in H; destruct H; break_and;
-          find_inversion; tauto || congruence
-      end.
   - repeat find_rewrite; rewrite_update.
     assert (In h0 (nodes gst))
       by in_crush.
@@ -650,20 +663,70 @@ Proof.
   autounfold; intros.
   repeat find_rewrite.
   destruct_update; rewrite_update; eauto with datatypes.
-  repeat (handler_def || handler_simpl).
-Admitted.
+  assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h0))
+    by auto.
+  apply cur_request_timeouts_ok'_sound.
+  repeat (handler_def || handler_simpl);
+    repeat find_rewrite;
+    inv_prop cur_request_timeouts_ok';
+    try (unfold option_map in *; break_match; congruence || find_injection);
+    eauto.
+  - constructor; eauto; intros; in_crush.
+    eapply at_most_one_request_timeout'_cons_neq; auto.
+    eapply at_most_one_request_timeout'_cons; eauto.
+    intros; in_crush.
+    eauto using in_remove.
+  - constructor; eauto; intros.
+    in_crush; [congruence|eauto using in_remove].
+  - constructor; eauto; intros.
+    in_crush; eauto using remove_preserve.
+  - constructor; eauto; intros.
+    in_crush; [congruence|eauto using in_remove].
+  - constructor; eauto; intros.
+    in_crush; eauto using remove_preserve.
+Qed.
 Hint Resolve cur_request_timeouts_related_tick.
 
 Lemma cur_request_timeouts_related_keepalive :
   chord_keepalive_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-Admitted.
+  autounfold; intros.
+  repeat find_rewrite.
+  destruct_update; rewrite_update; eauto with datatypes.
+  assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h0))
+    by auto.
+  apply cur_request_timeouts_ok'_sound.
+  repeat (handler_def || handler_simpl).
+  inv_prop cur_request_timeouts_ok';
+    subst; constructor; intros; in_crush;
+      congruence || eauto using in_remove, remove_preserve.
+Qed.
 Hint Resolve cur_request_timeouts_related_keepalive.
 
 Lemma cur_request_timeouts_related_rectify :
   chord_rectify_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-Admitted.
+  autounfold; intros.
+  repeat find_rewrite.
+  destruct_update; rewrite_update; eauto with datatypes.
+  assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h0))
+    by auto.
+  apply cur_request_timeouts_ok'_sound.
+  repeat (handler_def || handler_simpl);
+    inv_prop cur_request_timeouts_ok';
+    subst; constructor; intros; in_crush;
+      congruence || eauto using in_remove, remove_preserve;
+      unfold option_map in *; break_match; try congruence;
+        repeat find_injection;
+        eauto.
+  erewrite timeouts_in_None.
+  simpl.
+  eapply at_most_one_request_timeout'_cons.
+  intros; in_crush.
+  eauto using in_remove.
+  unfold clear_rectify_with.
+  repeat find_rewrite; auto.
+Qed.
 Hint Resolve cur_request_timeouts_related_rectify.
 
 Lemma make_request_query_request :
@@ -676,20 +739,6 @@ Proof.
     solve [congruence | find_injection; eauto].
 Qed.
 Hint Resolve make_request_query_request.
-
-Lemma at_most_one_request_timeout'_cons_new :
-  forall t ts,
-    (forall dst p, ~ In (Request dst p) ts) ->
-    at_most_one_request_timeout' (t :: ts).
-Proof.
-  intros.
-  unfold at_most_one_request_timeout'; intros.
-  destruct xs as [|x xs].
-  - simpl in *; find_injection; auto.
-  - simpl in *; find_injection.
-    exfalso; find_eapply_prop In; in_crush.
-Qed.
-Hint Resolve at_most_one_request_timeout'_cons_new.
 
 Lemma start_query_cur_requests_timeouts_ok' :
   forall ts h st q st' ms nts cts,
@@ -714,23 +763,6 @@ Proof.
       erewrite timeouts_in_Some by eauto.
       eauto using at_most_one_request_timeout'_remove_drops_all.
 Qed.
-
-Lemma at_most_one_request_timeout'_cons :
-  forall t ts,
-    at_most_one_request_timeout' ts ->
-    (forall dst p, ~ In (Request dst p) ts) ->
-    at_most_one_request_timeout' (t :: ts).
-Proof.
-  intros.
-  destruct t; eauto.
-Qed.
-Hint Resolve at_most_one_request_timeout'_swap.
-
-Lemma remove_idempotent :
-  forall A A_eq_dec (x : A) l,
-    remove A_eq_dec x (remove A_eq_dec x l) = remove A_eq_dec x l.
-Proof.
-Admitted.
 
 Lemma cur_request_timeouts_related_request :
   chord_request_invariant all_nodes_cur_request_timeouts_related.
@@ -760,9 +792,6 @@ Proof.
         find_injection.
         constructor; eauto with datatypes.
         eapply at_most_one_request_timeout'_cons.
-        rewrite remove_comm.
-        eapply at_most_one_request_timeout'_remove.
-        eapply at_most_one_request_timeout'_remove; auto.
         intros; intro.
         find_apply_lem_hyp in_remove.
         eapply at_most_one_request_timeout'_remove_drops_all; eauto.
@@ -831,13 +860,17 @@ Hint Resolve cur_request_timeouts_related_request.
 Lemma cur_request_timeouts_related_input :
   chord_input_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-Admitted.
+  autounfold; intros.
+  repeat find_rewrite; eauto.
+Qed.
 Hint Resolve cur_request_timeouts_related_input.
 
 Lemma cur_request_timeouts_related_output :
   chord_output_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-Admitted.
+  autounfold; intros.
+  repeat find_rewrite; eauto.
+Qed.
 Hint Resolve cur_request_timeouts_related_output.
 
 Lemma cur_request_timeouts_related_invariant :
@@ -847,6 +880,7 @@ Lemma cur_request_timeouts_related_invariant :
 Proof.
   apply chord_net_invariant; eauto.
 Qed.
+Print Assumptions cur_request_timeouts_related_invariant.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
