@@ -1203,6 +1203,8 @@ Ltac handler_simpl :=
     erewrite timeouts_in_Some; [|eassumption]
   | H: cur_request ?st = None |- context[timeouts_in ?st] =>
     erewrite timeouts_in_None; [|eassumption]
+  | |- context[update _ _ _ _ _] => update_destruct_goal; rewrite_update
+  | H: context[update _ _ _ _ _] |- _ => update_destruct_hyp; rewrite_update
   | |- _ => solve [assumption | congruence | eauto ]
   end.
 

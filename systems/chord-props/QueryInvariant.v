@@ -595,7 +595,6 @@ Proof.
     handler_def;
       repeat find_rewrite;
       repeat handler_simpl.
-    repeat rewrite_update; find_injection; simpl.
     econstructor 2; eauto.
     + simpl; tauto.
   - repeat find_rewrite; rewrite_update.
