@@ -638,12 +638,19 @@ Hint Resolve cur_request_timeouts_related_start.
 Lemma cur_request_timeouts_related_fail :
   chord_fail_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-Admitted.
+  autounfold; intros.
+  destruct (addr_eq_dec h0 h);
+    repeat find_rewrite; eauto with datatypes.
+Qed.
 Hint Resolve cur_request_timeouts_related_fail.
 
 Lemma cur_request_timeouts_related_tick :
   chord_tick_invariant all_nodes_cur_request_timeouts_related.
 Proof.
+  autounfold; intros.
+  repeat find_rewrite.
+  destruct_update; rewrite_update; eauto with datatypes.
+  repeat (handler_def || handler_simpl).
 Admitted.
 Hint Resolve cur_request_timeouts_related_tick.
 
