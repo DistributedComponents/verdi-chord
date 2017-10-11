@@ -446,56 +446,14 @@ Proof.
              repeat (find_rewrite || find_injection || rewrite_update);
              try inv_prop query_response;
              autorewrite with list;
-             eauto using remove_In with datatypes.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
+             eauto using remove_In with datatypes;
+             try solve [simpl;
+                        eauto with datatypes;
+                        econstructor; intros; eauto;
+                        rewrite remove_comm;
+                        eauto using remove_preserve].
            ++ econstructor 2; try reflexivity; eauto; repeat find_rewrite;
                 eauto using at_most_one_request_timeout'_swap with datatypes.
-           ++ econstructor 2; try reflexivity;
-                eauto using at_most_one_request_timeout'_swap with datatypes.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
-           ++ simpl;
-                eauto with datatypes;
-                econstructor; intros; eauto;
-                  rewrite remove_comm;
-                  eauto using remove_preserve.
            ++ simpl;
                 eauto with datatypes;
                 econstructor; intros; eauto;
