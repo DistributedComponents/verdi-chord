@@ -2266,8 +2266,9 @@ Section MergePoint.
         invar_eauto.
     - inv_prop lb_execution.
       find_copy_apply_lem_hyp channel_contents.
+      simpl in *.
       eapply_lem_prop_hyp open_request_with_response_on_wire_closed_or_preserved labeled_step_dynamic;
-        eauto using pair_GetPredAndSuccs.
+        try eassumption; eauto using pair_GetPredAndSuccs.
       break_or_hyp; break_and.
       + apply E_next.
         do 2 apply eventually_or_tl_intror.

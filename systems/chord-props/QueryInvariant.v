@@ -837,7 +837,6 @@ Lemma cur_request_timeouts_related_invariant :
 Proof.
   apply chord_net_invariant; eauto.
 Qed.
-Print Assumptions cur_request_timeouts_related_invariant.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
