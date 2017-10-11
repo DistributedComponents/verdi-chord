@@ -84,7 +84,11 @@ Proof.
   - invcs H0; simpl in *; eauto.
     + update_destruct; subst; rewrite_update; simpl in *; eauto.
       find_inversion. reflexivity.
-    + admit. (* timeout case *)
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion.
+      repeat (handler_def || handler_simpl);
+        find_eapply_lem_hyp cur_request_matches_joined; eauto;
+          simpl in *; congruence.
     + update_destruct; subst; rewrite_update; simpl in *; eauto.
       find_inversion.
       repeat (handler_def || handler_simpl);
@@ -97,4 +101,4 @@ know what invariants are needed here but they shouldn't be too complicated?
 DIFFICULTY: 2
 USED: In phase one
 *)
-Admitted.
+Qed.
