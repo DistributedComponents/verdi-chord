@@ -1133,8 +1133,27 @@ Proof.
   intuition.
 Qed.
 
+
+Lemma timeout_handler_definition :
+  forall h st t st' ms nts cts,
+    timeout_handler h st t = (st', ms, nts, cts) ->
+    exists eff,
+      timeout_handler_eff h st t = (st', ms, nts, cts, eff).
+Proof.
+  intros. unfold timeout_handler in *.
+  match goal with
+  | _ : context [timeout_handler_eff ?h ?st ?t] |- _ =>
+    destruct (timeout_handler_eff h st t) eqn:?
+  end. simpl in *. subst.
+  eauto.
+Qed.
+
 Ltac handler_def :=
   match goal with
+  | H : timeout_handler _ _ _ = _ |- _ =>
+    apply timeout_handler_definition in H; expand_def
+  | H : timeout_handler_eff _ _ _ = _ |- _ =>
+    apply timeout_handler_eff_definition in H; expand_def
   | H:request_timeout_handler _ _ _ _ = _ |- _ =>
     apply request_timeout_handler_definition in H; expand_def
   | H:handle_query_timeout _ _ _ _ = _ |- _ =>
@@ -1153,12 +1172,18 @@ Ltac handler_def :=
     apply handle_query_req_busy_definition in H; expand_def
   | H: handle_rectify _ _ _ = _ |- _ =>
     apply handle_rectify_definition in H; expand_def
+  | H : do_rectify _ _ = _ |- _ =>
+    apply do_rectify_definition in H; expand_def
   | H: handle_stabilize _ _ _ _ _ _ = _ |- _ =>
     apply handle_stabilize_definition in H; expand_def
+  | H : tick_handler _ _ = _ |- _ =>
+    apply tick_handler_definition in H; expand_def 
+  | H : add_tick _ = _ |- _ =>
+    apply add_tick_definition in H; expand_def 
   | H: start_query _ _ _ = _ |- _ =>
     apply start_query_definition in H; expand_def
-  | H: start_query ?h ?st ?q = _ |- _ =>
-    destruct (start_query ?h ?st ?q) as [[[? ?] ?] ?] eqn:?
+  | H: context [start_query ?h ?st ?q] |- _ =>
+    destruct (start_query h st q) as [[[? ?] ?] ?] eqn:?
   | H: do_delayed_queries _ _ = _ |- _ =>
     apply do_delayed_queries_definition in H; expand_def
   | H: schedule_rectify_with _ _ = _ |- _ =>
