@@ -379,7 +379,6 @@ Hint Resolve cur_request_timeouts_ok'_complete.
 Definition all_nodes_cur_request_timeouts_related (gst : global_state) : Prop :=
   forall h st,
     In h (nodes gst) ->
-    ~ In h (failed_nodes gst) ->
     sigma gst h = Some st ->
     cur_request_timeouts_ok (cur_request st) (timeouts gst h).
 Hint Unfold all_nodes_cur_request_timeouts_related.
@@ -884,6 +883,8 @@ Print Assumptions cur_request_timeouts_related_invariant.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
+    reachable_st gst ->
+    In src (nodes gst) ->
     labeled_step_dynamic gst l gst' ->
     open_request_to gst src dst req ->
     request_response_pair req res ->
@@ -892,6 +893,15 @@ Lemma open_request_with_response_on_wire_closed_or_preserved :
     open_request_to gst' src dst req /\
     In res (channel gst' dst src).
 Proof.
+  intros.
+  inv_prop open_request_to; expand_def.
+  assert (cur_request_timeouts_ok' (cur_request x0) (timeouts gst src)).
+  {
+    eapply cur_request_timeouts_ok'_complete.
+    eapply cur_request_timeouts_related_invariant; eauto.
+  }
+  repeat find_rewrite.
+  inv_prop cur_request_timeouts_ok'.
 (*
 If there's a response to a request on the wire, we'll either recieve the
 response or the situation will stay the same.
