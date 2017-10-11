@@ -1040,7 +1040,21 @@ Proof.
       * eapply has_first_succ_sigma; eauto.
         simpl in *. now rewrite_update.
     + eapply has_first_succ_sigma; eauto.
-    + admit.
+    + simpl in *.
+      update_destruct; subst; rewrite_update; simpl in *; eauto;
+        [|eapply has_first_succ_sigma; simpl in *; rewrite_update; eauto].
+      repeat (handler_def || handler_simpl;
+              try solve [eapply has_first_succ_sigma; eauto; simpl in *;
+                         rewrite_update; congruence];
+              try solve [eapply has_first_succ_succ_list; simpl; rewrite_update; eauto]).
+      * unfold has_first_succ. simpl. rewrite_update. eexists; intuition eauto.
+        simpl. find_apply_lem_hyp option_map_Some.
+        break_exists. intuition.
+        congruence.
+      * unfold has_first_succ. simpl. rewrite_update. eexists; intuition eauto.
+        simpl. find_apply_lem_hyp option_map_Some.
+        break_exists. intuition.
+        congruence.
     + repeat (handler_def || handler_simpl;
               try (update_destruct; subst; rewrite_update);
               repeat find_rewrite;
@@ -1050,7 +1064,7 @@ Proof.
               try solve [eapply has_first_succ_succ_list; simpl; rewrite_update; eauto]).
     + eapply has_first_succ_sigma; eauto.
     + eapply has_first_succ_sigma; eauto.
-Admitted.
+Qed.
 
 Lemma stabilize2_arg_is_dest :
   forall gst,
@@ -1069,12 +1083,14 @@ Proof.
     + subst. simpl in *.
       update_destruct; subst; rewrite_update; simpl in *; eauto.
       find_inversion. simpl in *. congruence.
-    + admit.
+    + simpl in *.
+      update_destruct; subst; rewrite_update; simpl in *; eauto.
+      repeat (handler_def || handler_simpl).
     + repeat (handler_def || handler_simpl;
               try (update_destruct; subst; rewrite_update);
               repeat find_rewrite;
               repeat find_inversion; simpl in *; eauto; try congruence).
-Admitted.
+Qed.
         
 Lemma hd_error_make_succs :
   forall x l,
@@ -1108,29 +1124,29 @@ induction 1; intros.
       * find_inversion. simpl in *. congruence.
       * find_eapply_lem_hyp has_first_succ_sigma; eauto.
         simpl. now rewrite_update.
-    + admit.
+    + simpl in *.
+      update_destruct; subst; rewrite_update; simpl in *; eauto;
+        [|find_eapply_lem_hyp has_first_succ_sigma; simpl; eauto;
+          now rewrite_update].
+      repeat (handler_def || handler_simpl;
+              try solve [find_eapply_lem_hyp has_first_succ_sigma; eauto;
+                         simpl; now rewrite_update];
+              try solve [eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
+                         simpl in *; rewrite_update; eauto]).
     + repeat (handler_def || handler_simpl;
               try (update_destruct; subst; rewrite_update);
               repeat find_rewrite;
-              repeat find_inversion; simpl in *; eauto; try congruence);
-        try solve [find_eapply_lem_hyp has_first_succ_sigma; eauto;
-                   simpl; now rewrite_update].
-      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
-          simpl in *; rewrite_update; eauto.
-      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
-          simpl in *; rewrite_update; eauto.
-      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
-          simpl in *; rewrite_update; eauto.
-      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
-          simpl in *; rewrite_update; eauto.
-      * eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
-          simpl in *; rewrite_update; eauto.
-      * unfold has_first_succ in *.
-        break_exists. simpl in *.
-        intuition.  rewrite_update. find_inversion.
-        simpl in *.
-        find_rewrite_lem hd_error_make_succs. congruence.
-Admitted.
+              repeat find_inversion; simpl in *; eauto; try congruence;
+              try solve [find_eapply_lem_hyp has_first_succ_sigma; eauto;
+                         simpl; now rewrite_update];
+              try solve [eapply_lem_prop_hyp has_first_succ_succ_list has_first_succ;
+                         simpl in *; rewrite_update; eauto]).
+      unfold has_first_succ in *.
+      break_exists. simpl in *.
+      intuition.  rewrite_update. find_inversion.
+      simpl in *.
+      find_rewrite_lem hd_error_make_succs. congruence.
+Qed.
   
 Lemma has_first_succ_inj :
   forall gst h s s',
@@ -1154,7 +1170,25 @@ Lemma live_successor_changed_improves :
     ptr_between (make_pointer h) s' s.
 Proof using.
   intros. invcs H0; simpl in *; eauto.
-  - admit.
+  - destruct (addr_eq_dec h0 h);
+      [| find_eapply_lem_hyp has_first_succ_sigma; simpl; rewrite_update;
+         eauto using has_first_succ_inj].
+    subst. unfold timeout_handler_l in *.
+    break_let. find_inversion.
+    repeat (handler_def || handler_simpl;
+            try solve [eapply_lem_prop_hyp has_first_succ_sigma @update; simpl; rewrite_update;
+                         eauto using has_first_succ_inj];
+              try solve [eapply_lem_prop_hyp has_first_succ_succ_list @update;
+                         simpl; rewrite_update;
+                         eauto using has_first_succ_inj]).
+    * find_copy_eapply_lem_hyp has_first_succ_intro; repeat find_rewrite; simpl; eauto.
+      find_eapply_lem_hyp stabilize_query_to_first_succ; eauto.
+      eapply_lem_prop_hyp has_first_succ_inj s; [|eauto]. subst.
+      solve_by_inversion. (* on the timeout constraint *)
+    * find_copy_eapply_lem_hyp has_first_succ_intro; repeat find_rewrite; simpl; eauto.
+      find_eapply_lem_hyp stabilize_query_to_first_succ; eauto.
+      eapply_lem_prop_hyp has_first_succ_inj s; [|eauto]. subst.
+      solve_by_inversion. (* on the timeout constraint *)
   - destruct (addr_eq_dec (fst (snd m)) h);
       [| find_eapply_lem_hyp has_first_succ_sigma; simpl; rewrite_update;
          eauto using has_first_succ_inj].
@@ -1227,7 +1261,7 @@ old successor, provided the old one is live.
 DIFFICULTY: 3
 USED: In phase two (a_before_pred_merge_point).
 *)
-Admitted. 
+Qed.
 
 Lemma has_pred_eq :
   forall gst h p q,
