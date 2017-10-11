@@ -18,6 +18,7 @@ Definition joined_for_query (q : query) :=
   | _ => true
   end.
 
+
 Theorem cur_request_matches_joined :
   forall gst,
     reachable_st gst ->
@@ -36,11 +37,13 @@ Proof.
   - invcs H0; simpl in *; eauto.
     + update_destruct; subst; rewrite_update; simpl in *; eauto.
       find_inversion. simpl in *. find_inversion. reflexivity.
-    + admit. (* timeout case *)
     + update_destruct; subst; rewrite_update; simpl in *; eauto.
       find_inversion.
       repeat (handler_def || handler_simpl).
-Admitted.
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion.
+      repeat (handler_def || handler_simpl).
+Qed.
 
 Theorem cur_request_join_not_joined :
   forall gst,
