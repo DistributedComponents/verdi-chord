@@ -22,7 +22,9 @@ Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
 
 Require Import Chord.LiveNodesStayLive.
+Require Import Chord.NodesHaveState.
 Require Import Chord.QueryInvariant.
+Require Import Chord.TimeoutMeansActive.
 
 Lemma l_enabled_RecvMsg_In_msgs :
   forall e src dst m d,
@@ -1861,11 +1863,39 @@ Definition Request_has_open_request_to (gst : global_state) :=
 
 Lemma Request_implies_open_request_to :
   forall dst p gst l gst' src,
+    reachable_st gst ->
     labeled_step_dynamic gst l gst' ->
+    In src (nodes gst) ->
+    In src (nodes gst') ->
     open_request_to gst src dst p ->
     In (Request dst p) (timeouts gst' src) ->
     open_request_to gst' src dst p.
 Proof.
+  intros.
+  inv_prop open_request_to.
+  break_exists_name q.
+  break_exists_name st.
+  expand_def.
+  assert (cur_request_timeouts_ok (cur_request st) (timeouts gst src))
+    by now eapply cur_request_timeouts_related_invariant.
+  assert (exists st', sigma gst' src = Some st') by admit.
+  break_exists_name st'.
+  assert (cur_request_timeouts_ok (cur_request st') (timeouts gst' src)).
+  {
+    eapply cur_request_timeouts_related_invariant; invar_eauto.
+  }
+  inv_prop cur_request_timeouts_ok.
+  - exfalso; unfold not in *; eauto.
+  - unfold open_request_to.
+    repeat find_rewrite.
+    assert (Request (addr_of x) p = Request (addr_of dstp) req)
+      by eauto using at_most_one_request_timeout'_uniqueness.
+    find_injection.
+    intuition (repeat eexists; eauto).
+    (* follows from both being well-formed. *)
+    assert (x = dstp) by admit.
+    repeat find_rewrite.
+    repeat invcs_prop cur_request_timeouts_ok; try congruence.
 Admitted.
 
 Lemma queries_now_closed :
@@ -1896,7 +1926,9 @@ Proof using.
     apply E_next.
     apply IHH_recv; auto.
     inv_prop (lb_execution (Cons o (Cons o' s'))).
-    eapply Request_implies_open_request_to; eauto.
+    assert (In src (nodes (occ_gst o)))
+      by eauto using timeout_means_active.
+    eauto using Request_implies_open_request_to, nodes_never_removed.
 Qed.
 
 Lemma requests_eventually_get_responses :

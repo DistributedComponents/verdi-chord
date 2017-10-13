@@ -8,7 +8,6 @@ Require Import Chord.SystemReachable.
 
 Require Import Chord.SystemLemmas.
 Require Import Chord.HandlerLemmas.
-Require Import Chord.LabeledLemmas.
 
 Set Bullet Behavior "Strict Subproofs".
 
