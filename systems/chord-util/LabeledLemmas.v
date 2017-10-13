@@ -20,11 +20,13 @@ Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
+Require Import Chord.SystemPointers.
 
 Require Import Chord.LiveNodesStayLive.
 Require Import Chord.NodesHaveState.
 Require Import Chord.QueryInvariant.
 Require Import Chord.TimeoutMeansActive.
+Require Import Chord.ValidPointersInvariant.
 
 Lemma l_enabled_RecvMsg_In_msgs :
   forall e src dst m d,
@@ -1878,12 +1880,11 @@ Proof.
   expand_def.
   assert (cur_request_timeouts_ok (cur_request st) (timeouts gst src))
     by now eapply cur_request_timeouts_related_invariant.
-  assert (exists st', sigma gst' src = Some st') by admit.
+  assert (exists st', sigma gst' src = Some st')
+    by (eapply nodes_have_state; invar_eauto).
   break_exists_name st'.
-  assert (cur_request_timeouts_ok (cur_request st') (timeouts gst' src)).
-  {
-    eapply cur_request_timeouts_related_invariant; invar_eauto.
-  }
+  assert (cur_request_timeouts_ok (cur_request st') (timeouts gst' src))
+    by (eapply cur_request_timeouts_related_invariant; invar_eauto).
   inv_prop cur_request_timeouts_ok.
   - exfalso; unfold not in *; eauto.
   - unfold open_request_to.
@@ -1893,10 +1894,23 @@ Proof.
     find_injection.
     intuition (repeat eexists; eauto).
     (* follows from both being well-formed. *)
-    assert (x = dstp) by admit.
+    assert (wf_ptr x).
+    {
+      cut (valid_ptr gst x); [unfold valid_ptr; tauto|].
+      eapply cur_request_valid; eauto.
+    }
+    assert (wf_ptr dstp).
+    {
+      cut (valid_ptr gst' dstp); [unfold valid_ptr; tauto|].
+      eapply cur_request_valid; invar_eauto.
+    }
+    assert (x = dstp).
+    rewrite (wf_ptr_eq x); auto.
+    rewrite (wf_ptr_eq dstp); auto.
+    congruence.
     repeat find_rewrite.
-    repeat invcs_prop cur_request_timeouts_ok; try congruence.
-Admitted.
+    repeat invcs_prop cur_request_timeouts_ok; congruence.
+Qed.
 
 Lemma queries_now_closed :
   forall s p m dst src,
