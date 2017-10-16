@@ -2709,9 +2709,106 @@ Proof.
   - auto using better_succ_better_pred; eauto.
 Qed.
 
+Fixpoint max_cmp {A : Type} (cmp : A -> A -> bool) (l : list A) (x : option A) :=
+  match l with
+  | [] => x
+  | y :: l =>
+    match x with
+    | None => max_cmp cmp l (Some y)
+    | Some x => if cmp x y then max_cmp cmp l (Some y) else max_cmp cmp l (Some x)
+    end
+  end.
+
+Lemma max_cmp_ret :
+  forall A cmp (l : list A) x,
+  (exists y,
+      max_cmp cmp l x = Some y) \/
+  l = [] /\ max_cmp cmp l x = x.
+Proof.
+  induction l; intros; auto; try congruence.
+  left. simpl.
+  repeat break_match; subst; simpl in *; eauto;
+  match goal with
+  | |- context [ max_cmp _ _ (Some ?x) ] =>
+    specialize (IHl (Some x))
+  end; intuition; subst; simpl; eauto.
+Qed.
+
+Lemma between_trans :
+  forall a b c d,
+    ptr_between a b c ->
+    ptr_between a c d ->
+    ptr_between a b d.
+Proof.
+  intros.
+  invcs H; invcs H0;
+    try solve [econstructor; eauto using lt_trans];
+    congruence.
+Qed.
+
+Lemma ptr_between_bool_trans :
+  forall a b c d,
+    ptr_between_bool a b c = true ->
+    ptr_between_bool a c d = true ->
+    ptr_between_bool a b d = true.
+Proof.
+  eauto using ptr_between_ptr_between_bool, ptr_between_bool_true, between_trans.
+Qed.
+
+Lemma max_cmp_correct :
+  forall A cmp,
+    (forall a b c, cmp a b = true -> cmp b c = true -> cmp a c = true) ->
+    (forall a b, cmp a b = true -> cmp b a = false) ->
+    (forall a b, cmp a b = true \/ cmp b a = true) ->
+    forall (l : list A) x r,
+      max_cmp cmp l x = Some r ->
+      forall y,
+        (In y l \/ x = Some y) ->
+        r = y \/ cmp r y = false.
+Proof.
+  intros A cmp Htrans Hasymm Htotal.
+  induction l; intros; simpl in *.
+  - intuition. subst. solve_by_inversion.
+  - repeat break_match; subst.
+    + intuition; subst; eauto.
+      find_inversion. specialize (IHl (Some a) r).
+      concludes. specialize (IHl a). concludes.
+      intuition; subst; auto.
+      destruct (cmp r y) eqn:?; auto.
+      erewrite Htrans in H0; eauto.
+    + intuition; subst; eauto.
+      specialize (IHl (Some a0) r).
+      concludes. specialize (IHl a0). concludes.
+      intuition; subst; auto.
+      right.
+      assert (cmp y a0 = true) by
+          (specialize (Htotal y a0); intuition; congruence).
+      assert (cmp a0 r = true) by
+          (specialize (Htotal a0 r); intuition; congruence).
+      eauto.
+    + intuition; subst; eauto; congruence.
+Qed.
+
+Lemma max_cmp_in :
+  forall A cmp (l : list A) x r,
+    max_cmp cmp l x = Some r ->
+    x = Some r \/
+    In r l.
+Proof.
+  induction l; intros; auto.
+  simpl in *; repeat break_match; auto; subst;
+    find_apply_hyp_hyp; intuition; solve_by_inversion.
+Qed.
+    
+
+Definition possible_preds_lst gst l :=
+  forall p,
+    (live_node gst (addr_of p) /\ wf_ptr p) <-> In p l.
+
 Lemma correct_pred_exists :
   forall gst h,
     reachable_st gst ->
+    wf_ptr h ->
     exists p,
       wf_ptr p /\
       live_node gst (addr_of p) /\
@@ -2794,7 +2891,7 @@ Lemma all_first_succs_correct_finds_pred :
       has_first_succ gst (addr_of p) h.
 Proof.
   intros.
-  find_copy_eapply_lem_hyp correct_pred_exists.
+  find_copy_eapply_lem_hyp correct_pred_exists; [|eauto].
   break_exists_exists.
   intuition eauto.
   eapply first_succs_correct_succ_right; auto.
