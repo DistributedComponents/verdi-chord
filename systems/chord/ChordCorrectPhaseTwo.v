@@ -2759,7 +2759,7 @@ Lemma max_cmp_correct :
   forall A cmp,
     (forall a b c, cmp a b = true -> cmp b c = true -> cmp a c = true) ->
     (forall a b, cmp a b = true -> cmp b a = false) ->
-    (forall a b, cmp a b = true \/ cmp b a = true) ->
+    (forall a b, cmp a b = true \/ cmp b a = true \/ a = b) ->
     forall (l : list A) x r,
       max_cmp cmp l x = Some r ->
       forall y,
@@ -2780,12 +2780,12 @@ Proof.
       specialize (IHl (Some a0) r).
       concludes. specialize (IHl a0). concludes.
       intuition; subst; auto.
-      right.
-      assert (cmp y a0 = true) by
+      assert (cmp y a0 = true \/ y = a0) by
           (specialize (Htotal y a0); intuition; congruence).
-      assert (cmp a0 r = true) by
+      intuition; subst; auto.
+      assert (cmp a0 r = true \/ a0 = r) by
           (specialize (Htotal a0 r); intuition; congruence).
-      eauto.
+      intuition; subst; eauto.
     + intuition; subst; eauto; congruence.
 Qed.
 
@@ -2804,6 +2804,8 @@ Qed.
 Definition possible_preds_lst gst l :=
   forall p,
     (live_node gst (addr_of p) /\ wf_ptr p) <-> In p l.
+
+
 
 Lemma correct_pred_exists :
   forall gst h,
