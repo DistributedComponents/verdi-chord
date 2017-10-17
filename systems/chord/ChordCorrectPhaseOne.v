@@ -808,6 +808,61 @@ Proof.
   eapply removing_head_decreases_failed_node_count; eauto.
 Qed.
 
+Definition no_requests (chan : list payload) : Prop :=
+  forall m,
+    In m chan ->
+    ~ request_payload m.
+
+Definition no_responses (chan : list payload) : Prop :=
+  forall m,
+    In m chan ->
+    ~ response_payload m.
+
+Inductive query_message_ok
+  (src : addr)
+  : option (pointer * query * payload) ->
+    list (addr * payload) ->
+    list payload ->
+    list payload ->
+    Prop :=
+| CInone :
+    forall outbound inbound dqs,
+      no_responses inbound ->
+      no_requests outbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_message_ok src None dqs outbound inbound
+| CIreq :
+    forall outbound inbound dqs dstp q req,
+      In req outbound ->
+      no_responses inbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound
+| CIres :
+    forall outbound inbound res dqs dstp q req,
+      request_response_pair req res ->
+      response_payload res ->
+      In res inbound ->
+      no_requests outbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound
+| CIdelayed :
+    forall outbound inbound dqs dstp q req,
+      In (src, req) dqs ->
+      no_responses inbound ->
+      no_requests outbound ->
+      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound.
+
+Theorem query_message_ok_invariant :
+  forall gst,
+    reachable_st gst ->
+    forall src dst st__src st__dst,
+      sigma gst src = Some st__src ->
+      sigma gst dst = Some st__dst ->
+      query_message_ok src (cur_request st__src) (delayed_queries st__dst)
+                       (channel gst src dst) (channel gst dst src).
+Proof.
+Admitted.
+
 Lemma open_stabilize_request_stays_or_timeout :
   forall gst l gst',
     reachable_st gst ->
@@ -830,6 +885,11 @@ Proof.
   {
     apply cur_request_timeouts_related_invariant; eauto using only_nodes_have_state.
   }
+  unfold open_stabilize_request_to.
+  repeat find_rewrite.
+  inv_prop cur_request_timeouts_ok; try congruence.
+  find_injection.
+  invcs_prop query_request.
   (* need to know that there's no inbound message to do the recv case of this *)
 Admitted.
 
