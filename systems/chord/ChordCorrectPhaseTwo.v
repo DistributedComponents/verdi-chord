@@ -2764,7 +2764,7 @@ Lemma max_cmp_correct :
       max_cmp cmp l x = Some r ->
       forall y,
         (In y l \/ x = Some y) ->
-        r = y \/ cmp r y = false.
+        r = y \/ cmp y r = true.
 Proof.
   intros A cmp Htrans Hasymm Htotal.
   induction l; intros; simpl in *.
@@ -2774,18 +2774,16 @@ Proof.
       find_inversion. specialize (IHl (Some a) r).
       concludes. specialize (IHl a). concludes.
       intuition; subst; auto.
-      destruct (cmp r y) eqn:?; auto.
-      erewrite Htrans in H0; eauto.
+      destruct (cmp y r) eqn:?; auto.
+      erewrite Htrans in Heqb0; eauto.
     + intuition; subst; eauto.
       specialize (IHl (Some a0) r).
       concludes. specialize (IHl a0). concludes.
       intuition; subst; auto.
-      assert (cmp y a0 = true \/ y = a0) by
+      * specialize (Htotal y a0); intuition; congruence.
+      * assert (cmp y a0 = true \/ y = a0) by
           (specialize (Htotal y a0); intuition; congruence).
-      intuition; subst; auto.
-      assert (cmp a0 r = true \/ a0 = r) by
-          (specialize (Htotal a0 r); intuition; congruence).
-      intuition; subst; eauto.
+        intuition; subst; eauto.
     + intuition; subst; eauto; congruence.
 Qed.
 
@@ -2799,13 +2797,29 @@ Proof.
   simpl in *; repeat break_match; auto; subst;
     find_apply_hyp_hyp; intuition; solve_by_inversion.
 Qed.
-    
 
 Definition possible_preds_lst gst l :=
   forall p,
     (live_node gst (addr_of p) /\ wf_ptr p) <-> In p l.
 
-
+Lemma correct_pred_exists' :
+  forall gst h l,
+    wf_ptr h ->
+    possible_preds_lst gst l ->
+    l <> [] ->
+    exists p,
+      wf_ptr p /\
+      live_node gst (addr_of p) /\
+      pred_correct gst h (Some p).
+Proof.
+  intros. destruct (max_cmp (ptr_between_bool h) l None) eqn:?.
+  + exists p. find_copy_apply_lem_hyp max_cmp_in; break_or_hyp; try congruence.
+    copy_eapply_prop_hyp possible_preds_lst In. intuition.
+    unfold pred_correct. eexists; intuition eauto.
+    unfold better_pred. intuition.
+    apply ptr_between_bool_true.
+    eapply max_cmp_correct in Heqo. intuition eauto.
+    find_eapply_lem_hyp max_cmp_correct; eauto.
 
 Lemma correct_pred_exists :
   forall gst h,
