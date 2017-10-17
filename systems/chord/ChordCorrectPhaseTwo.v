@@ -2734,11 +2734,33 @@ Proof.
   end; intuition; subst; simpl; eauto.
 Qed.
 
+Lemma max_cmp_empty :
+  forall A cmp (l : list A) x,
+    max_cmp cmp l x = None ->
+    l = [].
+Proof.
+  intros. specialize (max_cmp_ret A cmp l x); intros; intuition.
+  break_exists; congruence.
+Qed.
+
 Lemma between_trans :
   forall a b c d,
     ptr_between a b c ->
     ptr_between a c d ->
     ptr_between a b d.
+Proof.
+  intros.
+  invcs H; invcs H0;
+    try solve [econstructor; eauto using lt_trans];
+    congruence.
+Qed.
+
+
+Lemma between_trans' :
+  forall a b c d,
+    ptr_between a b c ->
+    ptr_between b d c ->
+    ptr_between a d c.
 Proof.
   intros.
   invcs H; invcs H0;
@@ -2755,36 +2777,13 @@ Proof.
   eauto using ptr_between_ptr_between_bool, ptr_between_bool_true, between_trans.
 Qed.
 
-Lemma max_cmp_correct :
-  forall A cmp,
-    (forall a b c, cmp a b = true -> cmp b c = true -> cmp a c = true) ->
-    (forall a b, cmp a b = true -> cmp b a = false) ->
-    (forall a b, cmp a b = true \/ cmp b a = true \/ a = b) ->
-    forall (l : list A) x r,
-      max_cmp cmp l x = Some r ->
-      forall y,
-        (In y l \/ x = Some y) ->
-        r = y \/ cmp y r = true.
+Lemma ptr_between_bool_trans' :
+  forall a b c d,
+    ptr_between_bool a b c = true ->
+    ptr_between_bool b d c = true ->
+    ptr_between_bool a d c = true.
 Proof.
-  intros A cmp Htrans Hasymm Htotal.
-  induction l; intros; simpl in *.
-  - intuition. subst. solve_by_inversion.
-  - repeat break_match; subst.
-    + intuition; subst; eauto.
-      find_inversion. specialize (IHl (Some a) r).
-      concludes. specialize (IHl a). concludes.
-      intuition; subst; auto.
-      destruct (cmp y r) eqn:?; auto.
-      erewrite Htrans in Heqb0; eauto.
-    + intuition; subst; eauto.
-      specialize (IHl (Some a0) r).
-      concludes. specialize (IHl a0). concludes.
-      intuition; subst; auto.
-      * specialize (Htotal y a0); intuition; congruence.
-      * assert (cmp y a0 = true \/ y = a0) by
-          (specialize (Htotal y a0); intuition; congruence).
-        intuition; subst; eauto.
-    + intuition; subst; eauto; congruence.
+  eauto using ptr_between_ptr_between_bool, ptr_between_bool_true, between_trans'.
 Qed.
 
 Lemma max_cmp_in :
@@ -2798,10 +2797,134 @@ Proof.
     find_apply_hyp_hyp; intuition; solve_by_inversion.
 Qed.
 
+Lemma max_cmp_correct :
+  forall A cmp (wf : A -> Prop),
+    (forall a b c, wf a -> wf b -> wf c -> cmp a b = true -> cmp b c = true -> cmp a c = true) ->
+    (forall a b, wf a -> wf b -> cmp a b = true -> cmp b a = false) ->
+    (forall a b, wf a -> wf b -> cmp a b = true \/ cmp b a = true \/ a = b) ->
+    forall (l : list A) x r,
+      (forall a, In a l -> wf a) ->
+      (forall x', x = Some x' -> wf x') ->
+      max_cmp cmp l x = Some r ->
+      forall y,
+        (In y l \/ x = Some y) ->
+        r = y \/ cmp y r = true.
+Proof.
+  intros A cmp wf Htrans Hasymm Htotal.
+  induction l; intros; simpl in *.
+  - intuition. subst. solve_by_inversion.
+  - repeat break_match; subst.
+    + specialize (IHl (Some a) r). concludes.
+      forward IHl; [intros; find_inversion; auto|].
+      repeat concludes.
+      intuition; subst; eauto.
+      find_inversion.
+      specialize (IHl a). concludes.
+      intuition; subst; auto.
+      destruct (cmp y r) eqn:?; auto.
+      erewrite Htrans in Heqb0; eauto.
+      find_apply_lem_hyp max_cmp_in. intuition.
+    + specialize (IHl (Some a0) r). concludes.
+      forward IHl; [intros; find_inversion; auto|].
+      repeat concludes.
+      intuition; subst; eauto.
+      specialize (IHl a0). concludes.
+      intuition; subst; auto.
+      * specialize (Htotal y a0); repeat concludes; intuition; try congruence.
+      * assert (cmp y a0 = true \/ y = a0) by
+          (specialize (Htotal y a0); repeat concludes; intuition; congruence).
+        intuition; subst; eauto. right.
+        eapply (Htrans y a0 r); eauto.
+        find_apply_lem_hyp max_cmp_in. intuition.
+    + intuition; subst; eauto; try congruence.
+      * specialize (IHl (Some y) r). repeat concludes.
+        forward IHl; [intros; find_inversion; auto|].
+        eauto.
+      * specialize (IHl (Some a) r). repeat concludes.
+        forward IHl; [intros; find_inversion; auto|].
+        eauto.
+Qed.
+
+Lemma max_cmp_None_correct :
+  forall A cmp (wf : A -> Prop),
+    (forall a b c, wf a -> wf b -> wf c ->  cmp a b = true -> cmp b c = true -> cmp a c = true) ->
+    (forall a b, wf a -> wf b -> cmp a b = true -> cmp b a = false) ->
+    (forall a b, wf a -> wf b -> cmp a b = true \/ cmp b a = true \/ a = b) ->
+    forall (l : list A) r y,
+      (forall x, In x l -> wf x) ->
+      max_cmp cmp l None = Some r ->
+      In y l ->
+      r <> y ->
+      cmp y r = true.
+Proof.
+  intros. find_eapply_lem_hyp max_cmp_correct; eauto; intuition; congruence.
+Qed.
+
 Definition possible_preds_lst gst l :=
   forall p,
     (live_node gst (addr_of p) /\ wf_ptr p) <-> In p l.
 
+Lemma better_pred_trans:
+  forall gst h a b c,
+    better_pred gst h a b ->
+    better_pred gst h b c ->
+    better_pred gst h a c.
+Proof.
+  intros.
+  invcs H.
+  invcs H0. unfold better_pred. intuition.
+  eauto using between_trans'.
+Qed.  
+
+Lemma better_pred_bool_trans:
+  forall h a b c,
+    better_pred_bool h a b = true ->
+    better_pred_bool h b c = true ->
+    better_pred_bool h a c = true.
+Proof.
+  unfold better_pred_bool.
+  eauto using ptr_between_bool_trans'.
+Qed.
+
+Open Scope id.
+Lemma ptr_between_antisym':
+  forall h a b : pointer, ptr_between a b h -> ~ ptr_between b a h.
+Proof.
+  intros. intro.
+  invcs H; invcs H0; intuition;
+    match goal with
+    | H : ?a < ?b, H' : ?b < ?a |- _ =>
+      eapply lt_asymm; [apply H | apply H']
+    end.
+Qed.
+Close Scope id.
+
+Lemma ptr_between_bool_antisym':
+  forall h a b : pointer, ptr_between_bool a b h = true -> ptr_between_bool b a h = false.
+Proof.
+  eauto using ptr_between_bool_true, not_ptr_between, ptr_between_antisym'.
+Qed.
+
+Lemma better_pred_bool_antisym':
+  forall h a b : pointer, better_pred_bool h a b = true -> better_pred_bool h b a = false.
+Proof.
+  unfold better_pred_bool.
+  eauto using ptr_between_bool_antisym'.
+Qed.
+
+Lemma better_pred_bool_total':
+  forall h a b : pointer,
+    wf_ptr h ->
+    wf_ptr a -> wf_ptr b ->
+    better_pred_bool h a b = true \/ better_pred_bool h b a = true \/ a = b.
+Proof.
+  intros.
+  destruct (pointer_eq_dec a b); auto.
+  find_eapply_lem_hyp wf_ptr_neq_id_neq; eauto.
+  destruct (better_pred_bool h a b) eqn:?; auto.
+  eauto using better_pred_bool_antisymmetric.
+Qed.
+  
 Lemma correct_pred_exists' :
   forall gst h l,
     wf_ptr h ->
@@ -2812,12 +2935,26 @@ Lemma correct_pred_exists' :
       live_node gst (addr_of p) /\
       pred_correct gst h (Some p).
 Proof.
-  intros. destruct (max_cmp (ptr_between_bool h) l None) eqn:?.
+  intros. destruct (max_cmp (better_pred_bool h) l None) eqn:?.
   + exists p. find_copy_apply_lem_hyp max_cmp_in; break_or_hyp; try congruence.
     copy_eapply_prop_hyp possible_preds_lst In. intuition.
     unfold pred_correct. eexists; intuition eauto.
-    unfold better_pred. intuition.
-    apply ptr_between_bool_true.
+    apply better_pred_bool_true_better_pred; auto. 
+    eapply max_cmp_None_correct with (wf := wf_ptr); eauto using better_pred_bool_trans, better_pred_bool_antisym', better_pred_bool_total';
+      intros; match goal with
+              | H : possible_preds_lst _ _ |- _ =>
+                apply H; auto
+              end.
+  + find_apply_lem_hyp max_cmp_empty.
+    congruence.
+Qed.
+
+Lemma always_possible_preds_lst :
+  forall gst,
+    reachable_st gst ->
+    exists l,
+      l <> [] /\
+      possible_preds_lst gst l.
 Admitted.
 
 Lemma correct_pred_exists :
@@ -2829,6 +2966,10 @@ Lemma correct_pred_exists :
       live_node gst (addr_of p) /\
       pred_correct gst h (Some p).
 Proof.
+  intros.
+  find_apply_lem_hyp always_possible_preds_lst. break_exists; intuition.
+  eauto using correct_pred_exists'.
+Qed.
 (*
 This is mostly a fact about the definition of pred_correct and shouldn't require
 any invariants besides "there are at least 2 live joined nodes in the network".
