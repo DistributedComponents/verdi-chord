@@ -23,6 +23,7 @@ Require Import Chord.LiveNodesStayLive.
 Require Import Chord.DeadNodesGoQuiet.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.NodesAlwaysHaveLiveSuccs.
+Require Import Chord.NodesHaveState.
 Require Import Chord.WfPtrSuccListInvariant.
 Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.StabilizeOnlyWithFirstSucc.
@@ -807,12 +808,38 @@ Proof.
   eapply removing_head_decreases_failed_node_count; eauto.
 Qed.
 
+Lemma open_stabilize_request_stays_or_timeout :
+  forall gst l gst',
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    forall h dst,
+      open_stabilize_request_to gst h dst ->
+      In dst (failed_nodes gst) ->
+
+      open_stabilize_request_to gst' h dst \/
+      l = Timeout h (Request dst GetPredAndSuccs) DetectFailure.
+Proof.
+  intros.
+  inv_prop open_stabilize_request_to.
+  inv_prop open_request_to.
+  break_exists_name q.
+  break_exists_name st.
+  break_exists_name dstp.
+  break_and.
+  assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h)).
+  {
+    apply cur_request_timeouts_related_invariant; eauto using only_nodes_have_state.
+  }
+  (* need to know that there's no inbound message to do the recv case of this *)
+Admitted.
+
 Lemma open_stabilize_request_until_timeout :
   forall ex h dst,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
 
     open_stabilize_request_to ex.(hd).(occ_gst) h dst ->
+    In dst (failed_nodes (occ_gst (hd ex))) ->
     weak_until (now (fun occ => open_stabilize_request_to (occ_gst occ) h dst) /\_
                 ~_ now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
                (now (fun occ => open_stabilize_request_to (occ_gst occ) h dst) /\_

@@ -44,3 +44,24 @@ Proof.
   intros.
   now eapply nodes_have_state_preserved.
 Qed.
+
+Lemma only_nodes_have_state :
+  forall gst h st,
+    sigma gst h = Some st ->
+    reachable_st gst ->
+    In h (nodes gst).
+Proof.
+  intros.
+  generalize dependent st.
+  generalize dependent h.
+  pattern gst.
+  eapply chord_net_invariant; autounfold; intros;
+    repeat find_rewrite;
+    repeat handler_simpl;
+    eauto with datatypes.
+  inv_prop initial_st.
+  break_and.
+  destruct (In_dec addr_eq_dec h (nodes gst0)); eauto.
+  assert (sigma gst0 h = None) by auto.
+  congruence.
+Qed.
