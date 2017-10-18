@@ -885,11 +885,14 @@ Proof.
   {
     apply cur_request_timeouts_related_invariant; eauto using only_nodes_have_state.
   }
+  pose proof (query_message_ok_invariant gst ltac:(invar_eauto)).
+  pose proof (query_message_ok_invariant gst' ltac:(invar_eauto)).
   unfold open_stabilize_request_to.
   repeat find_rewrite.
   inv_prop cur_request_timeouts_ok; try congruence.
   find_injection.
   invcs_prop query_request.
+  inv_labeled_step.
   (* need to know that there's no inbound message to do the recv case of this *)
 Admitted.
 
