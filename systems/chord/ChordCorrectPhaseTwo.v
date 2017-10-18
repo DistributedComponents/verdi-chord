@@ -2949,6 +2949,17 @@ Proof.
     congruence.
 Qed.
 
+Lemma live_ptrs_possible_preds_lst :
+  forall gst,
+    possible_preds_lst gst (live_ptrs gst).
+Proof.
+  intros. unfold live_ptrs.
+  unfold live_addrs. unfold possible_preds_lst.
+  intros. split.
+  - intuition.
+    unfold live_node in *.
+Admitted.
+    
 Lemma always_possible_preds_lst :
   forall gst,
     reachable_st gst ->
