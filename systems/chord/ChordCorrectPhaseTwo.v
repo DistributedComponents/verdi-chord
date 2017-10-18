@@ -2988,7 +2988,6 @@ any invariants besides "there are at least 2 live joined nodes in the network".
 DIFFICULTY: 3
 USED: In phase two.
 *)
-Admitted.
 
 Lemma correct_pred_unique :
   forall gst h p p',
