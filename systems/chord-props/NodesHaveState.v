@@ -44,6 +44,7 @@ Proof.
   intros.
   now eapply nodes_have_state_preserved.
 Qed.
+Hint Resolve nodes_have_state.
 
 Lemma only_nodes_have_state :
   forall gst h st,
@@ -65,3 +66,4 @@ Proof.
   assert (sigma gst0 h = None) by auto.
   congruence.
 Qed.
+Hint Resolve only_nodes_have_state.

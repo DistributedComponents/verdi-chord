@@ -1150,6 +1150,8 @@ Qed.
 
 Ltac handler_def :=
   match goal with
+  | H : timeout_handler_l _ _ _ = _ |- _ =>
+    apply timeout_handler_l_definition in H; expand_def
   | H : timeout_handler _ _ _ = _ |- _ =>
     apply timeout_handler_definition in H; expand_def
   | H : timeout_handler_eff _ _ _ = _ |- _ =>

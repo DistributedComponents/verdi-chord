@@ -20,6 +20,7 @@ Require Import Chord.LabeledMeasures.
 Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodesStayLive.
+Require Import Chord.LiveNodesNotClients.
 Require Import Chord.DeadNodesGoQuiet.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.NodesAlwaysHaveLiveSuccs.
@@ -294,11 +295,13 @@ Qed.
 Definition open_stabilize_request_to (gst : global_state) (h : addr) (dst : addr) : Prop :=
   In GetPredAndSuccs (channel gst h dst) /\
   open_request_to gst h dst GetPredAndSuccs.
+Hint Unfold open_stabilize_request_to.
 
 Definition open_stabilize_request (gst : global_state) (h : addr) : Prop :=
   exists p,
     open_stabilize_request_to gst h (addr_of p) /\
     wf_ptr p.
+Hint Unfold open_stabilize_request.
 
 (** If h is a valid node with a first successor s in gst, then h has an open
     stabilize request to s in gst. *)
@@ -863,12 +866,224 @@ Theorem query_message_ok_invariant :
 Proof.
 Admitted.
 
+Lemma ahr_unrelated_channel_unchanged :
+  forall src h,
+    h <> src ->
+    forall dst res tr gst,
+    channel (apply_handler_result h res tr gst) src dst = channel gst src dst.
+Proof.
+  intros.
+  unfold apply_handler_result; repeat break_match; subst.
+  unfold channel.
+  simpl.
+  rewrite filterMap_app.
+  rewrite filterMap_all_None.
+  auto with datatypes.
+  intros.
+  find_apply_lem_hyp in_map_iff; expand_def; simpl.
+  destruct (addr_eq_dec h src); simpl; congruence.
+Qed.
+Hint Rewrite ahr_unrelated_channel_unchanged using congruence.
+
+Lemma update_msgs_channel_preserved :
+  forall src dst m gst xs ys,
+    msgs gst = xs ++ m :: ys ->
+    fst (snd m) <> dst ->
+    channel (update_msgs gst (xs ++ ys)) src dst = channel gst src dst.
+Proof.
+  intros.
+  unfold update_msgs, channel; simpl.
+  repeat find_rewrite.
+  rewrite !filterMap_app.
+  f_equal.
+  simpl.
+  destruct (addr_eq_dec (fst (snd m)) dst); try congruence.
+  destruct (addr_eq_dec (fst m) src); simpl; auto.
+Qed.
+Hint Rewrite update_msgs_channel_preserved using congruence.
+
+Lemma msgs_eq_channel_eq :
+  forall gst gst',
+    msgs gst = msgs gst' ->
+    forall src dst,
+      channel gst src dst = channel gst' src dst.
+Proof.
+  unfold channel.
+  congruence.
+Qed.
+
+Lemma update_msgs_and_trace_update_msgs :
+  forall gst ms t,
+    msgs (update_msgs_and_trace gst ms t) = msgs (update_msgs gst ms).
+Proof.
+  reflexivity.
+Qed.
+
+Definition node_local (P : global_state -> addr -> Prop) : Prop :=
+  forall gst gst' h,
+    P gst h ->
+    In h (nodes gst) <-> In h (nodes gst') ->
+    sigma gst' h = sigma gst h ->
+    timeouts gst' h = timeouts gst h ->
+    P gst' h.
+Hint Unfold node_local.
+
+Lemma open_request_to_node_local :
+  forall dst req,
+    node_local (fun gst h => open_request_to gst h dst req).
+Proof.
+  autounfold; simpl; intros.
+  inv_prop open_request_to; expand_def.
+  repeat find_rewrite.
+  eapply open_request_to_intro; eauto.
+  congruence.
+Qed.
+Hint Resolve open_request_to_node_local.
+
+Inductive lbl_loc : label -> addr -> Prop :=
+| RecvAt :
+    forall src dst p,
+      lbl_loc (RecvMsg src dst p) dst
+| TimeoutAt :
+    forall h t eff,
+      lbl_loc (Timeout h t eff) h.
+Hint Constructors lbl_loc.
+
+Lemma input_not_lbl_loc :
+  forall h src dst m,
+    ~ lbl_loc (Input src dst m) h.
+Proof.
+  unfold not.
+  intros.
+  inv_prop lbl_loc.
+Qed.
+Hint Resolve input_not_lbl_loc.
+
+Lemma output_not_lbl_loc :
+  forall h src dst m,
+    ~ lbl_loc (Output src dst m) h.
+Proof.
+  unfold not.
+  intros.
+  inv_prop lbl_loc.
+Qed.
+Hint Resolve output_not_lbl_loc.
+
+Lemma recv_elsewhere_not_lbl_loc :
+  forall h src dst m,
+    h <> dst ->
+    ~ lbl_loc (RecvMsg src dst m) h.
+Proof.
+  intros; intro.
+  inv_prop lbl_loc.
+  congruence.
+Qed.
+Hint Resolve recv_elsewhere_not_lbl_loc.
+
+Lemma timeout_elsewhere_not_lbl_loc :
+  forall h h' t eff,
+    h <> h' ->
+    ~ lbl_loc (Timeout h' t eff) h.
+Proof.
+  intros; intro.
+  inv_prop lbl_loc.
+  congruence.
+Qed.
+Hint Resolve timeout_elsewhere_not_lbl_loc.
+
+Lemma ahr_nodes :
+  forall h r tr gst,
+    nodes (apply_handler_result h r tr gst) = nodes gst.
+Proof.
+  unfold apply_handler_result.
+  intros.
+  repeat break_match; reflexivity.
+Qed.
+Hint Rewrite ahr_nodes.
+
+Lemma node_local_preserved :
+  forall P gst l gst' h,
+    node_local P ->
+    P gst h ->
+    labeled_step_dynamic gst l gst' ->
+    ~ lbl_loc l h ->
+    P gst' h.
+Proof.
+  intros.
+  inv_labeled_step.
+  - destruct (addr_eq_dec h0 h); subst.
+    + exfalso.
+      repeat (handler_def; auto).
+    + find_eapply_prop node_local; eauto; simpl; try tauto; repeat handler_simpl.
+  - destruct (addr_eq_dec (fst (snd m)) h); subst.
+    + unfold recv_handler_l in *.
+      find_injection.
+      exfalso; auto.
+    + find_eapply_prop node_local; eauto; simpl; try tauto; repeat handler_simpl.
+  - find_eapply_prop node_local; eauto; simpl; tauto.
+  - find_eapply_prop node_local; eauto; simpl; tauto.
+Qed.
+
+Lemma open_request_to_dead_node_stays_or_timeout :
+  forall gst l gst',
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    forall h dst req,
+      open_request_to gst h dst req ->
+      In req (channel gst h dst) ->
+      In dst (nodes gst) ->
+      In dst (failed_nodes gst) ->
+
+      open_request_to gst' h dst req /\
+      In req (channel gst' h dst) \/
+      l = Timeout h (Request dst req) DetectFailure.
+Proof.
+  intros.
+  inv_prop open_request_to.
+  break_exists_name q.
+  break_exists_name st.
+  break_exists_name dstp.
+  break_and; subst.
+  pose proof (open_request_to_node_local (addr_of dstp) req) as Hnl.
+  pose proof (node_local_preserved _ gst l gst' h Hnl ltac:(auto) ltac:(auto)).
+  simpl in *.
+  assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h))
+    by eauto using only_nodes_have_state.
+  repeat find_rewrite.
+  inv_labeled_step.
+  - destruct (addr_eq_dec h0 h); subst.
+    + destruct t.
+      * left. admit.
+      * left. admit.
+      * left. admit.
+      * admit.
+    + left; split; [handler_def | autorewrite with core]; eauto.
+  - destruct (addr_eq_dec (fst (snd m)) h); subst.
+    + admit.
+    + left; split.
+      * unfold recv_handler_l in *; find_injection; eauto.
+      * autorewrite with core.
+        erewrite update_msgs_channel_preserved; eauto.
+  - left; split.
+    + eauto.
+    + unfold update_msgs_and_trace.
+      admit.
+  - left; split.
+    + eauto.
+    + autorewrite with core.
+      erewrite msgs_eq_channel_eq; try apply update_msgs_and_trace_update_msgs.
+      erewrite update_msgs_channel_preserved; eauto.
+      intro; repeat find_rewrite.
+      eapply nodes_not_clients; eauto.
+Admitted.
+
 Lemma open_stabilize_request_stays_or_timeout :
   forall gst l gst',
     reachable_st gst ->
     labeled_step_dynamic gst l gst' ->
     forall h dst,
       open_stabilize_request_to gst h dst ->
+      In dst (nodes gst) ->
       In dst (failed_nodes gst) ->
 
       open_stabilize_request_to gst' h dst \/
@@ -876,25 +1091,9 @@ Lemma open_stabilize_request_stays_or_timeout :
 Proof.
   intros.
   inv_prop open_stabilize_request_to.
-  inv_prop open_request_to.
-  break_exists_name q.
-  break_exists_name st.
-  break_exists_name dstp.
-  break_and.
-  assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h)).
-  {
-    apply cur_request_timeouts_related_invariant; eauto using only_nodes_have_state.
-  }
-  pose proof (query_message_ok_invariant gst ltac:(invar_eauto)).
-  pose proof (query_message_ok_invariant gst' ltac:(invar_eauto)).
-  unfold open_stabilize_request_to.
-  repeat find_rewrite.
-  inv_prop cur_request_timeouts_ok; try congruence.
-  find_injection.
-  invcs_prop query_request.
-  inv_labeled_step.
-  (* need to know that there's no inbound message to do the recv case of this *)
-Admitted.
+  find_eapply_lem_hyp open_request_to_dead_node_stays_or_timeout; eauto.
+  firstorder.
+Qed.
 
 Lemma open_stabilize_request_until_timeout :
   forall ex h dst,

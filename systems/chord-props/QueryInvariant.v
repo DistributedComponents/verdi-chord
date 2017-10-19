@@ -258,6 +258,18 @@ Definition open_request_to (gst : global_state) (h : addr) (dst : addr) (m : pay
     addr_of dstp = dst /\
     cur_request st = Some (dstp, q, m).
 
+Lemma open_request_to_intro :
+  forall gst h dst m q st dstp,
+    In (Request dst m) (timeouts gst h) ->
+    query_request q m ->
+    sigma gst h = Some st ->
+    addr_of dstp = dst ->
+    cur_request st = Some (dstp, q, m) ->
+    open_request_to gst h dst m.
+Proof.
+  firstorder.
+Qed.
+
 Definition responses_are_unique (gst : global_state) : Prop :=
   forall src dst p m m',
     In (src, (dst, m)) (msgs gst) ->
@@ -836,6 +848,18 @@ Lemma cur_request_timeouts_related_invariant :
 Proof.
   apply chord_net_invariant; eauto.
 Qed.
+
+Lemma cur_request_timeouts_related_invariant_elim :
+  forall gst,
+    reachable_st gst ->
+    forall h st,
+      In h (nodes gst) ->
+      sigma gst h = Some st ->
+      cur_request_timeouts_ok (cur_request st) (timeouts gst h).
+Proof.
+  firstorder using cur_request_timeouts_related_invariant.
+Qed.
+Hint Resolve cur_request_timeouts_related_invariant_elim.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
