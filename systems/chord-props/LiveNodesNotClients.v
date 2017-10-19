@@ -7,18 +7,22 @@ Require Import StructTact.Update.
 Set Bullet Behavior "Strict Subproofs".
 
 Lemma nodes_not_clients :
-  forall gst h,
+  forall gst,
     reachable_st gst ->
-    In h (nodes gst) ->
-    ~ client_addr h.
+    forall h,
+      In h (nodes gst) ->
+      ~ client_addr h.
 Proof.
-  intros. induct_reachable_st.
-  - (* need to know that clients aren't initial nodes (probably has to be an axiom) *)
-    admit.
-  - intros.
-    inversion H0; subst; simpl in *;
-      intuition; subst; eauto.
-Admitted.
+  intros until 1.
+  pattern gst.
+  apply chord_net_invariant; autounfold; intros; simpl in *;
+    try solve [repeat find_rewrite; eauto].
+  - inv_prop initial_st; break_and.
+    unfold not in *; eauto.
+  - repeat find_rewrite.
+    simpl in *; break_or_hyp; eauto.
+Qed.
+Hint Resolve nodes_not_clients.
 
 Lemma live_nodes_not_clients :
   forall gst h,
@@ -29,5 +33,4 @@ Proof.
   intros. unfold live_node in *.
   intuition. eapply nodes_not_clients; eauto.
 Qed.
-
 Hint Resolve live_nodes_not_clients.

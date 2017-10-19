@@ -431,6 +431,7 @@ Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
     step_dynamic gst gst' ->
 
     ~ In h (nodes gst) ->
+    ~ client_addr h ->
     In k (nodes gst) ->
     ~ In k (failed_nodes gst) ->
     start_handler h [k] = (st, ms, nts) ->
