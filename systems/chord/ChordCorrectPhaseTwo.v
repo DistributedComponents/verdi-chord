@@ -2939,7 +2939,21 @@ Proof.
   unfold live_addrs. unfold possible_preds_lst.
   intros. split.
   - intuition.
-    unfold live_node in *.
+    in_crush; [symmetry; eauto using wf_ptr_eq|].
+    apply filter_In; intuition.
+    apply live_node_equiv_live_node_bool. auto.
+  - intros.
+    in_crush; eauto using make_pointer_wf.
+    find_apply_lem_hyp filter_In.
+    intuition.
+    find_apply_lem_hyp live_node_equiv_live_node_bool. auto.
+Qed.
+
+Lemma live_ptrs_not_empty :
+  forall gst,
+    reachable_st gst ->
+    live_ptrs gst <> [].
+Proof.
 Admitted.
     
 Lemma always_possible_preds_lst :
@@ -2948,7 +2962,11 @@ Lemma always_possible_preds_lst :
     exists l,
       l <> [] /\
       possible_preds_lst gst l.
-Admitted.
+Proof.
+  intros. exists (live_ptrs gst).
+  intuition; eauto using live_ptrs_possible_preds_lst.
+  eapply live_ptrs_not_empty; eauto.
+Qed.
 
 Lemma correct_pred_exists :
   forall gst h,
