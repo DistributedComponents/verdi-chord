@@ -912,16 +912,6 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       _timeout_constraint gst h (Request dst p).
   Definition timeout_constraint := _timeout_constraint.
 
-  (* TODO: move this to core *)
-  Definition timeouts_detect_failure (gst : global_state) : Prop :=
-    forall xs t ys h dead req,
-      (trace gst) = xs ++ t :: ys ->
-      (* if a request timeout occurs at some point in the trace... *)
-      t = (e_timeout h (Request dead req)) ->
-      (* then it corresponds to an earlier node failure. *)
-      In (e_fail dead) xs.
-
-  (* tip: treat this as opaque and use lemmas: it never gets stopped except by failure *)
   Definition live_node (gst : global_state) (h : addr) : Prop :=
     In h (nodes gst) /\
     ~ In h (failed_nodes gst) /\
@@ -934,13 +924,6 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
     In h (failed_nodes gst) /\
     exists st,
       sigma gst h = Some st.
-
-  Definition joining_node (gst : global_state) (h : addr) : Prop :=
-    exists st,
-      sigma gst h = Some st /\
-      joined st = false /\
-      In h (nodes gst) /\
-      ~ In h (failed_nodes gst).
 
   Definition best_succ (gst : global_state) (h s : addr) : Prop :=
     exists st xs ys,
@@ -985,11 +968,6 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
     NoDup ps /\
     Forall (principal gst) ps /\
     forall p, principal gst p -> In p ps.
-
-  Definition sufficient_principals (gst : global_state) : Prop :=
-    exists ps,
-      principals gst ps /\
-      length ps > SUCC_LIST_LEN.
 
   Definition principal_failure_constraint (gst : global_state) (f : addr) : Prop :=
     principal gst f ->
