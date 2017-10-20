@@ -129,23 +129,6 @@ Definition ring_member (gst : global_state) (h : addr) : Prop :=
   reachable gst h h.
 Hint Unfold ring_member.
 
-Definition at_least_one_ring (gst : global_state) : Prop :=
-  exists h, ring_member gst h.
-
-Definition at_most_one_ring (gst : global_state) : Prop :=
-  forall x y,
-    ring_member gst x ->
-    ring_member gst y ->
-    reachable gst x y.
-
-Definition connected_appendages (gst : global_state) : Prop :=
-  forall a, live_node gst a ->
-       exists r, ring_member gst r /\ reachable gst a r.
-
-Definition state_invariant (gst : global_state) : Prop :=
-  sufficient_principals gst /\
-  live_node_in_succ_lists gst.
-
 (* If we have an open query at a live node, we have one of the following:
      - an appropriate request from src to dst
        and no other requests from src to dst
@@ -238,94 +221,11 @@ Definition query_state_net_invariant (gst : global_state) : Prop :=
      response_in_transit gst src (addr_of dstp) q \/
      pending_query gst src (addr_of dstp) q).
 
-Lemma query_state_net_invariant_elim :
-  forall gst,
-    query_state_net_invariant gst ->
-    forall src dstp q st m,
-      In src (nodes gst) ->
-      sigma gst src = Some st ->
-      cur_request st = Some (dstp, q, m) ->
-      src <> (addr_of dstp) /\
-      (request_in_transit gst src (addr_of dstp) q \/
-       response_in_transit gst src (addr_of dstp) q \/
-       pending_query gst src (addr_of dstp) q).
-Proof using.
-  eauto.
-Qed.
-
-Definition query_set_for_request (st : data) (dst : addr) (r : payload) :=
-  exists q remove,
-    cur_request st = Some (make_pointer dst, q, remove) /\
-    query_request q r.
-
-Definition request_timed_out (gst : global_state) (src dst : addr) (r : payload) :=
-  forall req_event,
-    req_event = e_send (dst, (src, r)) ->
-    exists before since,
-      trace gst = before ++ req_event :: since /\
-      ~ In req_event since /\
-      In (e_timeout src (Request dst r)) since.
-
-Definition requests_have_queries_or_timeouts (gst : global_state) : Prop :=
-  forall src dst r st,
-    request_payload r ->
-    In (dst, (src, r)) (msgs gst) ->
-    sigma gst src = Some st ->
-    query_set_for_request st dst r \/ request_timed_out gst src dst r.
-
-Definition timeouts_match_msg (gst : global_state) : Prop :=
-  forall src dst m,
-    In (Request dst m) (timeouts gst src) ->
-    In src (nodes gst) ->
-    In (src, (dst, m)) (msgs gst) \/
-    exists p,
-      request_response_pair m p /\
-      In (dst, (src, p)) (msgs gst).
-
-Definition timeouts_match_query (gst : global_state) : Prop :=
-  forall src dst st m p,
-    In (Request dst m) (timeouts gst src) ->
-    In src (nodes gst) ->
-    sigma gst src = Some st ->
-    addr_of p = dst ->
-    exists q,
-      cur_request st = Some (p, q, m) /\
-      query_request q m.
-
-Definition responses_have_queries (gst : global_state) : Prop :=
-  forall src dst r st,
-    sigma gst src = Some st ->
-    response_payload r ->
-    In (src, (dst, r)) (msgs gst) ->
-    exists q m,
-      query_request q r /\
-      cur_request st = Some (make_pointer dst, q, m).
-
 (* should follow from invariant *)
 Definition Request_goes_to_real_node (gst : global_state) : Prop :=
   forall src dst p,
     In (Request dst p) (timeouts gst src) ->
     In dst (nodes gst).
-
-Definition network_invariant (gst : global_state) : Prop :=
-  True.
-
-Theorem network_invariant_is_inductive :
-  forall gst gst',
-    network_invariant gst ->
-    step_dynamic gst gst' ->
-    network_invariant gst'.
-Abort.
-
-Definition inductive_invariant (gst : global_state) : Prop :=
-  state_invariant gst /\
-  network_invariant gst.
-
-Ltac break_invariant :=
-  match goal with
-  | H : inductive_invariant _ |- _ =>
-    unfold inductive_invariant, state_invariant, network_invariant in H; break_and
-  end.
 
 Lemma coarse_reachable_characterization :
   forall from to gst gst',
@@ -363,42 +263,6 @@ Ltac break_best_succ :=
     break_exists;
     break_and
   end.
-
-Definition fail_step_preserves (P : global_state -> Prop) : Prop :=
-  forall gst gst' h,
-    inductive_invariant gst ->
-    In h (nodes gst) ->
-    sigma gst' = sigma gst ->
-    nodes gst' = nodes gst ->
-    failed_nodes gst' = h :: failed_nodes gst ->
-    P gst'.
-
-Definition timeout_step_preserves (P : global_state -> Prop) : Prop :=
-  forall gst gst' h st t st' ms newts clearedts,
-    inductive_invariant gst ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst) ->
-    sigma gst h = Some st ->
-    In t (timeouts gst h) ->
-    timeout_handler h st t = (st', ms, newts, clearedts) ->
-    gst' = (apply_handler_result
-              h
-              (st', ms, newts, t :: clearedts)
-              [e_timeout h t]
-              gst) ->
-    P gst'.
-
-Definition node_deliver_step_preserves (P : global_state -> Prop) : Prop :=
-  forall gst xs m ys gst' h d st ms nts cts e,
-    inductive_invariant gst ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst) ->
-    sigma gst h = Some d ->
-    h = fst (snd m) ->
-    msgs gst = xs ++ m :: ys ->
-    gst' = update_msgs gst (xs ++ ys) ->
-    recv_handler (fst m) h d (snd (snd m)) = (st, ms, nts, cts) ->
-    P (apply_handler_result h (st, ms, nts, cts) e gst').
 
 Lemma In_timeouts_in :
   forall t st,

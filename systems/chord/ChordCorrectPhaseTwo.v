@@ -3240,12 +3240,12 @@ Proof.
   find_apply_lem_hyp error_means_merge_point_or_wrong_pred; auto.
   expand_def.
   - find_eapply_lem_hyp error_decreases_when_succs_right; eauto.
-    eexists; eauto using live_node_is_active, pred_improvement_suffices.
+    eexists; eauto using live_node_in_active, pred_improvement_suffices.
   - inv_prop merge_point; break_and.
     find_apply_lem_hyp error_decreases_at_merge_point; eauto.
     unfold pred_or_succ_improves_abj in *.
     repeat (find_apply_lem_hyp eventually_or_tl_or; auto; try break_or_hyp);
-      eexists; eauto using live_node_is_active.
+      eexists; eauto using live_node_in_active.
 Qed.
 
 Lemma phase_two_nonzero_error_continuous_drop :
