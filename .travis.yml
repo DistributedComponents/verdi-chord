@@ -7,6 +7,7 @@ addons:
       - ocaml
       - opam
       - aspcud
+      - gnuplot
 env:
   global:
     - COQ_VERSION=8.6
