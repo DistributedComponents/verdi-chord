@@ -67,3 +67,11 @@ Proof.
   congruence.
 Qed.
 Hint Resolve only_nodes_have_state.
+
+Lemma in_failed_in_nodes :
+  forall gst h,
+    reachable_st gst ->
+    In h (failed_nodes gst) ->
+    In h (nodes gst).
+Proof.
+Admitted.

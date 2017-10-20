@@ -1037,6 +1037,27 @@ Proof.
   - find_eapply_prop node_local; eauto; simpl; tauto.
 Qed.
 
+Lemma cur_request_stabilize_always_to_first_succ :
+  forall gst h st dst r,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    cur_request st = Some (dst, Stabilize, r) ->
+    hd_error (succ_list st) = Some dst.
+Proof.
+Admitted.
+Hint Resolve cur_request_stabilize_always_to_first_succ.
+
+Lemma first_succ_and_others_distinct :
+  forall gst h st s1 s2 xs ys,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    succ_list st = xs ++ s1 :: ys ->
+    In s2 (xs ++ ys) ->
+    addr_of s1 <> addr_of s2.
+Proof.
+Admitted.
+Hint Resolve first_succ_and_others_distinct.
+
 Lemma open_request_to_dead_node_stays_or_timeout :
   forall gst l gst',
     reachable_st gst ->
@@ -1048,7 +1069,9 @@ Lemma open_request_to_dead_node_stays_or_timeout :
       In dst (failed_nodes gst) ->
 
       open_request_to gst' h dst req /\
-      In req (channel gst' h dst) \/
+      In req (channel gst' h dst) /\
+      l <> Timeout h (Request dst req) DetectFailure \/
+      ~ open_request_to gst' h dst req /\
       l = Timeout h (Request dst req) DetectFailure.
 Proof.
   intros.
@@ -1069,20 +1092,43 @@ Proof.
         match goal with
         | |- context[Request _ _ :: _] => idtac
         | |- _ =>
-          left; split;
-            [ repeat (handler_def || congruence);
-              eapply open_request_to_intro; eauto; simpl; rewrite_update;
-              eauto using in_cons, remove_preserve; congruence
-            | apply in_msgs_in_channel; simpl; eauto with datatypes]
+          left; repeat split;
+            solve
+              [ repeat (handler_def || congruence);
+                eapply open_request_to_intro; eauto; simpl; rewrite_update;
+                eauto using in_cons, remove_preserve; congruence
+              | apply in_msgs_in_channel; simpl; eauto with datatypes
+              | eauto ]
         end.
       handler_def; try congruence.
       handler_def; try congruence.
       handler_def; try congruence.
       * find_injection.
-        right.
-        f_equal.
-        eapply at_most_one_request_timeout'_uniqueness; try eassumption.
-        now inv_prop cur_request_timeouts_ok'.
+        right; split.
+        -- intro.
+           inv_prop open_request_to; expand_def.
+           simpl in *.
+           handler_def; handler_simpl;
+             rewrite_update; find_injection; simpl in *; try congruence.
+           repeat find_rewrite; find_injection.
+           repeat find_rewrite; find_injection.
+           repeat find_injection.
+           assert (hd_error (succ_list st0) = Some x2) by eauto.
+           repeat find_rewrite; simpl in *; find_injection.
+           handler_def; simpl in *; try congruence.
+           simpl in *.
+           find_apply_lem_hyp option_map_Some; break_exists; break_and.
+           match goal with
+           | H: succ_list ?st = _ :: ?rest |- _ =>
+             destruct rest; simpl in *; try congruence
+           end.
+           repeat find_injection.
+           change (?a :: ?b :: ?c) with ([a] ++ b :: c) in *.
+           eapply first_succ_and_others_distinct;
+             eauto with datatypes.
+        -- f_equal.
+           eapply at_most_one_request_timeout'_uniqueness; try eassumption.
+           now inv_prop cur_request_timeouts_ok'.
       * repeat (find_rewrite; repeat find_injection).
         inv_prop cur_request_timeouts_ok'.
         match goal with
@@ -1092,7 +1138,8 @@ Proof.
             by eauto using at_most_one_request_timeout'_uniqueness
         end.
         congruence.
-    + left; split; [handler_def | autorewrite with core]; eauto.
+    + left.
+      repeat (split; try solve [handler_def; eauto | autorewrite with core; eauto]).
   - destruct (addr_eq_dec (fst (snd m)) h); subst.
     + left; split.
       * unfold recv_handler_l in *; find_injection.
@@ -1152,16 +1199,18 @@ Proof.
            ++ inv_prop query_request; eapply_prop no_requests; eauto.
         -- destruct m as [? [? ?]]; simpl in *.
            repeat find_rewrite; in_crush.
-      * apply ahr_related_preserved.
-        erewrite update_msgs_channel_preserved; eauto.
-    + left; split.
-      * unfold recv_handler_l in *; find_injection; eauto.
-      * autorewrite with core.
-        erewrite update_msgs_channel_preserved; eauto.
-  - left; split; eauto.
+      * split.
+        -- apply ahr_related_preserved.
+           erewrite update_msgs_channel_preserved; eauto.
+        -- unfold recv_handler_l in *; find_injection; auto.
+    + unfold recv_handler_l in *; find_injection.
+      left; repeat (split; eauto).
+      autorewrite with core.
+      erewrite update_msgs_channel_preserved; eauto.
+  - left; repeat (split; eauto).
     apply in_msgs_in_channel.
     simpl; auto.
-  - left; split; eauto.
+  - left; repeat (split; eauto).
     autorewrite with core.
     erewrite msgs_eq_channel_eq; try apply update_msgs_and_trace_update_msgs.
     erewrite update_msgs_channel_preserved; eauto.
@@ -1178,7 +1227,9 @@ Lemma open_stabilize_request_stays_or_timeout :
       In dst (nodes gst) ->
       In dst (failed_nodes gst) ->
 
-      open_stabilize_request_to gst' h dst \/
+      open_stabilize_request_to gst' h dst /\
+      l <> Timeout h (Request dst GetPredAndSuccs) DetectFailure \/
+      ~ open_stabilize_request_to gst' h dst /\
       l = Timeout h (Request dst GetPredAndSuccs) DetectFailure.
 Proof.
   intros.
@@ -1194,26 +1245,29 @@ Lemma open_stabilize_request_until_timeout :
 
     open_stabilize_request_to ex.(hd).(occ_gst) h dst ->
     In dst (failed_nodes (occ_gst (hd ex))) ->
+    In dst (nodes (occ_gst (hd ex))) ->
     weak_until (now (fun occ => open_stabilize_request_to (occ_gst occ) h dst) /\_
                 ~_ now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
                (now (fun occ => open_stabilize_request_to (occ_gst occ) h dst) /\_
                 now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
                ex.
 Proof.
-(*
-This needs to be reduced to a lemma of the (approximate) form
-   reachable_st gst ->
-   labeled_step_dynamic gst l gst'
-   P gst ->
-   P gst' \/ Q gst'.
-as is the case for all weak_until proofs.
-
-It will likely require some other invariants about open requests.
-
-DIFFICULTY: Ryan
-USED: In phase one.
-*)
-Admitted.
+  cofix c.
+  intros.
+  destruct ex as [o [o' [o'' ex]]].
+  inv_prop lb_execution.
+  find_copy_eapply_lem_hyp open_stabilize_request_stays_or_timeout;
+    try solve [clear c; eauto].
+  expand_def.
+  - apply W_tl.
+    + split; simpl;
+        try intro; auto.
+    + eapply c; invar_eauto;
+        eauto using failed_nodes_never_removed, nodes_never_removed.
+  - apply W0.
+    split; eauto.
+    unfold occurred; simpl; auto.
+Qed.
 
 Lemma open_stabilize_request_eventually_decreases_error :
   forall ex h,
@@ -1239,7 +1293,8 @@ Proof.
   inv_prop has_dead_first_succ; expand_def.
   find_copy_apply_hyp_hyp.
   inv_prop open_stabilize_request_to.
-  find_copy_eapply_lem_hyp open_stabilize_request_until_timeout; eauto.
+  find_copy_eapply_lem_hyp open_stabilize_request_until_timeout;
+    eauto using in_failed_in_nodes.
   find_copy_apply_lem_hyp request_eventually_fires;
     eauto using strong_local_fairness_weak.
   find_copy_apply_lem_hyp eventually_weak_until_cumul; eauto.
