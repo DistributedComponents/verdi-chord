@@ -100,6 +100,9 @@ function mkindex {
 </head>
 <body>
   <h1>Verdi Chord Proofalytics</h1>
+  <img src='admits.png'><br>
+  <img src='qeds.png'><br>
+<!--
   <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
   <svg class="chart" id="admits-plot"></svg>
   <script>
@@ -137,6 +140,7 @@ function mkindex {
         .attr("r", "2px");
     });
   </script>
+-->
   <ul>
 EOF
   for rep in $(ls -r | grep 'PA-*'); do
