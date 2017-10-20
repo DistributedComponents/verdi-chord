@@ -1068,7 +1068,7 @@ Proof.
     + destruct t;
         match goal with
         | |- context[Request _ _ :: _] => idtac
-        | |- _ => 
+        | |- _ =>
           left; split;
             [ repeat (handler_def || congruence);
               eapply open_request_to_intro; eauto; simpl; rewrite_update;
@@ -1096,6 +1096,13 @@ Proof.
   - destruct (addr_eq_dec (fst (snd m)) h); subst.
     + left; split.
       * unfold recv_handler_l in *; find_injection.
+        assert (wf_ptr dstp).
+        {
+          cut (valid_ptr gst dstp); [unfold valid_ptr; tauto|].
+          repeat find_rewrite.
+          find_injection.
+          eapply cur_request_valid; invar_eauto.
+        }
         find_eapply_lem_hyp constrained_Request_not_cleared_by_recv_handler; eauto.
         -- match goal with
            | |- open_request_to ?gst' ?src ?dst ?req =>
@@ -1121,14 +1128,28 @@ Proof.
            repeat find_injection.
            eapply open_request_to_intro; eauto.
            ++ simpl; rewrite_update; eauto.
-           ++ assert (wf_ptr dstp) by admit.
-              assert (wf_ptr dstp0) by admit.
+           ++ assert (wf_ptr dstp0).
+              {
+                cut (exists gst, valid_ptr gst dstp0);
+                  [unfold valid_ptr in *; firstorder|].
+                eexists; eapply cur_request_valid;
+                  [|eapply apply_handler_result_updates_sigma; eauto|eauto].
+                invar_eauto.
+              }
               rewrite (wf_ptr_eq dstp); eauto.
               repeat find_rewrite.
               rewrite <- (wf_ptr_eq dstp0); auto.
         -- constructor; eauto.
            intros.
-           admit.
+           assert (exists st, sigma gst (addr_of dstp) = Some st) by auto.
+           break_exists_name st__dst.
+           intro Hin. apply in_msgs_in_channel in Hin.
+           find_eapply_lem_hyp (query_message_ok_invariant gst ltac:(auto) (fst (snd m)) (addr_of dstp)); eauto.
+           inv_prop query_message_ok.
+           ++ congruence.
+           ++ inv_prop request_response_pair; eapply_prop no_responses; eauto.
+           ++ inv_prop query_request; eapply_prop no_requests; eauto.
+           ++ inv_prop query_request; eapply_prop no_requests; eauto.
         -- destruct m as [? [? ?]]; simpl in *.
            repeat find_rewrite; in_crush.
       * apply ahr_related_preserved.
@@ -1146,7 +1167,7 @@ Proof.
     erewrite update_msgs_channel_preserved; eauto.
     intro; repeat find_rewrite.
     eapply nodes_not_clients; eauto.
-Admitted.
+Qed.
 
 Lemma open_stabilize_request_stays_or_timeout :
   forall gst l gst',
