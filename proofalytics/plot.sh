@@ -20,16 +20,14 @@ set timefmt "%y%m%d"
 set format x "%b %d"
 set xtics rotate by 45 right
 set offset graph 0.01, graph 0.01, graph 0.05, graph 0.05
-plot "$tmp" using 1:2 with points \
+plot "$tmp" using 1:2 notitle with points \
         pointtype 5 \
-        linecolor rgb "#00aa00" \
-        notitle, \
-     "$tmp" using 1:2 smooth csplines with lines \
+        linecolor rgb "#009900", \
+     "$tmp" using 1:2 notitle smooth csplines with lines \
         linetype 2 \
         linewidth 2 \
         linecolor rgb "#888888" \
-        dashtype "-" \
-        notitle
+        dashtype "-"
 EOF
 
 if [ $? -ne 0 ]; then
