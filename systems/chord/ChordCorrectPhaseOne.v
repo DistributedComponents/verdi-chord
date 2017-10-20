@@ -885,6 +885,19 @@ Proof.
 Qed.
 Hint Rewrite ahr_unrelated_channel_unchanged using congruence.
 
+Lemma ahr_related_preserved :
+  forall h dst res tr gst m,
+    In m (channel gst h dst) ->
+    In m (channel (apply_handler_result h res tr gst) h dst).
+Proof.
+  intros.
+  unfold apply_handler_result; repeat break_match; subst.
+  unfold channel; simpl.
+  rewrite filterMap_app.
+  apply in_or_app; tauto.
+Qed.
+Hint Resolve ahr_related_preserved.
+
 Lemma update_msgs_channel_preserved :
   forall src dst m gst xs ys,
     msgs gst = xs ++ m :: ys ->
@@ -1081,22 +1094,58 @@ Proof.
         congruence.
     + left; split; [handler_def | autorewrite with core]; eauto.
   - destruct (addr_eq_dec (fst (snd m)) h); subst.
-    + admit.
+    + left; split.
+      * unfold recv_handler_l in *; find_injection.
+        find_eapply_lem_hyp constrained_Request_not_cleared_by_recv_handler; eauto.
+        -- match goal with
+           | |- open_request_to ?gst' ?src ?dst ?req =>
+             assert (In (Request dst req) (timeouts gst' src))
+               by (simpl; rewrite_update; break_or_hyp; in_crush;
+                   eauto using in_remove_all_preserve);
+             assert (cur_request_timeouts_ok' (cur_request st0) (timeouts gst' src))
+           end.
+           {
+             apply cur_request_timeouts_ok'_complete.
+             eapply cur_request_timeouts_related_invariant_elim; invar_eauto.
+             simpl; now rewrite_update.
+           }
+           repeat find_rewrite.
+           inv_prop cur_request_timeouts_ok';
+             try solve [exfalso; find_eapply_prop Request; eauto].
+           match goal with
+           | H: In (Request ?a ?b) (timeouts ?gst ?h),
+             H': In (Request ?a' ?b') (timeouts ?gst ?h) |- _ =>
+             assert (Request a b = Request a' b')
+               by eauto using at_most_one_request_timeout'_uniqueness
+           end.
+           repeat find_injection.
+           eapply open_request_to_intro; eauto.
+           ++ simpl; rewrite_update; eauto.
+           ++ assert (wf_ptr dstp) by admit.
+              assert (wf_ptr dstp0) by admit.
+              rewrite (wf_ptr_eq dstp); eauto.
+              repeat find_rewrite.
+              rewrite <- (wf_ptr_eq dstp0); auto.
+        -- constructor; eauto.
+           intros.
+           admit.
+        -- destruct m as [? [? ?]]; simpl in *.
+           repeat find_rewrite; in_crush.
+      * apply ahr_related_preserved.
+        erewrite update_msgs_channel_preserved; eauto.
     + left; split.
       * unfold recv_handler_l in *; find_injection; eauto.
       * autorewrite with core.
         erewrite update_msgs_channel_preserved; eauto.
-  - left; split.
-    + eauto.
-    + unfold update_msgs_and_trace.
-      admit.
-  - left; split.
-    + eauto.
-    + autorewrite with core.
-      erewrite msgs_eq_channel_eq; try apply update_msgs_and_trace_update_msgs.
-      erewrite update_msgs_channel_preserved; eauto.
-      intro; repeat find_rewrite.
-      eapply nodes_not_clients; eauto.
+  - left; split; eauto.
+    apply in_msgs_in_channel.
+    simpl; auto.
+  - left; split; eauto.
+    autorewrite with core.
+    erewrite msgs_eq_channel_eq; try apply update_msgs_and_trace_update_msgs.
+    erewrite update_msgs_channel_preserved; eauto.
+    intro; repeat find_rewrite.
+    eapply nodes_not_clients; eauto.
 Admitted.
 
 Lemma open_stabilize_request_stays_or_timeout :
