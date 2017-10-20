@@ -17,11 +17,16 @@ set xdata time
 set terminal pngcairo dashed
 set output "$name.png"
 unset label
+set xtics rotate
 set offset graph 0.01, graph 0.01, graph 0.05, graph 0.05
-plot "$tmp" using 1:2 notitle \
-        with points pt 5 lc rgb "#00aa00", \
-     "$tmp" using 1:2 notitle smooth csplines \
-        with lines lt 1 dt "-.-" lc rgb "#888888" lw 2
+plot "$tmp" using 1:2 notitle with points \
+        pointtype 5 \
+        linecolor rgb "#00aa00", \
+     "$tmp" using 1:2 notitle smooth csplines with lines \
+        linetype 2 \
+        dashtype "-.-" \
+        linecolor rgb "#888888" \
+        linewidth 2
 EOF
 
 if [ $? -ne 0 ]; then
