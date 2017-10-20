@@ -4,10 +4,10 @@ name="$(basename "$1" .csv)"
 tmp="$(mktemp "pa-plot-$name.XXXXXX")"
 
 cat "$1" \
-  | tail -n +1 \
   | sed 's/PA-\([^-]*\)-[^,]*,\(.*\)/\1 \2/g' \
   | sort \
   | uniq \
+  | grep -v '[a-z]' \
   > "$tmp"
 
 gnuplot <<EOF
