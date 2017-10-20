@@ -36,6 +36,16 @@ function main {
   echo "$(date) $(cat admit-count.txt)" >> "${LDASH}admit-log.txt"
   echo "$(date) $(cat qed-count.txt)" >> "${LDASH}qed-log.txt"
 
+  # TODO do not copy paste, handle paths better
+  if [ -f "${LDASH}admits.csv" ]; then
+    ${PADIR}/plot.sh "${LDASH}admits.csv"
+    mv admits.png "${LDASH}"
+  fi
+  if [ -f "${LDASH}qeds.csv" ]; then
+    ${PADIR}/plot.sh "${LDASH}qeds.csv"
+    mv qeds.png "${LDASH}"
+  fi
+
   echo "SYNC local  -> remote"
   $SYNC "$LDASH" "$RDASH"
 }
@@ -104,7 +114,7 @@ function mkindex {
         .attr("width", width)
         .attr("height", height)
       .append("g")
-        .attr("transform", 
+        .attr("transform",
               "translate(" + 10 + "," + 10 + ")");
 
     var x = d3.scale.ordinal().rangePoints([0, width - 20]);
@@ -188,7 +198,7 @@ EOF
       echo -n "${rep}," >> "${LDASH}qeds.csv"
       cat "${rep}/qed-count.txt" >> "${LDASH}qeds.csv"
     fi
-    
+
     echo "</li>"
   done
   cat <<EOF
