@@ -861,6 +861,61 @@ Proof.
 Qed.
 Hint Resolve cur_request_timeouts_related_invariant_elim.
 
+Definition no_requests (chan : list payload) : Prop :=
+  forall m,
+    In m chan ->
+    ~ request_payload m.
+
+Definition no_responses (chan : list payload) : Prop :=
+  forall m,
+    In m chan ->
+    ~ response_payload m.
+
+Inductive query_message_ok
+  (src : addr)
+  : option (pointer * query * payload) ->
+    list (addr * payload) ->
+    list payload ->
+    list payload ->
+    Prop :=
+| CInone :
+    forall outbound inbound dqs,
+      no_responses inbound ->
+      no_requests outbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_message_ok src None dqs outbound inbound
+| CIreq :
+    forall outbound inbound dqs dstp q req,
+      In req outbound ->
+      no_responses inbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound
+| CIres :
+    forall outbound inbound res dqs dstp q req,
+      request_response_pair req res ->
+      response_payload res ->
+      In res inbound ->
+      no_requests outbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound
+| CIdelayed :
+    forall outbound inbound dqs dstp q req,
+      In (src, req) dqs ->
+      no_responses inbound ->
+      no_requests outbound ->
+      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound.
+
+Theorem query_message_ok_invariant :
+  forall gst,
+    reachable_st gst ->
+    forall src dst st__src st__dst,
+      sigma gst src = Some st__src ->
+      sigma gst dst = Some st__dst ->
+      query_message_ok src (cur_request st__src) (delayed_queries st__dst)
+                       (channel gst src dst) (channel gst dst src).
+Proof.
+Admitted.
+
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
     reachable_st gst ->

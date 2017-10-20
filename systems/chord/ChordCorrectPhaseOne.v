@@ -30,6 +30,7 @@ Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.StabilizeOnlyWithFirstSucc.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.QueriesEventuallyStop.
+Require Import Chord.RingCorrect.
 Require Import Chord.LiveNodeHasTickInTimeouts.
 
 Set Bullet Behavior "Strict Subproofs".
@@ -811,61 +812,6 @@ Proof.
   eapply removing_head_decreases_failed_node_count; eauto.
 Qed.
 
-Definition no_requests (chan : list payload) : Prop :=
-  forall m,
-    In m chan ->
-    ~ request_payload m.
-
-Definition no_responses (chan : list payload) : Prop :=
-  forall m,
-    In m chan ->
-    ~ response_payload m.
-
-Inductive query_message_ok
-  (src : addr)
-  : option (pointer * query * payload) ->
-    list (addr * payload) ->
-    list payload ->
-    list payload ->
-    Prop :=
-| CInone :
-    forall outbound inbound dqs,
-      no_responses inbound ->
-      no_requests outbound ->
-      (forall m, ~ In (src, m) dqs) ->
-      query_message_ok src None dqs outbound inbound
-| CIreq :
-    forall outbound inbound dqs dstp q req,
-      In req outbound ->
-      no_responses inbound ->
-      (forall m, ~ In (src, m) dqs) ->
-      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound
-| CIres :
-    forall outbound inbound res dqs dstp q req,
-      request_response_pair req res ->
-      response_payload res ->
-      In res inbound ->
-      no_requests outbound ->
-      (forall m, ~ In (src, m) dqs) ->
-      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound
-| CIdelayed :
-    forall outbound inbound dqs dstp q req,
-      In (src, req) dqs ->
-      no_responses inbound ->
-      no_requests outbound ->
-      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound.
-
-Theorem query_message_ok_invariant :
-  forall gst,
-    reachable_st gst ->
-    forall src dst st__src st__dst,
-      sigma gst src = Some st__src ->
-      sigma gst dst = Some st__dst ->
-      query_message_ok src (cur_request st__src) (delayed_queries st__dst)
-                       (channel gst src dst) (channel gst dst src).
-Proof.
-Admitted.
-
 Lemma ahr_unrelated_channel_unchanged :
   forall src h,
     h <> src ->
@@ -1036,17 +982,6 @@ Proof.
   - find_eapply_prop node_local; eauto; simpl; tauto.
   - find_eapply_prop node_local; eauto; simpl; tauto.
 Qed.
-
-Lemma first_succ_and_others_distinct :
-  forall gst h st s1 s2 xs ys,
-    reachable_st gst ->
-    sigma gst h = Some st ->
-    succ_list st = xs ++ s1 :: ys ->
-    In s2 (xs ++ ys) ->
-    addr_of s1 <> addr_of s2.
-Proof.
-Admitted.
-Hint Resolve first_succ_and_others_distinct.
 
 Lemma open_request_to_dead_node_stays_or_timeout :
   forall gst l gst',
