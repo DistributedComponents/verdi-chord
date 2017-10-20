@@ -1412,24 +1412,6 @@ Section MergePoint.
       tauto.
   Qed.
 
-  Lemma a_before_pred_merge_point_with_stabilize_request :
-    forall ex,
-      lb_execution ex ->
-      reachable_st (occ_gst (hd ex)) ->
-      strong_local_fairness ex ->
-      always (~_ (now circular_wait)) ex ->
-      always (now phase_one) ex ->
-
-      forall st p,
-        merge_point (occ_gst (hd ex)) a b j ->
-        sigma (occ_gst (hd ex)) (addr_of j) = Some st ->
-        pred st = Some p ->
-        a <=? p = true ->
-        eventually (pred_or_succ_improves a) ex.
-  Proof.
-  (* USELESS *)
-  Admitted.
-
   Lemma handle_stabilize_sends_Notify_None :
     forall h src srcp st q new_succ succs st' ms nts cts,
       handle_stabilize h srcp st q new_succ succs = (st', ms, nts, cts) ->

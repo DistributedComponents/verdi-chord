@@ -193,40 +193,6 @@ Definition pending_query (gst : global_state) (src dst : addr) (q : query) : Pro
       In m (channel gst dst src) ->
       ~ response_payload m).
 
-Theorem queries_always_remote :
-  forall gst,
-    reachable_st gst ->
-    forall h st dstp q p,
-      sigma gst h = Some st ->
-      cur_request st = Some (dstp, q, p) ->
-      h <> (addr_of dstp).
-Proof.
-(*
-This is difficult to prove because we need to know that we're never given our
-own address as a successor by another node. It will require the full Zave
-invariant. Once we have that it shouldn't be so bad.
-
-DIFFICULTY: Ryan.
-USED: In the proof of query_state_net_inductive below.
-*)
-Admitted.
-
-Definition query_state_net_invariant (gst : global_state) : Prop :=
-  forall src st dstp q m,
-    In src (nodes gst) ->
-    sigma gst src = Some st ->
-    cur_request st = Some (dstp, q, m) ->
-    src <> (addr_of dstp) /\
-    (request_in_transit gst src (addr_of dstp) q \/
-     response_in_transit gst src (addr_of dstp) q \/
-     pending_query gst src (addr_of dstp) q).
-
-(* should follow from invariant *)
-Definition Request_goes_to_real_node (gst : global_state) : Prop :=
-  forall src dst p,
-    In (Request dst p) (timeouts gst src) ->
-    In dst (nodes gst).
-
 Lemma coarse_reachable_characterization :
   forall from to gst gst',
     reachable gst from to ->

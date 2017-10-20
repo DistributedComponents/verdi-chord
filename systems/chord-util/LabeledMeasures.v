@@ -74,15 +74,6 @@ Section Measure.
       eauto using measure_nonincreasing_stays_zero.
   Qed.
 
-  Lemma bound_decreased_measure_decreased :
-    forall ex n m,
-      eventually (measure_bounded m) ex ->
-      |occ_gst (hd ex)| = n ->
-      m < n ->
-      eventually (consecutive measure_decreasing) ex.
-  Proof.
-  Admitted.
-
   Lemma measure_bounded_hd_elim :
     forall m n ex,
       measure_bounded n ex ->

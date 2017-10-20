@@ -331,17 +331,6 @@ Proof.
     eauto using until_eventually.
 Qed.
 
-Lemma has_pred_has_succ_inv :
-  forall gst h s,
-    reachable_st gst ->
-    preds_and_first_succs_correct gst ->
-    wf_ptr h ->
-    wf_ptr s ->
-    has_pred gst (addr_of h) (Some s) ->
-    has_first_succ gst (addr_of s) h.
-Proof.
-Admitted.
-
 Lemma has_succ_has_pred_inv :
   forall gst h s,
     reachable_st gst ->

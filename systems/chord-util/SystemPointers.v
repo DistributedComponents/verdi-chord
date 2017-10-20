@@ -569,21 +569,6 @@ USED: In valid_ptrs_global_timeouts below.
 *)
 Admitted.
 
-Lemma apply_handler_result_In_timeouts :
-  forall t h0 h st ms nts cts e gst,
-    In t (timeouts (apply_handler_result h0 (st, ms, nts, cts) e gst) h) ->
-    In t nts \/
-    In t (timeouts gst h) /\ (~ In t cts \/ h <> h0).
-Proof using.
-(*
-This is a simple spec lemma for apply_handler_result. The proof should be very
-simple.
-
-DIFFICULTY: 1
-USED: In valid_ptrs_global_timeouts below
-*)
-Admitted.
-
 Lemma valid_ptrs_global_timeouts :
   forall gst gst',
     valid_ptrs_global gst ->
@@ -626,19 +611,11 @@ Proof using.
   - apply valid_ptrs_timeouts_intro; intros.
     eapply valid_ptr_timeout_nodes;
       try eapply apply_handler_result_preserves_nodes; eauto.
-    find_apply_lem_hyp apply_handler_result_In_timeouts;
-      repeat (break_and || break_or_hyp);
-      eauto using valid_ptrs_global_timeout_handler,
-      valid_ptr_timeout_nodes,
-      valid_ptrs_timeouts_elim.
+    admit.
   - apply valid_ptrs_timeouts_intro; intros.
     eapply valid_ptr_timeout_nodes;
       try eapply apply_handler_result_preserves_nodes; eauto.
-    find_apply_lem_hyp apply_handler_result_In_timeouts;
-      repeat (break_and || break_or_hyp);
-      eauto using valid_ptrs_global_recv_handler,
-      valid_ptr_timeout_nodes,
-      valid_ptrs_timeouts_elim.
+    admit.
   - admit.
   - admit.
 (*
