@@ -1178,6 +1178,8 @@ Ltac handler_def :=
     apply do_rectify_definition in H; expand_def
   | H: handle_stabilize _ _ _ _ _ _ = _ |- _ =>
     apply handle_stabilize_definition in H; expand_def
+  | H : keepalive_handler _ = _ |- _ =>
+    apply keepalive_handler_definition in H; expand_def
   | H : tick_handler _ _ = _ |- _ =>
     apply tick_handler_definition in H; expand_def 
   | H : add_tick _ = _ |- _ =>

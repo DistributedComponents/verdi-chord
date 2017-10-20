@@ -1052,11 +1052,33 @@ Proof.
   repeat find_rewrite.
   inv_labeled_step.
   - destruct (addr_eq_dec h0 h); subst.
-    + destruct t.
-      * left. admit.
-      * left. admit.
-      * left. admit.
-      * admit.
+    + destruct t;
+        match goal with
+        | |- context[Request _ _ :: _] => idtac
+        | |- _ => 
+          left; split;
+            [ repeat (handler_def || congruence);
+              eapply open_request_to_intro; eauto; simpl; rewrite_update;
+              eauto using in_cons, remove_preserve; congruence
+            | apply in_msgs_in_channel; simpl; eauto with datatypes]
+        end.
+      handler_def; try congruence.
+      handler_def; try congruence.
+      handler_def; try congruence.
+      * find_injection.
+        right.
+        f_equal.
+        eapply at_most_one_request_timeout'_uniqueness; try eassumption.
+        now inv_prop cur_request_timeouts_ok'.
+      * repeat (find_rewrite; repeat find_injection).
+        inv_prop cur_request_timeouts_ok'.
+        match goal with
+        | H: In (Request ?a ?b) (timeouts gst h),
+             H': In (Request ?a' ?b') (timeouts gst h) |- _ =>
+          assert (Request a b = Request a' b')
+            by eauto using at_most_one_request_timeout'_uniqueness
+        end.
+        congruence.
     + left; split; [handler_def | autorewrite with core]; eauto.
   - destruct (addr_eq_dec (fst (snd m)) h); subst.
     + admit.
