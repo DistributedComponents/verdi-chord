@@ -1037,16 +1037,6 @@ Proof.
   - find_eapply_prop node_local; eauto; simpl; tauto.
 Qed.
 
-Lemma cur_request_stabilize_always_to_first_succ :
-  forall gst h st dst r,
-    reachable_st gst ->
-    sigma gst h = Some st ->
-    cur_request st = Some (dst, Stabilize, r) ->
-    hd_error (succ_list st) = Some dst.
-Proof.
-Admitted.
-Hint Resolve cur_request_stabilize_always_to_first_succ.
-
 Lemma first_succ_and_others_distinct :
   forall gst h st s1 s2 xs ys,
     reachable_st gst ->
@@ -1113,7 +1103,12 @@ Proof.
            repeat find_rewrite; find_injection.
            repeat find_rewrite; find_injection.
            repeat find_injection.
-           assert (hd_error (succ_list st0) = Some x2) by eauto.
+           assert (hd_error (succ_list st0) = Some x2).
+           {
+             inv_prop (query_request Stabilize).
+             find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+             expand_def; congruence.
+           }
            repeat find_rewrite; simpl in *; find_injection.
            handler_def; simpl in *; try congruence.
            simpl in *.
