@@ -1361,17 +1361,17 @@ Proof.
   eapply lb_execution_cons_cons; eauto.
 Qed.
 
+Hint Resolve always_invar : invar.
+Hint Resolve lb_execution_invar : invar.
+Hint Resolve strong_local_fairness_invar : invar.
+Hint Resolve weak_local_fairness_invar : invar.
+Hint Resolve live_node_invariant : invar.
+Hint Resolve labeled_step_is_unlabeled_step : invar.
+Hint Resolve reachableStep : invar.
+Hint Resolve lb_execution_step_one_cons : invar.
+Hint Resolve lb_execution_cons_cons : invar.
 Ltac invar_eauto :=
-  eauto using
-        always_invar,
-        lb_execution_invar,
-        strong_local_fairness_invar,
-        weak_local_fairness_invar,
-        live_node_invariant,
-        labeled_step_is_unlabeled_step,
-        reachableStep,
-        lb_execution_step_one_cons,
-        lb_execution_cons_cons.
+  eauto with invar.
 
 Lemma channel_stays_empty :
   forall ex src dst,
