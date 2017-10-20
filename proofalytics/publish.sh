@@ -33,6 +33,7 @@ function main {
 
   echo "report,count" > "${LDASH}/admits.csv"
   echo "report,count" > "${LDASH}/qeds.csv"
+  echo "report,time" > "${LDASH}/btimes.csv"
   mkindex > "${LDASH}index.html"
   echo "$(date) $(cat admit-count.txt)" >> "${LDASH}admit-log.txt"
   echo "$(date) $(cat qed-count.txt)" >> "${LDASH}qed-log.txt"
@@ -40,6 +41,7 @@ function main {
   pushd "$LDASH" > /dev/null
   ${PADIR}/plot.sh admits.csv
   ${PADIR}/plot.sh qeds.csv
+  ${PADIR}/plot.sh btimes.csv
   popd > /dev/null
 
   echo "SYNC local  -> remote"
@@ -102,6 +104,7 @@ function mkindex {
   <h1>Verdi Chord Proofalytics</h1>
   <img src='admits.png'><br>
   <img src='qeds.png'><br>
+  <img src='btimes.png'><br>
 <!--
   <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
   <svg class="chart" id="admits-plot"></svg>
@@ -177,11 +180,13 @@ EOF
 
     echo "<br> &nbsp;"
     echo "<span class='it'>build time:</span> &nbsp;"
-    awk -W lint=fatal \
-        'BEGIN { FS = ","; tot = 0 }  \
-         { tot += $2 }      \
-         END { print tot " s"}' \
-        "${rep}/build-times.csv"
+    btime=$(awk -W lint=fatal \
+              'BEGIN { FS = ","; tot = 0 }  \
+               { tot += $2 }      \
+               END { print tot " s"}' \
+              "${rep}/build-times.csv")
+    echo $btime
+    echo "${rep},$btime" >> "${LDASH}btimes.csv"
 
     if [ -f "${rep}/admit-count.txt" ]; then
       echo "<br> &nbsp;"
