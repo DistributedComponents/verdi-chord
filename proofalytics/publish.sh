@@ -31,20 +31,16 @@ function main {
   # publish ticks for debugging travis ci
   cp *.ticks "$REPDIR"
 
-  echo "report,count" > "${LDASH}admits.csv"
+  echo "report,count" > "${LDASH}/admits.csv"
+  echo "report,count" > "${LDASH}/qeds.csv"
   mkindex > "${LDASH}index.html"
   echo "$(date) $(cat admit-count.txt)" >> "${LDASH}admit-log.txt"
   echo "$(date) $(cat qed-count.txt)" >> "${LDASH}qed-log.txt"
 
-  # TODO do not copy paste, handle paths better
-  if [ -f "${LDASH}admits.csv" ]; then
-    ${PADIR}/plot.sh "${LDASH}admits.csv"
-    mv admits.png "${LDASH}"
-  fi
-  if [ -f "${LDASH}qeds.csv" ]; then
-    ${PADIR}/plot.sh "${LDASH}qeds.csv"
-    mv qeds.png "${LDASH}"
-  fi
+  pushd "$LDASH" > /dev/null
+  ${PADIR}/plot.sh admits.csv
+  ${PADIR}/plot.sh qeds.csv
+  popd > /dev/null
 
   echo "SYNC local  -> remote"
   $SYNC "$LDASH" "$RDASH"
