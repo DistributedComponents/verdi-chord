@@ -377,7 +377,10 @@ Lemma cur_request_timeouts_ok'_sound :
     cur_request_timeouts_ok' cr ts ->
     cur_request_timeouts_ok cr ts.
 Proof.
-Admitted.
+  intros.
+  inv_prop cur_request_timeouts_ok';
+    econstructor; now eauto.
+Qed.
 Hint Resolve cur_request_timeouts_ok'_sound.
 
 Lemma cur_request_timeouts_ok'_complete :
@@ -385,7 +388,9 @@ Lemma cur_request_timeouts_ok'_complete :
     cur_request_timeouts_ok cr ts ->
     cur_request_timeouts_ok' cr ts.
 Proof.
-Admitted.
+  intros.
+  inv_prop cur_request_timeouts_ok; subst; eauto.
+Qed.
 Hint Resolve cur_request_timeouts_ok'_complete.
 
 Definition all_nodes_cur_request_timeouts_related (gst : global_state) : Prop :=
