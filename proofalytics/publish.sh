@@ -183,9 +183,9 @@ EOF
     btime=$(awk -W lint=fatal \
               'BEGIN { FS = ","; tot = 0 }  \
                { tot += $2 }      \
-               END { print tot " s"}' \
+               END { print tot }' \
               "${rep}/build-times.csv")
-    echo $btime
+    echo "$btime s"
     echo "${rep},$btime" >> "${LDASH}btimes.csv"
 
     if [ -f "${rep}/admit-count.txt" ]; then
