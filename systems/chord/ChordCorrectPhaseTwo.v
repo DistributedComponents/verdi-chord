@@ -2949,12 +2949,159 @@ Proof.
     find_apply_lem_hyp live_node_equiv_live_node_bool. auto.
 Qed.
 
+Lemma map_empty :
+  forall A B (f : A -> B) l,
+    map f l = [] ->
+    l = [].
+Proof.
+  intros. destruct l; simpl in *; congruence.
+Qed.
+
+Lemma nonempty_filter_exists :
+  forall A f (l : list A),
+    filter f l <> [] ->
+    exists x,
+      In x l /\ f x = true.
+Proof.
+  induction l; intros; simpl in *; try congruence.
+  - break_match.
+    + eexists; intuition eauto.
+    + intuition. break_exists_exists; intuition.
+Qed.
+
+Lemma exists_filter_nonempty :
+  forall A f (l : list A),
+    (exists x,
+      In x l /\
+      f x = true) ->
+    filter f l <> [].
+Proof.
+  intros.
+  break_exists. break_and.
+  cut (In x (filter f l)); intuition; repeat find_rewrite; try solve_by_inversion.
+  apply filter_In. intuition.
+Qed.
+
+Theorem live_node_preserved_by_recv_step :
+  forall gst h src st msg gst' e st' ms nts cts xs ys,
+    live_node gst h ->
+    Some st = sigma gst h ->
+    recv_handler src h st msg = (st', ms, nts, cts) ->
+    gst' = apply_handler_result h (st', ms, nts, cts) e (update_msgs gst (xs ++ ys)) ->
+    live_node gst' h.
+Proof using.
+  intuition.
+  eapply when_apply_handler_result_preserves_live_node; [| | | |eauto]; eauto.
+  - eauto using apply_handler_result_updates_sigma.
+  - eapply joined_preserved_by_recv_handler.
+    * eauto.
+    * break_live_node.
+      find_rewrite.
+      find_injection.
+      auto.
+Qed.
+
+Lemma in_nodes_sigma_some :
+  forall gst h,
+    initial_st gst ->
+    In h (nodes gst) ->
+    exists st,
+      sigma gst h = Some st.
+Proof.
+  intros. unfold initial_st in *. intuition.
+  match goal with
+  | H : context [start_handler] |- _ =>
+    remember H as Hsh; clear HeqHsh; clear H
+  end.
+  specialize (Hsh h). concludes.
+  destruct (start_handler h (nodes gst)) as [[st ms] nts].
+  specialize (Hsh st ms nts). intuition.
+  eauto.
+Qed.
+
+Lemma exists_node_in_initial_st :
+  forall gst,
+    initial_st gst ->
+    exists h,
+      In h (nodes gst) /\ ~ In h (failed_nodes gst).
+Proof.
+  intros. unfold initial_st in *. intuition.
+  destruct (nodes gst); simpl in *; [omega|].
+  repeat find_rewrite.
+  eexists; intuition; eauto.
+Qed.
+
+Lemma live_node_in_initial_st :
+  forall gst,
+    initial_st gst ->
+    exists h,
+      live_node gst h.
+Proof.
+  intros.
+  find_copy_apply_lem_hyp exists_node_in_initial_st.
+  break_exists_name h; exists h. intuition.
+  find_copy_eapply_lem_hyp in_nodes_sigma_some; eauto.
+  break_exists_name st. unfold live_node. intuition.
+  exists st. intuition.
+  find_apply_lem_hyp sigma_initial_st_start_handler; auto. subst.
+  pose proof succ_list_len_lower_bound.
+  rewrite start_handler_init_state_preset;
+    [|unfold initial_st in *; intuition].
+  reflexivity.
+Qed.
+
+Lemma always_exists_live_node :
+  forall gst,
+    reachable_st gst ->
+    exists h,
+      live_node gst h.
+Proof.
+  induction 1; intros.
+  - eauto using live_node_in_initial_st.
+  - inv H0.
+    + break_exists_exists.
+      eapply adding_nodes_does_not_affect_live_node; simpl; eauto.
+    + unfold failure_constraint in *. intuition.
+      unfold principal_failure_constraint in *. unfold principal in *.
+      admit.
+    + break_exists_exists.
+      destruct (addr_eq_dec h x); subst.
+      * eauto using live_node_preserved_by_timeout_step.
+      * simpl.
+        find_copy_apply_lem_hyp live_node_means_state_exists. break_exists.
+        eapply live_node_equivalence; simpl; rewrite_update; eauto.
+    + break_exists_exists.
+      destruct (addr_eq_dec (fst (snd m)) x); subst.
+      * eauto using live_node_preserved_by_recv_step.
+      * simpl.
+        find_copy_apply_lem_hyp live_node_means_state_exists. break_exists.
+        eapply live_node_equivalence; simpl; rewrite_update; eauto.
+    + break_exists_exists. erewrite live_node_specificity; eauto.
+    + break_exists_exists. erewrite live_node_specificity; eauto.
+Admitted.
+
+Lemma live_addrs_not_empty :
+  forall gst,
+    reachable_st gst ->
+    live_addrs gst <> [].
+Proof.
+  intros.
+  find_apply_lem_hyp always_exists_live_node.
+  apply exists_filter_nonempty.
+  break_exists_exists. find_copy_apply_lem_hyp live_node_equiv_live_node_bool.
+  unfold live_node in *.  intuition.
+Qed.
+
 Lemma live_ptrs_not_empty :
   forall gst,
     reachable_st gst ->
     live_ptrs gst <> [].
 Proof.
-Admitted.
+  intuition.
+  eapply live_addrs_not_empty; eauto. 
+  unfold live_ptrs in *.
+  eauto using map_empty.
+Qed.
     
 Lemma always_possible_preds_lst :
   forall gst,
