@@ -1,7 +1,7 @@
-COQVERSION := $(shell coqc --version|egrep "version (8\\.6|trunk)")
+include Makefile.detect-coq-version
 
-ifeq "$(COQVERSION)" ""
-$(error "Verdi Chord is only compatible with Coq version 8.6")
+ifeq (,$(filter $(COQVERSION),8.6 8.7 trunk))
+$(error "Verdi Chord is only compatible with Coq version 8.6.1")
 endif
 
 COQPROJECT_EXISTS=$(wildcard _CoqProject)
