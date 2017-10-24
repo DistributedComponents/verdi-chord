@@ -940,18 +940,16 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       exists s,
         best_succ gst h s.
 
-  (* This is a way of dealing with succ lists missing entries
-     mid-stabilization that doesn't involve putting artificial entries
-     into the actual successor list. *)
-  Definition ext_succ_list_span_includes (h : id) (succs : list id) (n : id) : Prop.
-  Admitted.
-  (* fix this definition to work with bitvectors.
-    forall n l e,
-      length (h :: succs) = n ->
-      l = last succs h ->
-      e = l + (Chord.SUCC_LIST_LEN - n) ->
-      ChordIDSpace.between h n e.
-   *)
+  Definition not_skipped (h : id) (succs : list id) (n : id) : Prop :=
+    forall k l,
+      length (h :: succs) = k ->
+      forall a b xs ys,
+        h :: succs = xs ++ [a; b] ++ ys ->
+        ~ between a n b \/
+        b = last succs h /\
+        forall e,
+          e = Z.to_nat (z_of_id l) + (SUCC_LIST_LEN - k) ->
+          between a n (id_of_z (Z.of_nat e)).
 
   (* "A principal node is a member that is not skipped by any member's
      extended successor list" *)
@@ -961,19 +959,23 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       sigma gst h = Some st ->
       succs = map ChordIDSpace.id_of (succ_list st) ->
       pid = hash p ->
-      ext_succ_list_span_includes (hash h) succs pid ->
+      not_skipped (hash h) succs pid ->
       In pid succs.
 
   Definition principals (gst : global_state) (ps : list addr) : Prop :=
     NoDup ps /\
     Forall (principal gst) ps /\
-    forall p, principal gst p -> In p ps.
+    forall p,
+      principal gst p ->
+      In p ps.
 
+  (* f can fail unless it's the (SUCC_LIST_LEN+1)th principal. *)
   Definition principal_failure_constraint (gst : global_state) (f : addr) : Prop :=
     principal gst f ->
     forall ps,
       principals gst ps ->
-      length ps > (SUCC_LIST_LEN + 1).
+      length ps = SUCC_LIST_LEN + 1 ->
+      False.
 
   Definition failure_constraint (gst : global_state) (f : addr) (gst' : global_state) : Prop :=
     live_node_in_succ_lists gst' /\
