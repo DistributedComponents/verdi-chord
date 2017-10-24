@@ -954,6 +954,7 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
   (* "A principal node is a member that is not skipped by any member's
      extended successor list" *)
   Definition principal (gst : global_state) (p : addr) : Prop :=
+    live_node gst p /\
     forall h st succs pid,
       live_node gst h ->
       sigma gst h = Some st ->

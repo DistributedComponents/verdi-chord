@@ -26,12 +26,13 @@ Require Import Chord.LiveNodesNotClients.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.QueryInvariant.
 Require Import Chord.NodesAlwaysHaveLiveSuccs.
+Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.PtrCorrectInvariant.
 Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.PredNeverSelfInvariant.
 Require Import Chord.PtrsJoined.
-Require Import Chord.NodesNotJoinedHaveNoSuccessors.
+Require Import Chord.RingCorrect.
 Require Import Chord.ChordCorrectPhaseOne.
 
 Open Scope nat_scope.
@@ -3056,29 +3057,17 @@ Lemma always_exists_live_node :
     exists h,
       live_node gst h.
 Proof.
-  induction 1; intros.
-  - eauto using live_node_in_initial_st.
-  - inv H0.
-    + break_exists_exists.
-      eapply adding_nodes_does_not_affect_live_node; simpl; eauto.
-    + unfold failure_constraint in *. intuition.
-      unfold principal_failure_constraint in *. unfold principal in *.
-      admit.
-    + break_exists_exists.
-      destruct (addr_eq_dec h x); subst.
-      * eauto using live_node_preserved_by_timeout_step.
-      * simpl.
-        find_copy_apply_lem_hyp live_node_means_state_exists. break_exists.
-        eapply live_node_equivalence; simpl; rewrite_update; eauto.
-    + break_exists_exists.
-      destruct (addr_eq_dec (fst (snd m)) x); subst.
-      * eauto using live_node_preserved_by_recv_step.
-      * simpl.
-        find_copy_apply_lem_hyp live_node_means_state_exists. break_exists.
-        eapply live_node_equivalence; simpl; rewrite_update; eauto.
-    + break_exists_exists. erewrite live_node_specificity; eauto.
-    + break_exists_exists. erewrite live_node_specificity; eauto.
-Admitted.
+  intros.
+  find_apply_lem_hyp zave_invariant_holds.
+  inv_prop zave_invariant.
+  pose proof succ_list_len_lower_bound.
+  inv_prop sufficient_principals; break_and.
+  inv_prop principals; break_and.
+  destruct x; simpl in *; try omega.
+  inv_prop Forall.
+  unfold principal in *.
+  eexists; intuition eauto.
+Qed.
 
 Lemma live_addrs_not_empty :
   forall gst,

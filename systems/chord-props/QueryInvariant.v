@@ -942,6 +942,7 @@ Proof.
   }
   repeat find_rewrite.
   inv_prop cur_request_timeouts_ok'.
+
 (*
 If there's a response to a request on the wire, we'll either recieve the
 response or the situation will stay the same.
