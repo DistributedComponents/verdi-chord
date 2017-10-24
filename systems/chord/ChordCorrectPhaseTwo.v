@@ -3128,12 +3128,25 @@ USED: In phase two.
 Lemma correct_pred_unique :
   forall gst h p p',
     reachable_st gst ->
+    wf_ptr p ->
+    wf_ptr p' ->
     live_node gst (addr_of p) ->
     live_node gst (addr_of p') ->
     pred_correct gst h (Some p) ->
     pred_correct gst h (Some p') ->
     p = p'.
 Proof.
+  intros.
+  destruct (pointer_eq_dec p p'); auto.
+  destruct (pointer_eq_dec p' p); auto.
+  unfold pred_correct in *. break_exists_name p1. break_exists_name p2. intuition.
+  repeat find_inversion.
+  eapply_prop_hyp p1 @eq; auto.
+  eapply_prop_hyp p2 @eq; auto.
+  find_apply_lem_hyp better_pred_elim. intuition.
+  find_apply_lem_hyp better_pred_elim. intuition.
+  find_eapply_lem_hyp ptr_between_antisym'. intuition.
+Qed.
 (*
 This is mostly a fact about the definition of pred_correct and shouldn't require
 any tricky invariants.
@@ -3141,7 +3154,6 @@ any tricky invariants.
 DIFFICULTY: 3
 USED: In phase two.
 *)
-Admitted.
 
 Lemma correct_first_succ_unique :
   forall gst h s s',
