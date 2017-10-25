@@ -266,6 +266,7 @@ Proof using.
   intros.
   now invc_labeled_step.
 Qed.
+Hint Resolve failed_nodes_never_added : invar.
 
 Lemma failed_nodes_never_removed :
   forall gst gst' l h,
@@ -276,6 +277,7 @@ Proof using.
   intros.
   now invc_labeled_step.
 Qed.
+Hint Resolve failed_nodes_never_removed : invar.
 
 Lemma failed_nodes_not_new :
   forall gst gst' l h,
@@ -286,6 +288,7 @@ Proof using.
   intros.
   now invc_labeled_step.
 Qed.
+Hint Resolve failed_nodes_not_new : invar.
 
 Lemma nodes_never_removed :
   forall gst gst' l h,
@@ -296,6 +299,7 @@ Proof using.
   intros.
   now invc_labeled_step.
 Qed.
+Hint Resolve nodes_never_removed : invar.
 
 Lemma recv_implies_state_exists_after_timeout :
   forall gst gst' gst'' h t eff src dst m,
@@ -1525,3 +1529,102 @@ Proof.
       eauto using lb_execution_invar, reachable_st_lb_execution_cons.
   - firstorder.
 Qed.
+
+(* TODO(ryan) move this somewhere else *)
+Lemma sent_non_client_message_means_in_nodes :
+  forall gst src dst p,
+    reachable_st gst ->
+    ~ client_payload p ->
+    In (src, (dst, p)) (msgs gst) ->
+    In src (nodes gst).
+Proof.
+  intros.
+  generalize dependent p.
+  generalize dependent dst.
+  generalize dependent src.
+  pattern gst.
+  apply chord_net_invariant; autounfold; simpl; intros;
+    repeat find_rewrite; intuition eauto;
+      try solve [
+            find_apply_lem_hyp in_app_or; break_or_hyp;
+            [find_apply_lem_hyp in_map_iff; expand_def; unfold send in *; find_injection; in_crush
+            |in_crush; eauto with datatypes]
+          ].
+  - inv_prop initial_st; break_and.
+    repeat find_rewrite.
+    in_crush.
+  - in_crush; eauto.
+    unfold send in *.
+    find_injection; tauto.
+  - simpl in *. 
+    find_apply_lem_hyp in_app_or.
+    break_or_hyp; eauto with datatypes.
+Qed.
+Hint Resolve sent_non_client_message_means_in_nodes.
+
+Lemma open_request_with_response_on_wire_closed_or_preserved :
+  forall gst l gst' src dst req res,
+    reachable_st gst ->
+    In src (nodes gst) ->
+    labeled_step_dynamic gst l gst' ->
+    open_request_to gst src dst req ->
+    request_response_pair req res ->
+    In res (channel gst dst src) ->
+    RecvMsg dst src res = l \/
+    open_request_to gst' src dst req /\
+    In res (channel gst' dst src).
+Proof.
+(*
+If there's a response to a request on the wire, we'll either recieve the
+response or the situation will stay the same.
+
+This still needs some set-up to be proved easily since it relies on the
+assumption that there's only ever one request.
+
+DIFFICULTY: Ryan.
+USED: In phase two.
+ *)
+  intros.
+  assert (exists st__src, sigma gst src = Some st__src)
+    by eauto.
+  break_exists_name st__src.
+  assert (exists st__src, sigma gst' src = Some st__src)
+    by eauto with invar.
+  break_exists_name st__src'.
+  assert (~ client_payload res0)
+    by (intro; inv_prop client_payload; inv_prop request_response_pair).
+  assert (In dst (nodes gst))
+    by eauto.
+  assert (exists st__dst, sigma gst dst = Some st__dst)
+    by eauto.
+  break_exists_name st__dst.
+  assert (exists st__dst, sigma gst' dst = Some st__dst)
+    by eauto with invar.
+  break_exists_name st__dst'.
+  assert (query_message_ok src (cur_request st__src) (delayed_queries st__dst)
+                           (channel gst src dst) (channel gst dst src)).
+    by (eapply query_message_ok_invariant; eauto).
+  assert (query_message_ok src (cur_request st__src') (delayed_queries st__dst')
+                           (channel gst' src dst) (channel gst' dst src))
+    by (eapply query_message_ok_invariant; eauto with invar).
+  inv_prop open_request_to; expand_def.
+  assert (cur_request_timeouts_ok' (cur_request st__src) (timeouts gst src))
+    by eauto.
+  assert (cur_request_timeouts_ok' (cur_request st__src') (timeouts gst' src)).
+  {
+    eapply cur_request_timeouts_ok'_complete.
+    eapply cur_request_timeouts_related_invariant; eauto with invar.
+  }
+
+  inv_prop labeled_step_dynamic.
+  - handler_def.
+    handler_def.
+    + right; simpl in *.
+      update_destruct; subst; rewrite_update; split; admit.
+    + admit.
+    + admit.
+    + admit.
+  - admit.
+  - admit.
+  - admit.
+Admitted.
