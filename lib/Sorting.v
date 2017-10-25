@@ -2,6 +2,10 @@ Require Import List.
 Import ListNotations.
 Require Import Sorting.Permutation.
 
+(**
+  Lightly adapted from Coq stdlib mergesort to not be a functor.
+*)
+
 Section Sorting.
   Variable t : Type.
   Variable le : t -> t -> bool.
@@ -72,10 +76,80 @@ Section Sorting.
   Definition sort : list t -> list t :=
     iter_merge [].
 
+  (* all proofs below from Coq stdlib mergesort implementation *)
+
+  Local Ltac invert H := inversion H; subst; clear H.
+
+  Fixpoint flatten_stack (stack : list (option (list t))) :=
+    match stack with
+    | [] => []
+    | None :: stack' => flatten_stack stack'
+    | Some l :: stack' => l ++ flatten_stack stack'
+    end.
+
+  Theorem Permuted_merge :
+   forall l1 l2, Permutation (l1++l2) (merge l1 l2).
+  Proof.
+    induction l1; simpl merge; intro.
+    - assert (forall l, (fix merge_aux (l0 : list t) : list t := l0) l = l)
+      as -> by (destruct l; trivial). (* Technical lemma *)
+      apply Permutation_refl.
+    - induction l2.
+      rewrite app_nil_r. apply Permutation_refl.
+      destruct (le a a0).
+        + constructor; apply IHl1.
+        + apply Permutation_sym, Permutation_cons_app, Permutation_sym, IHl2.
+  Qed.
+
+  Theorem Permuted_merge_stack : forall stack,
+    Permutation (flatten_stack stack) (merge_stack stack).
+  Proof.
+    induction stack as [|[]]; simpl.
+    -  trivial.
+    -  transitivity (l ++ merge_stack stack).
+        + apply Permutation_app_head; trivial.
+        + apply Permuted_merge.
+    - assumption.
+  Qed.
+
+  Theorem Permuted_merge_list_to_stack :
+    forall stack l,
+      Permutation (l ++ flatten_stack stack)
+                  (flatten_stack (merge_list_to_stack stack l)).
+  Proof.
+    induction stack as [|[]]; simpl; intros.
+    - reflexivity.
+    - rewrite app_assoc.
+      etransitivity.
+      + apply Permutation_app_tail.
+        etransitivity.
+        * apply Permutation_app_comm.
+        * apply Permuted_merge.
+      + apply IHstack.
+    - reflexivity.
+  Qed.
+
+  Theorem Permuted_iter_merge : forall l stack,
+    Permutation (flatten_stack stack ++ l) (iter_merge stack l).
+  Proof.
+    induction l; simpl; intros.
+    - rewrite app_nil_r. apply Permuted_merge_stack.
+    - change (a::l) with ([a]++l).
+      rewrite app_assoc.
+      etransitivity.
+      +  apply Permutation_app_tail.
+         etransitivity.
+         apply Permutation_app_comm.
+         apply Permuted_merge_list_to_stack.
+      + apply IHl.
+  Qed.
+
   Theorem sort_permutes :
     forall l l',
       l' = sort l ->
       Permutation l l'.
-  Admitted.
+  Proof.
+    intros; subst; apply (Permuted_iter_merge l []).
+  Qed.
 
 End Sorting.
