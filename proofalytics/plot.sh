@@ -18,6 +18,7 @@ set title "$name"
 set xdata time
 set timefmt "%y%m%d"
 set format x "%b %d"
+set xrange ["170909":]
 set xtics rotate by 45 right
 set offset graph 0.01, graph 0.01, graph 0.05, graph 0.05
 plot "$tmp" using 1:2 notitle with points \
