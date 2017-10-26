@@ -2880,6 +2880,18 @@ Proof.
       eapply lt_asymm; [apply H | apply H']
     end.
 Qed.
+
+Lemma ptr_between_antisym'':
+  forall a b c : pointer, ptr_between a b c -> ~ ptr_between a c b.
+Proof.
+  intros. intro.
+  invcs H; invcs H0; intuition;
+    match goal with
+    | H : ?a < ?b, H' : ?b < ?a |- _ =>
+      eapply lt_asymm; [apply H | apply H']
+    end.
+Qed.
+
 Close Scope id.
 
 Lemma ptr_between_bool_antisym':
@@ -3156,14 +3168,25 @@ USED: In phase two.
 *)
 
 Lemma correct_first_succ_unique :
-  forall gst h s s',
+  forall gst h p p',
     reachable_st gst ->
-    live_node gst (addr_of s) ->
-    live_node gst (addr_of s') ->
-    first_succ_correct gst h (Some s) ->
-    first_succ_correct gst h (Some s') ->
-    s = s'.
+    wf_ptr p ->
+    wf_ptr p' ->
+    live_node gst (addr_of p) ->
+    live_node gst (addr_of p') ->
+    first_succ_correct gst h (Some p) ->
+    first_succ_correct gst h (Some p') ->
+    p = p'.
 Proof.
+  intros.
+  destruct (pointer_eq_dec p p'); auto.
+  destruct (pointer_eq_dec p' p); auto.
+  unfold first_succ_correct in *. break_exists_name p1. break_exists_name p2. intuition.
+  repeat find_inversion.
+  eapply_prop_hyp p1 @eq; auto.
+  eapply_prop_hyp p2 @eq; auto.
+  unfold better_succ in *. intuition. unfold ptr_between in *.
+  find_eapply_lem_hyp ptr_between_antisym''. intuition.
 (*
 This is mostly a fact about the definition of first_succ_correct and shouldn't
 require any tricky invariants.
@@ -3171,7 +3194,7 @@ require any tricky invariants.
 DIFFICULTY: 3
 USED: In phase two.
 *)
-Admitted.
+Qed.
 
 Lemma first_succs_correct_succ_right :
   forall gst h s,
@@ -3183,6 +3206,12 @@ Lemma first_succs_correct_succ_right :
     first_succ_correct gst h (Some s) ->
     has_first_succ gst (addr_of h) s.
 Proof.
+  intros. unfold first_succs_correct in *.
+  copy_eapply_lem_prop_hyp live_node_means_state_exists h.
+  break_exists.
+  copy_eapply_prop_hyp first_succ_correct sigma; eauto.
+  destruct (succ_list x) eqn:?; simpl in *; [unfold first_succ_correct in *; break_exists; intuition; congruence|].
+  find_eapply_lem_hyp WfPtrSuccListInvariant.wf_ptr_succ_list_invariant; eauto.
 (*
 This is really a proof about first_succ_correct and has_first_succ and shouldn't
 require any invariants.
