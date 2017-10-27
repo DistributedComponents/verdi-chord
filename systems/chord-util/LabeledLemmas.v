@@ -1377,18 +1377,53 @@ Hint Resolve lb_execution_cons_cons : invar.
 Ltac invar_eauto :=
   eauto with invar.
 
+Lemma channel_stays_empty' :
+  forall gst gst' src dst,
+    (forall p, In (src, (dst, p)) (msgs gst') -> In (src, (dst, p)) (msgs gst)) ->
+    channel gst src dst = [] ->
+    channel gst' src dst = [].
+Proof.
+  intros.
+  destruct (channel gst' src dst) eqn:?; auto.
+  exfalso.
+  assert (In p (channel gst' src dst)) by (find_rewrite; intuition).
+  find_apply_lem_hyp in_channel_in_msgs. find_apply_hyp_hyp.
+  find_apply_lem_hyp in_msgs_in_channel. repeat find_rewrite. solve_by_inversion.
+Qed.
+
 Lemma channel_stays_empty :
   forall ex src dst,
+    reachable_st (occ_gst (hd ex)) ->
     lb_execution ex ->
     In src (failed_nodes (occ_gst (hd ex))) ->
     channel (occ_gst (hd ex)) src dst = [] ->
     channel (occ_gst (hd (tl ex))) src dst = [].
 Proof.
+  intros. destruct ex. simpl in *.
+  inv_prop lb_execution.
+  inv_prop labeled_step_dynamic; simpl in *; repeat find_rewrite.
+  - destruct (addr_eq_dec h src); subst; try congruence.
+    eapply channel_stays_empty'; [|eauto]; simpl in *.
+    intros. in_crush. destruct x. find_rewrite_lem send_definition.
+    congruence.
+  - destruct (addr_eq_dec (fst (snd m)) src); subst; try congruence.
+    eapply channel_stays_empty'; [|eauto]; simpl in *.
+    intros. repeat find_rewrite. in_crush.
+    destruct x. find_rewrite_lem send_definition.
+    congruence.
+  - find_eapply_lem_hyp clients_not_in_failed; eauto.
+    intuition. destruct (addr_eq_dec h src); subst; intuition.
+    eapply channel_stays_empty'; [|eauto]; simpl in *.
+    intros. intuition.
+    find_rewrite_lem send_definition.
+    congruence.
+  - eapply channel_stays_empty'; [|eauto]; simpl in *.
+    intros. find_rewrite. in_crush.
 (*
 USED: In phase one (transitively)
 DIFFICULTY: 1
 *)
-Admitted.
+Qed.
 
 Lemma open_request_until_timeout :
   forall h dst req ex,
