@@ -74,4 +74,9 @@ Lemma in_failed_in_nodes :
     In h (failed_nodes gst) ->
     In h (nodes gst).
 Proof.
-Admitted.
+  induction 1; intros.
+  - unfold initial_st in *.
+    intuition; repeat find_rewrite; solve_by_inversion.
+  - invcs H0; intuition.
+    subst. auto.
+Qed.
