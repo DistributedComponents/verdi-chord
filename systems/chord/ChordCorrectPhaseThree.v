@@ -187,15 +187,29 @@ Proof.
   find_rewrite; find_injection; find_rewrite.
 Admitted.
 
+Lemma better_succ_same :
+  forall gst l gst' h s s',
+    labeled_step_dynamic gst l gst' ->
+    better_succ gst h s s' ->
+    better_succ gst' h s s'.
+Proof.
+  intros.
+  unfold better_succ in *. intuition. eauto using live_node_invariant.
+Qed.
+
 Lemma first_succ_correct_invar :
   forall o ex h s,
     lb_execution (Cons o ex) ->
-    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
+    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) (Cons o ex) ->
     first_succ_correct (occ_gst o) h (Some s) ->
     first_succ_correct (occ_gst (hd ex)) h (Some s).
 Proof.
-  (* relies on the fact that when nodes aren't joining, better_succ is preserved *)
-Admitted.
+  intros.
+  inv_prop lb_execution. simpl in *. unfold first_succ_correct in *.
+  break_exists_exists. intuition.
+  find_apply_lem_hyp always_now. simpl in *.
+  eapply_prop_hyp better_succ @eq; eauto using better_succ_same.
+Qed.
 
 Lemma succs_error_helper_invar :
   forall o ex h succs,
