@@ -373,9 +373,10 @@ Section LocalMeasure.
   Qed.
 
   Lemma max_cons_le :
-    forall l n,
+    forall n l,
       n <= max (n :: l).
   Proof.
+    intros. generalize n; clear n.
     induction l; intros; simpl in *; auto.
     unfold max in *. simpl in *.
     eapply le_trans; [eapply Nat.le_max_l|]; eauto.
