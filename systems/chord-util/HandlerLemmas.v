@@ -329,6 +329,16 @@ Proof.
   repeat eexists; intuition eauto.
 Qed.
 
+Lemma recv_handler_l_definition :
+  forall src dst st p st' ms nts cts l,
+    recv_handler_l src dst st p = (st', ms, nts, cts, l) ->
+    l = RecvMsg src dst p /\
+    recv_handler src dst st p = (st', ms, nts, cts).
+Proof.
+  unfold recv_handler_l.
+  intuition congruence.
+Qed.
+
 Lemma update_for_start_definition :
   forall gst gst' h st ms newts,
     gst' = update_for_start gst h (st, ms, newts) ->
@@ -1160,6 +1170,8 @@ Ltac handler_def :=
     apply request_timeout_handler_definition in H; expand_def
   | H:handle_query_timeout _ _ _ _ = _ |- _ =>
     apply handle_query_timeout_definition in H; expand_def
+  | H: recv_handler_l _ _ _ _ = _ |- _ =>
+    apply recv_handler_l_definition in H; expand_def
   | H: recv_handler _ _ _ _ = _ |- _ =>
     apply recv_handler_definition_existential in H; expand_def
   | H: handle_msg _ _ _ _ = _ |- _ =>

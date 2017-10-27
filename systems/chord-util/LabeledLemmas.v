@@ -1597,6 +1597,16 @@ Proof.
 Qed.
 Hint Resolve sent_non_client_message_means_in_nodes.
 
+(*TODO move to wherever response_payload is defined *)
+Definition response_payload_dec :
+  forall p,
+    {response_payload p} + {~ response_payload p}.
+Proof.
+  destruct p;
+    solve [left; constructor
+          |right; intro; inv_prop response_payload].
+Defined.
+
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
     reachable_st gst ->
@@ -1656,10 +1666,16 @@ USED: In phase two.
     handler_def.
     + right; simpl in *.
       update_destruct; subst; rewrite_update; split; admit.
+    + right; simpl in *; admit.
+    + right; simpl in *; admit.
+    + right; simpl in *; admit.
+  - handler_def.
+    destruct (addr_eq_dec (fst (snd m)) src); repeat find_rewrite;
+      destruct (response_payload_dec (snd (snd m))).
     + admit.
     + admit.
     + admit.
-  - admit.
+    + admit.
   - admit.
   - admit.
 Admitted.
