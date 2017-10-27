@@ -10,7 +10,7 @@ addons:
       - gnuplot
 env:
   global:
-    - COQ_VERSION=8.6.1
+    - COQ_VERSION=8.7.0
   matrix:
   - MODE=build
   - MODE=chord

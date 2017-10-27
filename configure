@@ -11,6 +11,7 @@ NAMESPACE_lib="Chord"
 NAMESPACE_systems_chord_util="Chord"
 NAMESPACE_systems_chord_props="Chord"
 NAMESPACE_systems_chord="Chord"
+NAMESPACE_extraction_chord_coq="Chord"
 CANARIES=("mathcomp.ssreflect.ssreflect" "Verdi requires mathcomp to be installed" "StructTact.StructTactics" "Build StructTact before building Verdi" "InfSeqExt.infseq" "Build InfSeqExt before building Verdi")
 Verdi_DIRS=(core lib systems extraction)
 source script/coqproject.sh

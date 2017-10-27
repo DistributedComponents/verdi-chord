@@ -16,8 +16,7 @@ $(info $(CHECKPATH))
 $(warning checkpath reported an error)
 endif
 
-CHORDMLFILES = extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli
-MLFILES = $(CHORDMLFILES)
+MLFILES = extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli
 
 default: Makefile.coq
 	$(MAKE) -f Makefile.coq
@@ -38,11 +37,9 @@ proofalytics-aux: Makefile.coq
 
 Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq -install none \
-	  -extra '$(CHORDMLFILES)' \
+	  -extra '$(MLFILES)' \
 	    'extraction/chord/coq/ExtractChord.v systems/chord/Chord.vo' \
-	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v' \
-	  -extra-phony 'distclean' 'clean' \
-	    'rm -f $$(join $$(dir $$(VFILES)),$$(addprefix .,$$(notdir $$(patsubst %.v,%.aux,$$(VFILES)))))'
+	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v'
 
 clean:
 	if [ -f Makefile.coq ]; then \
