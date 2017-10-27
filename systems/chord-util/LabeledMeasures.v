@@ -373,10 +373,13 @@ Section LocalMeasure.
   Qed.
 
   Lemma max_cons_le :
-    forall n l,
+    forall l n,
       n <= max (n :: l).
   Proof.
-  Admitted.
+    induction l; intros; simpl in *; auto.
+    unfold max in *. simpl in *.
+    eapply le_trans; [eapply Nat.le_max_l|]; eauto.
+  Qed.
 
   Lemma max_cons_cases :
     forall n l,
@@ -385,7 +388,14 @@ Section LocalMeasure.
       max (n :: l) = max l /\
       n <= max l.
   Proof.
-  Admitted.
+    intros. unfold max.
+    repeat (rewrite fold_symmetric; eauto using Max.max_assoc, Max.max_comm).
+    simpl.
+    match goal with
+    | |- context [Nat.max ?n ?m] =>
+      destruct (Nat.max_spec n m)
+    end; intuition.
+  Qed.
 
   Lemma sum_app :
     forall l l',
