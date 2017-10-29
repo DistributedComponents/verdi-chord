@@ -135,12 +135,19 @@ Lemma phase_three_error_nonincreasing_Cons :
   forall o ex,
     lb_execution (Cons o ex) ->
     reachable_st (occ_gst o) ->
+    strong_local_fairness (Cons o ex) ->
+    always (~_ now circular_wait) (Cons o ex) ->
     always (now phase_one) (Cons o ex) ->
     always (now phase_two) (Cons o ex) ->
     phase_three_error (occ_gst (hd ex)) <= phase_three_error (occ_gst o).
 Proof.
   (* use succs_error_nonincreasing *)
-Admitted.
+  intros.
+  find_eapply_lem_hyp succs_error_nonincreasing; eauto.
+  find_eapply_lem_hyp local_always_nonincreasing_causes_max_always_nonincreasing; eauto.
+  eapply_lem_prop_hyp always_now succs_error.
+  unfold measure_nonincreasing in *. destruct ex. simpl in *. auto.
+Qed.
 
 Lemma stabilize_adopt_succs :
   forall s h st p succs gst,
