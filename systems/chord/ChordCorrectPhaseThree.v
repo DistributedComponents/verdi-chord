@@ -84,6 +84,7 @@ Definition correct_succs (gst : global_state) (h : pointer) (st : data) : Prop :
     succ_list st = xs ++ s :: ys ->
     ptr_between h s' s ->
     live_node gst (addr_of s') ->
+    wf_ptr s' ->
     In s' xs.
 
 Definition all_succs_correct (gst : global_state) : Prop :=
@@ -94,13 +95,112 @@ Definition all_succs_correct (gst : global_state) : Prop :=
     correct_succs gst h st /\
     length (succ_list st) = Chord.SUCC_LIST_LEN.
 
+Lemma length_chop_succs :
+  forall l,
+    length (chop_succs l) <= SUCC_LIST_LEN.
+Proof.
+  intros. unfold chop_succs. apply firstn_le_length.
+Qed.
+
+Lemma length_find_succs :
+  forall h l,
+    length (find_succs h l) <= SUCC_LIST_LEN.
+Proof.
+  intros. induction l; simpl; try omega.
+  break_if; eauto using length_chop_succs.
+Qed.
+
+Lemma succ_list_bounded_by_succ_list_len :
+  forall gst h st,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    length (succ_list st) <= SUCC_LIST_LEN.
+Proof.
+  pose proof succ_list_len_lower_bound.
+  intros. induct_reachable_st; intros; simpl in *.
+  - find_apply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst. unfold start_handler. repeat break_match; simpl; try omega.
+    repeat break_match; eauto using length_chop_succs, length_find_succs.
+  - concludes. inv_prop step_dynamic; simpl in *; eauto.
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion. simpl. omega.
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion.
+      repeat (handler_def || handler_simpl);
+        find_apply_hyp_hyp; repeat find_rewrite; simpl in *; omega.
+    + update_destruct; subst; rewrite_update; simpl in *; eauto.
+      repeat (handler_def || handler_simpl;
+              eauto using length_chop_succs, length_find_succs).
+Qed.
+
+Lemma succs_error_helper_length:
+  forall ys gst p xs x,
+    x - (succs_error_helper gst p xs ys x) <= length ys.
+Proof.
+  induction ys; intros; simpl in *; try omega.
+  break_if; simpl; try omega.
+  match goal with
+  | |- context [ succs_error_helper ?gst ?p ?xs ?ys ?x ] =>
+    specialize (IHys gst p xs x)
+  end. omega.
+Qed.
+
+Lemma succs_error_helper_correct_succs:
+  forall gst h xs ys s acc x,
+    wf_ptr h ->
+    wf_ptr s ->
+    x = length (xs ++ s :: ys) ->
+    succs_error_helper gst h acc (xs ++ s :: ys) x <= 0 ->
+    forall s',
+      ptr_between h s' s ->
+      wf_ptr s' ->
+      live_node gst (addr_of s') ->
+      (In s' xs \/ In s' acc).
+Proof.
+  induction xs; intros; simpl in *.
+  - right. 
+    break_if; try omega.
+    find_rewrite_lem Forall_forall.
+    apply f.
+    apply filter_In. intuition; eauto using live_In_live_ptrs.
+    find_eapply_lem_hyp better_succ_intro;
+      [| | | | eauto]; eauto.
+    find_apply_lem_hyp better_succ_better_succ_bool_true. intuition.
+  - subst. break_if; try omega. simpl in *.
+    rewrite <- minus_n_O in *.
+    eapply_prop_hyp succs_error_helper succs_error_helper; eauto. simpl in *. intuition.
+Qed.
+
 Lemma phase_three_error_sound :
   forall occ,
     reachable_st (occ_gst occ) ->
     measure_zero phase_three_error occ ->
     all_succs_correct (occ_gst occ).
 Proof.
-Admitted.
+  unfold all_succs_correct. intros.
+  unfold measure_zero in *.
+  unfold phase_three_error in *.
+  find_eapply_lem_hyp max_measure_bounds_measures; eauto using live_node_in_active.
+  unfold succs_error in *. find_rewrite.
+  find_copy_apply_lem_hyp live_node_joined.
+  break_exists. break_and.
+  repeat find_rewrite. find_inversion. repeat find_rewrite.
+  match goal with
+  | |- _ /\ ?len_goal =>
+    assert len_goal by (find_apply_lem_hyp succ_list_bounded_by_succ_list_len; auto;
+                        match goal with
+                        | H : context [ succs_error_helper ?gst ?p ?xs ?ys ?x ] |- _ =>
+                          pose proof (succs_error_helper_length ys gst p xs x)
+                        end; omega)
+  end.
+  intuition.
+  unfold correct_succs.
+  intros. repeat find_rewrite.
+  rewrite <- wf_ptr_eq in *; eauto.
+  assert (wf_ptr s) by (eapply wf_ptr_succ_list_invariant'; eauto; repeat find_rewrite; in_crush).
+  eapply_lem_prop_hyp succs_error_helper_correct_succs succs_error_helper; eauto.
+  in_crush.
+Qed.
 
 Lemma phase_three_error_continuously_zero_sound :
   forall ex,
