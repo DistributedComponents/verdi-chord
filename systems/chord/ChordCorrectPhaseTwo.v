@@ -3199,8 +3199,10 @@ Qed.
 Lemma first_succs_correct_succ_right :
   forall gst h s,
     reachable_st gst ->
+    all_first_succs_best gst ->
     first_succs_correct gst ->
     wf_ptr h ->
+    wf_ptr s ->
     live_node gst (addr_of h) ->
     live_node gst (addr_of s) ->
     first_succ_correct gst h (Some s) ->
@@ -3210,8 +3212,14 @@ Proof.
   copy_eapply_lem_prop_hyp live_node_means_state_exists h.
   break_exists.
   copy_eapply_prop_hyp first_succ_correct sigma; eauto.
-  destruct (succ_list x) eqn:?; simpl in *; [unfold first_succ_correct in *; break_exists; intuition; congruence|].
-  find_eapply_lem_hyp WfPtrSuccListInvariant.wf_ptr_succ_list_invariant; eauto.
+  copy_eapply_prop_hyp all_first_succs_best h.
+  unfold first_succ_is_best_succ in *. break_exists. intuition.
+  unfold best_succ in *. break_exists. intuition.
+  repeat find_rewrite. repeat find_inversion. repeat find_rewrite. simpl in *.
+  find_copy_eapply_lem_hyp WfPtrSuccListInvariant.wf_ptr_succ_list_invariant; eauto.
+  find_copy_eapply_lem_hyp (correct_first_succ_unique gst h s); eauto.
+  subst. unfold has_first_succ.
+  eexists; intuition eauto. repeat find_rewrite. reflexivity.
 (*
 This is really a proof about first_succ_correct and has_first_succ and shouldn't
 require any invariants.
@@ -3219,11 +3227,12 @@ require any invariants.
 DIFFICULTY: 2
 USED: In phase two.
 *)
-Admitted.
+Qed.
 
 Lemma all_first_succs_correct_finds_pred :
   forall gst h,
     reachable_st gst ->
+    all_first_succs_best gst ->
     first_succs_correct gst ->
     wf_ptr h ->
     live_node gst (addr_of h) ->
@@ -3278,6 +3287,16 @@ Proof.
   eapply between_swap_not_xy; eauto.
 Qed.
 
+Lemma phase_one_all_first_succs_best :
+  forall ex,
+    always (now phase_one) ex ->
+    all_first_succs_best (occ_gst (hd ex)).
+Proof.
+  intros. unfold phase_one in *.
+  destruct ex. simpl in *.
+  find_eapply_lem_hyp always_now. simpl in *. auto.
+Qed.
+
 Lemma error_decreases_when_succs_right :
   forall ex h,
     lb_execution ex ->
@@ -3294,7 +3313,10 @@ Lemma error_decreases_when_succs_right :
     eventually (pred_improves h) ex.
 Proof.
   intros.
-  find_copy_apply_lem_hyp all_first_succs_correct_finds_pred; auto.
+  find_copy_apply_lem_hyp all_first_succs_correct_finds_pred; auto using phase_one_all_first_succs_best.
+  Focus 2. destruct ex. simpl in *. 
+  eapply_lem_prop_hyp always_now' phase_one. unfold phase_one in *.
+  unfold now in *.
   break_exists_name p. break_and.
   find_copy_apply_lem_hyp (start_stabilize_with_first_successor_eventually ex (addr_of p));
     eauto; try now (inv_prop merge_point; break_and).
