@@ -3314,7 +3314,6 @@ Lemma error_decreases_when_succs_right :
 Proof.
   intros.
   find_copy_apply_lem_hyp all_first_succs_correct_finds_pred; auto using phase_one_all_first_succs_best.
-  Focus 2. destruct ex. simpl in *. 
   eapply_lem_prop_hyp always_now' phase_one. unfold phase_one in *.
   unfold now in *.
   break_exists_name p. break_and.
