@@ -1606,6 +1606,15 @@ Proof.
     solve [left; constructor
           |right; intro; inv_prop response_payload].
 Defined.
+Lemma req_res_pair_response_payload :
+  forall req res,
+    request_response_pair req res ->
+    response_payload res.
+Proof.
+  intros.
+  inv_prop request_response_pair; constructor.
+Qed.
+Hint Resolve req_res_pair_response_payload.
 
 Lemma open_request_with_response_on_wire_closed_or_preserved :
   forall gst l gst' src dst req res,
@@ -1670,12 +1679,29 @@ USED: In phase two.
     + right; simpl in *; admit.
     + right; simpl in *; admit.
   - handler_def.
-    destruct (addr_eq_dec (fst (snd m)) src); repeat find_rewrite;
+    destruct (addr_eq_dec (fst (snd m)) src); repeat find_rewrite.
+    + subst.
+      find_injection.
+      inv H11; repeat find_rewrite; find_injection;
+        try congruence;
+        try (exfalso; eapply_prop no_responses; eauto).
+      repeat find_rewrite; find_injection.
+      assert (res1 = res0); subst.
+      {
+        repeat find_apply_lem_hyp in_split; break_exists.
+        assert (no_responses (x0 ++ x2)) by eauto.
+        assert (~ In res0 x0).
+          by (intro; eapply_prop no_responses; [in_crush|]; eauto).
+        assert (~ In res0 x2).
+          by (intro; eapply_prop no_responses; [in_crush|]; eauto).
+        assert (In res0 (x9 ++ res0 :: x10)) by in_crush.
+        repeat find_rewrite.
+        in_crush.
+      }
       destruct (response_payload_dec (snd (snd m))).
-    + admit.
-    + admit.
-    + admit.
-    + admit.
+      * admit.
+      * admit.
+    + left. admit.
   - admit.
   - admit.
 Admitted.
