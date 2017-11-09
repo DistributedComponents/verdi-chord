@@ -1122,11 +1122,12 @@ Proof.
            break_exists_name st__dst.
            intro Hin. apply in_msgs_in_channel in Hin.
            find_eapply_lem_hyp (query_message_ok_invariant gst ltac:(auto) (fst (snd m)) (addr_of dstp)); eauto.
-           inv_prop query_message_ok.
+           invcs_prop query_message_ok.
            ++ congruence.
            ++ inv_prop request_response_pair; eapply_prop no_responses; eauto.
-           ++ inv_prop query_request; eapply_prop no_requests; eauto.
-           ++ inv_prop query_request; eapply_prop no_requests; eauto.
+           ++ repeat find_rewrite; inv_prop request_response_pair; eapply_prop no_responses; eauto.
+           ++ repeat find_rewrite; inv_prop query_request; eapply_prop no_requests; eauto.
+           ++ repeat find_rewrite; inv_prop query_request; eapply_prop no_requests; eauto.
         -- destruct m as [? [? ?]]; simpl in *.
            repeat find_rewrite; in_crush.
       * split.
