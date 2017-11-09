@@ -878,24 +878,32 @@ Definition no_responses (chan : list payload) : Prop :=
 
 Inductive query_message_ok
   (src : addr)
-  : option (pointer * query * payload) ->
+  : addr ->
+    option (pointer * query * payload) ->
     list (addr * payload) ->
     list payload ->
     list payload ->
     Prop :=
 | CInone :
-    forall outbound inbound dqs,
+    forall dst outbound inbound dqs,
       no_responses inbound ->
       no_requests outbound ->
       (forall m, ~ In (src, m) dqs) ->
-      query_message_ok src None dqs outbound inbound
+      query_message_ok src dst None dqs outbound inbound
+| CIother :
+    forall dst dstp q req dqs outbound inbound,
+      dst <> (addr_of dstp) ->
+      no_responses inbound ->
+      no_requests outbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_message_ok src dst (Some (dstp, q, req)) dqs outbound inbound
 | CIreq :
     forall outbound inbound dqs dstp q req,
       In req outbound ->
       (forall xs ys, outbound = xs ++ req :: ys -> no_requests (xs ++ ys)) ->
       no_responses inbound ->
       (forall m, ~ In (src, m) dqs) ->
-      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound
+      query_message_ok src (addr_of dstp) (Some (dstp, q, req)) dqs outbound inbound
 | CIres :
     forall outbound inbound res dqs dstp q req,
       request_response_pair req res ->
@@ -903,14 +911,14 @@ Inductive query_message_ok
       (forall xs ys, inbound = xs ++ res :: ys -> no_responses (xs ++ ys)) ->
       no_requests outbound ->
       (forall m, ~ In (src, m) dqs) ->
-      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound
+      query_message_ok src (addr_of dstp) (Some (dstp, q, req)) dqs outbound inbound
 | CIdelayed :
     forall outbound inbound dqs dstp q req,
       In (src, req) dqs ->
       (forall xs ys req', dqs = xs ++ (src, req) :: ys -> ~ In (src, req') (xs ++ ys)) ->
       no_responses inbound ->
       no_requests outbound ->
-      query_message_ok src (Some (dstp, q, req)) dqs outbound inbound.
+      query_message_ok src (addr_of dstp) (Some (dstp, q, req)) dqs outbound inbound.
 
 Theorem query_message_ok_invariant :
   forall gst,
@@ -918,7 +926,7 @@ Theorem query_message_ok_invariant :
     forall src dst st__src st__dst,
       sigma gst src = Some st__src ->
       sigma gst dst = Some st__dst ->
-      query_message_ok src (cur_request st__src) (delayed_queries st__dst)
+      query_message_ok src dst (cur_request st__src) (delayed_queries st__dst)
                        (channel gst src dst) (channel gst dst src).
 Proof.
 Admitted.

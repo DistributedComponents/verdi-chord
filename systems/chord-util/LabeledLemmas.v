@@ -1655,10 +1655,10 @@ USED: In phase two.
   assert (exists st__dst, sigma gst' dst = Some st__dst)
     by eauto with invar.
   break_exists_name st__dst'.
-  assert (query_message_ok src (cur_request st__src) (delayed_queries st__dst)
+  assert (query_message_ok src dst (cur_request st__src) (delayed_queries st__dst)
                            (channel gst src dst) (channel gst dst src)).
     by (eapply query_message_ok_invariant; eauto).
-  assert (query_message_ok src (cur_request st__src') (delayed_queries st__dst')
+  assert (query_message_ok src dst (cur_request st__src') (delayed_queries st__dst')
                            (channel gst' src dst) (channel gst' dst src))
     by (eapply query_message_ok_invariant; eauto with invar).
   inv_prop open_request_to; expand_def.
@@ -1679,7 +1679,15 @@ USED: In phase two.
     + right; simpl in *; admit.
     + right; simpl in *; admit.
   - handler_def.
-    destruct (addr_eq_dec (fst (snd m)) src); repeat find_rewrite.
+    destruct m as [m__src [m__dst p]].
+    simpl (fst _) in *; simpl (snd _) in *.
+    assert (exists stm, sigma gst m__src = Some stm)
+      by admit.
+    break_exists_name stm.
+    assert (query_message_ok src m__src (cur_request st__src) (delayed_queries stm)
+                             (channel gst src m__src) (channel gst m__src src))
+      by (eapply query_message_ok_invariant; eauto).
+    destruct (addr_eq_dec m__dst src); repeat find_rewrite.
     + subst.
       find_injection.
       inv H11; repeat find_rewrite; find_injection;
@@ -1698,8 +1706,27 @@ USED: In phase two.
         repeat find_rewrite.
         in_crush.
       }
-      destruct (response_payload_dec (snd (snd m))).
-      * admit.
+      destruct (response_payload_dec p).
+      * inv_prop query_message_ok;
+          try solve [exfalso; eapply_prop no_responses; eauto;
+                     eapply in_msgs_in_channel; find_rewrite; in_crush].
+        repeat find_rewrite; find_injection.
+        assert (res0 = p).
+        {
+          assert (In p (channel gst (addr_of x1) src))
+            by (eapply in_msgs_in_channel; find_rewrite; in_crush).
+          repeat find_apply_lem_hyp in_split; break_exists.
+          repeat find_rewrite.
+          assert (no_responses (x5 ++ x6)) by eauto.
+          assert (~ In p x5)
+            by (intro; eapply_prop no_responses; [in_crush|]; eauto).
+          assert (~ In p x6)
+            by (intro; eapply_prop no_responses; [in_crush|]; eauto).
+          assert (In p (x0 ++ p :: x2)) by in_crush.
+          assert (In p (x5 ++ res0 :: x6)) by congruence.
+          in_crush.
+        }
+        subst; left; auto.
       * admit.
     + left. admit.
   - admit.
