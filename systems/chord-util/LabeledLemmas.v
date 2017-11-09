@@ -1727,8 +1727,36 @@ USED: In phase two.
           in_crush.
         }
         subst; left; auto.
-      * admit.
-    + left. admit.
+      * assert (p <> res0) by (intro; subst; eauto).
+        right; split.
+        -- assert (~ query_response x p).
+           {
+             intro; find_eapply_prop response_payload.
+             inv_prop query_response; constructor.
+           }
+           find_copy_eapply_lem_hyp recv_msg_not_right_response_never_removes_request_timeout; eauto.
+           eapply open_request_to_intro; try erewrite sigma_ahr_updates; simpl; eauto.
+           rewrite_update.
+           break_or_hyp; try now in_crush.
+           apply in_or_app; right; eauto using in_remove_all_preserve.
+           find_copy_eapply_lem_hyp recv_msg_not_right_response_preserves_cur_request; eauto.
+           congruence.
+        -- apply in_msgs_in_channel; repeat find_apply_lem_hyp in_channel_in_msgs.
+           apply in_or_app; right.
+           repeat find_rewrite.
+           simpl; in_crush; congruence.
+    + right; split.
+      * find_injection.
+        repeat find_rewrite.
+        eapply open_request_to_intro; try erewrite sigma_ahr_passthrough; simpl; eauto.
+        rewrite_update.
+        repeat invcs_prop cur_request_timeouts_ok'; auto.
+      * apply in_msgs_in_channel; simpl.
+        apply in_or_app; right.
+        repeat find_apply_lem_hyp in_channel_in_msgs.
+        repeat find_rewrite.
+        in_crush.
+        find_injection; tauto.
   - admit.
   - admit.
 Admitted.
