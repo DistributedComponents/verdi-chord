@@ -1597,6 +1597,41 @@ Proof.
 Qed.
 Hint Resolve sent_non_client_message_means_in_nodes.
 
+Lemma sent_message_means_in_nodes_or_client :
+  forall gst src dst p,
+    reachable_st gst ->
+    In (src, (dst, p)) (msgs gst) ->
+    In src (nodes gst) \/ client_payload p /\ client_addr src.
+Proof.
+  intros.
+  generalize dependent p.
+  generalize dependent dst.
+  generalize dependent src.
+  pattern gst.
+  apply chord_net_invariant; autounfold; simpl; intros;
+    repeat find_rewrite; intuition eauto;
+      try solve [
+            find_apply_lem_hyp in_app_or; break_or_hyp;
+            [find_apply_lem_hyp in_map_iff; expand_def; unfold send in *; find_injection; in_crush
+            |in_crush; eauto with datatypes]
+          ].
+  - inv_prop initial_st; break_and.
+    repeat find_rewrite.
+    in_crush.
+  - in_crush; eauto.
+    + unfold send in *.
+      find_injection; tauto.
+    + find_apply_hyp_hyp; tauto.
+  - unfold send in *.
+    simpl in *.
+    break_or_hyp.
+    + find_injection; tauto.
+    + find_apply_hyp_hyp; tauto.
+  - simpl in *.
+    assert (In (src, (dst, p)) (xs ++ m :: ys)) by in_crush.
+    find_apply_hyp_hyp; tauto.
+Qed.
+
 (*TODO move to wherever response_payload is defined *)
 Definition response_payload_dec :
   forall p,
@@ -1681,8 +1716,49 @@ USED: In phase two.
   - handler_def.
     destruct m as [m__src [m__dst p]].
     simpl (fst _) in *; simpl (snd _) in *.
-    assert (exists stm, sigma gst m__src = Some stm)
-      by admit.
+    assert (In (m__src, (m__dst, p)) (msgs gst))
+      by (repeat find_rewrite; in_crush).
+    assert (m__src <> (addr_of x1) /\ client_addr m__src /\ client_payload p \/ exists stm, sigma gst m__src = Some stm).
+    {
+      find_eapply_lem_hyp sent_message_means_in_nodes_or_client; eauto.
+      break_or_hyp.
+      right; eauto.
+      left.
+      break_and.
+      split; auto.
+      intro; subst.
+      find_eapply_lem_hyp clients_not_in_failed; eauto.
+      break_and; eauto.
+    }
+    break_or_hyp; break_and.
+    {
+      right; split.
+      - eapply open_request_to_intro; eauto.
+        + repeat find_rewrite; find_injection.
+          simpl; update_destruct; rewrite_update; eauto.
+          subst.
+          repeat find_rewrite; find_injection.
+          find_eapply_lem_hyp (recv_msg_not_right_response_never_removes_request_timeout m__src src); eauto.
+          break_or_hyp; try now in_crush.
+          apply in_or_app; right; eauto using in_remove_all_preserve.
+          intro; inv_prop client_payload; inv_prop query_response.
+        + repeat find_rewrite; find_injection.
+          simpl in *.
+          destruct (addr_eq_dec m__dst src).
+          * repeat rewrite_update.
+            find_injection.
+            repeat find_rewrite; find_injection.
+            find_eapply_lem_hyp recv_msg_not_right_response_preserves_cur_request; eauto.
+            congruence.
+            intro; inv_prop query_response; inv_prop client_payload.
+          * repeat rewrite_update.
+            congruence.
+      - repeat find_apply_lem_hyp in_channel_in_msgs.
+        apply in_msgs_in_channel.
+        simpl.
+        repeat find_rewrite; in_crush;
+          find_injection; tauto.
+    }
     break_exists_name stm.
     assert (query_message_ok src m__src (cur_request st__src) (delayed_queries stm)
                              (channel gst src m__src) (channel gst m__src src))
@@ -1702,7 +1778,7 @@ USED: In phase two.
           by (intro; eapply_prop no_responses; [in_crush|]; eauto).
         assert (~ In res0 x2).
           by (intro; eapply_prop no_responses; [in_crush|]; eauto).
-        assert (In res0 (x9 ++ res0 :: x10)) by in_crush.
+        assert (In res0 (x11 ++ res0 :: x12)) by in_crush.
         repeat find_rewrite.
         in_crush.
       }
@@ -1755,8 +1831,7 @@ USED: In phase two.
         apply in_or_app; right.
         repeat find_apply_lem_hyp in_channel_in_msgs.
         repeat find_rewrite.
-        in_crush.
-        find_injection; tauto.
+        in_crush; find_injection; tauto.
   - admit.
   - admit.
 Admitted.
