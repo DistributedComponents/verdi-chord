@@ -1709,10 +1709,57 @@ USED: In phase two.
   - handler_def.
     handler_def.
     + right; simpl in *.
-      update_destruct; subst; rewrite_update; split; admit.
-    + right; simpl in *; admit.
-    + right; simpl in *; admit.
-    + right; simpl in *; admit.
+      update_destruct; subst; rewrite_update; simpl; auto.
+      * split.
+        -- eapply open_request_to_intro; simpl; try rewrite_update; eauto;
+             repeat (handler_def || handler_simpl);
+             eauto using remove_preserve.
+        -- find_apply_lem_hyp in_channel_in_msgs; apply in_msgs_in_channel; simpl;
+             in_crush.
+      * split.
+        -- eapply open_request_to_intro; simpl; try rewrite_update; eauto.
+        -- find_apply_lem_hyp in_channel_in_msgs; apply in_msgs_in_channel; simpl;
+             in_crush.
+    + right; simpl in *.
+      update_destruct; subst; rewrite_update; simpl; auto.
+      * split.
+        -- eapply open_request_to_intro; simpl; try rewrite_update; eauto;
+             repeat (handler_def || handler_simpl);
+             eauto using remove_preserve.
+        -- find_apply_lem_hyp in_channel_in_msgs; apply in_msgs_in_channel; simpl;
+             in_crush.
+      * split.
+        -- eapply open_request_to_intro; simpl; try rewrite_update; eauto.
+        -- find_apply_lem_hyp in_channel_in_msgs; apply in_msgs_in_channel; simpl;
+             in_crush.
+    + right; simpl in *.
+      update_destruct; subst; rewrite_update; simpl; auto.
+      * split.
+        -- eapply open_request_to_intro; simpl; try rewrite_update; eauto;
+             repeat (handler_def || handler_simpl);
+             eauto using remove_preserve.
+        -- find_apply_lem_hyp in_channel_in_msgs; apply in_msgs_in_channel; simpl;
+             in_crush.
+      * split.
+        -- eapply open_request_to_intro; simpl; try rewrite_update; eauto.
+        -- find_apply_lem_hyp in_channel_in_msgs; apply in_msgs_in_channel; simpl;
+             in_crush.
+    + right; simpl in *.
+      update_destruct; subst; rewrite_update; simpl; auto.
+      * match goal with
+           | H : In (Request ?x1 ?y1) _, H' : In (Request ?x2 ?y2) _ |- _ =>
+             assert (Request x1 y1 = Request x2 y2) by
+                 eauto using at_most_one_request_timeout_uniqueness,
+                 at_most_one_request_timeout_invariant
+        end. find_inversion.
+        exfalso.
+        inv_prop timeout_constraint.
+        find_apply_lem_hyp in_channel_in_msgs.
+        intuition. eauto.
+      * split.
+        -- eapply open_request_to_intro; simpl; try rewrite_update; eauto.
+        -- find_apply_lem_hyp in_channel_in_msgs; apply in_msgs_in_channel; simpl;
+             in_crush.
   - handler_def.
     destruct m as [m__src [m__dst p]].
     simpl (fst _) in *; simpl (snd _) in *.
