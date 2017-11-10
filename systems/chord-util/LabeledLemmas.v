@@ -338,6 +338,28 @@ Proof using.
   assumption.
 Qed.
 
+(* TODO: put this in a good place *)
+Lemma clients_not_in_failed :
+  forall st h,
+    reachable_st st ->
+    client_addr h ->
+    ~ In h (nodes st) /\
+    ~ In h (failed_nodes st).
+Proof.
+  intros.
+  induct_reachable_st.
+  - intros.
+    inv_prop initial_st; intuition eauto.
+    repeat find_rewrite; tauto.
+  - intros. inv_prop step_dynamic; simpl; auto.
+    + intuition; try congruence; firstorder.
+    + intuition; try congruence.
+      * firstorder.
+      * subst. firstorder.
+      * firstorder.
+Qed.
+
+
 Lemma labeled_step_dynamic_timeout_enabled :
   forall gst gst' gst'' dst src m h t eff,
     labeled_step_dynamic gst (Timeout h t eff) gst' ->
@@ -354,18 +376,57 @@ Qed.
 
 Lemma RecvMsg_stays_enabled_after_other_label :
   forall gst src dst m l' gst',
+    reachable_st gst ->
     enabled (RecvMsg src dst m) gst ->
     l' <> RecvMsg src dst m ->
     labeled_step_dynamic gst l' gst' ->
     enabled (RecvMsg src dst m) gst'.
 Proof.
+  intros.
+  match goal with
+  | H : enabled _ _ |- _ =>
+    unfold enabled in H; break_exists_name gst'';
+      inversion H; try handler_def; simpl in *;
+        unfold label_input, label_output in *; try congruence
+  end.
+  find_inversion.
+  inv_prop labeled_step_dynamic; simpl in *.
+  - apply when_RecvMsg_enabled; simpl; auto.
+    + update_destruct; subst; rewrite_update; eauto.
+    + repeat find_rewrite.
+      destruct m0 as [x [y z]]. simpl.  in_crush.
+  - handler_def.
+    apply when_RecvMsg_enabled; simpl; auto.
+    + update_destruct; subst; rewrite_update; eauto.
+    + repeat find_rewrite.
+      destruct m0 as [x [y z]]. simpl. in_crush.
+      right. in_crush.
+      match goal with
+      | H : ?xs ++ ?m :: ?ys = ?xs' ++ ?m' :: ?ys' |- _ =>
+        let x := fresh H in
+        assert (In m (xs ++ m :: ys)) as x by in_crush;
+          rewrite H in x;
+          in_crush
+      end.
+  - apply when_RecvMsg_enabled; simpl; eauto.
+    repeat find_rewrite. destruct m0 as [x [y z]]. simpl. in_crush.
+  -  apply when_RecvMsg_enabled; simpl; eauto.
+     repeat find_rewrite. destruct m0 as [x [y z]]. simpl. in_crush.
+      match goal with
+      | H : ?xs ++ ?m :: ?ys = ?xs' ++ ?m' :: ?ys' |- _ =>
+        let x := fresh H in
+        assert (In m (xs ++ m :: ys)) as x by in_crush;
+          rewrite H in x;
+          in_crush
+      end. find_eapply_lem_hyp clients_not_in_failed; eauto.
+      intuition.
 (*
 Other kinds of step don't remove (src, (dst, m)) from (msgs gst).
 
 USED: in phase three.
 DIFFICULTY: 1
 *)
-Admitted.
+Qed.
 
 Lemma RecvMsg_enabled_until_occurred :
   forall s,
@@ -954,26 +1015,6 @@ Proof using.
   exists x.
   exists gst'.
   eapply LTimeout; eauto.
-Qed.
-
-Lemma clients_not_in_failed :
-  forall st h,
-    reachable_st st ->
-    client_addr h ->
-    ~ In h (nodes st) /\
-    ~ In h (failed_nodes st).
-Proof.
-  intros.
-  induct_reachable_st.
-  - intros.
-    inv_prop initial_st; intuition eauto.
-    repeat find_rewrite; tauto.
-  - intros. inv_prop step_dynamic; simpl; auto.
-    + intuition; try congruence; firstorder.
-    + intuition; try congruence.
-      * firstorder.
-      * subst. firstorder.
-      * firstorder.
 Qed.
 
 Lemma step_preserves_timeout_constraint :
