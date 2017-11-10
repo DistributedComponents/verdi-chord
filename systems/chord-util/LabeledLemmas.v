@@ -1879,6 +1879,12 @@ USED: In phase two.
         repeat find_apply_lem_hyp in_channel_in_msgs.
         repeat find_rewrite.
         in_crush; find_injection; tauto.
-  - admit.
-  - admit.
-Admitted.
+  - right. split; eauto.
+    -- find_apply_lem_hyp in_channel_in_msgs; apply in_msgs_in_channel; simpl;
+         in_crush.
+  - right. split; eauto.
+    -- find_apply_lem_hyp in_channel_in_msgs. repeat find_rewrite.
+       apply in_msgs_in_channel; simpl;
+         in_crush.
+       find_eapply_lem_hyp clients_not_in_failed; eauto. intuition.
+Qed.
