@@ -26,12 +26,8 @@ Proof using.
     repeat find_rewrite;
     repeat (update_destruct; rewrite_update);
       eauto with datatypes.
-  - unfold initial_st in *; break_and.
-    destruct (start_handler h (nodes gst)) as [[? ?] ?] eqn:?.
-    eapply_prop_hyp start_handler start_handler; auto.
-    break_and; eauto.
-  - simpl in *; break_or_hyp;
-      congruence || eauto.
+  simpl in *; break_or_hyp;
+    congruence || eauto.
 Qed.
 
 Lemma nodes_have_state :

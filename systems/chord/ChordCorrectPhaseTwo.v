@@ -3014,55 +3014,6 @@ Proof using.
       auto.
 Qed.
 
-Lemma in_nodes_sigma_some :
-  forall gst h,
-    initial_st gst ->
-    In h (nodes gst) ->
-    exists st,
-      sigma gst h = Some st.
-Proof.
-  intros. unfold initial_st in *. intuition.
-  match goal with
-  | H : context [start_handler] |- _ =>
-    remember H as Hsh; clear HeqHsh; clear H
-  end.
-  specialize (Hsh h). concludes.
-  destruct (start_handler h (nodes gst)) as [[st ms] nts].
-  specialize (Hsh st ms nts). intuition.
-  eauto.
-Qed.
-
-Lemma exists_node_in_initial_st :
-  forall gst,
-    initial_st gst ->
-    exists h,
-      In h (nodes gst) /\ ~ In h (failed_nodes gst).
-Proof.
-  intros. unfold initial_st in *. intuition.
-  destruct (nodes gst); simpl in *; [omega|].
-  repeat find_rewrite.
-  eexists; intuition; eauto.
-Qed.
-
-Lemma live_node_in_initial_st :
-  forall gst,
-    initial_st gst ->
-    exists h,
-      live_node gst h.
-Proof.
-  intros.
-  find_copy_apply_lem_hyp exists_node_in_initial_st.
-  break_exists_name h; exists h. intuition.
-  find_copy_eapply_lem_hyp in_nodes_sigma_some; eauto.
-  break_exists_name st. unfold live_node. intuition.
-  exists st. intuition.
-  find_apply_lem_hyp sigma_initial_st_start_handler; auto. subst.
-  pose proof succ_list_len_lower_bound.
-  rewrite start_handler_init_state_preset;
-    [|unfold initial_st in *; intuition].
-  reflexivity.
-Qed.
-
 Lemma always_exists_live_node :
   forall gst,
     reachable_st gst ->

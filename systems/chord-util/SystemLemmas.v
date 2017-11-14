@@ -770,3 +770,122 @@ Proof.
   eapply_prop_hyp start_handler start_handler; auto.
   tauto.
 Qed.
+
+Lemma in_nodes_sigma_some :
+  forall gst h,
+    initial_st gst ->
+    In h (nodes gst) ->
+    exists st,
+      sigma gst h = Some st.
+Proof.
+  intros. unfold initial_st in *. intuition.
+  match goal with
+  | H : context [start_handler] |- _ =>
+    remember H as Hsh; clear HeqHsh; clear H
+  end.
+  specialize (Hsh h). concludes.
+  destruct (start_handler h (nodes gst)) as [[st ms] nts].
+  specialize (Hsh st ms nts). intuition.
+  eauto.
+Qed.
+
+Lemma exists_node_in_initial_st :
+  forall gst,
+    initial_st gst ->
+    exists h,
+      In h (nodes gst) /\ ~ In h (failed_nodes gst).
+Proof.
+  intros. unfold initial_st in *. intuition.
+  destruct (nodes gst); simpl in *; [omega|].
+  repeat find_rewrite.
+  eexists; intuition; eauto.
+Qed.
+
+Lemma start_handler_init_state_preset :
+  forall h knowns,
+    length knowns > 1 ->
+    start_handler h knowns =
+    (init_state_preset h
+                       (find_pred h (sort_by_between h (map make_pointer knowns)))
+                       (find_succs h (sort_by_between h (map make_pointer knowns))),
+     nil,
+     Tick :: nil).
+Proof.
+  intros.
+  unfold start_handler.
+  repeat break_match;
+    match goal with H : _ = _ |- _ => symmetry in H end;
+    find_copy_apply_lem_hyp sort_by_between_permutes;
+    [| | reflexivity];
+    find_apply_lem_hyp Permutation.Permutation_length;
+    rewrite map_length in H0; simpl in *; repeat find_reverse_rewrite;
+      exfalso; eapply gt_irrefl; eauto.
+Qed.
+
+Lemma live_node_in_initial_st :
+  forall gst,
+    initial_st gst ->
+    exists h,
+      live_node gst h.
+Proof.
+  intros.
+  find_copy_apply_lem_hyp exists_node_in_initial_st.
+  break_exists_name h; exists h. intuition.
+  find_copy_eapply_lem_hyp in_nodes_sigma_some; eauto.
+  break_exists_name st. unfold live_node. intuition.
+  exists st. intuition.
+  find_apply_lem_hyp sigma_initial_st_start_handler; auto. subst.
+  pose proof succ_list_len_lower_bound.
+  rewrite start_handler_init_state_preset;
+    [|unfold initial_st in *; intuition].
+  reflexivity.
+Qed.
+
+Lemma sorted_knowns_same_length :
+  forall h ks,
+    length (sort_by_between h (map make_pointer ks)) = length ks.
+Proof.
+  intros.
+  pose proof (sort_by_between_permutes h (map make_pointer ks) ltac:(eauto) ltac:(eauto)).
+  find_apply_lem_hyp Permutation.Permutation_length.
+  find_reverse_rewrite.
+  apply map_length.
+Qed.
+Hint Rewrite sorted_knowns_same_length.
+
+
+Lemma initial_start_handler_st_joined :
+  forall h ks st ms nts,
+    start_handler h ks = (st, ms, nts) ->
+    length ks > 1 ->
+    joined st = true.
+Proof.
+  intros.
+  unfold start_handler, empty_start_res, init_state_join, init_state_preset in *.
+  repeat break_match; try find_injection.
+  - rewrite <- (sorted_knowns_same_length h) in *.
+    find_rewrite.
+    simpl in *; omega.
+  - rewrite <- (sorted_knowns_same_length h) in *.
+    find_rewrite.
+    simpl in *; omega.
+  - reflexivity.
+Qed.
+
+Lemma initial_nodes_live :
+  forall gst h,
+    initial_st gst ->
+    In h (nodes gst) ->
+    live_node gst h.
+Proof.
+  intros.
+  destruct (start_handler h (nodes gst)) as [[?st ?ms] ?nts] eqn:?.
+  inv_prop initial_st; break_and.
+  eapply live_node_characterization.
+  - apply_prop_hyp sigma start_handler; break_and; eauto.
+  - find_copy_apply_lem_hyp initial_nodes_large.
+    eapply initial_start_handler_st_joined; eauto; omega.
+  - auto.
+  - repeat find_rewrite; in_crush.
+Qed.
+Hint Resolve initial_nodes_live.

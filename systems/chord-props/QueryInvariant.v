@@ -205,27 +205,6 @@ Proof.
   - now tuple_inversion.
 Qed.
 
-Lemma start_handler_init_state_preset :
-  forall h knowns,
-    length knowns > 1 ->
-    start_handler h knowns =
-    (init_state_preset h
-                       (find_pred h (sort_by_between h (map make_pointer knowns)))
-                       (find_succs h (sort_by_between h (map make_pointer knowns))),
-     nil,
-     Tick :: nil).
-Proof.
-  intros.
-  unfold start_handler.
-  repeat break_match;
-    match goal with H : _ = _ |- _ => symmetry in H end;
-    find_copy_apply_lem_hyp sort_by_between_permutes;
-    [| | reflexivity];
-    find_apply_lem_hyp Permutation.Permutation_length;
-    rewrite map_length in *; simpl in *; repeat find_reverse_rewrite;
-      exfalso; eapply gt_irrefl; eauto.
-Qed.
-
 Lemma send_definition :
   forall src dst msg,
     send src (dst, msg) = (src, (dst, msg)).
