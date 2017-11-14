@@ -941,27 +941,19 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
         best_succ gst h s.
 
   Definition not_skipped (h : id) (succs : list id) (n : id) : Prop :=
-    forall k l,
-      length (h :: succs) = k ->
-      forall a b xs ys,
-        h :: succs = xs ++ [a; b] ++ ys ->
-        ~ between a n b \/
-        b = last succs h /\
-        forall e,
-          e = Z.to_nat (z_of_id l) + (SUCC_LIST_LEN - k) ->
-          between a n (id_of_z (Z.of_nat e)).
+    forall a b xs ys,
+      h :: succs = xs ++ [a; b] ++ ys ->
+      ~ between a n b.
 
   (* "A principal node is a member that is not skipped by any member's
      extended successor list" *)
   Definition principal (gst : global_state) (p : addr) : Prop :=
     live_node gst p /\
-    forall h st succs pid,
+    forall h st succs,
       live_node gst h ->
       sigma gst h = Some st ->
       succs = map ChordIDSpace.id_of (succ_list st) ->
-      pid = hash p ->
-      not_skipped (hash h) succs pid ->
-      In pid succs.
+      not_skipped (hash h) succs (hash p).
 
   Definition principals (gst : global_state) (ps : list addr) : Prop :=
     NoDup ps /\

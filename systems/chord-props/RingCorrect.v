@@ -1,4 +1,5 @@
 Require Import List.
+Import ListNotations.
 Require Import Omega.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
@@ -20,6 +21,53 @@ Definition zave_invariant (gst : global_state) : Prop :=
   live_node_in_succ_lists gst.
 Hint Unfold zave_invariant.
 
+Inductive pair_in {A : Type} : A -> A -> list A -> Prop :=
+| pair_in_head :
+    forall a b l,
+      pair_in a b (a :: b :: l)
+| pair_in_rest :
+    forall a b l,
+      pair_in a b l ->
+      forall x,
+        pair_in a b (x :: l).
+
+Lemma pair_in_sound :
+  forall A (l : list A) xs a b ys,
+    l = xs ++ a :: b :: ys ->
+    pair_in a b l.
+Proof.
+Admitted.
+Hint Resolve pair_in_sound.
+
+Lemma initial_esl_is_sorted_nodes_chopped :
+  forall h ns,
+    hash h :: map id_of (find_succs h (sort_by_between h (map make_pointer ns))) =
+    map id_of (chop_succs (sort_by_between h (map make_pointer (h :: ns)))).
+Proof.
+Admitted.
+
+Lemma initial_succ_lists_all_principal :
+  forall p l,
+    In p l ->
+    forall h a b,
+      pair_in a b (hash h :: map id_of (find_succs h (sort_by_between h (map make_pointer l)))) ->
+      ~ between a (hash p) b.
+Proof.
+  intros.
+  match goal with
+  | H: pair_in a b ?ss |- _ =>
+    remember ss as succs;
+      revert Heqsuccs;
+      generalize dependent l;
+      induction H
+  end.
+  - intros; find_injection.
+    assert (In (make_pointer p) (map make_pointer l0)) by auto using in_map.
+    admit.
+  - admit.
+Admitted.
+Hint Resolve initial_succ_lists_all_principal.
+
 Lemma initial_nodes_principal :
   forall gst h,
     initial_st gst ->
@@ -29,10 +77,15 @@ Proof.
   intros.
   unfold principal; split.
   - auto.
-  - intros.
-    (* hard part *)
-    admit.
-Admitted.
+  - unfold not_skipped; intros.
+    inv_prop initial_st; break_and.
+    find_copy_apply_lem_hyp initial_nodes_large.
+    destruct (start_handler h0 (nodes gst)) as [[?st ?ms] ?nts] eqn:?.
+    copy_eapply_prop_hyp start_handler start_handler; auto; break_and.
+    rewrite start_handler_init_state_preset in *; eauto with arith.
+    repeat find_rewrite; repeat find_injection.
+    simpl in *; eauto.
+Qed.
 Hint Resolve initial_nodes_principal.
 
 Theorem zave_invariant_holds :
