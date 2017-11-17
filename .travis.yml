@@ -1,4 +1,7 @@
 language: c
+cache:
+  directories:
+  - $HOME/.opam
 addons:
   apt:
     sources:
@@ -8,8 +11,11 @@ addons:
       - opam
       - aspcud
       - gnuplot
+      - gcc-multilib
+      - g++-multilib
 env:
   global:
+    - COMPILER="4.05.0+32bit"
     - COQ_VERSION=8.7.0
   matrix:
   - MODE=build
