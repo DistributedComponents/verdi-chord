@@ -11,7 +11,7 @@ proofalytics: timestamp-lines
 	./mkreport.sh
 
 timestamp-lines: timestamp-lines.c
-	gcc $< -o $@ $(LIBS)
+	gcc $(GCC_OPTIONS) $< -o $@ $(LIBS)
 
 publish:
 	./publish.sh
