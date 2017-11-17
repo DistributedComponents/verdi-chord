@@ -1,4 +1,7 @@
 language: c
+cache:
+  directories:
+  - $HOME/.opam
 addons:
   apt:
     sources:
@@ -8,13 +11,15 @@ addons:
       - opam
       - aspcud
       - gnuplot
+      - gcc-multilib
+      - g++-multilib
 env:
   global:
-    - COQ_VERSION=8.7.0
+    - COQ_VERSION="8.7.0"
   matrix:
-  - MODE=build
-  - MODE=chord
-  - MODE=proofalytics
+  - COMPILER="4.05.0+32bit" MODE=build
+  - COMPILER="4.05.0+32bit" MODE=chord
+  - COMPILER="4.05.0" MODE=proofalytics
 before_install:
   - openssl aes-256-cbc -K $encrypted_de10e8586561_key -iv $encrypted_de10e8586561_iv -in .travis/travis_rsa.enc -out .travis/travis_rsa -d
   - cp .travis/travis_rsa ~/.ssh
