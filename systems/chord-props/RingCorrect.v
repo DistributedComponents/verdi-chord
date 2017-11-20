@@ -157,15 +157,14 @@ Lemma initial_successor_lists_full :
 Proof.
 Admitted.
 
-Lemma In_find_succs_in_l :
+Lemma in_find_succs :
   forall x h l,
     In x (find_succs h l) ->
     In x l.
 Proof.
 Admitted.
-Hint Resolve In_find_succs_in_l.
 
-Lemma in_sort_by_between_in_l :
+Lemma in_sort_by_between :
   forall x h l,
     In x (sort_by_between h l) ->
     In x l.
@@ -211,8 +210,12 @@ Proof.
            congruence.
         -- intros; simpl in *; tauto.
         -- eapply initial_nodes_live; eauto.
-           repeat find_reverse_rewrite.
-           admit.
+           assert (In p (find_succs h (sort_by_between h (map make_pointer (nodes gst)))))
+             by (cut (In p (p :: l)); [congruence | auto with datatypes]).
+           find_apply_lem_hyp in_find_succs.
+           find_apply_lem_hyp in_sort_by_between.
+           find_apply_lem_hyp in_map_iff; expand_def.
+           easy.
   - admit.
   - admit.
   - admit.
