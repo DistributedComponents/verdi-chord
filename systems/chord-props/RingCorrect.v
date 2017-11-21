@@ -177,6 +177,60 @@ Proof.
   eauto.
 Qed.
 
+Lemma principals_intro :
+  forall gst ps,
+    NoDup ps ->
+    (forall p, In p ps -> principal gst p) ->
+    (forall p, principal gst p -> In p ps) ->
+    principals gst ps.
+Proof.
+  unfold principals.
+  intros.
+  intuition (apply Forall_forall; auto).
+Qed.
+
+
+Lemma sufficient_principals_intro :
+  forall gst ps,
+    NoDup ps ->
+    (forall p, In p ps -> principal gst p) ->
+    (forall p, principal gst p -> In p ps) ->
+    length ps > SUCC_LIST_LEN ->
+    sufficient_principals gst.
+Proof.
+  unfold sufficient_principals.
+  intros; exists ps.
+  eauto using principals_intro.
+Qed.
+
+Lemma principals_involves_joined_node_state_only :
+  forall gst gst' p,
+    principal gst p ->
+    (forall h st,
+        live_node gst h /\ sigma gst h = Some st <->
+        live_node gst' h /\ sigma gst' h = Some st) ->
+    principal gst' p.
+Proof.
+  unfold principal.
+  intros.
+  expand_def.
+  split.
+  - firstorder.
+  - intros.
+    assert ((forall h, live_node gst h -> live_node gst' h) /\
+            (forall h, live_node gst' h -> live_node gst h)).
+    {
+      split; intros;
+        inv_prop live_node;
+        expand_def;
+        eapply H0;
+        split; eauto.
+    }
+    break_and.
+    eapply H1; eauto.
+    eapply H0; split; eauto.
+Qed.
+
 Theorem zave_invariant_holds :
   forall gst,
     reachable_st gst ->
@@ -216,7 +270,21 @@ Proof.
            find_apply_lem_hyp in_sort_by_between.
            find_apply_lem_hyp in_map_iff; expand_def.
            easy.
-  - admit.
+  - split; break_and.
+    + unfold sufficient_principals in *.
+      break_exists_exists.
+      break_and; split; eauto.
+      inv_prop principals; break_and.
+      apply principals_intro; auto; intros.
+      * inv_prop principals; expand_def.
+        eapply principals_involves_joined_node_state_only; eauto.
+        eapply Forall_forall; eauto.
+        admit.
+      * find_eapply_prop In.
+        admit.
+    + unfold live_node_in_succ_lists.
+      intros; repeat split; intuition eauto.
+      admit.
   - admit.
   - admit.
   - admit.
