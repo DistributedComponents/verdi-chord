@@ -231,6 +231,17 @@ Proof.
     eapply H0; split; eauto.
 Qed.
 
+Lemma joining_start_handler_st_joined:
+  forall h k st ms nts,
+    start_handler h [k] = (st, ms, nts) ->
+    joined st = false.
+Proof.
+  unfold start_handler.
+  intros.
+  simpl in *; find_injection.
+  reflexivity.
+Qed.
+
 Theorem zave_invariant_holds :
   forall gst,
     reachable_st gst ->
@@ -279,9 +290,30 @@ Proof.
       * inv_prop principals; expand_def.
         eapply principals_involves_joined_node_state_only; eauto.
         eapply Forall_forall; eauto.
-        admit.
+        intros.
+        intuition; inv_prop live_node; expand_def.
+        -- eapply live_node_characterization; eauto;
+             repeat find_rewrite;
+             try rewrite_update;
+             in_crush || eauto.
+        -- repeat find_rewrite; rewrite_update; auto.
+        -- repeat find_rewrite; update_destruct;
+             subst; rewrite_update;
+               repeat find_injection.
+           cut (joined x0 = false); [congruence|].
+           eapply joining_start_handler_st_joined; eauto.
+           eapply live_node_characterization; eauto; in_crush.
+        -- repeat find_rewrite; update_destruct;
+             subst; rewrite_update;
+               repeat find_injection.
+           cut (joined x0 = false); [congruence|].
+           eapply joining_start_handler_st_joined; eauto.
+           rewrite_update; auto.
       * find_eapply_prop In.
-        admit.
+        inv_prop principal.
+        split; intros.
+        -- admit.
+        -- admit.
     + unfold live_node_in_succ_lists.
       intros; repeat split; intuition eauto.
       admit.
