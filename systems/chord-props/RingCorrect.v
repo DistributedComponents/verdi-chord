@@ -242,90 +242,144 @@ Proof.
   reflexivity.
 Qed.
 
+Theorem zave_invariant_init :
+  chord_init_invariant zave_invariant.
+Proof.
+  autounfold; intros.
+  inv_prop initial_st.
+  split.
+  - break_and.
+    unfold sufficient_principals.
+    exists (nodes gst); split; try omega.
+    unfold principals; repeat split.
+    + auto.
+    + apply Forall_forall; eauto.
+    + intros; inv_prop principal; auto.
+  - unfold live_node_in_succ_lists.
+    intros.
+    find_copy_apply_lem_hyp initial_succ_list; auto.
+    find_copy_eapply_lem_hyp (initial_successor_lists_full h).
+    pose proof succ_list_len_lower_bound.
+    destruct (succ_list st) as [|p l] eqn:?.
+    + assert (length (@nil pointer) >= 2) by congruence.
+      simpl in *; omega.
+    + exists (addr_of p).
+      unfold best_succ; exists st; exists nil; exists (map addr_of l).
+      split; eauto.
+      split; eauto.
+      split; try split.
+      * simpl.
+         change (addr_of p :: map addr_of l) with (map addr_of (p :: l)).
+         congruence.
+      * intros; simpl in *; tauto.
+      * eapply initial_nodes_live; eauto.
+         assert (In p (find_succs h (sort_by_between h (map make_pointer (nodes gst)))))
+           by (cut (In p (p :: l)); [congruence | auto with datatypes]).
+         find_apply_lem_hyp in_find_succs.
+         find_apply_lem_hyp in_sort_by_between.
+         find_apply_lem_hyp in_map_iff; expand_def.
+         easy.
+Qed.
+Hint Resolve zave_invariant_init.
+
+Theorem zave_invariant_start :
+  chord_start_invariant zave_invariant.
+Proof.
+  autounfold; intros.
+  split; break_and.
+  + unfold sufficient_principals in *.
+    break_exists_exists.
+    break_and; split; eauto.
+    inv_prop principals; break_and.
+    apply principals_intro; auto; intros.
+    * inv_prop principals; expand_def.
+      eapply principals_involves_joined_node_state_only; eauto.
+      eapply Forall_forall; eauto.
+      intros.
+      intuition; inv_prop live_node; expand_def.
+      -- eapply live_node_characterization; eauto;
+           repeat find_rewrite;
+           try rewrite_update;
+           in_crush || eauto.
+      -- repeat find_rewrite; rewrite_update; auto.
+      -- repeat find_rewrite; update_destruct;
+           subst; rewrite_update;
+             repeat find_injection.
+         cut (joined x0 = false); [congruence|].
+         eapply joining_start_handler_st_joined; eauto.
+         eapply live_node_characterization; eauto; in_crush.
+      -- repeat find_rewrite; update_destruct;
+           subst; rewrite_update;
+             repeat find_injection.
+         cut (joined x0 = false); [congruence|].
+         eapply joining_start_handler_st_joined; eauto.
+         rewrite_update; auto.
+    * find_eapply_prop In.
+      inv_prop principal.
+      split; intros.
+      -- admit.
+      -- admit.
+  + unfold live_node_in_succ_lists.
+    intros; repeat split; intuition eauto.
+    admit.
+Admitted.
+Hint Resolve zave_invariant_start.
+
+Theorem zave_invariant_fail :
+  chord_fail_invariant zave_invariant.
+Proof.
+Admitted.
+Hint Resolve zave_invariant_fail.
+
+Theorem zave_invariant_recv :
+  chord_recv_handler_invariant zave_invariant.
+Proof.
+Admitted.
+Hint Resolve zave_invariant_recv.
+
+Theorem zave_invariant_tick :
+  chord_tick_invariant zave_invariant.
+Proof.
+Admitted.
+Hint Resolve zave_invariant_tick.
+
+Theorem zave_invariant_keepalive :
+  chord_keepalive_invariant zave_invariant.
+Proof.
+Admitted.
+Hint Resolve zave_invariant_keepalive.
+
+Theorem zave_invariant_rectify :
+  chord_rectify_invariant zave_invariant.
+Proof.
+Admitted.
+Hint Resolve zave_invariant_rectify.
+
+Theorem zave_invariant_request :
+  chord_request_invariant zave_invariant.
+Proof.
+Admitted.
+Hint Resolve zave_invariant_request.
+
+Theorem zave_invariant_input :
+  chord_input_invariant zave_invariant.
+Proof.
+Admitted.
+Hint Resolve zave_invariant_input.
+
+Theorem zave_invariant_output :
+  chord_output_invariant zave_invariant.
+Proof.
+Admitted.
+Hint Resolve zave_invariant_output.
+
 Theorem zave_invariant_holds :
   forall gst,
     reachable_st gst ->
     zave_invariant gst.
 Proof.
-  apply chord_net_invariant; autounfold; intros.
-  - inv_prop initial_st.
-    split.
-    + break_and.
-      unfold sufficient_principals.
-      exists (nodes gst); split; try omega.
-      unfold principals; repeat split.
-      * auto.
-      * apply Forall_forall; eauto.
-      * intros; inv_prop principal; auto.
-    + unfold live_node_in_succ_lists.
-      intros.
-      find_copy_apply_lem_hyp initial_succ_list; auto.
-      find_copy_eapply_lem_hyp (initial_successor_lists_full h).
-      pose proof succ_list_len_lower_bound.
-      destruct (succ_list st) as [|p l] eqn:?.
-      * assert (length (@nil pointer) >= 2) by congruence.
-        simpl in *; omega.
-      * exists (addr_of p).
-        unfold best_succ; exists st; exists nil; exists (map addr_of l).
-        split; eauto.
-        split; eauto.
-        split; try split.
-        -- simpl.
-           change (addr_of p :: map addr_of l) with (map addr_of (p :: l)).
-           congruence.
-        -- intros; simpl in *; tauto.
-        -- eapply initial_nodes_live; eauto.
-           assert (In p (find_succs h (sort_by_between h (map make_pointer (nodes gst)))))
-             by (cut (In p (p :: l)); [congruence | auto with datatypes]).
-           find_apply_lem_hyp in_find_succs.
-           find_apply_lem_hyp in_sort_by_between.
-           find_apply_lem_hyp in_map_iff; expand_def.
-           easy.
-  - split; break_and.
-    + unfold sufficient_principals in *.
-      break_exists_exists.
-      break_and; split; eauto.
-      inv_prop principals; break_and.
-      apply principals_intro; auto; intros.
-      * inv_prop principals; expand_def.
-        eapply principals_involves_joined_node_state_only; eauto.
-        eapply Forall_forall; eauto.
-        intros.
-        intuition; inv_prop live_node; expand_def.
-        -- eapply live_node_characterization; eauto;
-             repeat find_rewrite;
-             try rewrite_update;
-             in_crush || eauto.
-        -- repeat find_rewrite; rewrite_update; auto.
-        -- repeat find_rewrite; update_destruct;
-             subst; rewrite_update;
-               repeat find_injection.
-           cut (joined x0 = false); [congruence|].
-           eapply joining_start_handler_st_joined; eauto.
-           eapply live_node_characterization; eauto; in_crush.
-        -- repeat find_rewrite; update_destruct;
-             subst; rewrite_update;
-               repeat find_injection.
-           cut (joined x0 = false); [congruence|].
-           eapply joining_start_handler_st_joined; eauto.
-           rewrite_update; auto.
-      * find_eapply_prop In.
-        inv_prop principal.
-        split; intros.
-        -- admit.
-        -- admit.
-    + unfold live_node_in_succ_lists.
-      intros; repeat split; intuition eauto.
-      admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  apply chord_net_invariant; eauto.
+Qed.
 
 Lemma first_succ_and_others_distinct :
   forall gst h st s1 s2 xs ys,
