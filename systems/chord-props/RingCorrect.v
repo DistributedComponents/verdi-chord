@@ -415,9 +415,18 @@ Proof.
       split; intros.
       -- admit.
       -- admit.
-  + unfold live_node_in_succ_lists.
-    intros; repeat split; intuition eauto.
-    admit.
+  + unfold live_node_in_succ_lists in *.
+    intros; repeat split.
+    repeat find_rewrite.
+    update_destruct; subst; rewrite_update.
+    * inv_prop live_node; expand_def.
+      repeat find_rewrite; rewrite_update; repeat find_injection.
+      find_eapply_lem_hyp joining_start_handler_st_joined.
+      congruence.
+    * eapply_lem_prop_hyp adding_nodes_did_not_affect_live_node live_node; eauto.
+      find_apply_hyp_hyp.
+      break_exists_exists.
+      eapply adding_nodes_does_not_affect_best_succ; eauto.
 Admitted.
 Hint Resolve zave_invariant_start.
 
