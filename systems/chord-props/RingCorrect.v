@@ -155,6 +155,10 @@ Lemma initial_successor_lists_full :
     initial_st gst ->
     length (find_succs h (sort_by_between h (map make_pointer (nodes gst)))) = SUCC_LIST_LEN.
 Proof.
+  intros.
+  pose proof (sorted_knowns_same_length h (nodes gst)).
+  inv_prop initial_st; break_and.
+  (* need to know find_succs will work *)
 Admitted.
 
 Lemma in_find_succs :
