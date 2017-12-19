@@ -150,6 +150,28 @@ Proof.
 Qed.
 Hint Resolve initial_nodes_principal.
 
+Require Import mathcomp.ssreflect.ssreflect.
+
+Lemma NoDup_map_make_pointer :
+  forall l, NoDup l ->
+  NoDup (map make_pointer l).
+Proof.
+elim => //=.
+move => a l IH H_nd.
+inversion H_nd; subst.
+find_apply_lem_hyp IH.
+apply NoDup_cons => //.
+move {H2 H_nd IH}.
+elim: l H1 => //=.
+move => a' l IH H_in H_in'.
+have H_neq: a' <> a by auto.
+have H_nin: ~ In a l by auto.
+break_or_hyp.
+- unfold make_pointer in H.
+  by find_injection.
+- by apply IH.
+Qed.
+
 Lemma initial_successor_lists_full :
   forall h gst,
     initial_st gst ->
@@ -158,15 +180,56 @@ Proof.
   intros.
   pose proof (sorted_knowns_same_length h (nodes gst)).
   inv_prop initial_st; break_and.
-  (* need to know find_succs will work *)
-Admitted.
+  rewrite -H0 in H1.
+  move: H1 H0.
+  set mm := map _ _.
+  move => H_le H_eq.
+  have H_pm := sort_by_between_permutes h mm (sort_by_between h mm) (eq_refl _).
+  have H_nd := NoDup_map_make_pointer _ H2.
+  rewrite -/mm in H_nd.
+  apply NoDup_Permutation_NoDup in H_pm => //.
+  move: H_pm H_le.
+  set l := sort_by_between _ _.
+  case: l => /=.
+  - move => H_nd' H_le.
+    by omega.
+  - move => a l H_nd' H_le.
+    have H_le': length l >= SUCC_LIST_LEN by omega.
+    break_if.
+    * inversion H_nd'.
+      subst.
+      move: H11 H_le' {H12 H_nd' H_le}.
+      case: l => /=.
+      + move => H_in H_le.
+        by auto with arith.
+      + move => a l H_in H_le.
+        have H_neq: a <> make_pointer h by auto.
+        break_if => //.
+        rewrite /chop_succs.
+        rewrite firstn_length /=.
+        by rewrite min_l.      
+    * rewrite /chop_succs.
+      rewrite firstn_length /=.
+      rewrite min_l //.
+      by auto with arith.
+Qed.
 
 Lemma in_find_succs :
   forall x h l,
     In x (find_succs h l) ->
     In x l.
 Proof.
-Admitted.
+  move => x h.
+  elim => //=.
+  move => a l IH.
+  break_if => H_in.
+  - by right; apply IH.
+  - rewrite /chop_succs in H_in.
+    apply in_firstn in H_in.
+    rewrite /= in H_in.
+    break_or_hyp; first by left.
+    by right.
+Qed.
 
 Lemma in_sort_by_between :
   forall x h l,
