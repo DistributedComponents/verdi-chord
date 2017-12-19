@@ -31,12 +31,24 @@ Inductive pair_in {A : Type} : A -> A -> list A -> Prop :=
       forall x,
         pair_in a b (x :: l).
 
+Require Import mathcomp.ssreflect.ssreflect.
+
 Lemma pair_in_sound :
   forall A (l : list A) xs a b ys,
     l = xs ++ a :: b :: ys ->
     pair_in a b l.
 Proof.
-Admitted.
+move => A.
+elim => //=; first by case.
+move => a l IH.
+case => /= [a0 b|a0 l0 a1 b] ys H_eq.
+- find_injection.
+  exact: pair_in_head.
+- find_injection.
+  apply pair_in_rest.
+  exact: IH.
+Qed.
+
 Hint Resolve pair_in_sound.
 
 Lemma initial_esl_is_sorted_nodes_chopped :
@@ -44,6 +56,8 @@ Lemma initial_esl_is_sorted_nodes_chopped :
     hash h :: map id_of (find_succs h (sort_by_between h (map make_pointer ns))) =
     map id_of (chop_succs (sort_by_between h (map make_pointer (h :: ns)))).
 Proof.
+move => h ns.
+rewrite map_cons /= {2}/sort_by_between.
 Admitted.
 
 Lemma sorted_list_elements_not_between :
@@ -60,7 +74,24 @@ Lemma pair_in_firstn :
     pair_in a b (firstn k l) ->
     pair_in a b l.
 Proof.
-Admitted.
+move => A a b k l.
+move: l a b k.
+elim => //=.
+- move => a b.
+  by case.
+- move => a l IH.
+  move => a0 b.
+  case => //=; first by move => H_p; inversion H_p.
+  move => n H_p.
+  inversion H_p; subst.
+  * destruct n => //=.
+    destruct l => //=.
+    simpl in *.
+    find_injection.
+    exact: pair_in_head.
+  * apply pair_in_rest.
+    by eapply IH; eauto.
+Qed.
 
 Lemma sorted_list_chopped_elements_not_between :
   forall p l,
@@ -107,7 +138,7 @@ Lemma initial_succ_lists_all_principal :
       ~ between a (hash p) b.
 Proof.
   intros.
-  rewrite initial_esl_is_sorted_nodes_chopped in *.
+  rewrite initial_esl_is_sorted_nodes_chopped in H0.
   pose proof (sorted_list_chopped_elements_not_between (make_pointer p) (map make_pointer (h :: l))).
   forwards. apply in_map; auto with datatypes. concludes.
   find_apply_lem_hyp pair_in_map; expand_def.
@@ -128,7 +159,7 @@ Proof.
   find_copy_apply_lem_hyp initial_nodes_large.
   destruct (start_handler h (nodes gst)) as [[?st ?ms] ?nts] eqn:?.
   copy_eapply_prop_hyp start_handler start_handler; auto; break_and.
-  rewrite start_handler_init_state_preset in *; eauto with arith.
+  rewrite start_handler_init_state_preset in Heqp; eauto with arith.
   repeat find_rewrite; repeat find_injection.
   simpl in *; eauto.
 Qed.
@@ -149,8 +180,6 @@ Proof.
     simpl in *; eauto.
 Qed.
 Hint Resolve initial_nodes_principal.
-
-Require Import mathcomp.ssreflect.ssreflect.
 
 Lemma NoDup_map_make_pointer :
   forall l, NoDup l ->
