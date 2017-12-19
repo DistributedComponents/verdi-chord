@@ -430,9 +430,81 @@ Proof.
 Admitted.
 Hint Resolve zave_invariant_start.
 
+Definition live_node_dec :
+  forall gst h,
+    {live_node gst h} + {~ live_node gst h}.
+Proof.
+Admitted.
+
+Definition principal_dec :
+  forall gst h,
+    {principal gst h} + {~ principal gst h}.
+Proof.
+Admitted.
+
+Lemma principal_preserved :
+  forall gst gst',
+    nodes gst = nodes gst' ->
+    (forall f,
+        In f (failed_nodes gst) ->
+        In f (failed_nodes gst')) ->
+    sigma gst = sigma gst' ->
+    forall h,
+      principal gst h ->
+      ~ In h (failed_nodes gst') ->
+      principal gst' h.
+Proof.
+  intros.
+  unfold principal in *; split; intros.
+  - break_and.
+    inv_prop live_node; expand_def.
+    repeat find_rewrite.
+    eapply live_node_characterization; eauto.
+  - subst.
+    inv_prop live_node; expand_def.
+    find_rewrite; find_injection.
+    find_eapply_prop not_skipped; repeat find_rewrite; eauto.
+    eapply live_node_characterization; repeat find_rewrite; eauto.
+Qed.
+
 Theorem zave_invariant_fail :
   chord_fail_invariant zave_invariant.
 Proof.
+  autounfold.
+  intros.
+  break_and.
+  split.
+  - inv_prop failure_constraint.
+    unfold principal_failure_constraint in *.
+    unfold sufficient_principals in *.
+    break_and.
+    destruct (principal_dec gst h).
+    + admit.
+    + unfold principals in * |-; break_exists_exists; expand_def.
+      rewrite -> ?Forall_forall in *.
+      assert (~ In h x) by eauto.
+      split; auto.
+      unfold principals in *; break_and.
+      intuition eauto.
+      * eapply Forall_forall; intros.
+        eapply principal_preserved; try symmetry; try eassumption; eauto.
+        repeat find_rewrite.
+        intros.
+        in_crush.
+        find_rewrite.
+        in_crush.
+        assert (principal gst x0) by eauto.
+        inv_prop principal.
+        inv_prop live_node.
+        firstorder.
+      * assert (principal gst p); [|auto].
+        split; intros.
+        inv_prop principal.
+        inv_prop live_node; intuition eauto using live_node_characterization.
+        -- admit.
+        -- admit.
+  - inv_prop failure_constraint.
+    easy.
 Admitted.
 Hint Resolve zave_invariant_fail.
 
