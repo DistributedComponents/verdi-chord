@@ -152,4 +152,64 @@ Section Sorting.
     intros; subst; apply (Permuted_iter_merge l []).
   Qed.
 
+  Fixpoint sorted_stack stack :=
+  match stack with
+  | [] => True
+  | None :: stack' => sorted_stack stack'
+  | Some l :: stack' => sorted l /\ sorted_stack stack'
+  end.
+
+  Theorem sorted_merge : forall l1 l2,
+      sorted l1 -> sorted l2 -> sorted (merge l1 l2).
+  Proof.
+    induction l1; induction l2; intros; simpl; auto.
+    destruct (le a a0) eqn:Heq1.
+    - invert H.
+      simpl. constructor; trivial; rewrite Heq1; constructor.
+      assert (sorted (merge (y::l) (a0::l2))) by (apply IHl1; auto).
+      clear H0 H3 IHl1; simpl in *.
+      destruct (le y a0); constructor; auto || rewrite Heq1; constructor.
+    - assert (le a0 a = true).
+        (destruct (le_total a0 a)); auto.
+        rewrite H1 in Heq1.
+        congruence.
+      invert H0.
+      constructor; trivial.
+      assert (sorted (merge (a::l1) (y::l))) by auto using IHl1.
+      clear IHl2; simpl in *.
+      destruct (le a y); constructor; auto.
+  Qed.
+
+  Theorem sorted_merge_stack : forall stack,
+      sorted_stack stack -> sorted (merge_stack stack).
+  Proof.
+    induction stack as [|[|]]; simpl; intros.
+    constructor; auto.
+    apply sorted_merge; tauto.
+    auto.
+  Qed.
+
+  Theorem sorted_merge_list_to_stack : forall stack l,
+      sorted_stack stack -> sorted l -> sorted_stack (merge_list_to_stack stack l).
+  Proof.
+  induction stack as [|[|]]; intros; simpl.
+    auto.
+    apply IHstack. destruct H as (_,H1). fold sorted_stack in H1. auto.
+      apply sorted_merge; auto; destruct H; auto.
+      auto.
+  Qed.
+
+  Theorem sorted_iter_merge : forall stack l,
+      sorted_stack stack -> sorted (iter_merge stack l).
+  Proof.
+    intros stack l H; induction l in stack, H |- *; simpl.
+    auto using sorted_merge_stack.
+    assert (sorted [a]) by constructor.
+    auto using sorted_merge_list_to_stack.
+  Qed.
+
+  Theorem sorted_sort : forall l, sorted (sort l).
+  Proof.
+    intro; apply sorted_iter_merge. constructor.
+  Qed.
 End Sorting.
