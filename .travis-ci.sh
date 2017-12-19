@@ -9,9 +9,10 @@ else
     opam repo add distributedcomponents-dev http://opam-dev.distributedcomponents.net
 fi
 
-opam pin add coq $COQ_VERSION --yes --verbose
-
 opam update --yes --verbose
+
+opam pin add coq $COQ_VERSION --yes
+
 opam upgrade --yes --verbose
 
 case $MODE in

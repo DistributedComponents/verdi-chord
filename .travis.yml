@@ -15,7 +15,7 @@ addons:
       - g++-multilib
 env:
   global:
-    - COQ_VERSION="8.7.0"
+    - COQ_VERSION="8.7.1"
   matrix:
   - COMPILER="4.05.0+32bit" MODE=build
   - COMPILER="4.05.0+32bit" MODE=chord
