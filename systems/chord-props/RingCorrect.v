@@ -467,6 +467,20 @@ Proof.
     eapply live_node_characterization; repeat find_rewrite; eauto.
 Qed.
 
+Lemma principal_not_failed :
+  forall gst h,
+    principal gst h ->
+    In h (failed_nodes gst) ->
+    False.
+Proof.
+  unfold principal.
+  intros until 1.
+  fold (~ In h (failed_nodes gst)).
+  break_and.
+  eauto.
+Qed.
+Hint Resolve principal_not_failed.
+
 Theorem zave_invariant_fail :
   chord_fail_invariant zave_invariant.
 Proof.
@@ -479,8 +493,33 @@ Proof.
     unfold sufficient_principals in *.
     break_and.
     destruct (principal_dec gst h).
-    + admit.
-    + unfold principals in * |-; break_exists_exists; expand_def.
+    + concludes.
+      break_exists_name ps; break_and.
+      exists (remove addr_eq_dec h ps).
+      split.
+      * inv_prop principals.
+        pose proof (principal_preserved gst gst').
+        econcludes.
+        forwards.
+        intros. repeat find_rewrite. in_crush.
+        concludes.
+        econcludes.
+        repeat split.
+        -- auto using remove_NoDup.
+        -- break_and.
+           rewrite -> ?Forall_forall in *; intros.
+           repeat find_rewrite.
+           eauto.
+           eapply H17; eauto using in_remove.
+           simpl.
+           intro; break_or_hyp; try solve [eapply remove_In; eauto].
+           admit.
+        -- admit.
+      * apply gt_S_n.
+        inv_prop principals; break_and.
+        assert (length ps = SUCC_LIST_LEN + 1 -> False) by eauto.
+        rewrite remove_length_in; eauto; omega.
+    + unfold principals in * |- ; break_exists_exists; expand_def.
       rewrite -> ?Forall_forall in *.
       assert (~ In h x) by eauto.
       split; auto.
