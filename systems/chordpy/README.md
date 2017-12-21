@@ -16,14 +16,14 @@ inductive invariant presented in Zave's paper.
 Any design limitations in the Zave specification also apply to this
 implementation. For example, there's no key-value storage or external API
 available in this implementation, since Zave's paper doesn't include anything
-to that end. 
+to that end.
 
 Running it
 ==========
 Presently the only available command just runs a demo, in which a ring of nodes
 is started up and then a few of them are killed off. This is an artifact of the
 code's general disorganization, and when I fix that I'll be sure to get the
-demo separated from the chord implementation itself. 
+demo separated from the chord implementation itself.
 
 That said, the demo is pretty satisfying to watch. As mentioned above, running
 `python2 demo.py | python2 report.py` will get it going. Grepping out all the

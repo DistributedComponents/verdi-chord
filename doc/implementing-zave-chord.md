@@ -62,7 +62,7 @@ Queries to other nodes can change a node's local state. According to Zave:
 > dead. If the node does respond, then the atomic step associated with the query
 > is deemed to occur at the instant that the queried node responds with
 > information about its own state.
-> 
+>
 > To maintain the shared-state abstraction, the querying node must obey the
 > following rules:
 > - The querying node does not know the instant that its query is answered; it
@@ -127,7 +127,7 @@ rest`, then `n` starts a `Join2(s)` query.
 A node `n` requests a copy of the successor list `succs` of `s`. If the query
 times out, `n` starts back over joining at its `known_node`. Otherwise, `n` sets
 its successor list to `s :: succs` truncated to `SUCC_LIST_LEN` and sets `joined
-= true`. 
+= true`.
 
 This means a node with `joined = true` will initially have `pred = None`.
 

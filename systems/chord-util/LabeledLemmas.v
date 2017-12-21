@@ -1632,7 +1632,7 @@ Proof.
   - in_crush; eauto.
     unfold send in *.
     find_injection; tauto.
-  - simpl in *. 
+  - simpl in *.
     find_apply_lem_hyp in_app_or.
     break_or_hyp; eauto with datatypes.
 Qed.

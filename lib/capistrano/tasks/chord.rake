@@ -1,5 +1,5 @@
 namespace :chord do
-  
+
   desc 'start chord'
   task :start do
     nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
@@ -22,7 +22,7 @@ namespace :chord do
   desc 'stop chord'
   task :stop do
     on roles(:node) do
-      execute '/sbin/start-stop-daemon', 
+      execute '/sbin/start-stop-daemon',
         '--stop',
         '--oknodo',
         "--pidfile #{current_path}/extraction/chord/tmp/chord.pid"

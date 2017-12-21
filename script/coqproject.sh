@@ -52,7 +52,7 @@ done
 
 COQTOP="coqtop $(cat $COQPROJECT_TMP)"
 function check_canary(){
-    echo "Require Import $@." | $COQTOP 2>&1 | grep -i error 1> /dev/null 2>&1 
+    echo "Require Import $@." | $COQTOP 2>&1 | grep -i error 1> /dev/null 2>&1
 }
 i=0
 len="${#CANARIES[@]}"

@@ -26,7 +26,7 @@ Proof.
   unfold live_node in *. simpl in *.
   intuition.
 Qed.
-  
+
 Ltac simpler := repeat (repeat find_inversion; subst; simpl in *; repeat rewrite_update); auto.
 
 Lemma do_delayed_queries_never_clears_tick :

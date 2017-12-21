@@ -64,7 +64,7 @@ Theorems and Lemmas
 * proof script indented by two spaces
 
 Example:
-```  
+```
 Theorem inverse_trace_relations_work :
   forall s tr,
     refl_trans_1n_trace step init s tr ->

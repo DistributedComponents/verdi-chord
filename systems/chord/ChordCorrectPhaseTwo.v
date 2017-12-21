@@ -1092,7 +1092,7 @@ Proof.
               repeat find_rewrite;
               repeat find_inversion; simpl in *; eauto; try congruence).
 Qed.
-        
+
 Lemma hd_error_make_succs :
   forall x l,
     hd_error (make_succs x l) = Some x.
@@ -1148,7 +1148,7 @@ induction 1; intros.
       simpl in *.
       find_rewrite_lem hd_error_make_succs. congruence.
 Qed.
-  
+
 Lemma has_first_succ_inj :
   forall gst h s s',
     has_first_succ gst h s ->
@@ -2857,7 +2857,7 @@ Proof.
   invcs H.
   invcs H0. unfold better_pred. intuition.
   eauto using between_trans'.
-Qed.  
+Qed.
 
 Lemma better_pred_bool_trans:
   forall h a b c,
@@ -2919,7 +2919,7 @@ Proof.
   destruct (better_pred_bool h a b) eqn:?; auto.
   eauto using better_pred_bool_antisymmetric.
 Qed.
-  
+
 Lemma correct_pred_exists' :
   forall gst h l,
     wf_ptr h ->
@@ -2934,7 +2934,7 @@ Proof.
   + exists p. find_copy_apply_lem_hyp max_cmp_in; break_or_hyp; try congruence.
     copy_eapply_prop_hyp possible_preds_lst In. intuition.
     unfold pred_correct. eexists; intuition eauto.
-    apply better_pred_bool_true_better_pred; auto. 
+    apply better_pred_bool_true_better_pred; auto.
     eapply max_cmp_None_correct with (wf := wf_ptr); eauto using better_pred_bool_trans, better_pred_bool_antisym', better_pred_bool_total';
       intros; match goal with
               | H : possible_preds_lst _ _ |- _ =>
@@ -3050,11 +3050,11 @@ Lemma live_ptrs_not_empty :
     live_ptrs gst <> [].
 Proof.
   intuition.
-  eapply live_addrs_not_empty; eauto. 
+  eapply live_addrs_not_empty; eauto.
   unfold live_ptrs in *.
   eauto using map_empty.
 Qed.
-    
+
 Lemma always_possible_preds_lst :
   forall gst,
     reachable_st gst ->

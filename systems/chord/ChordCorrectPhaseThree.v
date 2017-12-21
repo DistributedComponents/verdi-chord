@@ -158,7 +158,7 @@ Lemma succs_error_helper_correct_succs:
       (In s' xs \/ In s' acc).
 Proof.
   induction xs; intros; simpl in *.
-  - right. 
+  - right.
     break_if; try omega.
     find_rewrite_lem Forall_forall.
     apply f.

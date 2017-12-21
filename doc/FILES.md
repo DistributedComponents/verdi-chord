@@ -46,7 +46,7 @@ Chord files
   * admitted: `ext_succ_list_span_includes` (definition needs to be changed to work with bitvectors)
 
 - `systems/chord/ChordCorrectPhaseOne.v`: general facts about that stabilization eventually happens in Chord systems
-  * admits can be proved using simple facts from labeled semantics, exactly what is needed, may need to be reformulated 
+  * admits can be proved using simple facts from labeled semantics, exactly what is needed, may need to be reformulated
   * proofs are somewhat ad-hoc
   * uses measure machinery heavily
 
@@ -137,7 +137,7 @@ Chord correctness properties files
 
 - `systems/chord-props/NodesNotJoinedHaveNoSuccessors.v`: successor lists of never-active nodes are empty
   * used in phase one correctness
-  
+
 - `systems/chord-props/QueryInvariant.v`: at most one request per timeout
 
 - `systems/chord-props/ValidPointersInvariant.v`: pointers point to reasonable things

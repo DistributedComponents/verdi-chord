@@ -304,7 +304,7 @@ Proof.
         break_if => //.
         rewrite /chop_succs.
         rewrite firstn_length /=.
-        by rewrite min_l.      
+        by rewrite min_l.
     * rewrite /chop_succs.
       rewrite firstn_length /=.
       rewrite min_l //.

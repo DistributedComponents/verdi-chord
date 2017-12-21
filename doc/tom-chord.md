@@ -38,7 +38,7 @@ is Pastry -- unlike Chord, those authors did understand consensus.)
 My approach uses version #'s, commutativity, and chain replication.  I assume we
 want to be able to survive k-1 failures (between reconvergence steps), and each
 node keeps k successors, and 1 predecessor.  for now, i'm going to ignore key
-replication.  
+replication.
 
 1) if we assume no joins, and up to k-1 failures, and the ring was k-connected
    prior to any failures, then it is simple to rebuild the k-successor list by
@@ -47,7 +47,7 @@ replication.
 2)  there are k+2 nodes whose state we need to update on a join (joiner,
     k predecessors, and the one successor). keeping things simple, let's insist
     that the k predecessors and the one successor need to have a consistent view
-    of their state to proceed (which they can get from step 1).  
+    of their state to proceed (which they can get from step 1).
 
 Secondly, let's insist that each successor node processes at most one join
 request at a time.  No harm here -- the joiner talks to the successor, so if the
@@ -87,7 +87,7 @@ reaches the tail and returns to the joiner.
 
 possible that multiple updates will proceed concurrently.  Since you don't know
 if a change will commit, you need to keep multiple versions, and merge as
-necessary. 
+necessary.
 
 at this point, all nodes have computed the new state (equal to "rectify" in the
 Zave protocol?) but have the old state to fall back upon

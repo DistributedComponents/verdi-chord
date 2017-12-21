@@ -1193,9 +1193,9 @@ Ltac handler_def :=
   | H : keepalive_handler _ = _ |- _ =>
     apply keepalive_handler_definition in H; expand_def
   | H : tick_handler _ _ = _ |- _ =>
-    apply tick_handler_definition in H; expand_def 
+    apply tick_handler_definition in H; expand_def
   | H : add_tick _ = _ |- _ =>
-    apply add_tick_definition in H; expand_def 
+    apply add_tick_definition in H; expand_def
   | H: start_query _ _ _ = _ |- _ =>
     apply start_query_definition in H; expand_def
   | H: context [start_query ?h ?st ?q] |- _ =>
