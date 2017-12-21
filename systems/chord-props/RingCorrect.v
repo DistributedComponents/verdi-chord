@@ -27,7 +27,14 @@ Definition live_node_dec :
   forall gst h,
     {live_node gst h} + {~ live_node gst h}.
 Proof.
-Admitted.
+  intros.
+  destruct (In_dec addr_eq_dec h (nodes gst));
+    destruct (In_dec addr_eq_dec h (failed_nodes gst));
+    destruct (sigma gst h) as [st|] eqn:?;
+    try destruct (joined st) eqn:?;
+        try solve [left; eapply live_node_characterization; eassumption
+                  |right; intro; inv_prop live_node; expand_def; congruence].
+Defined.
 
 Definition principal_dec :
   forall gst h,
@@ -541,10 +548,10 @@ Proof.
     unfold principal_failure_constraint in *.
     unfold sufficient_principals in *.
     break_and.
+    eapply some_principals_ok.
     destruct (principal_dec gst h).
     + concludes.
       break_exists_name ps; break_and.
-      eapply some_principals_ok.
       exists (remove addr_eq_dec h ps); repeat split.
       * inv_prop principals; auto using remove_NoDup.
       * inv_prop principals.
@@ -575,27 +582,20 @@ Proof.
       assert (~ In h x) by eauto.
       split; auto.
       unfold principals in *; break_and.
-      intuition eauto.
-      * eapply Forall_forall; intros.
-        eapply principal_preserved; try symmetry; try eassumption; eauto.
-        repeat find_rewrite.
-        intros.
-        in_crush.
-        find_rewrite.
-        in_crush.
-        assert (principal gst x0) by eauto.
-        inv_prop principal.
-        inv_prop live_node.
-        firstorder.
-      * assert (principal gst p); [|auto].
-        split; intros.
-        inv_prop principal.
-        inv_prop live_node; intuition eauto using live_node_characterization.
-        -- admit.
-        -- admit.
+      intuition eauto; try omega.
+      eapply principal_preserved; try symmetry; try eassumption; eauto.
+      repeat find_rewrite.
+      intros.
+      in_crush.
+      find_rewrite.
+      in_crush.
+      assert (principal gst x0) by eauto.
+      inv_prop principal.
+      inv_prop live_node.
+      tauto.
   - inv_prop failure_constraint.
     easy.
-Admitted.
+Qed.
 Hint Resolve zave_invariant_fail.
 
 Theorem zave_invariant_recv :
