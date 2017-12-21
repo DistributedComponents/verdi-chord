@@ -1,5 +1,6 @@
 Require Import List.
 Import ListNotations.
+Require Import mathcomp.ssreflect.ssreflect.
 Require Import Omega.
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
@@ -16,6 +17,68 @@ Definition sufficient_principals (gst : global_state) : Prop :=
     principals gst ps /\
     length ps > SUCC_LIST_LEN.
 
+Definition have_principals (gst : global_state) (n : nat) : Prop :=
+  exists ps,
+    NoDup ps /\
+    Forall (principal gst) ps /\
+    length ps >= n.
+
+Definition live_node_dec :
+  forall gst h,
+    {live_node gst h} + {~ live_node gst h}.
+Proof.
+Admitted.
+
+Definition principal_dec :
+  forall gst h,
+    {principal gst h} + {~ principal gst h}.
+Proof.
+Admitted.
+
+Definition compute_principals (gst : global_state) : list addr :=
+  dedup
+    addr_eq_dec
+    (filter
+       (fun h => ssrbool.is_left (principal_dec gst h))
+       (nodes gst)).
+
+Lemma compute_principals_correct :
+  forall gst,
+    principals gst (compute_principals gst).
+Proof.
+  unfold compute_principals, principals.
+  repeat split; [now eapply NoDup_dedup|apply Forall_forall|]; intros.
+  - find_eapply_lem_hyp in_dedup_was_in.
+    find_eapply_lem_hyp filter_In; break_and.
+    destruct (principal_dec gst x);
+      simpl in *; congruence.
+  - apply dedup_In.
+    apply filter_In; split.
+    + inv_prop principal.
+      now inv_prop live_node.
+    + destruct (principal_dec gst p);
+        simpl in *; congruence.
+Qed.
+
+Lemma some_principals_ok :
+  forall gst,
+    have_principals gst (SUCC_LIST_LEN + 1) ->
+    sufficient_principals gst.
+Proof.
+  intros.
+  inv_prop have_principals; break_and.
+  pose proof (compute_principals_correct gst).
+  inv_prop principals; break_and.
+  assert (incl x (compute_principals gst)).
+  {
+    unfold incl; intros.
+    rewrite -> ?Forall_forall in *; eauto.
+  }
+  find_eapply_lem_hyp NoDup_incl_length; auto.
+  eexists.
+  split; eauto; omega.
+Qed.
+
 Definition zave_invariant (gst : global_state) : Prop :=
   sufficient_principals gst /\
   live_node_in_succ_lists gst.
@@ -30,8 +93,6 @@ Inductive pair_in {A : Type} : A -> A -> list A -> Prop :=
       pair_in a b l ->
       forall x,
         pair_in a b (x :: l).
-
-Require Import mathcomp.ssreflect.ssreflect.
 
 Lemma pair_in_sound :
   forall A (l : list A) xs a b ys,
@@ -430,18 +491,6 @@ Proof.
 Admitted.
 Hint Resolve zave_invariant_start.
 
-Definition live_node_dec :
-  forall gst h,
-    {live_node gst h} + {~ live_node gst h}.
-Proof.
-Admitted.
-
-Definition principal_dec :
-  forall gst h,
-    {principal gst h} + {~ principal gst h}.
-Proof.
-Admitted.
-
 Lemma principal_preserved :
   forall gst gst',
     nodes gst = nodes gst' ->
@@ -495,8 +544,9 @@ Proof.
     destruct (principal_dec gst h).
     + concludes.
       break_exists_name ps; break_and.
-      exists (remove addr_eq_dec h ps).
-      split.
+      eapply some_principals_ok.
+      exists (remove addr_eq_dec h ps); repeat split.
+      * inv_prop principals; auto using remove_NoDup.
       * inv_prop principals.
         pose proof (principal_preserved gst gst').
         econcludes.
@@ -504,21 +554,22 @@ Proof.
         intros. repeat find_rewrite. in_crush.
         concludes.
         econcludes.
-        repeat split.
-        -- auto using remove_NoDup.
-        -- break_and.
-           rewrite -> ?Forall_forall in *; intros.
-           repeat find_rewrite.
-           eauto.
-           eapply H17; eauto using in_remove.
-           simpl.
-           intro; break_or_hyp; try solve [eapply remove_In; eauto].
-           admit.
-        -- admit.
-      * apply gt_S_n.
-        inv_prop principals; break_and.
+        break_and.
+        rewrite -> ?Forall_forall in *; intros.
+        repeat find_rewrite.
+        eauto.
+        eapply H17; eauto using in_remove.
+        simpl.
+        destruct (addr_eq_dec h x);
+          intro; break_or_hyp; try solve [eapply remove_In; eauto].
+        assert (principal gst x) by eauto using in_remove.
+        inv_prop principal; inv_prop live_node; tauto.
+      * inv_prop principals; break_and.
         assert (length ps = SUCC_LIST_LEN + 1 -> False) by eauto.
-        rewrite remove_length_in; eauto; omega.
+        cut (length (remove addr_eq_dec h ps) > SUCC_LIST_LEN); [omega|].
+        eapply gt_S_n.
+        rewrite remove_length_in; eauto.
+        omega.
     + unfold principals in * |- ; break_exists_exists; expand_def.
       rewrite -> ?Forall_forall in *.
       assert (~ In h x) by eauto.
