@@ -647,13 +647,18 @@ Theorem zave_invariant_holds :
 Proof.
   apply chord_net_invariant; eauto.
 Qed.
+Hint Resolve zave_invariant_holds.
 
 Lemma sufficient_principals_invariant :
   forall gst,
     reachable_st gst ->
     sufficient_principals gst.
 Proof.
-Admitted.
+  intros.
+  assert (zave_invariant gst) by auto.
+  unfold zave_invariant in *.
+  tauto.
+Qed.
 Hint Resolve sufficient_principals_invariant.
 
 Lemma live_node_in_succ_lists_invariant :
@@ -661,7 +666,11 @@ Lemma live_node_in_succ_lists_invariant :
     reachable_st gst ->
     live_node_in_succ_lists gst.
 Proof.
-Admitted.
+  intros.
+  assert (zave_invariant gst) by auto.
+  unfold zave_invariant in *.
+  tauto.
+Qed.
 Hint Resolve live_node_in_succ_lists_invariant.
 
 Lemma first_succ_and_others_distinct :
