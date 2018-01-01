@@ -529,6 +529,8 @@ Proof using.
   - (* need to dissect timeout_handler here *)
     admit.
 (*
+IGNORE
+
 This proof is a grind through the definition of timeout_handler. It might not go
 through until definition of valid_ptr_timeout gets fixed. (It's missing a case
 for RectifyTick.)
@@ -562,6 +564,8 @@ Lemma valid_ptrs_global_recv_handler :
          valid_ptr_timeout gst t.
 Proof using.
 (*
+IGNORE
+
 This proof is a grind through the definition of recv_handler.
 
 DIFFICULTY: 2
@@ -619,6 +623,8 @@ Proof using.
   - admit.
   - admit.
 (*
+IGNORE
+
 I need to clean this up.
 
 DIFFICULTY: Ryan.
@@ -641,6 +647,8 @@ Proof using.
   - admit.
   - admit.
 (*
+IGNORE
+
 I need to break this out into smaller admits.
 
 DIFFICULTY: Ryan.
@@ -661,6 +669,8 @@ Proof using.
   - admit.
   - admit.
 (*
+IGNORE
+
 I need to break this out into smaller admits.
 
 DIFFICULTY: Ryan.
@@ -681,6 +691,8 @@ Proof using.
   - admit.
   - admit.
 (*
+IGNORE
+
 I need to break this out into smaller admits.
 
 DIFFICULTY: Ryan.
@@ -699,6 +711,8 @@ Proof.
     find_apply_lem_hyp valid_ptrs_state_elim;
     break_and.
 (*
+IGNORE
+
 This follows from valid_ptr_nodes_subset.
 
 DIFFICULTY: 2
@@ -716,6 +730,8 @@ Lemma start_handler_valid_ptrs_state :
 Proof.
   intros.
 (*
+IGNORE
+
 This follows from valid_ptr_nodes_subset.
 
 DIFFICULTY: 2

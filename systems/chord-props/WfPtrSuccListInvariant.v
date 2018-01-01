@@ -18,6 +18,8 @@ Lemma wf_ptr_succ_list_invariant' :
     wf_ptr p.
 Proof.
 (*
+IGNORE
+
 This invariant says pointers in successor lists are well-formed. It
 should be inductive if we tack on something about the contents of
 GotPredAndSuccs/GotSuccList messages.

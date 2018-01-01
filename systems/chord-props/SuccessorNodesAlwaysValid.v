@@ -22,6 +22,8 @@ Lemma successor_nodes_always_valid :
     successor_nodes_valid gst.
 Proof.
 (*
+IGNORE
+
 This invariant says every successor list pointer points to a node
 that's both live and has joined st = true.  It will require some
 strengthening before it's inductive.
