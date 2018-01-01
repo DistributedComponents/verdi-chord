@@ -933,6 +933,12 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       (forall o, In o xs -> dead_node gst o) /\
       live_node gst s.
 
+  Definition live_node_in_msg_succ_lists (gst : global_state) : Prop :=
+    forall src dst succs p,
+      In (src, (dst, GotPredAndSuccs p succs)) (msgs gst) \/
+      In (src, (dst, GotSuccList succs)) (msgs gst) ->
+      Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))).
+
   Definition live_node_in_succ_lists (gst : global_state) : Prop :=
     forall h st,
       sigma gst h = Some st ->
@@ -971,6 +977,7 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       False.
 
   Definition failure_constraint (gst : global_state) (f : addr) (gst' : global_state) : Prop :=
+    live_node_in_msg_succ_lists gst' /\
     live_node_in_succ_lists gst' /\
     principal_failure_constraint gst f.
 

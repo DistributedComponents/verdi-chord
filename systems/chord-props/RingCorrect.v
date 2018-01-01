@@ -88,7 +88,8 @@ Qed.
 
 Definition zave_invariant (gst : global_state) : Prop :=
   sufficient_principals gst /\
-  live_node_in_succ_lists gst.
+  live_node_in_succ_lists gst /\
+  live_node_in_msg_succ_lists gst.
 Hint Unfold zave_invariant.
 
 Inductive pair_in {A : Type} : A -> A -> list A -> Prop :=
@@ -411,7 +412,7 @@ Theorem zave_invariant_init :
 Proof.
   autounfold; intros.
   inv_prop initial_st.
-  split.
+  repeat split.
   - break_and.
     unfold sufficient_principals.
     exists (nodes gst); split; try omega.
@@ -443,6 +444,8 @@ Proof.
          find_apply_lem_hyp in_sort_by_between.
          find_apply_lem_hyp in_map_iff; expand_def.
          easy.
+  - unfold live_node_in_msg_succ_lists; intros.
+    break_and; find_rewrite; in_crush.
 Qed.
 Hint Resolve zave_invariant_init.
 
@@ -522,7 +525,7 @@ Theorem zave_invariant_start :
   chord_start_invariant zave_invariant.
 Proof.
   autounfold; intros.
-  split; break_and.
+  repeat split; break_and.
   + unfold sufficient_principals in *.
     break_exists_exists.
     break_and; split; eauto.
@@ -573,7 +576,8 @@ Proof.
       find_apply_hyp_hyp.
       break_exists_exists.
       eapply adding_nodes_does_not_affect_best_succ; eauto.
-Qed.
+  + admit. (* easy, only one message sent by start handler *)
+Admitted.
 Hint Resolve zave_invariant_start.
 
 Lemma principal_preserved :
@@ -643,7 +647,7 @@ Proof.
         rewrite -> ?Forall_forall in *; intros.
         repeat find_rewrite.
         eauto.
-        eapply H17; eauto using in_remove.
+        find_eapply_prop principal; eauto using in_remove.
         simpl.
         destruct (addr_eq_dec h x);
           intro; break_or_hyp; try solve [eapply remove_In; eauto].
