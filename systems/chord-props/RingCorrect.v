@@ -446,6 +446,78 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_init.
 
+Lemma live_node_not_just_started :
+  forall h gst gst' k st ms nts,
+    ~ In h (nodes gst) ->
+    In k (nodes gst) ->
+    ~ In k (failed_nodes gst) ->
+    start_handler h [k] = (st, ms, nts) ->
+    nodes gst' = h :: nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h nts ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st) ->
+    msgs gst' = map (send h) ms ++ msgs gst ->
+    trace gst' = trace gst ++ map e_send (map (send h) ms) ->
+    forall l,
+      live_node gst' l ->
+      l <> h.
+Proof.
+  intros; intro; subst.
+  assert (joined st = true).
+  {
+    inv_prop live_node; expand_def.
+    repeat find_rewrite; rewrite_update; congruence.
+  }
+  assert (joined st = false) by
+      eauto using joining_start_handler_st_joined.
+  congruence.
+Qed.
+
+Lemma live_before_start_stays_live :
+  forall h gst gst' k st ms nts,
+    ~ In h (nodes gst) ->
+    In k (nodes gst) ->
+    ~ In k (failed_nodes gst) ->
+    start_handler h [k] = (st, ms, nts) ->
+    nodes gst' = h :: nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h nts ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st) ->
+    msgs gst' = map (send h) ms ++ msgs gst ->
+    trace gst' = trace gst ++ map e_send (map (send h) ms) ->
+    forall l,
+      live_node gst l ->
+      live_node gst' l.
+Proof.
+  intros.
+  inv_prop live_node; expand_def.
+  eapply live_node_characterization; eauto; repeat find_rewrite;
+    solve [now rewrite_update | in_crush].
+Qed.
+
+Lemma live_after_start_was_live :
+  forall h gst gst' k st ms nts,
+    ~ In h (nodes gst) ->
+    In k (nodes gst) ->
+    ~ In k (failed_nodes gst) ->
+    start_handler h [k] = (st, ms, nts) ->
+    nodes gst' = h :: nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h nts ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st) ->
+    msgs gst' = map (send h) ms ++ msgs gst ->
+    trace gst' = trace gst ++ map e_send (map (send h) ms) ->
+    forall l,
+      live_node gst' l ->
+      live_node gst l.
+Proof.
+  intros.
+  inv_prop live_node; expand_def.
+  assert (l <> h) by eauto using live_node_not_just_started.
+  eapply live_node_characterization; eauto; repeat find_rewrite;
+    solve [now rewrite_update | in_crush].
+Qed.
+
 Theorem zave_invariant_start :
   chord_start_invariant zave_invariant.
 Proof.
@@ -480,9 +552,15 @@ Proof.
          rewrite_update; auto.
     * find_eapply_prop In.
       inv_prop principal.
-      split; intros.
-      -- admit.
-      -- admit.
+      split; eauto using live_after_start_was_live.
+      intros.
+      inv_prop principal.
+      assert (live_node gst p) by eauto using live_after_start_was_live.
+      assert (live_node gst' h0) by eauto using live_before_start_stays_live.
+      inv_prop (live_node gst' h0); expand_def.
+      find_eapply_prop not_skipped; eauto.
+      assert (h0 <> h) by eauto using live_node_not_just_started.
+      repeat find_rewrite; rewrite_update; congruence.
   + unfold live_node_in_succ_lists in *.
     intros; repeat split.
     repeat find_rewrite.
@@ -495,7 +573,7 @@ Proof.
       find_apply_hyp_hyp.
       break_exists_exists.
       eapply adding_nodes_does_not_affect_best_succ; eauto.
-Admitted.
+Qed.
 Hint Resolve zave_invariant_start.
 
 Lemma principal_preserved :
