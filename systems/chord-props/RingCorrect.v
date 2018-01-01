@@ -648,6 +648,22 @@ Proof.
   apply chord_net_invariant; eauto.
 Qed.
 
+Lemma sufficient_principals_invariant :
+  forall gst,
+    reachable_st gst ->
+    sufficient_principals gst.
+Proof.
+Admitted.
+Hint Resolve sufficient_principals_invariant.
+
+Lemma live_node_in_succ_lists_invariant :
+  forall gst,
+    reachable_st gst ->
+    live_node_in_succ_lists gst.
+Proof.
+Admitted.
+Hint Resolve live_node_in_succ_lists_invariant.
+
 Lemma first_succ_and_others_distinct :
   forall gst h st s1 s2 xs ys,
     reachable_st gst ->

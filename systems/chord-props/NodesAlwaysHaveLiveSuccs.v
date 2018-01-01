@@ -1,5 +1,6 @@
 Require Import List.
 Import ListNotations.
+Require Import Omega.
 
 Require Import StructTact.StructTactics.
 
@@ -7,31 +8,7 @@ Require Import Chord.Chord.
 
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
-
-Definition nodes_have_live_succs (gst : global_state) : Prop :=
-  forall h st,
-    live_node gst h ->
-    sigma gst h = Some st ->
-    exists s,
-      live_node gst (addr_of s) /\
-      In s (succ_list st).
-
-Theorem nodes_always_have_live_succs :
-  forall gst,
-    reachable_st gst ->
-    nodes_have_live_succs gst.
-Proof.
-(*
-In Zave's paper, this is one half of the inductive invariant. The
-other half of the invariant is SufficientPrincipals. So it's provable,
-but it will require coming up with an inductive invariant that works
-for verdi-chord.
-
-DIFFICULTY: 5
-USED: below to prove node successor lists are nonempty, which is used
-in phase one.
- *)
-Admitted.
+Require Import Chord.RingCorrect.
 
 Definition nonempty_succ_lists (gst : global_state) : Prop :=
   forall h st,
@@ -48,10 +25,17 @@ Lemma nodes_have_nonempty_succ_lists :
 Proof.
   unfold nonempty_succ_lists.
   intros.
-  find_apply_lem_hyp nodes_always_have_live_succs;
-    eauto using live_node_characterization.
-  break_exists.
+  assert (live_node_in_succ_lists gst) by eauto.
+  unfold live_node_in_succ_lists in *.
+  assert (exists s, best_succ gst h s) by
+      eauto using live_node_characterization.
+  break_exists_name s.
+  inv_prop best_succ; repeat break_exists; break_and.
+  repeat find_rewrite.
+  find_injection.
   intro.
   repeat find_rewrite.
-  intuition.
+  find_apply_lem_hyp (f_equal (@length addr)).
+  rewrite app_length in *.
+  simpl in *; omega.
 Qed.
