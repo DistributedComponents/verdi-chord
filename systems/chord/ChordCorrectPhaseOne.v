@@ -180,10 +180,11 @@ Proof.
   exists [].
   exists (map addr_of rest).
   simpl.
+  find_copy_eapply_lem_hyp zero_leading_failed_nodes_leading_node_live; eauto; break_and.
   intuition.
   - repeat find_rewrite.
     apply map_cons.
-  - find_copy_eapply_lem_hyp zero_leading_failed_nodes_leading_node_live; eauto; tauto.
+  - break_live_node; auto.
 Qed.
 
 Theorem zero_leading_failed_nodes_implies_all_first_succs_best :
