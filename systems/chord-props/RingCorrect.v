@@ -688,6 +688,66 @@ Proof.
     solve [left; constructor|right; intro; inv_prop response_payload].
 Defined.
 
+Lemma in_concat :
+  forall A (x : A) (l : list (list A)),
+    In x (concat l) ->
+    exists xs,
+      In xs l /\
+      In x xs.
+Proof.
+Admitted.
+
+Lemma handle_query_req_GotPredAndSuccs_response_accurate :
+  forall st src m ms,
+    handle_query_req st src m = ms ->
+    forall dst pr succs,
+      In (dst, GotPredAndSuccs pr succs) ms ->
+      pr = pred st /\
+      succs = succ_list st.
+Proof.
+  intros.
+  unfold handle_query_req in *; break_match; subst;
+    try in_crush; try congruence.
+Qed.
+Hint Resolve handle_query_req_GotPredAndSuccs_response_accurate.
+
+Lemma handle_delayed_queries_GotPredAndSuccs_response_accurate :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    forall dst pr succs,
+      In (dst, GotPredAndSuccs pr succs) ms ->
+      pr = pred st' /\
+      succs = succ_list st'.
+Proof.
+  unfold do_delayed_queries, handle_delayed_query.
+  intros.
+  break_match; find_injection; try solve [in_crush].
+  find_apply_lem_hyp in_concat; expand_def.
+  match goal with
+  | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; break_let; subst
+  end.
+  simpl in *; eauto.
+Qed.
+Hint Resolve handle_delayed_queries_GotPredAndSuccs_response_accurate.
+
+Lemma recv_handler_GotPredAndSuccs_response_accurate :
+  forall src dst st p st' ms nts cts h pr succs,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    In (h, GotPredAndSuccs pr succs) ms ->
+    pr = pred st' /\
+    succs = succ_list st'.
+Proof.
+  intros.
+  repeat match goal with
+         | H : context[do_delayed_queries] |- _ => fail 1
+         | |- _ => handler_def
+         end.
+  find_apply_lem_hyp in_app_or; break_or_hyp; eauto.
+  repeat handler_def; simpl in *; try break_or_hyp; repeat find_injection; try (congruence || tauto).
+  eauto.
+Qed.
+Hint Resolve recv_handler_GotPredAndSuccs_response_accurate.
+
 Theorem zave_invariant_recv :
   chord_recv_handler_invariant zave_invariant.
 Proof.
@@ -705,7 +765,29 @@ Proof.
       * admit.
       * handler_def; handler_def; simpl in *; try congruence.
         -- admit.
-        -- admit (* here *).
+        -- unfold live_node_in_msg_succ_lists; intros.
+           find_rewrite.
+           break_or_hyp.
+           ++ find_apply_lem_hyp in_app_or.
+              break_or_hyp.
+              ** match goal with
+                 | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; cbv in H; injc H
+                 end.
+                 in_crush; try congruence.
+                 eapply handle_delayed_queries_GotPredAndSuccs_response_accurate in H15; eauto.
+                 break_and; subst.
+                 apply Exists_exists.
+                 admit.
+              ** assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src0 :: succs)))).
+                 eapply_prop live_node_in_msg_succ_lists.
+                 repeat find_rewrite; left; in_crush; firstorder eauto.
+                 apply Exists_exists; find_apply_lem_hyp Exists_exists.
+                 break_exists_exists; intuition.
+                 inv_prop live_node; expand_def.
+                 destruct (addr_eq_dec x h); subst;
+                 eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto;
+                 find_injection; handler_def; eauto.
+           ++ admit.
       * admit.
       * admit.
       * admit.
