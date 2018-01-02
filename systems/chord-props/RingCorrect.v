@@ -432,18 +432,19 @@ Proof.
       unfold best_succ; exists st; exists nil; exists (map addr_of l).
       split; eauto.
       split; eauto.
-      do 2 try split.
+      split; try split.
       * simpl.
-        change (addr_of p :: map addr_of l) with (map addr_of (p :: l)).
-        congruence.
+         change (addr_of p :: map addr_of l) with (map addr_of (p :: l)).
+         congruence.
       * intros; simpl in *; tauto.
-      * assert (In p (find_succs h (sort_by_between h (map make_pointer (nodes gst)))))
+      * eapply initial_nodes_live; eauto.
+         assert (In p (find_succs h (sort_by_between h (map make_pointer (nodes gst)))))
            by (cut (In p (p :: l)); [congruence | auto with datatypes]).
          find_apply_lem_hyp in_find_succs.
          find_apply_lem_hyp in_sort_by_between.
          find_apply_lem_hyp in_map_iff; expand_def.
-         split; auto.
-  - autounfold; intros.
+         easy.
+  - unfold live_node_in_msg_succ_lists; intros.
     break_and; find_rewrite; in_crush.
 Qed.
 Hint Resolve zave_invariant_init.
@@ -747,58 +748,6 @@ Proof.
 Qed.
 Hint Resolve recv_handler_GotPredAndSuccs_response_accurate.
 
-Lemma chop_succs_one :
-  forall x l,
-    In x (chop_succs (x :: l)).
-Proof.
-  intros.
-  unfold chop_succs.
-  pose proof succ_list_len_lower_bound.
-  destruct SUCC_LIST_LEN; try omega.
-  rewrite firstn_cons; in_crush.
-Qed.
-
-Lemma live_node_in_msg_succ_lists_add_msgs :
-  forall gst gst' new old,
-    msgs gst' = new ++ old ->
-    (forall x, In x old -> In x (msgs gst)) ->
-    (forall x, In x (nodes gst) -> In x (nodes gst')) ->
-    failed_nodes gst = failed_nodes gst' ->
-    live_node_in_msg_succ_lists gst ->
-    live_node_in_msg_succ_lists' gst' new ->
-    live_node_in_msg_succ_lists gst'.
-Proof.
-  intros.
-  autounfold; intros.
-  find_rewrite.
-  break_or_hyp;
-    find_apply_lem_hyp in_app_or; break_or_hyp; eauto;
-      assert (exists s : ChordIDParams.name,
-                 In s (map addr_of (chop_succs (make_pointer src :: succs))) /\
-                 In s (nodes gst) /\ (In s (failed_nodes gst) -> False))
-      by eauto;
-      break_exists_exists; break_and;
-        repeat split; eauto; congruence.
-  (* weird ???? *)
-  Unshelve.
-  all:exact None.
-Qed.
-
-Lemma live_node_in_msg_succ_lists_app :
-  forall gst xs ys,
-    live_node_in_msg_succ_lists' gst xs ->
-    live_node_in_msg_succ_lists' gst ys ->
-    live_node_in_msg_succ_lists' gst (xs ++ ys).
-Proof.
-  intros.
-  autounfold; intros.
-  break_or_hyp;
-    find_apply_lem_hyp in_app_or; intuition eauto.
-  (* weird ???? *)
-  Unshelve.
-  all:exact None.
-Qed.
-
 Theorem zave_invariant_recv :
   chord_recv_handler_invariant zave_invariant.
 Proof.
@@ -815,26 +764,8 @@ Proof.
     + destruct p; try solve [exfalso; eapply_prop not; constructor].
       * admit.
       * handler_def; handler_def; simpl in *; try congruence.
-        -- eapply live_node_in_msg_succ_lists_add_msgs with (old := xs ++ ys) (gst := gst) (gst' := gst');
-             repeat find_rewrite; eauto.
-           repeat find_rewrite; in_crush.
-           rewrite map_app.
-           eapply live_node_in_msg_succ_lists_app.
-           ++ autounfold; intros.
-              assert (src0 = h).
-              {
-                break_or_hyp;
-                match goal with
-                | H: _ |- _ => rewrite -> in_map_iff in H; expand_def
-                end;
-                unfold send in *; congruence.
-              }
-              exists src0.
-              repeat split; repeat find_rewrite; auto.
-              change h with (addr_of (make_pointer h)).
-              auto using in_map, chop_succs_one.
-           ++ handler_def; simpl; autounfold; intros; in_crush; unfold send in *; congruence.
-        -- autounfold; intros.
+        -- admit.
+        -- unfold live_node_in_msg_succ_lists; intros.
            find_rewrite.
            break_or_hyp.
            ++ find_apply_lem_hyp in_app_or.
@@ -843,35 +774,20 @@ Proof.
                  | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; cbv in H; injc H
                  end.
                  in_crush; try congruence.
-                 exists src0.
-                 repeat split; repeat find_rewrite; auto.
-                 change src0 with (addr_of (make_pointer src0)).
-                 auto using in_map, chop_succs_one.
-              ** assert (exists s, In s (map addr_of (chop_succs (make_pointer src0 :: succs))) /\
-                              In s (nodes gst) /\
-                              ~ In s (failed_nodes gst)).
+                 eapply handle_delayed_queries_GotPredAndSuccs_response_accurate in H15; eauto.
+                 break_and; subst.
+                 apply Exists_exists.
+                 admit.
+              ** assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src0 :: succs)))).
                  eapply_prop live_node_in_msg_succ_lists.
                  repeat find_rewrite; left; in_crush; firstorder eauto.
-                 break_exists_exists; break_and.
+                 apply Exists_exists; find_apply_lem_hyp Exists_exists.
+                 break_exists_exists; intuition.
+                 inv_prop live_node; expand_def.
                  destruct (addr_eq_dec x h); subst;
-                   repeat find_rewrite; rewrite_update; eauto.
-           ++ find_apply_lem_hyp in_app_or.
-              break_or_hyp.
-              ** match goal with
-                 | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; cbv in H; injc H
-                 end.
-                 exists src0.
-                 repeat split; repeat find_rewrite; auto.
-                 change src0 with (addr_of (make_pointer src0)).
-                 auto using in_map, chop_succs_one.
-              ** assert (exists s, In s (map addr_of (chop_succs (make_pointer src0 :: succs))) /\
-                              In s (nodes gst) /\
-                              ~ In s (failed_nodes gst)).
-                 eapply_prop live_node_in_msg_succ_lists.
-                 repeat find_rewrite; right; in_crush; firstorder eauto.
-                 break_exists_exists; break_and.
-                 destruct (addr_eq_dec x h); subst;
-                   repeat find_rewrite; rewrite_update; eauto.
+                 eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto;
+                 find_injection; handler_def; eauto.
+           ++ admit.
       * admit.
       * admit.
       * admit.

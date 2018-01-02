@@ -455,8 +455,7 @@ Proof using.
   - move => o H_in.
     find_apply_hyp_hyp.
     eapply coarse_dead_node_characterization; eauto.
-  - congruence.
-  - congruence.
+  - eapply coarse_live_node_characterization; eauto.
 Qed.
 
 Lemma adding_nodes_does_not_affect_best_succ :
@@ -469,21 +468,22 @@ Lemma adding_nodes_does_not_affect_best_succ :
     best_succ gst' h s.
 Proof using.
   unfold best_succ.
-  intros.
+  intuition.
   break_exists_exists.
   break_and.
-  repeat break_and_goal; eauto.
+  repeat break_and_goal;
+    eauto using adding_nodes_does_not_affect_live_node.
   - repeat break_live_node.
     repeat find_rewrite.
-    find_injection.
-    eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto.
-    in_crush.
-  - repeat find_rewrite; update_destruct; subst;
-      try solve [exfalso; eauto].
-    rewrite_update; auto.
-  - eauto using adding_nodes_does_not_affect_dead_node.
-  - find_rewrite; in_crush.
-  - find_rewrite; in_crush.
+    match goal with
+    | H: sigma gst h = Some _ |- _ = Some _ => rewrite <- H
+    end.
+    eapply update_diff.
+    congruence.
+  - intuition.
+    find_copy_apply_hyp_hyp.
+    break_dead_node.
+    eauto using adding_nodes_does_not_affect_dead_node.
 Qed.
 
 (*
@@ -520,6 +520,11 @@ Proof using.
   break_and.
   repeat break_and_goal.
   - break_live_node.
+    break_live_node.
+    unfold live_node.
+    repeat find_rewrite.
+    repeat break_and_goal; eauto.
+    eexists; split; eauto.
 Admitted.
 (*
 

@@ -931,21 +931,13 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       sigma gst h = Some st /\
       map ChordIDSpace.addr_of (succ_list st) = xs ++ s :: ys /\
       (forall o, In o xs -> dead_node gst o) /\
-      In s (nodes gst) /\
-      ~ In s (failed_nodes gst).
-
-  Definition live_node_in_msg_succ_lists' (gst : global_state) (l : list msg) : Prop :=
-    forall src dst succs p,
-      In (src, (dst, GotPredAndSuccs p succs)) l \/
-      In (src, (dst, GotSuccList succs)) l ->
-      exists s,
-        In s (map addr_of (chop_succs (make_pointer src :: succs))) /\
-        In s (nodes gst) /\
-        ~ In s (failed_nodes gst).
-  Hint Unfold live_node_in_msg_succ_lists'.
+      live_node gst s.
 
   Definition live_node_in_msg_succ_lists (gst : global_state) : Prop :=
-    live_node_in_msg_succ_lists' gst (msgs gst).
+    forall src dst succs p,
+      In (src, (dst, GotPredAndSuccs p succs)) (msgs gst) \/
+      In (src, (dst, GotSuccList succs)) (msgs gst) ->
+      Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))).
   Hint Unfold live_node_in_msg_succ_lists.
 
   Definition live_node_in_succ_lists (gst : global_state) : Prop :=
