@@ -680,9 +680,35 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_fail.
 
+Definition response_payload_dec :
+  forall p,
+    {response_payload p} + {~ response_payload p}.
+Proof.
+  destruct p;
+    solve [left; constructor|right; intro; inv_prop response_payload].
+Defined.
+
 Theorem zave_invariant_recv :
   chord_recv_handler_invariant zave_invariant.
 Proof.
+  unfold chord_recv_handler_invariant, zave_invariant.
+  intros; break_and.
+  destruct (response_payload_dec p).
+  - repeat split.
+    + admit.
+    + admit.
+    + admit.
+  - repeat split.
+    + admit.
+    + admit.
+    + destruct p; try solve [exfalso; eapply_prop not; constructor].
+      * admit.
+      * handler_def; handler_def; simpl in *; try congruence.
+        -- admit.
+        -- admit (* here *).
+      * admit.
+      * admit.
+      * admit.
 Admitted.
 Hint Resolve zave_invariant_recv.
 
