@@ -844,6 +844,43 @@ Proof.
 Admitted.
 Hint Resolve zave_invariant_recv_sufficient_principals.
 
+Lemma best_succ_preserved :
+  forall gst gst' h h0 s st st',
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    sigma gst h = Some st ->
+    sigma gst' = update (addr_eq_dec) (sigma gst) h (Some st') ->
+    (joined st = true -> joined st' = true) ->
+    nodes gst' = nodes gst ->
+    failed_nodes gst = failed_nodes gst' ->
+    h0 <> h ->
+    best_succ gst h0 s ->
+    best_succ gst' h0 s.
+Proof.
+  unfold best_succ.
+  intros.
+  break_exists_exists.
+  repeat break_and_goal; break_and;
+    repeat find_rewrite; rewrite_update.
+  - repeat break_live_node.
+    eapply live_node_characterization; try congruence.
+    + repeat find_rewrite; rewrite_update; eauto.
+    + congruence.
+  - auto.
+  - auto.
+  - intros.
+    assert (dead_node gst o) by auto.
+    inv_prop dead_node; expand_def; unfold dead_node; repeat find_rewrite.
+    rewrite_update; eauto.
+  - repeat break_live_node.
+    destruct (addr_eq_dec s h);
+      eapply live_node_characterization; try congruence;
+        try solve [repeat find_rewrite; rewrite_update; eauto
+                  |congruence
+                  |find_eapply_prop joined; congruence].
+Qed.
+Hint Resolve best_succ_preserved.
+
 Theorem zave_invariant_recv_live_node_in_succ_lists :
   forall (gst : global_state) (gst' : ChordSemantics.global_state) (src h : addr) (st : data) 
     (p : payload) (xs ys : list (addr * (addr * payload))) (st' : data) (ms : list (addr * payload))
@@ -863,6 +900,19 @@ Theorem zave_invariant_recv_live_node_in_succ_lists :
     zave_invariant gst ->
     live_node_in_succ_lists gst'.
 Proof.
+  unfold zave_invariant; intros; break_and.
+  unfold live_node_in_succ_lists; intros.
+  repeat find_rewrite.
+  update_destruct; rewrite_update.
+  - subst.
+    (* hard part *)
+    admit.
+  - assert (live_node gst h0).
+    break_live_node; repeat find_rewrite; rewrite_update; eauto using live_node_characterization.
+    assert (exists s : addr, best_succ gst h0 s) by eauto.
+    break_exists_exists.
+    eapply best_succ_preserved; try find_eapply_prop update; eauto.
+    eauto using joined_preserved_by_recv_handler.
 Admitted.
 Hint Resolve zave_invariant_recv_live_node_in_succ_lists.
 
