@@ -732,6 +732,38 @@ Proof.
 Qed.
 Hint Resolve handle_delayed_queries_GotPredAndSuccs_response_accurate.
 
+Lemma handle_query_req_GotSuccList_response_accurate :
+  forall st src m ms,
+    handle_query_req st src m = ms ->
+    forall dst succs,
+      In (dst, GotSuccList succs) ms ->
+      succs = succ_list st.
+Proof.
+  intros.
+  unfold handle_query_req in *; break_match; subst;
+    try in_crush; try congruence.
+Qed.
+Hint Resolve handle_query_req_GotSuccList_response_accurate.
+
+Lemma handle_delayed_queries_GotSuccList_response_accurate :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    forall dst succs,
+      In (dst, GotSuccList succs) ms ->
+      succs = succ_list st'.
+Proof.
+  unfold do_delayed_queries, handle_delayed_query.
+  intros.
+  break_match; find_injection; try solve [in_crush].
+  find_apply_lem_hyp in_concat; expand_def.
+  match goal with
+  | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; break_let; subst
+  end.
+  simpl in *.
+  simpl in *; eauto.
+Qed.
+Hint Resolve handle_delayed_queries_GotSuccList_response_accurate.
+
 Lemma recv_handler_GotPredAndSuccs_response_accurate :
   forall src dst st p st' ms nts cts h pr succs,
     recv_handler src dst st p = (st', ms, nts, cts) ->
@@ -762,58 +794,267 @@ Proof.
 Qed.
 Hint Resolve hd_in_chop_succs.
 
+Lemma live_node_exists_after_simple_change :
+  forall h src dst l succs gst gst' st st',
+    live_node_in_msg_succ_lists gst ->
+    (exists p, In (src, (dst, GotPredAndSuccs p succs)) l) \/ In (src, (dst, GotSuccList succs)) l ->
+    (forall x, In x l -> In x (msgs gst)) ->
+    nodes gst = nodes gst' ->
+    failed_nodes gst = failed_nodes gst' ->
+    sigma gst h = Some st ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    joined st = joined st' ->
+    length succs > 0 ->
+    Exists (live_node gst') (map addr_of (chop_succs (make_pointer src :: succs))).
+Proof.
+  repeat (match goal with H: _ |- _ => clear H end).
+  intros.
+  assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
+  repeat break_or_hyp; break_exists;
+    eapply_prop live_node_in_msg_succ_lists; eauto;
+    solve [constructor; eauto].
+  apply Exists_exists; find_apply_lem_hyp Exists_exists.
+  break_exists_exists; split; break_and; auto.
+  break_live_node.
+  destruct (addr_eq_dec x h); subst;
+    eapply live_node_characterization;
+    repeat find_rewrite; rewrite_update; try find_injection; eauto.
+  Unshelve. exact None.
+Qed.
+
 Theorem zave_invariant_recv :
   chord_recv_handler_invariant zave_invariant.
 Proof.
   unfold chord_recv_handler_invariant, zave_invariant.
   intros; break_and.
-  destruct (response_payload_dec p).
-  - repeat split.
-    + admit.
-    + admit.
-    + admit.
   - repeat split.
     + admit.
     + admit.
     + destruct p; try solve [exfalso; eapply_prop not; constructor].
       * admit.
       * handler_def; handler_def; simpl in *; try congruence.
-        -- admit.
+        -- unfold live_node_in_msg_succ_lists; intros.
+           assert (cur_request x <> None).
+           {
+             erewrite handle_query_req_busy_preserves_cur_request; eauto.
+             congruence.
+           }
+           find_rewrite.
+           find_apply_lem_hyp do_delayed_queries_definition; expand_def; simpl in *;
+             find_apply_lem_hyp in_app_or; break_or_hyp;
+               try solve [handler_def; simpl in *; unfold send in *; break_or_hyp; congruence || tauto];
+               eapply live_node_exists_after_simple_change; eauto;
+                 solve [intros; repeat find_rewrite; in_crush
+                       |repeat handler_def; simpl; auto].
         -- unfold live_node_in_msg_succ_lists; intros.
            find_rewrite.
-           break_or_hyp.
-           ++ find_apply_lem_hyp in_app_or.
-              break_or_hyp.
-              ** match goal with
-                 | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; cbv in H; injc H
-                 end.
-                 in_crush; try congruence.
-                 eapply handle_delayed_queries_GotPredAndSuccs_response_accurate in H15; eauto.
-                 break_and; subst.
-                 assert (joined x3 = true).
-                 {
-                   destruct (joined x3) eqn:?; try congruence.
-                   find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
-                   - repeat find_rewrite; simpl in *; omega.
-                   - solve [econstructor; eauto].
-                   - repeat find_rewrite; now rewrite_update.
-                 }
-                 apply Exists_exists.
-                 exists (addr_of (make_pointer src0)).
-                 split; eauto using in_map.
-                 eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
-              ** assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src0 :: succs)))).
-                 eapply_prop live_node_in_msg_succ_lists; try assumption.
-                 repeat find_rewrite; left; in_crush; firstorder eauto.
-                 apply Exists_exists; find_apply_lem_hyp Exists_exists.
-                 break_exists_exists; intuition.
-                 inv_prop live_node; expand_def.
-                 destruct (addr_eq_dec x h); subst;
-                 eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto;
-                 find_injection; handler_def; eauto.
-           ++ admit.
+           break_or_hyp; find_apply_lem_hyp in_app_or; break_or_hyp;
+             match goal with
+             | H: In _ (xs ++ ys) |- _ =>
+               solve [eapply live_node_exists_after_simple_change; eauto;
+                      [intros; repeat find_rewrite; in_crush
+                      |handler_def; auto]]
+             | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; cbv in H; injc H
+             end;
+             in_crush; try congruence.
+           ++ eapply handle_delayed_queries_GotPredAndSuccs_response_accurate in H15; eauto.
+              break_and; subst.
+              assert (joined x3 = true).
+              {
+                destruct (joined x3) eqn:?; try congruence.
+                find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+                - repeat find_rewrite; simpl in *; omega.
+                - solve [econstructor; eauto].
+                - repeat find_rewrite; now rewrite_update.
+              }
+              apply Exists_exists.
+              exists (addr_of (make_pointer src0)).
+              split; eauto using in_map.
+              eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
+           ++ eapply handle_delayed_queries_GotSuccList_response_accurate in H15; eauto.
+              assert (joined x3 = true).
+              {
+                destruct (joined x3) eqn:?; try congruence.
+                find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+                - repeat find_rewrite; simpl in *; omega.
+                - solve [econstructor; eauto].
+                - repeat find_rewrite; now rewrite_update.
+              }
+              apply Exists_exists.
+              exists (addr_of (make_pointer src0)).
+              split; eauto using in_map.
+              eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
+      * admit.
+      * handler_def; handler_def; simpl in *; try congruence.
+        -- unfold live_node_in_msg_succ_lists; intros.
+           assert (cur_request x <> None).
+           {
+             erewrite handle_query_req_busy_preserves_cur_request; eauto.
+             congruence.
+           }
+           find_rewrite.
+           find_apply_lem_hyp do_delayed_queries_definition; expand_def; simpl in *;
+             find_apply_lem_hyp in_app_or; break_or_hyp;
+               try solve [handler_def; simpl in *; unfold send in *; break_or_hyp; congruence || tauto];
+               eapply live_node_exists_after_simple_change; eauto;
+                 solve [intros; repeat find_rewrite; in_crush
+                       |repeat handler_def; simpl; auto].
+        -- unfold live_node_in_msg_succ_lists; intros.
+           find_rewrite.
+           break_or_hyp; find_apply_lem_hyp in_app_or; break_or_hyp;
+             match goal with
+             | H: In _ (xs ++ ys) |- _ =>
+               solve [eapply live_node_exists_after_simple_change; eauto;
+                      [intros; repeat find_rewrite; in_crush
+                      |handler_def; auto]]
+             | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; cbv in H; injc H
+             end;
+             in_crush; try congruence.
+           ++ eapply handle_delayed_queries_GotPredAndSuccs_response_accurate in H15; eauto.
+              break_and; subst.
+              assert (joined x3 = true).
+              {
+                destruct (joined x3) eqn:?; try congruence.
+                find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+                - repeat find_rewrite; simpl in *; omega.
+                - solve [econstructor; eauto].
+                - repeat find_rewrite; now rewrite_update.
+              }
+              apply Exists_exists.
+              exists (addr_of (make_pointer src0)).
+              split; eauto using in_map.
+              eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
+           ++ eapply handle_delayed_queries_GotSuccList_response_accurate in H15; eauto.
+              assert (joined x3 = true).
+              {
+                destruct (joined x3) eqn:?; try congruence.
+                find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+                - repeat find_rewrite; simpl in *; omega.
+                - solve [econstructor; eauto].
+                - repeat find_rewrite; now rewrite_update.
+              }
+              apply Exists_exists.
+              exists (addr_of (make_pointer src0)).
+              split; eauto using in_map.
+              eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
+           ++ find_injection.
+              assert (joined st = true).
+              {
+                destruct (joined st) eqn:?; try congruence.
+                find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst); [|eauto|eauto].
+                repeat find_rewrite; simpl in *; omega.
+              }
+              apply Exists_exists.
+              exists (addr_of (make_pointer src0)).
+              find_apply_lem_hyp joined_preserved_by_do_delayed_queries.
+              split; eauto using in_map.
+              eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
+      * admit.
+      * handler_def; handler_def; simpl in *; try congruence.
+        -- unfold live_node_in_msg_succ_lists; intros.
+           assert (cur_request x <> None).
+           {
+             erewrite handle_query_req_busy_preserves_cur_request; eauto.
+             congruence.
+           }
+           find_rewrite.
+           find_apply_lem_hyp do_delayed_queries_definition; expand_def; simpl in *;
+             find_apply_lem_hyp in_app_or; break_or_hyp;
+               try solve [handler_def; simpl in *; unfold send in *; break_or_hyp; congruence || tauto];
+               eapply live_node_exists_after_simple_change; eauto;
+                 solve [intros; repeat find_rewrite; in_crush
+                       |repeat handler_def; simpl; auto].
+        -- unfold live_node_in_msg_succ_lists; intros.
+           find_rewrite.
+           break_or_hyp; find_apply_lem_hyp in_app_or; break_or_hyp;
+             match goal with
+             | H: In _ (xs ++ ys) |- _ =>
+               solve [eapply live_node_exists_after_simple_change; eauto;
+                      [intros; repeat find_rewrite; in_crush
+                      |handler_def; auto]]
+             | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; cbv in H; injc H
+             end;
+             in_crush; try congruence.
+           ++ eapply handle_delayed_queries_GotPredAndSuccs_response_accurate in H15; eauto.
+              break_and; subst.
+              assert (joined x3 = true).
+              {
+                destruct (joined x3) eqn:?; try congruence.
+                find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+                - repeat find_rewrite; simpl in *; omega.
+                - solve [econstructor; eauto].
+                - repeat find_rewrite; now rewrite_update.
+              }
+              apply Exists_exists.
+              exists (addr_of (make_pointer src0)).
+              split; eauto using in_map.
+              eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
+           ++ find_injection.
+              assert (joined st = true).
+              {
+                destruct (joined st) eqn:?; try congruence.
+                find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst); [|eauto|eauto].
+                repeat find_rewrite; simpl in *; omega.
+              }
+              apply Exists_exists.
+              exists (addr_of (make_pointer src0)).
+              find_apply_lem_hyp joined_preserved_by_do_delayed_queries.
+              split; eauto using in_map.
+              eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
+           ++ eapply handle_delayed_queries_GotSuccList_response_accurate in H15; eauto.
+              assert (joined x3 = true).
+              {
+                destruct (joined x3) eqn:?; try congruence.
+                find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+                - repeat find_rewrite; simpl in *; omega.
+                - solve [econstructor; eauto].
+                - repeat find_rewrite; now rewrite_update.
+              }
+              apply Exists_exists.
+              exists (addr_of (make_pointer src0)).
+              split; eauto using in_map.
+              eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
       * admit.
       * admit.
+      * handler_def; handler_def; simpl in *; try congruence.
+        unfold live_node_in_msg_succ_lists; intros.
+        find_rewrite.
+        break_or_hyp; find_apply_lem_hyp in_app_or; break_or_hyp;
+          match goal with
+          | H: In _ (xs ++ ys) |- _ =>
+            solve [eapply live_node_exists_after_simple_change; eauto;
+                   [intros; repeat find_rewrite; in_crush
+                   |handler_def; auto]]
+          | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; cbv in H; injc H
+          end;
+          in_crush; try congruence.
+        ++ eapply handle_delayed_queries_GotPredAndSuccs_response_accurate in H15; eauto.
+           break_and; subst.
+           assert (joined x3 = true).
+           {
+             destruct (joined x3) eqn:?; try congruence.
+             find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+             - repeat find_rewrite; simpl in *; omega.
+             - solve [econstructor; eauto].
+             - repeat find_rewrite; now rewrite_update.
+           }
+           apply Exists_exists.
+           exists (addr_of (make_pointer src0)).
+           split; eauto using in_map.
+           eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
+        ++ eapply handle_delayed_queries_GotSuccList_response_accurate in H15; eauto.
+           assert (joined x3 = true).
+           {
+             destruct (joined x3) eqn:?; try congruence.
+             find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+             - repeat find_rewrite; simpl in *; omega.
+             - solve [econstructor; eauto].
+             - repeat find_rewrite; now rewrite_update.
+           }
+           apply Exists_exists.
+           exists (addr_of (make_pointer src0)).
+           split; eauto using in_map.
+           eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
       * admit.
 Admitted.
 Hint Resolve zave_invariant_recv.
