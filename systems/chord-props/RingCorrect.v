@@ -9,6 +9,8 @@ Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
+Require Import Chord.SuccessorNodesAlwaysValid.
+Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -748,6 +750,18 @@ Proof.
 Qed.
 Hint Resolve recv_handler_GotPredAndSuccs_response_accurate.
 
+Lemma hd_in_chop_succs :
+  forall x l,
+    In x (chop_succs (x :: l)).
+Proof.
+  intros.
+  unfold chop_succs.
+  pose proof succ_list_len_lower_bound.
+  destruct SUCC_LIST_LEN; try omega.
+  rewrite firstn_cons; in_crush.
+Qed.
+Hint Resolve hd_in_chop_succs.
+
 Theorem zave_invariant_recv :
   chord_recv_handler_invariant zave_invariant.
 Proof.
@@ -776,10 +790,20 @@ Proof.
                  in_crush; try congruence.
                  eapply handle_delayed_queries_GotPredAndSuccs_response_accurate in H15; eauto.
                  break_and; subst.
+                 assert (joined x3 = true).
+                 {
+                   destruct (joined x3) eqn:?; try congruence.
+                   find_eapply_lem_hyp (nodes_not_joined_have_no_successors gst').
+                   - repeat find_rewrite; simpl in *; omega.
+                   - solve [econstructor; eauto].
+                   - repeat find_rewrite; now rewrite_update.
+                 }
                  apply Exists_exists.
-                 admit.
+                 exists (addr_of (make_pointer src0)).
+                 split; eauto using in_map.
+                 eapply live_node_characterization; repeat find_rewrite; try rewrite_update; eauto.
               ** assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src0 :: succs)))).
-                 eapply_prop live_node_in_msg_succ_lists.
+                 eapply_prop live_node_in_msg_succ_lists; try assumption.
                  repeat find_rewrite; left; in_crush; firstorder eauto.
                  apply Exists_exists; find_apply_lem_hyp Exists_exists.
                  break_exists_exists; intuition.
