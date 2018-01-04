@@ -1,25 +1,6 @@
 set -ev
 
-if [ -e "/home/travis/.opam/config" ]; then
-    eval $(opam config env)
-else
-    opam init --compiler=${COMPILER} --yes --no-setup
-    eval $(opam config env)
-    opam repo add coq-released https://coq.inria.fr/opam/released
-    opam repo add distributedcomponents-dev http://opam-dev.distributedcomponents.net
-fi
-
-opam update --yes --verbose
-
-opam pin add coq ${COQ_VERSION} --yes
-
-# upgrade but avoid full verboseness
-opam upgrade --yes &
-export PID=$!
-while [[ `ps -p $PID | tail -n +2` ]]; do
-    echo 'upgrading...'
-    sleep 10
-done
+eval $(opam config env)
 
 case ${MODE} in
   proofalytics)
