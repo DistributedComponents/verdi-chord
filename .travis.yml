@@ -42,7 +42,8 @@ script:
        git clone --quiet --depth 9 -b $TRAVIS_BRANCH $REMOTE_ORIGIN_URL $THIS_REPO || git clone --quiet --depth 9 -b $TRAVIS_BRANCH $REMOTE_ORIGIN_URL $THIS_REPO
        cd $THIS_REPO
      fi &&
-    ./.travis-ci.sh"
+     pwd &&
+     ./.travis-ci.sh"
 
 notifications:
   slack:
