@@ -823,7 +823,7 @@ Proof.
 Qed.
 
 Theorem zave_invariant_recv_sufficient_principals :
-  forall (gst : global_state) (gst' : ChordSemantics.global_state) (src h : addr) (st : data) 
+  forall (gst : global_state) (gst' : ChordSemantics.global_state) (src h : addr) (st : data)
     (p : payload) (xs ys : list (addr * (addr * payload))) (st' : data) (ms : list (addr * payload))
     (nts cts : list timeout),
     reachable_st gst ->
@@ -851,6 +851,7 @@ Lemma best_succ_preserved :
     sigma gst h = Some st ->
     sigma gst' = update (addr_eq_dec) (sigma gst) h (Some st') ->
     (joined st = true -> joined st' = true) ->
+    succ_list st = succ_list st' \/ h <> h0 ->
     nodes gst' = nodes gst ->
     failed_nodes gst = failed_nodes gst' ->
     best_succ gst h0 s ->
@@ -859,7 +860,31 @@ Proof.
   unfold best_succ.
   intros.
   destruct (addr_eq_dec h h0).
-  { admit. }
+  {
+    symmetry in e; subst.
+    expand_def.
+    repeat find_rewrite; rewrite_update.
+    find_inversion.
+    do 3 eexists.
+    repeat break_and_goal.
+    - repeat break_live_node.
+      eapply live_node_characterization; try congruence.
+      + repeat find_rewrite; rewrite_update; eauto.
+      + find_eapply_prop joined; congruence.
+    - reflexivity.
+    - find_rewrite; eauto.
+    - intros.
+      assert (dead_node gst o) by auto.
+      inv_prop dead_node; expand_def; unfold dead_node; repeat find_rewrite.
+      rewrite_update; eauto.
+    - inv_prop live_node; expand_def.
+      destruct (addr_eq_dec h s); subst.
+      + eapply live_node_characterization;
+          repeat find_rewrite; rewrite_update; eauto.
+        find_injection; auto.
+      + eapply live_node_equivalence; eauto.
+        repeat find_rewrite; rewrite_update; auto.
+  }
   break_exists_exists.
   repeat break_and_goal; break_and;
     repeat find_rewrite; rewrite_update.
@@ -871,15 +896,15 @@ Proof.
   - auto.
   - intros.
     assert (dead_node gst o) by auto.
-    inv_prop dead_node; expand_def; unfold dead_node; repeat find_rewrite.
-    rewrite_update; eauto.
+    inv_prop dead_node; expand_def; unfold dead_node; repeat find_rewrite;
+      rewrite_update; eauto.
   - repeat break_live_node.
     destruct (addr_eq_dec s h);
       eapply live_node_characterization; try congruence;
         try solve [repeat find_rewrite; rewrite_update; eauto
                   |congruence
                   |find_eapply_prop joined; congruence].
-Admitted.
+Qed.
 Hint Resolve best_succ_preserved.
 
 Theorem zave_invariant_recv_live_node_in_succ_lists :
