@@ -1,3 +1,5 @@
+#!/bin/sh
+
 set -ev
 
 openssl aes-256-cbc -K $encrypted_de10e8586561_key -iv $encrypted_de10e8586561_iv -in .travis/travis_rsa.enc -out .travis/travis_rsa -d
