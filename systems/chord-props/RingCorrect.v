@@ -907,6 +907,39 @@ Proof.
 Qed.
 Hint Resolve best_succ_preserved.
 
+Lemma recv_handler_sets_succ_list_when_setting_joined :
+  forall src dst st m st' ms nts cts,
+    recv_handler src dst st m = (st', ms, nts, cts) ->
+    joined st = false ->
+    joined st' = true ->
+    exists succs qdst s p,
+      m = GotSuccList succs /\
+      cur_request st = Some (qdst, Join2 s, p) /\
+      succ_list st' = make_succs s succs.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl).
+  repeat eexists; eauto.
+Qed.
+
+Lemma recv_handler_setting_joined_makes_succ_list_nonempty :
+  forall src dst st m st' ms nts cts,
+    recv_handler src dst st m = (st', ms, nts, cts) ->
+    joined st = false ->
+    joined st' = true ->
+    succ_list st' <> [].
+Proof.
+  intros.
+  find_eapply_lem_hyp recv_handler_sets_succ_list_when_setting_joined; eauto.
+  expand_def.
+  intro.
+  repeat find_rewrite.
+  unfold make_succs in *.
+  eapply (@in_nil pointer).
+  repeat find_reverse_rewrite.
+  eauto using hd_in_chop_succs.
+Qed.
+
 Theorem zave_invariant_recv_live_node_in_succ_lists :
   forall (gst : global_state) (gst' : ChordSemantics.global_state) (src h : addr) (st : data) 
     (p : payload) (xs ys : list (addr * (addr * payload))) (st' : data) (ms : list (addr * payload))
@@ -938,15 +971,18 @@ Proof.
         find_eapply_prop live_node_in_succ_lists; eauto.
         destruct (joined st) eqn:?;
           try solve [break_live_node; eapply live_node_characterization; eauto].
-        find_copy_eapply_lem_hyp nodes_not_joined_have_no_successors; eauto.
-        admit.
+        break_live_node; repeat find_rewrite; rewrite_update; find_injection.
+        exfalso; eapply recv_handler_setting_joined_makes_succ_list_nonempty; eauto.
+        repeat find_reverse_rewrite.
+        eapply nodes_not_joined_have_no_successors; eauto.
       }
       break_exists_exists.
       eapply best_succ_preserved; eauto.
       eauto using joined_preserved_by_recv_handler.
-    + find_apply_lem_hyp recv_handler_updating_succ_list.
-      admit.
-      congruence.
+    + find_apply_lem_hyp recv_handler_updating_succ_list; auto.
+      break_or_hyp.
+      * admit.
+      * admit.
   - assert (live_node gst h0).
     break_live_node; repeat find_rewrite; rewrite_update; eauto using live_node_characterization.
     assert (exists s : addr, best_succ gst h0 s) by eauto.
