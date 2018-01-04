@@ -4,6 +4,7 @@ sudo: false
 env:
   global:
     - COQ_VERSION=coq8.7
+    - THIS_REPO=verdi-chord
   matrix:
   - COMPILER="4.05.0+32bit" MODE=build
   - COMPILER="4.05.0+32bit" MODE=chord
