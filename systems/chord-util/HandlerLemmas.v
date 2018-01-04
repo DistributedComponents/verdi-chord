@@ -1474,9 +1474,16 @@ Lemma recv_handler_updating_succ_list :
   forall src h st p st' ms nts cts,
     recv_handler src h st p = (st', ms, nts, cts) ->
     succ_list st' <> succ_list st ->
-    (exists pr succs, p = GotPredAndSuccs pr succs) \/
-    (exists succs, p = GotSuccList succs).
+
+    exists query_dst q m,
+      cur_request st = Some (query_dst, q, m) /\
+      addr_of query_dst = src /\
+      exists succs,
+        (exists pr, p = GotPredAndSuccs pr succs) \/
+        p = GotSuccList succs.
 Proof.
   intros.
-  repeat handler_def; simpl in H0; simpl; try congruence; eauto.
+  repeat handler_def; simpl in * |-; try congruence;
+    repeat find_injection;
+    repeat eexists; eauto.
 Qed.
