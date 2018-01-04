@@ -1469,3 +1469,14 @@ Proof.
     repeat (handler_simpl || in_crush);
     try solve [inv_prop request_payload].
 Qed.
+
+Lemma recv_handler_updating_succ_list :
+  forall src h st p st' ms nts cts,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    succ_list st' <> succ_list st ->
+    (exists pr succs, p = GotPredAndSuccs pr succs) \/
+    (exists succs, p = GotSuccList succs).
+Proof.
+  intros.
+  repeat handler_def; simpl in H0; simpl; try congruence; eauto.
+Qed.

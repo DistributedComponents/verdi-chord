@@ -853,12 +853,13 @@ Lemma best_succ_preserved :
     (joined st = true -> joined st' = true) ->
     nodes gst' = nodes gst ->
     failed_nodes gst = failed_nodes gst' ->
-    h0 <> h ->
     best_succ gst h0 s ->
     best_succ gst' h0 s.
 Proof.
   unfold best_succ.
   intros.
+  destruct (addr_eq_dec h h0).
+  { admit. }
   break_exists_exists.
   repeat break_and_goal; break_and;
     repeat find_rewrite; rewrite_update.
@@ -878,7 +879,7 @@ Proof.
         try solve [repeat find_rewrite; rewrite_update; eauto
                   |congruence
                   |find_eapply_prop joined; congruence].
-Qed.
+Admitted.
 Hint Resolve best_succ_preserved.
 
 Theorem zave_invariant_recv_live_node_in_succ_lists :
@@ -904,9 +905,21 @@ Proof.
   unfold live_node_in_succ_lists; intros.
   repeat find_rewrite.
   update_destruct; rewrite_update.
-  - subst.
-    (* hard part *)
-    admit.
+  - symmetry in e; subst.
+    find_injection.
+    destruct (list_eq_dec pointer_eq_dec (succ_list st) (succ_list st0)).
+    + assert (exists s, best_succ gst h s).
+      {
+        find_eapply_prop live_node_in_succ_lists; eauto.
+        destruct (joined st) eqn:?;
+          try solve [break_live_node; eapply live_node_characterization; eauto].
+        find_copy_eapply_lem_hyp nodes_not_joined_have_no_successors; eauto.
+        admit.
+      }
+      break_exists_exists.
+      eapply best_succ_preserved; eauto.
+      eauto using joined_preserved_by_recv_handler.
+    + find_apply_lem_hyp recv_handler_updating_succ_list.
   - assert (live_node gst h0).
     break_live_node; repeat find_rewrite; rewrite_update; eauto using live_node_characterization.
     assert (exists s : addr, best_succ gst h0 s) by eauto.
