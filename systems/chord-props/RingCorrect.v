@@ -920,6 +920,8 @@ Proof.
       eapply best_succ_preserved; eauto.
       eauto using joined_preserved_by_recv_handler.
     + find_apply_lem_hyp recv_handler_updating_succ_list.
+      admit.
+      congruence.
   - assert (live_node gst h0).
     break_live_node; repeat find_rewrite; rewrite_update; eauto using live_node_characterization.
     assert (exists s : addr, best_succ gst h0 s) by eauto.
