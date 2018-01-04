@@ -44,7 +44,7 @@ script:
        cd $THIS_REPO
      fi &&
      pwd &&
-     ./.travis-ci.sh"
+     ./.travis-ci.sh $MODE"
 
 notifications:
   slack:

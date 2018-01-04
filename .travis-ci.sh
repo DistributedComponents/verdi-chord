@@ -2,11 +2,7 @@
 
 set -ev
 
-## Temporarily comment out
-# openssl aes-256-cbc -K $encrypted_de10e8586561_key -iv $encrypted_de10e8586561_iv -in .travis/travis_rsa.enc -out .travis/travis_rsa -d
-# cp .travis/travis_rsa ~/.ssh
-# chmod 600 ~/.ssh/travis_rsa
-# cp .travis/ssh_config ~/.ssh/config
+export MODE=$1
 
 eval $(opam config env)
 
