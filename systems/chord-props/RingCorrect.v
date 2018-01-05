@@ -11,6 +11,7 @@ Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
+Require Import Chord.Stabilize2Matches.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -983,21 +984,41 @@ Proof.
       * handler_def.
         simpl in *; repeat find_rewrite.
         break_if; try congruence.
+        assert (succ_list x8 = chop_succs ((make_pointer (addr_of x)) :: x2))
+          by repeat (handler_def || find_injection || congruence || auto).
         find_apply_lem_hyp handle_query_res_definition; expand_def;
           try congruence;
           try inv_prop request_payload;
           try find_injection.
-        -- assert (succ_list x8 = chop_succs ((make_pointer (addr_of x)) :: x13))
-            by repeat (handler_def || congruence || auto).
-           assert (Exists (live_node gst) (map addr_of (chop_succs ((make_pointer (addr_of x)) :: x13)))).
+        -- assert (Exists (live_node gst) (map addr_of (chop_succs ((make_pointer (addr_of x)) :: x13)))).
            {
              find_eapply_prop live_node_in_msg_succ_lists; eauto.
              repeat find_rewrite; constructor; in_crush.
              admit.
            }
+           find_apply_lem_hyp Exists_exists; break_exists.
+           break_and.
+           assert (live_node gst' x0).
+           {
+             break_live_node.
+             destruct (addr_eq_dec x0 h).
+             - eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto.
+               find_apply_lem_hyp joined_preserved_by_do_delayed_queries.
+               find_apply_lem_hyp joined_preserved_by_handle_stabilize.
+               congruence.
+             - eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto.
+           }
            admit.
         -- admit.
-      * admit.
+      * handler_def.
+        simpl in *; repeat find_rewrite.
+        break_if; try congruence.
+        assert (succ_list x7 = chop_succs ((make_pointer (addr_of x)) :: x2)).
+        {
+          repeat (handler_def || find_injection || congruence || auto || simpl);
+            unfold make_succs; admit.
+        }
+        admit.
   - assert (live_node gst h0).
     break_live_node; repeat find_rewrite; rewrite_update; eauto using live_node_characterization.
     assert (exists s : addr, best_succ gst h0 s) by eauto.
