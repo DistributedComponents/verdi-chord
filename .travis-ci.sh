@@ -16,16 +16,11 @@ case ${MODE} in
 	echo 'proofalyzing...'
 	sleep 10
     done
-    opam pin remove verdi-chord --yes --verbose
     ;;
   chord)
     opam pin add chord . --yes --verbose
-    opam remove chord --yes --verbose
-    opam pin remove chord --yes --verbose
     ;;
   *)
     opam pin add verdi-chord . --yes --verbose
-    opam remove verdi-chord --yes --verbose
-    opam pin remove verdi-chord --yes --verbose
     ;;
 esac
