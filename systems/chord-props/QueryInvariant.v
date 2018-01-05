@@ -908,5 +908,15 @@ Theorem query_message_ok_invariant :
       query_message_ok src dst (cur_request st__src) (delayed_queries st__dst)
                        (channel gst src dst) (channel gst dst src).
 Proof.
+  induction 1; intros; simpl in *.
+  - erewrite sigma_initial_st_start_handler at 1; eauto.
+    unfold start_handler. repeat break_match; simpl; admit.
+  - inv_prop step_dynamic; simpl in *; eauto.
+    + update_destruct; subst; rewrite_update; try find_inversion.
+      * simpl.
+        destruct (addr_eq_dec dst (addr_of (make_pointer k))).
+        -- subst. apply CIreq; simpl; auto.
+           ++
+    
 Admitted.
 Hint Resolve query_message_ok_invariant.
