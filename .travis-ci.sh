@@ -4,6 +4,8 @@ set -ev
 
 export MODE=$1
 
+eval $(opam config env)
+
 case ${MODE} in
   proofalytics)
     opam pin add verdi-chord . --yes --verbose --no-action
