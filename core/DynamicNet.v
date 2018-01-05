@@ -479,9 +479,21 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
         | H: churn_between _ _ |- _ =>
           inversion H; eauto
         end.
-    - admit.
-    - admit.
-  Admitted.
+    - left. split.
+      + eauto using labeled_step_dynamic.
+      + intuition.
+        match goal with
+        | H: churn_between _ _ |- _ =>
+          inversion H; eauto
+        end.
+    - left. split.
+      + eauto using labeled_step_dynamic.
+      + intuition.
+        match goal with
+        | H: churn_between _ _ |- _ =>
+          inversion H; eauto
+        end.
+  Qed.
 
   Ltac break_step :=
     match goal with
