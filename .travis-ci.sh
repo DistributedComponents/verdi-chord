@@ -4,8 +4,6 @@ set -ev
 
 export MODE=$1
 
-eval $(opam config env)
-
 case ${MODE} in
   proofalytics)
     opam pin add verdi-chord . --yes --verbose --no-action
@@ -16,7 +14,7 @@ case ${MODE} in
     export PID=$!
     while [[ `ps -p $PID | tail -n +2` ]]; do
 	echo 'proofalyzing...'
-	sleep 240
+	sleep 10
     done
     opam pin remove verdi-chord --yes --verbose
     ;;

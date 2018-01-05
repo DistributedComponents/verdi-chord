@@ -6,9 +6,9 @@ env:
     - COQ_VERSION=coq8.7
     - THIS_REPO=verdi-chord
   matrix:
-  - COMPILER="4.05.0+32bit" MODE=build
-  - COMPILER="4.05.0+32bit" MODE=chord
-  - COMPILER="4.05.0" MODE=proofalytics
+  - MODE=build
+  - MODE=chord
+  - MODE=proofalytics
 
 before_script:
 - docker pull mdernst/xenial-for-verdi-$COQ_VERSION
@@ -21,7 +21,7 @@ script:
 - REMOTE_ORIGIN_URL=`git config --get remote.origin.url`
 - echo "THIS_REPO=${THIS_REPO}"
 - echo "COQ_VERSION=${COQ_VERSION}"
-- echo "DOWNSTREAM=${DOWNSTREAM}"
+- echo "MODE=${MODE}"
 - echo "TRAVIS_BRANCH=${TRAVIS_BRANCH}"
 - echo "REMOTE_ORIGIN_URL=${REMOTE_ORIGIN_URL}"
 - echo "TRAVIS_EVENT_TYPE=${TRAVIS_EVENT_TYPE}"
@@ -45,6 +45,9 @@ script:
      fi &&
      pwd &&
      ./.travis-ci.sh $MODE"
+
+git:
+  depth: 9
 
 notifications:
   slack:
