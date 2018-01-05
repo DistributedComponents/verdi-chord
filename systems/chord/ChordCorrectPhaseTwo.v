@@ -2492,13 +2492,11 @@ Lemma not_between_between_bool_equiv :
     between_bool x y z = false <->
     ~ between x y z.
 Proof.
-(*
-This is easy.
-
-DIFFICULTY: 1
-USED: In unroll_between_neq_swap_false and phase two.
-*)
-Admitted.
+  intuition.
+  - find_apply_lem_hyp between_between_bool_equiv. congruence.
+  - destruct (between_bool x y z) eqn:?; auto.
+    find_apply_lem_hyp between_between_bool_equiv. congruence.
+Qed.
 
 Lemma unroll_between_neq_swap_false :
   forall x y z,
