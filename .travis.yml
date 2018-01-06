@@ -3,12 +3,11 @@ sudo: false
 
 env:
   global:
-    - COQ_VERSION=coq8.7
     - THIS_REPO=verdi-chord
   matrix:
-  - MODE=build
-  - MODE=chord
-  - MODE=proofalytics
+  - MODE=build COQ_VERSION=coq8.7-32bit
+  - MODE=chord COQ_VERSION=coq8.7
+  - MODE=proofalytics COQ_VERSION=coq8.7
 
 before_script:
 - docker pull mdernst/xenial-for-verdi-$COQ_VERSION
