@@ -38,11 +38,110 @@ Proof.
                   |right; intro; inv_prop live_node; expand_def; congruence].
 Defined.
 
+Fixpoint not_skipped_bool (h : id) (succs : list id) (n : id) :=
+  match succs with
+  | [] => true
+  | a :: succs' =>
+    if between_bool h n a then
+      false
+    else
+      not_skipped_bool a succs' n
+  end.
+
+Lemma not_skipped_initial :
+  forall h x succs n,
+    not_skipped h (x :: succs) n ->
+    not_skipped x succs n.
+Proof.
+  intros.
+  unfold not_skipped. intros.
+  match goal with
+  | H : not_skipped _ _ _ |- _ =>
+    specialize (H a b (h :: xs) ys)
+  end.
+  simpl in *. repeat find_rewrite. intuition.
+Qed.
+
+
+Lemma not_skipped_initial' :
+  forall h x succs n,
+    not_skipped x succs n ->
+    ~ between h n x ->
+    not_skipped h (x :: succs) n.
+Proof.
+  intros.
+  unfold not_skipped. intros.
+  destruct xs.
+  - simpl in *. find_inversion. auto.
+  - simpl in *. find_inversion. unfold not_skipped in *. simpl in *. eauto.
+Qed.
+
+Lemma not_skipped_not_skipped_bool :
+  forall succs h n,
+    not_skipped h succs n ->
+    not_skipped_bool h succs n = true.
+Proof.
+  induction succs;
+    intros; simpl in *; auto.
+  break_match; auto.
+  - exfalso.
+    match goal with
+    | H : not_skipped _ _ _ |- _ =>
+      specialize (H h a [] succs)
+    end.
+    simpl in *. intuition.
+    eauto using between_bool_between.
+  - eauto using not_skipped_initial.
+Qed.
+
+Lemma not_skipped_bool_not_skipped :
+  forall succs h n,
+    not_skipped_bool h succs n = true ->
+    not_skipped h succs n.
+Proof.
+  induction succs;
+    intros; simpl in *; auto.
+  - unfold not_skipped. intros.
+    destruct xs; simpl in *; try congruence.
+    destruct xs; simpl in *; try congruence.
+  - break_match; try congruence.
+    find_apply_hyp_hyp. eapply not_skipped_initial'; eauto.
+Qed.
+
+Definition forallb_exists :
+  forall A f (l : list A),
+    forallb f l = false ->
+    exists x,
+      In x l /\ f x = false.
+Proof.
+  intros. induction l; simpl in *; try congruence.
+  do_bool. intuition eauto.
+  break_exists_exists. intuition.
+Qed.
+
 Definition principal_dec :
   forall gst h,
     {principal gst h} + {~ principal gst h}.
 Proof.
-Admitted.
+  intros.
+  destruct (live_node_dec gst h).
+  - destruct (forallb (fun h' => match sigma gst h' with
+                              | Some st => not_skipped_bool (hash h')
+                                                           (map id_of (succ_list st)) (hash h)
+                              | None => true
+                              end) (live_addrs gst)) eqn:?.
+    + left. unfold principal. intuition.
+      find_eapply_lem_hyp forallb_forall; eauto using live_addr_In_live_addrs.
+      repeat find_rewrite. eauto using not_skipped_bool_not_skipped.
+    + right. intro. find_apply_lem_hyp forallb_exists.
+      break_exists. intuition. find_apply_lem_hyp In_live_addrs_live.
+      break_match; try congruence.
+      unfold principal in *.
+      intuition.
+      eapply_prop_hyp live_node sigma; eauto.
+      eauto using not_skipped_not_skipped_bool.
+  - right. intuition. unfold principal in *. intuition.
+Defined.
 
 Definition compute_principals (gst : global_state) : list addr :=
   dedup
