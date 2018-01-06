@@ -251,14 +251,14 @@ function mkindex {
     <td>
       $(find "${PADIR}/.." -name '*.v' \
           | xargs coqwc \
-          | awk -W lint=fatal \
+          | gawk --lint=fatal \
               'END { printf("spec = %'"'"'d &nbsp; &nbsp; proof = %'"'"'d\n", $1, $2) }')
     </td>
   </tr><tr>
     <td class='cfg-fld'>Compile</td>
     <td>
       $([ -f "$BUILD_TIMES" ] &&  \
-          awk -W lint=fatal \
+          gawk --lint=fatal \
               'BEGIN { FS = ","; tot = 0 }  \
                { tot += $2 }      \
                END { print tot " sec"}' \
@@ -292,9 +292,9 @@ EOF
 EOF
     echo "<div class='scroller'>"
     cat "$PROOF_TIMES" \
-      | awk -W lint=fatal -v commit="$COMMIT" \
+      | gawk --lint=fatal -v commit="$COMMIT" \
             -f "${PADIR}/proof-times-links.awk" \
-      | awk -W lint=fatal -f "${PADIR}/csv-table.awk"
+      | gawk --lint=fatal -f "${PADIR}/csv-table.awk"
     echo "</div>"
   fi
 
@@ -315,9 +315,9 @@ EOF
 EOF
     echo "<div class='scroller'>"
     cat "$BUILD_TIMES" \
-      | awk -W lint=fatal -v commit="$COMMIT" \
+      | gawk --lint=fatal -v commit="$COMMIT" \
             -f "${PADIR}/build-times-links.awk" \
-      | awk -W lint=fatal -f "${PADIR}/csv-table.awk"
+      | gawk --lint=fatal -f "${PADIR}/csv-table.awk"
     echo "</div>"
   fi
 
@@ -332,7 +332,7 @@ EOF
           -e 's|^--$||' \
           -e 's|admit|<span class="bf red">admit</span>|g' \
           -e 's|Admitted|<span class="bf red">Admitted</span>|g' \
-    | awk -W lint=fatal -v commit="$COMMIT" \
+    | gawk --lint=fatal -v commit="$COMMIT" \
           -f "${PADIR}/admits-links.awk"
   echo "</code></pre></div>"
 
@@ -353,9 +353,9 @@ EOF
 EOF
     echo "<div class='scroller'>"
     cat "$PROOF_SIZES" \
-      | awk -W lint=fatal -v commit="$COMMIT" \
+      | gawk --lint=fatal -v commit="$COMMIT" \
             -f "${PADIR}/proof-sizes-links.awk" \
-      | awk -W lint=fatal -f "${PADIR}/csv-table.awk"
+      | gawk --lint=fatal -f "${PADIR}/csv-table.awk"
     echo "</div>"
   fi
 
