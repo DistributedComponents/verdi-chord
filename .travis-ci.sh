@@ -12,7 +12,7 @@ case ${MODE} in
     opam install verdi-chord --yes --verbose --deps-only
     ./configure
     make proofalytics &
-    # Output to the screen every few minutes to prevent a travis timeout
+    # Output to the screen intermittently to prevent a Travis timeout
     export PID=$!
     while [[ `ps -p $PID | tail -n +2` ]]; do
 	echo 'proofalyzing...'
