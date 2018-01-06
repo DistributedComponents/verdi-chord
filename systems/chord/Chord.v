@@ -937,7 +937,7 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
     forall src dst succs p,
       In (src, (dst, GotPredAndSuccs p succs)) (msgs gst) \/
       In (src, (dst, GotSuccList succs)) (msgs gst) ->
-      length succs > 0 ->
+      length succs > 0 \/ (exists st, sigma gst src = Some st /\ joined st = true) ->
       Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))).
   Hint Unfold live_node_in_msg_succ_lists.
 

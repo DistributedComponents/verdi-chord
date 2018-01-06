@@ -61,6 +61,26 @@ Proof using.
   easy.
 Qed.
 
+Lemma valid_ptr_wf :
+  forall gst p,
+    valid_ptr gst p ->
+    wf_ptr p.
+Proof.
+  firstorder.
+Qed.
+Hint Resolve valid_ptr_wf.
+
+Lemma valid_ptr_in_nodes :
+  forall gst p,
+    valid_ptr gst p ->
+    wf_ptr p.
+Proof.
+  firstorder.
+Qed.
+Hint Resolve valid_ptr_wf.
+
+
+
 Lemma valid_ptr_elim_hash :
   forall gst p,
     valid_ptr gst p ->
@@ -78,6 +98,7 @@ Proof using.
   unfold valid_ptr.
   easy.
 Qed.
+Hint Resolve valid_ptr_elim_nodes.
 
 Lemma valid_ptr_nodes_subset :
   forall gst gst' p,
