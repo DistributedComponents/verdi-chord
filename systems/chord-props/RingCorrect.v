@@ -895,6 +895,66 @@ Proof.
 Qed.
 Hint Resolve hd_in_chop_succs.
 
+Lemma live_node_in_msg_succ_lists_app :
+  forall gst xs ys,
+    live_node_in_msg_succ_lists' gst xs ->
+    live_node_in_msg_succ_lists' gst ys ->
+    live_node_in_msg_succ_lists' gst (xs ++ ys).
+Proof.
+  autounfold; intros.
+  match goal with
+  | H: In _ _ \/ In _ _ |- _ =>
+    destruct H;
+      find_apply_lem_hyp in_app_or;
+      intuition eauto
+  end.
+  Unshelve.
+  all:exact None.
+Qed.
+Hint Resolve live_node_in_msg_succ_lists_app.
+
+Lemma live_node_in_msg_succ_lists_app_l :
+  forall gst xs ys,
+    live_node_in_msg_succ_lists' gst (xs ++ ys) ->
+    live_node_in_msg_succ_lists' gst xs.
+Proof.
+  autounfold; intros.
+  match goal with
+  | H: In _ _ \/ In _ _ |- _ =>
+    destruct H; eauto using in_or_app
+  end.
+  Unshelve.
+  all:exact None.
+Qed.
+Hint Resolve live_node_in_msg_succ_lists_app_l.
+
+Lemma live_node_in_msg_succ_lists_app_r :
+  forall gst xs ys,
+    live_node_in_msg_succ_lists' gst (xs ++ ys) ->
+    live_node_in_msg_succ_lists' gst ys.
+Proof.
+  autounfold; intros.
+  match goal with
+  | H: In _ _ \/ In _ _ |- _ =>
+    destruct H; eauto using in_or_app
+  end.
+  Unshelve.
+  all:exact None.
+Qed.
+Hint Resolve live_node_in_msg_succ_lists_app_r.
+
+Lemma live_node_in_msg_succ_lists_app_cons :
+  forall gst x xs,
+    live_node_in_msg_succ_lists' gst (x :: xs) ->
+    live_node_in_msg_succ_lists' gst xs.
+Proof.
+  autounfold; intros.
+  simpl in *; intuition eauto.
+  Unshelve.
+  all:exact None.
+Qed.
+Hint Resolve live_node_in_msg_succ_lists_app_cons.
+
 Lemma live_node_exists_after_simple_change :
   forall h src dst l succs gst gst' st st',
     live_node_in_msg_succ_lists gst ->
@@ -1180,6 +1240,40 @@ Theorem zave_invariant_recv_live_node_in_msg_succ_lists :
     live_node_in_msg_succ_lists gst'.
 Proof.
   unfold zave_invariant; intros; break_and.
+  pose proof (joined_preserved_by_recv_handler _ _ _ _ _ _ _ _ ltac:(eauto)).
+  handler_def.
+  unfold live_node_in_msg_succ_lists in *.
+  repeat find_rewrite.
+  rewrite map_app.
+  apply live_node_in_msg_succ_lists_app;
+    [apply live_node_in_msg_succ_lists_app|].
+  - admit.
+  - admit.
+  - assert (live_node_in_msg_succ_lists' gst (xs ++ ys)) by eauto.
+    autounfold in *; intros.
+    repeat find_rewrite.
+    update_destruct; rewrite_update; eauto; subst; break_or_hyp;
+      try solve [apply Exists_exists; exists (addr_of (make_pointer src0));
+                 break_exists; break_and;
+                 find_injection;
+                 split; auto using in_map;
+                 eapply live_node_characterization; repeat find_rewrite; simpl; try congruence;
+                 rewrite_update; auto];
+    assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src0 :: succs))))
+      by eauto;
+    find_apply_lem_hyp Exists_exists; apply Exists_exists; break_exists_exists;
+    break_and; split; eauto;
+      break_live_node;
+      match goal with
+      | H: sigma gst' = update _ _ ?h (Some ?st) |- _ =>
+        destruct (addr_eq_dec h x7);
+          [subst; eapply live_node_characterization;
+           repeat find_rewrite; rewrite_update; find_injection; eauto
+          |eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto]
+      end.
+
+(*
+  handler_def.
   destruct p.
   - admit.
   - handler_def; handler_def; simpl in *; try congruence.
@@ -1415,6 +1509,7 @@ Proof.
   - admit.
 Unshelve.
 all:exact None.
+*)
 Admitted.
 Hint Resolve zave_invariant_recv_live_node_in_msg_succ_lists.
 
