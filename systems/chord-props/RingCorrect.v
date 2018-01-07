@@ -548,8 +548,7 @@ Proof.
          find_apply_lem_hyp in_sort_by_between.
          find_apply_lem_hyp in_map_iff; expand_def.
          easy.
-  - unfold live_node_in_msg_succ_lists; intros.
-    break_and; find_rewrite; in_crush.
+  - autounfold; break_and; find_rewrite; in_crush.
 Qed.
 Hint Resolve zave_invariant_init.
 
@@ -1184,7 +1183,7 @@ Proof.
   destruct p.
   - admit.
   - handler_def; handler_def; simpl in *; try congruence.
-    + unfold live_node_in_msg_succ_lists; intros.
+    + autounfold; intros.
       assert (cur_request x <> None).
       {
         erewrite handle_query_req_busy_preserves_cur_request; eauto.
@@ -1232,7 +1231,7 @@ Proof.
                  simpl; repeat find_rewrite; auto.
                  simpl; admit. (* need a really easy invariant *)
         -- admit.
-    + unfold live_node_in_msg_succ_lists; intros.
+    + autounfold; intros.
       repeat find_rewrite.
       break_or_hyp.
       * break_or_hyp; find_apply_lem_hyp in_app_or; break_or_hyp;
@@ -1292,7 +1291,7 @@ Proof.
                      congruence.
   - admit.
   - handler_def; handler_def; simpl in *; try congruence.
-    + unfold live_node_in_msg_succ_lists; intros.
+    + autounfold; intros.
       assert (cur_request x <> None).
       {
         erewrite handle_query_req_busy_preserves_cur_request; eauto.
@@ -1340,7 +1339,7 @@ Proof.
                  simpl; repeat find_rewrite; auto.
                  simpl; admit. (* need a really easy invariant *)
         -- admit.
-    + unfold live_node_in_msg_succ_lists; intros.
+    + autounfold; intros.
       repeat find_rewrite.
       break_or_hyp.
       * break_or_hyp; find_apply_lem_hyp in_app_or; break_or_hyp;
