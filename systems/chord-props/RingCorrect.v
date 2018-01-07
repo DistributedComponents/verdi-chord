@@ -13,7 +13,7 @@ Require Import Chord.SystemPointers.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
-Require Import Chord.Stabilize2Matches.
+Require Import Chord.QueryTargetsJoined.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -1154,8 +1154,7 @@ Proof.
         {
           find_eapply_prop live_node_in_msg_succ_lists; eauto.
           repeat find_rewrite; constructor; in_crush.
-          (* x is joined because we're stabilizing with it. *)
-          admit.
+          find_eapply_lem_hyp stabilize_target_joined; eauto.
         }
         find_apply_lem_hyp Exists_exists; break_exists.
         break_and.
@@ -1171,8 +1170,10 @@ Proof.
         }
         (* we know there's a live node in succ_list x8, so there's got to be
            a best_succ as well *)
-        unfold best_succ.
-        admit.
+        eapply live_node_in_succs_best_succ; eauto.
+        -- solve [econstructor; eauto].
+        -- repeat find_rewrite; rewrite_update; eauto.
+        -- repeat find_rewrite; auto.
       * handler_def.
         simpl in *; repeat find_rewrite.
         break_if; try congruence.
@@ -1183,8 +1184,7 @@ Proof.
           - find_copy_eapply_lem_hyp stabilize2_param_matches; eauto; subst.
             find_eapply_lem_hyp cur_request_valid; eauto.
             rewrite <- wf_ptr_eq; eauto.
-          - simpl in *.
-            assert (x11 = x) by admit; subst.
+          - find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
             find_eapply_lem_hyp cur_request_valid; eauto.
             rewrite <- wf_ptr_eq; eauto.
         }
@@ -1194,9 +1194,10 @@ Proof.
           eapply_prop live_node_in_msg_succ_lists;
             try solve [repeat find_rewrite; right; in_crush].
           repeat (handler_def || handler_simpl).
-          - admit. (* must have joined = true since we only stabilize2 with joined nodes *)
-          - admit. (* again, must have joined = true since we only join2 after
-                      talking to a joined node and joined nodes have joined successors *)
+          - find_copy_eapply_lem_hyp stabilize2_param_matches; eauto; subst.
+            find_eapply_lem_hyp stabilize2_target_joined; eauto.
+          - find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
+            find_eapply_lem_hyp join2_target_joined; eauto.
         }
         find_apply_lem_hyp Exists_exists; break_exists_name l.
         break_and.
@@ -1210,14 +1211,19 @@ Proof.
               congruence.
           - eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto.
         }
-        admit.
+        eapply live_node_in_succs_best_succ; eauto.
+        -- solve [econstructor; eauto].
+        -- repeat find_rewrite; rewrite_update; eauto.
+        -- repeat find_rewrite; eauto.
   - assert (live_node gst h0).
     break_live_node; repeat find_rewrite; rewrite_update; eauto using live_node_characterization.
     assert (exists s : addr, best_succ gst h0 s) by eauto.
     break_exists_exists.
     eapply best_succ_preserved; try find_eapply_prop update; eauto.
     eauto using joined_preserved_by_recv_handler.
-Admitted.
+Unshelve.
+all:exact None.
+Qed.
 Hint Resolve zave_invariant_recv_live_node_in_succ_lists.
 
 Theorem zave_invariant_recv_live_node_in_msg_succ_lists :
