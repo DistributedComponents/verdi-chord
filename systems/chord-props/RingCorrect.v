@@ -1116,11 +1116,11 @@ Theorem zave_invariant_recv_live_node_in_succ_lists :
     timeouts gst' = update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
     sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
     msgs gst' = map (send h) ms ++ xs ++ ys -> trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
-    zave_invariant gst ->
+    live_node_in_succ_lists gst ->
+    live_node_in_msg_succ_lists gst ->
     live_node_in_succ_lists gst'.
 Proof.
-  unfold zave_invariant; intros; break_and.
-  unfold live_node_in_succ_lists; intros.
+  intros; unfold live_node_in_succ_lists; intros.
   repeat find_rewrite.
   update_destruct; rewrite_update.
   - symmetry in e; subst.
@@ -1242,10 +1242,11 @@ Theorem zave_invariant_recv_live_node_in_msg_succ_lists :
     timeouts gst' = update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
     sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
     msgs gst' = map (send h) ms ++ xs ++ ys -> trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
-    zave_invariant gst ->
+    live_node_in_succ_lists gst ->
+    live_node_in_msg_succ_lists gst ->
     live_node_in_msg_succ_lists gst'.
 Proof.
-  unfold zave_invariant; intros; break_and.
+  intros.
   assert (reachable_st gst') by (econstructor; eauto).
   pose proof (joined_preserved_by_recv_handler _ _ _ _ _ _ _ _ ltac:(eauto)).
   handler_def.
