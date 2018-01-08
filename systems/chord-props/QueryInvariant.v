@@ -395,7 +395,7 @@ Qed.
 Lemma cur_request_timeouts_related_recv_invariant :
   chord_recv_handler_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-  autounfold; intros.
+  do 2 autounfold; intros.
   destruct (addr_eq_dec h0 h).
   - subst; rewrite_update.
     assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h))
@@ -583,7 +583,7 @@ Hint Resolve cur_request_timeouts_related_init.
 Lemma cur_request_timeouts_related_start :
   chord_start_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-  autounfold; intros.
+  do 2 autounfold; intros.
   destruct (addr_eq_dec h0 h).
   - subst.
     autorewrite with core in *.
@@ -603,7 +603,7 @@ Hint Resolve cur_request_timeouts_related_start.
 Lemma cur_request_timeouts_related_fail :
   chord_fail_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-  autounfold; intros.
+  do 2 autounfold; intros.
   destruct (addr_eq_dec h0 h);
     repeat find_rewrite; eauto with datatypes.
 Qed.
@@ -612,7 +612,7 @@ Hint Resolve cur_request_timeouts_related_fail.
 Lemma cur_request_timeouts_related_tick :
   chord_tick_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-  autounfold; intros.
+  do 2 autounfold; intros.
   repeat find_rewrite.
   destruct_update; rewrite_update; eauto with datatypes.
   assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h0))
@@ -642,7 +642,7 @@ Hint Resolve cur_request_timeouts_related_tick.
 Lemma cur_request_timeouts_related_keepalive :
   chord_keepalive_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-  autounfold; intros.
+  do 2 autounfold; intros.
   repeat find_rewrite.
   destruct_update; rewrite_update; eauto with datatypes.
   assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h0))
@@ -658,7 +658,7 @@ Hint Resolve cur_request_timeouts_related_keepalive.
 Lemma cur_request_timeouts_related_rectify :
   chord_rectify_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-  autounfold; intros.
+  do 2 autounfold; intros.
   repeat find_rewrite.
   destruct_update; rewrite_update; eauto with datatypes.
   assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h0))
@@ -812,7 +812,7 @@ Hint Resolve cur_request_timeouts_related_request.
 Lemma cur_request_timeouts_related_input :
   chord_input_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-  autounfold; intros.
+  do 2 autounfold; intros.
   repeat find_rewrite; eauto.
 Qed.
 Hint Resolve cur_request_timeouts_related_input.
@@ -820,7 +820,7 @@ Hint Resolve cur_request_timeouts_related_input.
 Lemma cur_request_timeouts_related_output :
   chord_output_invariant all_nodes_cur_request_timeouts_related.
 Proof.
-  autounfold; intros.
+  do 2 autounfold; intros.
   repeat find_rewrite; eauto.
 Qed.
 Hint Resolve cur_request_timeouts_related_output.

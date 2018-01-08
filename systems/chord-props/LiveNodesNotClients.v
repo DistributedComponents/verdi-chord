@@ -15,7 +15,7 @@ Lemma nodes_not_clients :
 Proof.
   intros until 1.
   pattern gst.
-  apply chord_net_invariant; autounfold; intros; simpl in *;
+  apply chord_net_invariant; do 2 autounfold; intros; simpl in *;
     try solve [repeat find_rewrite; eauto].
   - inv_prop initial_st; break_and.
     unfold not in *; eauto.

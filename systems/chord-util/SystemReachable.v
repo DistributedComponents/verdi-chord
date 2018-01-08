@@ -255,7 +255,7 @@ Definition chord_init_invariant (P : global_state -> Prop) :=
     P gst.
 Hint Unfold chord_init_invariant.
 
-Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
+Definition chord_start_pre_post (P Q : global_state -> Prop) : Prop :=
   forall h gst gst' k st ms nts,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -274,10 +274,14 @@ Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
     trace gst' = trace gst ++ map e_send (map (send h) ms) ->
 
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_start_pre_post.
+
+Definition chord_start_invariant (P : global_state -> Prop) : Prop :=
+  chord_start_pre_post P P.
 Hint Unfold chord_start_invariant.
 
-Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
+Definition chord_fail_pre_post (P Q : global_state -> Prop) : Prop :=
   forall h gst gst',
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -294,10 +298,14 @@ Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
     trace gst' = trace gst ->
 
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_fail_pre_post.
+
+Definition chord_fail_invariant (P : global_state -> Prop) : Prop :=
+  chord_fail_pre_post P P.
 Hint Unfold chord_fail_invariant.
 
-Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
+Definition chord_tick_pre_post (P Q : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -318,10 +326,14 @@ Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
     trace gst' = trace gst ++ [e_timeout h Tick] ->
 
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_tick_pre_post.
+
+Definition chord_tick_invariant (P : global_state -> Prop) : Prop :=
+  chord_tick_pre_post P P.
 Hint Unfold chord_tick_invariant.
 
-Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
+Definition chord_keepalive_pre_post (P Q : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -342,10 +354,14 @@ Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
     trace gst' = trace gst ++ [e_timeout h KeepaliveTick] ->
 
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_keepalive_pre_post.
+
+Definition chord_keepalive_invariant (P : global_state -> Prop) : Prop :=
+  chord_keepalive_pre_post P P.
 Hint Unfold chord_keepalive_invariant.
 
-Definition chord_rectify_invariant (P : global_state -> Prop) :=
+Definition chord_rectify_pre_post (P Q : global_state -> Prop) :=
   forall gst gst' h st st' ms nts cts eff,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -366,10 +382,14 @@ Definition chord_rectify_invariant (P : global_state -> Prop) :=
     trace gst' = trace gst ++ [e_timeout h RectifyTick] ->
 
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_rectify_pre_post.
+
+Definition chord_rectify_invariant (P : global_state -> Prop) :=
+  chord_rectify_pre_post P P.
 Hint Unfold chord_rectify_invariant.
 
-Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
+Definition chord_request_pre_post (P Q : global_state -> Prop) : Prop :=
   forall gst gst' h st st' ms nts cts eff t dst req,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -392,10 +412,14 @@ Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
     trace gst' = trace gst ++ [e_timeout h t] ->
 
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_request_pre_post.
+
+Definition chord_request_invariant (P : global_state -> Prop) : Prop :=
+  chord_request_pre_post P P.
 Hint Unfold chord_request_invariant.
 
-Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
+Definition chord_recv_handler_pre_post (P Q : global_state -> Prop) : Prop :=
   forall gst gst' src h st p xs ys st' ms nts cts,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -414,10 +438,14 @@ Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
     trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
 
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_recv_handler_pre_post.
+
+Definition chord_recv_handler_invariant (P : global_state -> Prop) : Prop :=
+  chord_recv_handler_pre_post P P.
 Hint Unfold chord_recv_handler_invariant.
 
-Definition chord_input_invariant (P : global_state -> Prop) :=
+Definition chord_input_pre_post (P Q : global_state -> Prop) :=
   forall gst gst' h i to m,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -427,10 +455,14 @@ Definition chord_input_invariant (P : global_state -> Prop) :=
     client_payload i ->
     m = send h (to, i) ->
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_input_pre_post.
+
+Definition chord_input_invariant (P : global_state -> Prop) :=
+  chord_input_pre_post P P.
 Hint Unfold chord_input_invariant.
 
-Definition chord_output_invariant (P : global_state -> Prop) :=
+Definition chord_output_pre_post (P Q : global_state -> Prop) :=
   forall gst gst' h xs m ys,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -440,7 +472,11 @@ Definition chord_output_invariant (P : global_state -> Prop) :=
     msgs gst = xs ++ m :: ys ->
     h = fst (snd m) ->
     P gst ->
-    P gst'.
+    Q gst'.
+Hint Unfold chord_output_pre_post.
+
+Definition chord_output_invariant (P : global_state -> Prop) :=
+  chord_output_pre_post P P.
 Hint Unfold chord_output_invariant.
 
 Theorem chord_net_invariant :

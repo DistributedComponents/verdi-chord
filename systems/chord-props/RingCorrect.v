@@ -983,23 +983,9 @@ Proof.
 Qed.
 
 Theorem zave_invariant_recv_sufficient_principals :
-  forall (gst : global_state) (gst' : ChordSemantics.global_state) (src h : addr) (st : data)
-    (p : payload) (xs ys : list (addr * (addr * payload))) (st' : data) (ms : list (addr * payload))
-    (nts cts : list timeout),
-    reachable_st gst ->
-    step_dynamic gst gst' ->
-    recv_handler src h st p = (st', ms, nts, cts) ->
-    msgs gst = xs ++ (src, (h, p)) :: ys ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst') ->
-    sigma gst h = Some st ->
-    nodes gst' = nodes gst ->
-    failed_nodes gst' = failed_nodes gst ->
-    timeouts gst' = update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
-    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
-    msgs gst' = map (send h) ms ++ xs ++ ys -> trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
-    zave_invariant gst ->
-    sufficient_principals gst'.
+  chord_recv_handler_pre_post
+    zave_invariant
+    sufficient_principals.
 Proof.
 Admitted.
 Hint Resolve zave_invariant_recv_sufficient_principals.
@@ -1101,26 +1087,14 @@ Proof.
 Qed.
 
 Theorem zave_invariant_recv_live_node_in_succ_lists :
-  forall (gst : global_state) (gst' : ChordSemantics.global_state) (src h : addr) (st : data) 
-    (p : payload) (xs ys : list (addr * (addr * payload))) (st' : data) (ms : list (addr * payload))
-    (nts cts : list timeout),
-    reachable_st gst ->
-    step_dynamic gst gst' ->
-    recv_handler src h st p = (st', ms, nts, cts) ->
-    msgs gst = xs ++ (src, (h, p)) :: ys ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst') ->
-    sigma gst h = Some st ->
-    nodes gst' = nodes gst ->
-    failed_nodes gst' = failed_nodes gst ->
-    timeouts gst' = update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
-    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
-    msgs gst' = map (send h) ms ++ xs ++ ys -> trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
-    live_node_in_succ_lists gst ->
-    live_node_in_msg_succ_lists gst ->
-    live_node_in_succ_lists gst'.
+  chord_recv_handler_pre_post
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst)
+    live_node_in_succ_lists.
 Proof.
-  intros; unfold live_node_in_succ_lists; intros.
+  autounfold_one; intros.
+  cbn in *; break_and.
+  unfold live_node_in_succ_lists; intros.
   repeat find_rewrite.
   update_destruct; rewrite_update.
   - symmetry in e; subst.
@@ -1227,26 +1201,13 @@ Qed.
 Hint Resolve zave_invariant_recv_live_node_in_succ_lists.
 
 Theorem zave_invariant_recv_live_node_in_msg_succ_lists :
-  forall (gst : global_state) (gst' : ChordSemantics.global_state) (src h : addr) (st : data) 
-    (p : payload) (xs ys : list (addr * (addr * payload))) (st' : data) (ms : list (addr * payload))
-    (nts cts : list timeout),
-    reachable_st gst ->
-    step_dynamic gst gst' ->
-    recv_handler src h st p = (st', ms, nts, cts) ->
-    msgs gst = xs ++ (src, (h, p)) :: ys ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst') ->
-    sigma gst h = Some st ->
-    nodes gst' = nodes gst ->
-    failed_nodes gst' = failed_nodes gst ->
-    timeouts gst' = update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
-    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
-    msgs gst' = map (send h) ms ++ xs ++ ys -> trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
-    live_node_in_succ_lists gst ->
-    live_node_in_msg_succ_lists gst ->
-    live_node_in_msg_succ_lists gst'.
+  chord_recv_handler_pre_post
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst)
+    live_node_in_msg_succ_lists.
 Proof.
-  intros.
+  autounfold_one; intros.
+  cbn in *; break_and.
   assert (reachable_st gst') by (econstructor; eauto).
   pose proof (joined_preserved_by_recv_handler _ _ _ _ _ _ _ _ ltac:(eauto)).
   handler_def.
@@ -1361,11 +1322,38 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_recv_live_node_in_msg_succ_lists.
 
+Lemma recv_handler_post_conj :
+  forall Pre P Q,
+    chord_recv_handler_pre_post Pre P ->
+    chord_recv_handler_pre_post Pre Q ->
+    chord_recv_handler_pre_post Pre (fun gst => P gst /\ Q gst).
+Proof.
+  autounfold; eauto.
+Qed.
+Hint Resolve recv_handler_post_conj.
+
+Lemma recv_handler_pre_strengthen_l :
+  forall P Q Post,
+    chord_recv_handler_pre_post P Post ->
+    chord_recv_handler_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intuition eauto.
+Qed.
+Hint Resolve recv_handler_pre_strengthen_l.
+
+Lemma recv_handler_pre_strengthen_r :
+  forall P Q Post,
+    chord_recv_handler_pre_post P Post ->
+    chord_recv_handler_pre_post (fun gst => Q gst /\ P gst) Post.
+Proof.
+  autounfold; intuition eauto.
+Qed.
+Hint Resolve recv_handler_pre_strengthen_r.
+
 Theorem zave_invariant_recv :
   chord_recv_handler_invariant zave_invariant.
 Proof.
-  unfold chord_recv_handler_invariant, zave_invariant.
-  intuition eauto.
+  autounfold; eauto.
 Qed.
 Hint Resolve zave_invariant_recv.
 

@@ -18,7 +18,7 @@ Theorem timeout_means_active_inductive :
     reachable_st gst ->
     timeout_means_active_invariant gst.
 Proof using.
-  eapply chord_net_invariant; autounfold; intros;
+  eapply chord_net_invariant; do 2 autounfold; intros;
     repeat find_rewrite;
     repeat handler_simpl.
   inv_prop initial_st; expand_def.

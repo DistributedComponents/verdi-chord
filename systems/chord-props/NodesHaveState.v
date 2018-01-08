@@ -22,7 +22,7 @@ Theorem nodes_have_state_preserved :
     reachable_st gst ->
     nodes_have_state_invariant gst.
 Proof using.
-  eapply chord_net_invariant; autounfold; intros;
+  eapply chord_net_invariant; do 2 autounfold; intros;
     repeat find_rewrite;
     repeat (update_destruct; rewrite_update);
       eauto with datatypes.
@@ -52,7 +52,7 @@ Proof.
   generalize dependent st.
   generalize dependent h.
   pattern gst.
-  eapply chord_net_invariant; autounfold; intros;
+  eapply chord_net_invariant; do 2 autounfold; intros;
     repeat find_rewrite;
     repeat handler_simpl;
     eauto with datatypes.

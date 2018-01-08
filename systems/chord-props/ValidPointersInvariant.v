@@ -15,7 +15,7 @@ Set Bullet Behavior "Strict Subproofs".
 Theorem valid_ptrs_global_start_invariant :
   chord_start_invariant valid_ptrs_global.
 Proof.
-  unfold chord_start_invariant.
+  do 2 autounfold.
   intros.
   find_copy_eapply_lem_hyp valid_ptrs_global_elim; break_and.
   apply valid_ptrs_global_intro; try intro h'; intros; subst_max.

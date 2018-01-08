@@ -1619,7 +1619,7 @@ Proof.
   generalize dependent dst.
   generalize dependent src.
   pattern gst.
-  apply chord_net_invariant; autounfold; simpl; intros;
+  apply chord_net_invariant; do 2 autounfold; simpl; intros;
     repeat find_rewrite; intuition eauto;
       try solve [
             find_apply_lem_hyp in_app_or; break_or_hyp;
@@ -1649,7 +1649,7 @@ Proof.
   generalize dependent dst.
   generalize dependent src.
   pattern gst.
-  apply chord_net_invariant; autounfold; simpl; intros;
+  apply chord_net_invariant; do 2 autounfold; simpl; intros;
     repeat find_rewrite; intuition eauto;
       try solve [
             find_apply_lem_hyp in_app_or; break_or_hyp;
