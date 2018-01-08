@@ -13,6 +13,8 @@ Require Import Chord.SystemPointers.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.QueryTargetsJoined.
+Require Import Chord.QueryInvariant.
+Require Import Chord.StabilizeOnlyWithFirstSucc.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -587,10 +589,40 @@ Proof.
       {
         repeat find_rewrite; update_destruct; rewrite_update;
           repeat (find_rewrite || find_injection).
-        * repeat handler_def; simpl; try congruence.
-          admit.
-          admit.
-        * auto.
+        - find_copy_eapply_lem_hyp cur_request_timeouts_related_invariant; auto.
+          repeat find_reverse_rewrite.
+          repeat handler_def; simpl; try congruence.
+          + repeat find_rewrite.
+            inv_prop cur_request_timeouts_ok; try congruence; find_injection.
+            inv_prop query_request.
+            find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+            break_exists; break_and.
+            repeat find_rewrite; simpl in *; repeat find_injection.
+            assert (In best (addr_of x2 :: map addr_of x6)) by congruence.
+            in_crush.
+          + simpl in *.
+            find_apply_lem_hyp option_map_None.
+            find_apply_lem_hyp hd_error_None; subst.
+            inv_prop cur_request_timeouts_ok; try congruence.
+            repeat find_rewrite; repeat find_injection.
+            inv_prop query_request.
+            find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+            break_exists; break_and.
+            repeat find_rewrite; simpl in *; repeat find_injection.
+            assert (exists s, best_succ gst h0 s).
+            eapply_prop live_node_in_succ_lists; eauto.
+            break_exists; inv_prop best_succ; expand_def.
+            repeat (find_rewrite || find_injection); simpl in *.
+            match goal with
+            | H: context[app] |- _ =>
+              symmetry in H;
+                apply app_cons_singleton_inv in H;
+                destruct H as [? [? ?]];
+                subst
+            end.
+            break_live_node.
+            tauto.
+        - auto.
       }
       assert (live_node gst' best)
         by (eapply live_node_preserved_by_request; eauto).
@@ -625,7 +657,7 @@ Proof.
       apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
       break_and; split; eauto.
       eapply live_node_preserved_by_request; subst; eauto.
-Admitted.
+Qed.
 Hint Resolve live_node_invariant_request.
 
 Theorem live_node_invariant_output :
