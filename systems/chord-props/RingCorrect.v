@@ -7,6 +7,7 @@ Require Import StructTact.Util.
 
 Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
+Require Import Chord.HashInjective.
 Require Import Chord.PairIn.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
@@ -17,6 +18,7 @@ Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.QueryTargetsJoined.
 Require Import Chord.LiveNodeInSuccLists.
 Require Import Chord.LiveNodePreservation.
+Require Import Chord.WfPtrSuccListInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -705,8 +707,17 @@ Proof.
   }
   repeat invcs_prop principal.
   intro.
-  assert (id_of s1 = id_of s2) by admit.
-  assert (hash p <> hash p') by admit.
+  assert (id_of s1 = id_of s2).
+  {
+    assert (wf_ptr s1 /\ wf_ptr s2)
+      by (split; eapply wf_ptr_succ_list_invariant'; eauto; repeat find_rewrite; in_crush).
+    in_crush; repeat invcs_prop valid_ptr; congruence.
+  }
+  assert (hash p <> hash p').
+  {
+    intro; find_eapply_prop (p <> p').
+    eapply hash_injective_invariant; eauto.
+  }
   assert (between (id_of s1) (hash p) (id_of s2) \/
           between (id_of s1) (hash p') (id_of s2)).
   {
@@ -728,5 +739,5 @@ Proof.
         with ([ChordIDSpace.hash h] ++ id_of s1 :: id_of s2 :: map id_of rest);
       repeat find_rewrite;
       eauto.
-Admitted.
+Qed.
 Hint Resolve first_succ_and_second_distinct.
