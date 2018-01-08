@@ -24,6 +24,7 @@ Definition sufficient_principals (gst : global_state) : Prop :=
   exists ps,
     principals gst ps /\
     length ps > SUCC_LIST_LEN.
+Hint Unfold sufficient_principals.
 
 Definition have_principals (gst : global_state) (n : nat) : Prop :=
   exists ps,
@@ -355,7 +356,7 @@ Proof.
   unfold chord_start_invariant, zave_invariant.
   repeat apply chord_start_pre_post_conj; eauto.
   do 2 autounfold_one; intros; break_and.
-  unfold sufficient_principals in *.
+  unfold sufficient_principals in *; break_and.
   break_exists_exists.
   break_and; split; eauto.
   inv_prop principals; break_and.
@@ -536,13 +537,37 @@ Hint Resolve zave_invariant_request.
 Theorem zave_invariant_input :
   chord_input_invariant zave_invariant.
 Proof.
-Admitted.
+  unfold zave_invariant.
+  split; eauto.
+  break_and.
+  autounfold in *.
+  break_exists_exists.
+  break_and; split; auto.
+  inv_prop principals; expand_def.
+  eapply principals_intro; eauto.
+  intros.
+  eapply principals_involves_joined_node_state_only.
+  eapply Forall_forall; eauto.
+  split; intros; simpl; eauto.
+Qed.
 Hint Resolve zave_invariant_input.
 
 Theorem zave_invariant_output :
   chord_output_invariant zave_invariant.
 Proof.
-Admitted.
+  unfold zave_invariant.
+  split; eauto.
+  break_and.
+  autounfold in *.
+  break_exists_exists.
+  break_and; split; auto.
+  inv_prop principals; expand_def.
+  eapply principals_intro; eauto.
+  intros.
+  eapply principals_involves_joined_node_state_only.
+  eapply Forall_forall; eauto.
+  split; intros; simpl; eauto.
+Qed.
 Hint Resolve zave_invariant_output.
 
 Theorem zave_invariant_holds :
