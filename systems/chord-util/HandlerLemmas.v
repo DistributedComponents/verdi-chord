@@ -8,6 +8,7 @@ Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
 
 Require Import Chord.Chord.
+Require Import Chord.PairIn.
 
 Require Import mathcomp.ssreflect.ssreflect.
 Set Bullet Behavior "Strict Subproofs".
@@ -1224,6 +1225,16 @@ Ltac handler_simpl :=
   | |- _ => solve [assumption | congruence | eauto ]
   end.
 
+Lemma joined_preserved_by_request_timeout_handler :
+  forall h st dst req st' ms nts cts eff,
+    request_timeout_handler h st dst req = (st', ms, nts, cts, eff) ->
+    joined st = joined st'.
+Proof.
+  intros; repeat (handler_def || handler_simpl).
+Qed.
+Hint Resolve joined_preserved_by_request_timeout_handler.
+
+
 Lemma handle_query_res_info_from_changed_set_cur_request :
   forall src dst st q p st' ms nts cts,
     handle_query_res src dst st q p = (st', ms, nts, cts) ->
@@ -1488,6 +1499,51 @@ Proof.
     repeat eexists; eauto.
 Qed.
 
+Lemma recv_handler_sets_succ_list_when_setting_joined :
+  forall src dst st m st' ms nts cts,
+    recv_handler src dst st m = (st', ms, nts, cts) ->
+    joined st = false ->
+    joined st' = true ->
+    exists succs qdst s p,
+      m = GotSuccList succs /\
+      cur_request st = Some (qdst, Join2 s, p) /\
+      succ_list st' = make_succs s succs.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl).
+  repeat eexists; eauto.
+Qed.
+
+Lemma hd_in_chop_succs :
+  forall x l,
+    In x (chop_succs (x :: l)).
+Proof.
+  intros.
+  unfold chop_succs.
+  pose proof succ_list_len_lower_bound.
+  destruct SUCC_LIST_LEN; try omega.
+  rewrite firstn_cons; in_crush.
+Qed.
+Hint Resolve hd_in_chop_succs.
+
+Lemma recv_handler_setting_joined_makes_succ_list_nonempty :
+  forall src dst st m st' ms nts cts,
+    recv_handler src dst st m = (st', ms, nts, cts) ->
+    joined st = false ->
+    joined st' = true ->
+    succ_list st' <> [].
+Proof.
+  intros.
+  find_eapply_lem_hyp recv_handler_sets_succ_list_when_setting_joined; eauto.
+  expand_def.
+  intro.
+  repeat find_rewrite.
+  unfold make_succs in *.
+  eapply (@in_nil pointer).
+  repeat find_reverse_rewrite.
+  eauto using hd_in_chop_succs.
+Qed.
+
 Lemma option_map_Some :
   forall A B (f : A -> B) a b,
     option_map f a = Some b ->
@@ -1507,4 +1563,167 @@ Lemma option_map_None :
 Proof.
   intros.
   destruct a; simpl in *; congruence.
+Qed.
+
+Lemma in_concat :
+  forall A (x : A) (l : list (list A)),
+    In x (concat l) ->
+    exists xs,
+      In xs l /\
+      In x xs.
+Proof.
+Admitted.
+
+Lemma handle_query_req_GotPredAndSuccs_response_accurate :
+  forall st src m ms,
+    handle_query_req st src m = ms ->
+    forall dst pr succs,
+      In (dst, GotPredAndSuccs pr succs) ms ->
+      pr = pred st /\
+      succs = succ_list st.
+Proof.
+  intros.
+  unfold handle_query_req in *; break_match; subst;
+    try in_crush; try congruence.
+Qed.
+Hint Resolve handle_query_req_GotPredAndSuccs_response_accurate.
+
+Lemma handle_delayed_queries_GotPredAndSuccs_response_accurate :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    forall dst pr succs,
+      In (dst, GotPredAndSuccs pr succs) ms ->
+      pr = pred st' /\
+      succs = succ_list st'.
+Proof.
+  unfold do_delayed_queries, handle_delayed_query.
+  intros.
+  break_match; find_injection; try solve [in_crush].
+  find_apply_lem_hyp in_concat; expand_def.
+  match goal with
+  | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; break_let; subst
+  end.
+  simpl in *; eauto.
+Qed.
+Hint Resolve handle_delayed_queries_GotPredAndSuccs_response_accurate.
+
+Lemma handle_query_req_GotSuccList_response_accurate :
+  forall st src m ms,
+    handle_query_req st src m = ms ->
+    forall dst succs,
+      In (dst, GotSuccList succs) ms ->
+      succs = succ_list st.
+Proof.
+  intros.
+  unfold handle_query_req in *; break_match; subst;
+    try in_crush; try congruence.
+Qed.
+Hint Resolve handle_query_req_GotSuccList_response_accurate.
+
+Lemma handle_delayed_queries_GotSuccList_response_accurate :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    forall dst succs,
+      In (dst, GotSuccList succs) ms ->
+      succs = succ_list st'.
+Proof.
+  unfold do_delayed_queries, handle_delayed_query.
+  intros.
+  break_match; find_injection; try solve [in_crush].
+  find_apply_lem_hyp in_concat; expand_def.
+  match goal with
+  | H: _ |- _ => rewrite -> in_map_iff in H; expand_def; break_let; subst
+  end.
+  simpl in *.
+  simpl in *; eauto.
+Qed.
+Hint Resolve handle_delayed_queries_GotSuccList_response_accurate.
+
+Lemma recv_handler_GotPredAndSuccs_response_accurate :
+  forall src dst st p st' ms nts cts h pr succs,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    In (h, GotPredAndSuccs pr succs) ms ->
+    pr = pred st' /\
+    succs = succ_list st'.
+Proof.
+  intros.
+  repeat match goal with
+         | H : context[do_delayed_queries] |- _ => fail 1
+         | |- _ => handler_def
+         end.
+  find_apply_lem_hyp in_app_or; break_or_hyp; eauto.
+  repeat handler_def; simpl in *; try break_or_hyp; repeat find_injection; try (congruence || tauto).
+  eauto.
+Qed.
+Hint Resolve recv_handler_GotPredAndSuccs_response_accurate.
+
+Lemma joining_start_handler_st_joined:
+  forall h k st ms nts,
+    start_handler h [k] = (st, ms, nts) ->
+    joined st = false.
+Proof.
+  unfold start_handler.
+  intros.
+  simpl in *; find_injection.
+  reflexivity.
+Qed.
+
+Lemma initial_esl_is_sorted_nodes_chopped :
+  forall h ns,
+    hash h :: map id_of (find_succs h (sort_by_between h (map make_pointer ns))) =
+    map id_of (chop_succs (sort_by_between h (map make_pointer (h :: ns)))).
+Proof.
+move => h ns.
+rewrite map_cons /= {2}/sort_by_between.
+Admitted.
+
+Lemma in_find_succs :
+  forall x h l,
+    In x (find_succs h l) ->
+    In x l.
+Proof.
+  move => x h.
+  elim => //=.
+  move => a l IH.
+  break_if => H_in.
+  - by right; apply IH.
+  - rewrite /chop_succs in H_in.
+    apply in_firstn in H_in.
+    rewrite /= in H_in.
+    break_or_hyp; first by left.
+    by right.
+Qed.
+
+Lemma in_sort_by_between :
+  forall x h l,
+    In x (sort_by_between h l) ->
+    In x l.
+Proof.
+  intros.
+  eapply Permutation.Permutation_in.
+  apply Permutation.Permutation_sym.
+  eapply sort_by_between_permutes.
+  eauto.
+  eauto.
+Qed.
+
+Lemma sorted_list_elements_not_between :
+  forall p l,
+    In p l ->
+    forall a b h,
+      pair_in a b (sort_by_between h l) ->
+      ~ ptr_between a p b.
+Proof.
+Admitted.
+
+Lemma sorted_list_chopped_elements_not_between :
+  forall p l,
+    In p l ->
+    forall a b h,
+      pair_in a b (chop_succs (sort_by_between h l)) ->
+      ~ ptr_between a p b.
+Proof.
+  intros.
+  unfold chop_succs in *.
+  eauto using pair_in_firstn, sorted_list_elements_not_between.
 Qed.

@@ -517,3 +517,145 @@ Proof using.
         simpl in *; tuple_inversion; eauto.
     + destruct m as [? [? ?]]; eauto.
 Qed.
+
+Lemma chord_fail_pre_post_conj :
+  forall Pre P Q,
+    chord_fail_pre_post Pre P ->
+    chord_fail_pre_post Pre Q ->
+    chord_fail_pre_post Pre (fun gst => P gst /\ Q gst).
+Proof.
+  eauto.
+Qed.
+Hint Resolve chord_fail_pre_post_conj.
+
+Lemma chord_fail_pre_post_weaken_l :
+  forall Pre P Q,
+    chord_fail_pre_post Pre (fun gst => P gst /\ Q gst) ->
+    chord_fail_pre_post Pre P.
+Proof.
+  autounfold; intros.
+  cut (P gst' /\ Q gst'); [tauto|eauto].
+Qed.
+Hint Resolve chord_fail_pre_post_weaken_l.
+
+Lemma chord_fail_pre_post_weaken_r :
+  forall Pre P Q,
+    chord_fail_pre_post Pre (fun gst => P gst /\ Q gst) ->
+    chord_fail_pre_post Pre Q.
+Proof.
+  autounfold; intros.
+  cut (P gst' /\ Q gst'); [tauto|eauto].
+Qed.
+Hint Resolve chord_fail_pre_post_weaken_r.
+
+Lemma chord_fail_pre_post_strengthen_l :
+  forall P Q Post,
+    chord_fail_pre_post P Post ->
+    chord_fail_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intros; intuition eauto.
+Qed.
+Hint Resolve chord_fail_pre_post_strengthen_l.
+
+Lemma chord_fail_pre_post_strengthen_r :
+  forall P Q Post,
+    chord_fail_pre_post Q Post ->
+    chord_fail_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intros; intuition eauto.
+Qed.
+Hint Resolve chord_fail_pre_post_strengthen_r.
+
+Lemma chord_start_pre_post_conj :
+  forall Pre P Q,
+    chord_start_pre_post Pre P ->
+    chord_start_pre_post Pre Q ->
+    chord_start_pre_post Pre (fun gst => P gst /\ Q gst).
+Proof.
+  eauto.
+Qed.
+Hint Resolve chord_start_pre_post_conj.
+
+Lemma chord_start_pre_post_weaken_l :
+  forall Pre P Q,
+    chord_start_pre_post Pre (fun gst => P gst /\ Q gst) ->
+    chord_start_pre_post Pre P.
+Proof.
+  autounfold; intros.
+  cut (P gst' /\ Q gst'); [tauto|eauto].
+Qed.
+Hint Resolve chord_start_pre_post_weaken_l.
+
+Lemma chord_start_pre_post_weaken_r :
+  forall Pre P Q,
+    chord_start_pre_post Pre (fun gst => P gst /\ Q gst) ->
+    chord_start_pre_post Pre Q.
+Proof.
+  autounfold; intros.
+  cut (P gst' /\ Q gst'); [tauto|eauto].
+Qed.
+Hint Resolve chord_start_pre_post_weaken_r.
+
+Lemma chord_start_pre_post_strengthen_l :
+  forall P Q Post,
+    chord_start_pre_post P Post ->
+    chord_start_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intros; intuition eauto.
+Qed.
+Hint Resolve chord_start_pre_post_strengthen_l.
+
+Lemma chord_start_pre_post_strengthen_r :
+  forall P Q Post,
+    chord_start_pre_post Q Post ->
+    chord_start_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intros; intuition eauto.
+Qed.
+Hint Resolve chord_start_pre_post_strengthen_r.
+
+Lemma chord_init_invariant_weaken_l :
+  forall P Q,
+    chord_init_invariant (fun gst => P gst /\ Q gst) ->
+    chord_init_invariant P.
+Proof.
+  simpl; autounfold; intros; find_apply_hyp_hyp; tauto.
+Qed.
+Hint Resolve chord_init_invariant_weaken_l.
+
+Lemma chord_init_invariant_weaken_r :
+  forall P Q,
+    chord_init_invariant (fun gst => P gst /\ Q gst) ->
+    chord_init_invariant Q.
+Proof.
+  simpl; autounfold; intros; find_apply_hyp_hyp; tauto.
+Qed.
+Hint Resolve chord_init_invariant_weaken_r.
+
+Lemma recv_handler_post_conj :
+  forall Pre P Q,
+    chord_recv_handler_pre_post Pre P ->
+    chord_recv_handler_pre_post Pre Q ->
+    chord_recv_handler_pre_post Pre (fun gst => P gst /\ Q gst).
+Proof.
+  autounfold; eauto.
+Qed.
+Hint Resolve recv_handler_post_conj.
+
+Lemma recv_handler_pre_strengthen_l :
+  forall P Q Post,
+    chord_recv_handler_pre_post P Post ->
+    chord_recv_handler_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intuition eauto.
+Qed.
+Hint Resolve recv_handler_pre_strengthen_l.
+
+Lemma recv_handler_pre_strengthen_r :
+  forall P Q Post,
+    chord_recv_handler_pre_post P Post ->
+    chord_recv_handler_pre_post (fun gst => Q gst /\ P gst) Post.
+Proof.
+  autounfold; intuition eauto.
+Qed.
+Hint Resolve recv_handler_pre_strengthen_r.

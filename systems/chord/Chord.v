@@ -852,6 +852,15 @@ Inductive response_payload : payload -> Prop :=
 | res_Pong : response_payload Pong
 | res_Busy : response_payload Busy.
 
+Definition response_payload_dec :
+  forall p,
+    {response_payload p} + {~ response_payload p}.
+Proof.
+  destruct p;
+    solve [left; constructor|right; intro; inv_prop response_payload].
+Defined.
+
+
 Inductive request_response_pair : payload -> payload -> Prop :=
 | pair_GetBestPredecessor : forall n p, request_response_pair (GetBestPredecessor n) (GotBestPredecessor p)
 | pair_GetSuccList : forall l, request_response_pair GetSuccList (GotSuccList l)

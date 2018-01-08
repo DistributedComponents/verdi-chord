@@ -889,3 +889,146 @@ Proof.
   - repeat find_rewrite; in_crush.
 Qed.
 Hint Resolve initial_nodes_live.
+
+Theorem initial_succ_list :
+  forall h gst st,
+    initial_st gst ->
+    In h (nodes gst) ->
+    sigma gst h = Some st ->
+    succ_list st = find_succs h (sort_by_between h (map make_pointer (nodes gst))).
+Proof.
+  intros.
+  inv_prop initial_st; break_and.
+  find_copy_apply_lem_hyp initial_nodes_large.
+  destruct (start_handler h (nodes gst)) as [[?st ?ms] ?nts] eqn:?.
+  copy_eapply_prop_hyp start_handler start_handler; auto; break_and.
+  rewrite start_handler_init_state_preset in Heqp; eauto with arith.
+  repeat find_rewrite; repeat find_injection.
+  simpl in *; eauto.
+Qed.
+Hint Rewrite initial_succ_list.
+
+Lemma NoDup_map_make_pointer :
+  forall l, NoDup l ->
+  NoDup (map make_pointer l).
+Proof.
+elim => //=.
+move => a l IH H_nd.
+inversion H_nd; subst.
+find_apply_lem_hyp IH.
+apply NoDup_cons => //.
+move {H2 H_nd IH}.
+elim: l H1 => //=.
+move => a' l IH H_in H_in'.
+have H_neq: a' <> a by auto.
+have H_nin: ~ In a l by auto.
+break_or_hyp.
+- unfold make_pointer in H.
+  by find_injection.
+- by apply IH.
+Qed.
+
+Lemma initial_successor_lists_full :
+  forall h gst,
+    initial_st gst ->
+    length (find_succs h (sort_by_between h (map make_pointer (nodes gst)))) = SUCC_LIST_LEN.
+Proof.
+  intros.
+  pose proof (sorted_knowns_same_length h (nodes gst)).
+  inv_prop initial_st; break_and.
+  rewrite -H0 in H1.
+  move: H1 H0.
+  set mm := map _ _.
+  move => H_le H_eq.
+  have H_pm := sort_by_between_permutes h mm (sort_by_between h mm) (eq_refl _).
+  have H_nd := NoDup_map_make_pointer _ H2.
+  rewrite -/mm in H_nd.
+  apply NoDup_Permutation_NoDup in H_pm => //.
+  move: H_pm H_le.
+  set l := sort_by_between _ _.
+  case: l => /=.
+  - move => H_nd' H_le.
+    by omega.
+  - move => a l H_nd' H_le.
+    have H_le': length l >= SUCC_LIST_LEN by omega.
+    break_if.
+    * inversion H_nd'.
+      subst.
+      move: H11 H_le' {H12 H_nd' H_le}.
+      case: l => /=.
+      + move => H_in H_le.
+        by auto with arith.
+      + move => a l H_in H_le.
+        have H_neq: a <> make_pointer h by auto.
+        break_if => //.
+        rewrite /chop_succs.
+        rewrite firstn_length /=.
+        by rewrite min_l.
+    * rewrite /chop_succs.
+      rewrite firstn_length /=.
+      rewrite min_l //.
+      by auto with arith.
+Qed.
+
+Lemma best_succ_preserved :
+  forall gst gst' h h0 s st st',
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    sigma gst h = Some st ->
+    sigma gst' = update (addr_eq_dec) (sigma gst) h (Some st') ->
+    (joined st = true -> joined st' = true) ->
+    succ_list st = succ_list st' \/ h <> h0 ->
+    nodes gst' = nodes gst ->
+    failed_nodes gst = failed_nodes gst' ->
+    best_succ gst h0 s ->
+    best_succ gst' h0 s.
+Proof.
+  unfold best_succ.
+  intros.
+  destruct (addr_eq_dec h h0).
+  {
+    symmetry in e; subst.
+    expand_def.
+    repeat find_rewrite; rewrite_update.
+    find_inversion.
+    do 3 eexists.
+    repeat break_and_goal.
+    - repeat break_live_node.
+      eapply live_node_characterization; try congruence.
+      + repeat find_rewrite; rewrite_update; eauto.
+      + find_eapply_prop joined; congruence.
+    - reflexivity.
+    - find_rewrite; eauto.
+    - intros.
+      assert (dead_node gst o) by auto.
+      inv_prop dead_node; expand_def; unfold dead_node; repeat find_rewrite.
+      rewrite_update; eauto.
+    - inv_prop live_node; expand_def.
+      destruct (addr_eq_dec h s); subst.
+      + eapply live_node_characterization;
+          repeat find_rewrite; rewrite_update; eauto.
+        find_injection; auto.
+      + eapply live_node_equivalence; eauto.
+        repeat find_rewrite; rewrite_update; auto.
+  }
+  break_exists_exists.
+  repeat break_and_goal; break_and;
+    repeat find_rewrite; rewrite_update.
+  - repeat break_live_node.
+    eapply live_node_characterization; try congruence.
+    + repeat find_rewrite; rewrite_update; eauto.
+    + congruence.
+  - auto.
+  - auto.
+  - intros.
+    assert (dead_node gst o) by auto.
+    inv_prop dead_node; expand_def; unfold dead_node; repeat find_rewrite;
+      rewrite_update; eauto.
+  - repeat break_live_node.
+    destruct (addr_eq_dec s h);
+      eapply live_node_characterization; try congruence;
+        try solve [repeat find_rewrite; rewrite_update; eauto
+                  |congruence
+                  |find_eapply_prop joined; congruence].
+Qed.
+Hint Resolve best_succ_preserved.
