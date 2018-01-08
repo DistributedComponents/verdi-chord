@@ -34,6 +34,7 @@ Require Import Chord.PredNeverSelfInvariant.
 Require Import Chord.PtrsJoined.
 Require Import Chord.RingCorrect.
 Require Import Chord.ChordCorrectPhaseOne.
+Require Import Chord.HashInjective.
 
 Open Scope nat_scope.
 
@@ -58,11 +59,13 @@ Definition counting_opt_error (gst : global_state) (p : option pointer) (better_
 
 Lemma counting_opt_error_zero_implies_correct :
   forall gst p better_bool,
+    reachable_st gst ->
     (forall x y, id_of x <> id_of y -> better_bool x y = false -> better_bool y x = true) ->
     wf_ptr p ->
     counting_opt_error gst (Some p) better_bool = 0 ->
     forall p',
       p <> p' ->
+      In (addr_of p) (nodes gst) ->
       live_node gst (addr_of p') ->
       wf_ptr p' ->
       better_bool p' p = true.
@@ -72,6 +75,7 @@ Proof.
   repeat break_match; try omega.
   find_apply_lem_hyp length_zero_iff_nil.
   find_apply_lem_hyp live_In_live_ptrs; eauto.
+  find_apply_lem_hyp hash_injective_invariant.
   find_eapply_prop better_bool.
   {
     intro.
@@ -82,8 +86,10 @@ Proof.
       destruct p as [a i], p' as [a' i']; simpl in *.
       congruence.
     }
-    apply Chord.hash_inj.
-    now rewrite !wf_ptr_hash_eq; auto.
+    replace (id_of p) with (hash (addr_of p)) in *.
+    replace (id_of p') with (hash (addr_of p')) in *.
+    find_apply_lem_hyp In_live_ptrs_live.
+    eapply_prop hash_injective_on; eauto.
   }
   eapply not_in_filter_false; eauto.
   find_rewrite.
@@ -499,6 +505,7 @@ Proof.
     * assert (wf_ptr x /\ live_node gst (addr_of x)) by admit; try tauto.
       rewrite <- wf_ptr_eq in * by auto.
       by apply better_pred_bool_true_better_pred; tauto.
+    * by admit.
     * by admit.
   - find_copy_apply_lem_hyp phase_two_zero_error_has_first_succ; auto.
     break_exists_exists; expand_def; split; try find_rewrite; auto.
@@ -2381,36 +2388,6 @@ Proof.
   apply not_between_between_bool_equiv, between_swap_not, between_between_bool_equiv; auto.
 Qed.
 
-Lemma id_eq_wf_ptr_eq :
-  forall p q,
-    id_of p = id_of q ->
-    wf_ptr p ->
-    wf_ptr q ->
-    p = q.
-Proof.
-  intros.
-  cut (addr_of p = addr_of q).
-  {
-    intros.
-    destruct p, q; simpl in *; congruence.
-  }
-  apply Chord.hash_inj.
-  by rewrite wf_ptr_hash_eq // wf_ptr_hash_eq.
-Qed.
-
-Lemma wf_ptr_neq_id_neq :
-  forall p q,
-    p <> q ->
-    wf_ptr p ->
-    wf_ptr q ->
-    id_of p <> id_of q.
-Proof.
-  unfold not.
-  intros.
-  find_false.
-  auto using id_eq_wf_ptr_eq.
-Qed.
-
 Lemma between_ends_neq_unroll_between :
   forall x y z,
     between_bool x y z = true ->
@@ -2449,13 +2426,12 @@ Proof using.
   eapply open_stabilize_request_a_after_p_eventually_improves_join_point; eauto.
   - unfold unroll_between_ptr, ChordIDParams.hash in *.
     apply Bool.negb_true_iff.
-    apply unroll_between_neq_swap_false; auto using wf_ptr_neq_id_neq.
+    apply unroll_between_neq_swap_false.
+    admit.
     unfold ptr_between in *.
     apply between_ends_neq_unroll_between;
       rewrite wf_ptr_hash_eq;
-      auto using wf_ptr_neq_id_neq.
-    apply between_between_bool_equiv.
-    by apply between_rot_r; auto using wf_ptr_neq_id_neq.
+      admit.
   - unfold open_stabilize_request_to_first_succ. intros.
     cut (h = dst).
     { intros; subst; auto. }
@@ -2463,7 +2439,7 @@ Proof using.
     break_and.
     find_apply_lem_hyp hd_error_tl_exists. break_exists.
     congruence.
-Qed.
+Admitted.
 
 Lemma succ_error_means_merge_point :
   forall gst,
@@ -2525,7 +2501,7 @@ Proof.
   {
     intro.
     unfold not in *; find_false.
-    apply id_eq_wf_ptr_eq; auto.
+    admit.
   }
   destruct (pointer_eq_dec x p').
   - subst.
@@ -2533,7 +2509,7 @@ Proof.
     intuition.
     apply between_xyx; auto.
   - auto using better_pred_better_succ; eauto.
-Qed.
+Admitted.
 
 Lemma best_first_succ_is_best_pred :
   forall gst p s,
@@ -2551,7 +2527,7 @@ Proof.
   {
     intro.
     unfold not in *; find_false.
-    apply id_eq_wf_ptr_eq; auto.
+    admit.
   }
   destruct (pointer_eq_dec x p').
   - subst.
@@ -2559,7 +2535,7 @@ Proof.
     intuition.
     apply between_xyx; auto.
   - auto using better_succ_better_pred; eauto.
-Qed.
+Admitted.
 
 Fixpoint max_cmp {A : Type} (cmp : A -> A -> bool) (l : list A) (x : option A) :=
   match l with
@@ -2784,10 +2760,10 @@ Lemma better_pred_bool_total':
 Proof.
   intros.
   destruct (pointer_eq_dec a b); auto.
-  find_eapply_lem_hyp wf_ptr_neq_id_neq; eauto.
+  assert (id_of a <> id_of b) by admit.
   destruct (better_pred_bool h a b) eqn:?; auto.
   eauto using better_pred_bool_antisymmetric.
-Qed.
+Admitted.
 
 Lemma correct_pred_exists' :
   forall gst h l,
@@ -3172,8 +3148,7 @@ Proof.
            find_eapply_lem_hyp wrong_pred_not_correct_pred; eauto.
            assert (addr_of h <> addr_of x1)
              by (eapply pred_never_self; eauto).
-           assert (id_of h <> id_of x1)
-             by (apply wf_ptr_neq_id_neq; auto; congruence).
+           assert (id_of h <> id_of x1) by admit.
            admit.
         -- admit.
   - inv_prop wrong_pred. expand_def.

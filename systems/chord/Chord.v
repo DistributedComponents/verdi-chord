@@ -46,10 +46,6 @@ Definition id_to_ascii : id -> string :=
 Definition hash (a : addr) : id :=
   ascii_to_id (ocaml_hash a).
 
-(* We have to assume the injectivity of the hash function, which is a stretch
- * but remains true "most of the time" *)
-Axiom hash_inj : IDSpace.injective hash.
-
 Parameter client_addr : string -> Prop.
 Parameter client_addr_dec :
   forall a,
@@ -81,8 +77,6 @@ Module ChordIDParams <: IDSpaceParams.
   Definition hash := hash.
   Definition ltb := id_ltb.
   Definition lt := fun a b => id_ltb a b = true.
-
-  Definition hash_inj := hash_inj.
 
   Definition name_eq_dec := addr_eq_dec.
   Definition id_eq_dec := id_eq_dec.
@@ -921,6 +915,9 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       _timeout_constraint gst h (Request dst p).
   Definition timeout_constraint := _timeout_constraint.
 
+  Definition start_constraint (gst : global_state) (h : addr) : Prop :=
+    ~ In (hash h) (map hash (nodes gst)).
+
   Definition live_node (gst : global_state) (h : addr) : Prop :=
     In h (nodes gst) /\
     ~ In h (failed_nodes gst) /\
@@ -1007,7 +1004,8 @@ Definition hash_injective_on (gst : global_state) : Prop :=
   forall n m,
     In n (nodes gst) ->
     In m (nodes gst) ->
-    hash n <> hash m.
+    hash n = hash m ->
+    n = m.
 
 Definition initial_st (gst : global_state) : Prop :=
   (* at least N+1 nodes *)

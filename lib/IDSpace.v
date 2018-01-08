@@ -18,9 +18,6 @@ Module Type IDSpaceParams.
   Parameter ltb : id -> id -> bool.
   Parameter lt : id -> id -> Prop.
 
-  (* problematic (i.e. untrue) hypothesis, there might be a better way to handle this *)
-  Parameter hash_inj : injective hash.
-
   (* name and id have decidable equality *)
   Parameter name_eq_dec :
       forall a b : name,

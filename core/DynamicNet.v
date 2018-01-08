@@ -75,6 +75,7 @@ Module Type ConstrainedDynamicSystem.
      address of the failing node, and what the state would be after
      the failure. *)
   Parameter failure_constraint : global_state -> addr -> global_state -> Prop.
+  Parameter start_constraint : global_state -> addr -> Prop.
 End ConstrainedDynamicSystem.
 
 Module DynamicSemantics (S : ConstrainedDynamicSystem).
@@ -204,6 +205,7 @@ Module DynamicSemantics (S : ConstrainedDynamicSystem).
       forall h gst gst' k,
         ~ In h (nodes gst) ->
         ~ client_addr h ->
+        start_constraint gst h ->
         (* hypotheses on the list of known nodes *)
         In k (nodes gst) ->
         ~ In k (failed_nodes gst) ->

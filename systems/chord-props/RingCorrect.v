@@ -704,10 +704,6 @@ Proof.
     simpl in *; intuition.
   }
   repeat invcs_prop principal.
-  assert (not_skipped (ChordIDSpace.hash h) (map id_of (succ_list st)) (ChordIDSpace.hash p))
-    by eauto.
-  assert (not_skipped (ChordIDSpace.hash h) (map id_of (succ_list st)) (ChordIDSpace.hash p'))
-    by eauto.
   intro.
   assert (id_of s1 = id_of s2) by admit.
   assert (hash p <> hash p') by admit.
@@ -718,6 +714,10 @@ Proof.
     destruct (id_eq_dec (id_of s2) (hash p));
       [right|left]; eapply between_xyx; congruence.
   }
+  assert (not_skipped (ChordIDSpace.hash h) (map id_of (succ_list st)) (ChordIDSpace.hash p))
+    by eauto.
+  assert (not_skipped (ChordIDSpace.hash h) (map id_of (succ_list st)) (ChordIDSpace.hash p'))
+    by eauto.
   break_or_hyp;
     match goal with
     | H: not_skipped _ _ _ |- _ =>

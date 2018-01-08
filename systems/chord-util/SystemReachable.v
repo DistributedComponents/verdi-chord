@@ -262,6 +262,7 @@ Definition chord_start_pre_post (P Q : global_state -> Prop) : Prop :=
 
     ~ In h (nodes gst) ->
     ~ client_addr h ->
+    start_constraint gst h ->
     In k (nodes gst) ->
     ~ In k (failed_nodes gst) ->
     start_handler h [k] = (st, ms, nts) ->
