@@ -14,6 +14,8 @@ Require Import Chord.ValidPointersInvariant.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.QueryTargetsJoined.
 
+Set Bullet Behavior "Strict Subproofs".
+
 Theorem live_node_invariant_init :
   chord_init_invariant (fun gst => live_node_in_succ_lists gst /\
                                 live_node_in_msg_succ_lists gst).
@@ -49,39 +51,6 @@ Proof.
 Qed.
 Hint Resolve live_node_invariant_init.
 
-Theorem live_node_invariant_start :
-  chord_start_invariant (fun gst => live_node_in_succ_lists gst /\
-                                 live_node_in_msg_succ_lists gst).
-Proof.
-  autounfold; intros.
-  repeat split; break_and.
-  + unfold live_node_in_succ_lists in *.
-    intros; repeat split.
-    repeat find_rewrite.
-    update_destruct; subst; rewrite_update.
-    * inv_prop live_node; expand_def.
-      repeat find_rewrite; rewrite_update; repeat find_injection.
-      find_eapply_lem_hyp joining_start_handler_st_joined.
-      congruence.
-    * break_and.
-      eapply_lem_prop_hyp adding_nodes_did_not_affect_live_node live_node; eauto.
-      find_apply_hyp_hyp.
-      break_exists_exists.
-      eapply adding_nodes_does_not_affect_best_succ; eauto.
-  + admit. (* easy, only one message sent by start handler *)
-Admitted.
-Hint Resolve live_node_invariant_start.
-
-Theorem live_node_invariant_fail :
-  chord_fail_invariant (fun gst => live_node_in_succ_lists gst /\
-                                live_node_in_msg_succ_lists gst).
-Proof.
-  autounfold.
-  intros.
-  break_and.
-  split; inv_prop failure_constraint; tauto.
-Qed.
-Hint Resolve live_node_invariant_fail.
 Lemma live_node_in_msg_succ_lists_app :
   forall gst xs ys,
     live_node_in_msg_succ_lists' gst xs ->
@@ -155,6 +124,55 @@ Proof.
 Qed.
 Hint Resolve live_node_in_msg_succ_lists_app_cons_split.
 
+Theorem live_node_invariant_start :
+  chord_start_invariant (fun gst => live_node_in_succ_lists gst /\
+                                 live_node_in_msg_succ_lists gst).
+Proof.
+  do 2 autounfold_one; intros.
+  repeat split; break_and.
+  - unfold live_node_in_succ_lists in *.
+    intros; repeat split.
+    repeat find_rewrite.
+    update_destruct; subst; rewrite_update.
+    + inv_prop live_node; expand_def.
+      repeat find_rewrite; rewrite_update; repeat find_injection.
+      find_eapply_lem_hyp joining_start_handler_st_joined.
+      congruence.
+    + break_and.
+      eapply_lem_prop_hyp adding_nodes_did_not_affect_live_node live_node; eauto.
+      find_apply_hyp_hyp.
+      break_exists_exists.
+      eapply adding_nodes_does_not_affect_best_succ; eauto.
+  - autounfold_one.
+    find_rewrite; apply live_node_in_msg_succ_lists_app; autounfold; intros.
+    + exfalso.
+      unfold start_handler in *; simpl in *; find_injection.
+      unfold send in *; simpl in *.
+      intuition congruence.
+    + simpl in *; break_and.
+      assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
+      {
+        eapply_prop live_node_in_msg_succ_lists; eauto.
+        break_or_hyp; try tauto.
+        break_exists; break_and.
+        repeat find_rewrite; update_destruct; rewrite_update;
+          [find_apply_lem_hyp joining_start_handler_st_joined; congruence|eauto].
+      }
+      find_apply_lem_hyp Exists_exists; apply Exists_exists; break_exists_exists.
+      break_and; eauto using live_before_start_stays_live.
+Qed.
+Hint Resolve live_node_invariant_start.
+
+Theorem live_node_invariant_fail :
+  chord_fail_invariant (fun gst => live_node_in_succ_lists gst /\
+                                live_node_in_msg_succ_lists gst).
+Proof.
+  autounfold.
+  intros.
+  break_and.
+  split; inv_prop failure_constraint; tauto.
+Qed.
+Hint Resolve live_node_invariant_fail.
 
 Theorem zave_invariant_recv_live_node_in_succ_lists :
   chord_recv_handler_pre_post
@@ -558,7 +576,27 @@ Proof.
           break_live_node; eapply live_node_characterization; eauto;
             repeat find_rewrite; rewrite_update; congruence.
     }
-    admit. (* actually interesting *)
+    subst; inv_prop timeout_constraint.
+    break_exists_name best.
+    inv_prop best_succ; break_exists; break_and.
+    destruct (addr_eq_dec best dst); subst.
+    + break_live_node; tauto.
+    + assert (In best (map addr_of (succ_list x)))
+        by (repeat find_rewrite; in_crush).
+      assert (In best (map addr_of (succ_list st0))).
+      {
+        repeat find_rewrite; update_destruct; rewrite_update;
+          repeat (find_rewrite || find_injection).
+        * repeat handler_def; simpl; try congruence.
+          admit.
+          admit.
+        * auto.
+      }
+      assert (live_node gst' best)
+        by (eapply live_node_preserved_by_request; eauto).
+      eapply live_node_in_succs_best_succ;
+        solve [eauto
+              |econstructor; eauto].
   - repeat find_rewrite.
     apply live_node_in_msg_succ_lists_app; autounfold; intros.
     + repeat handler_def; simpl in *; intuition;
