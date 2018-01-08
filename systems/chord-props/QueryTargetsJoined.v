@@ -1,6 +1,16 @@
 Require Import List.
+Import ListNotations.
+Require Import Omega.
+
+Require Import StructTact.StructTactics.
+Require Import StructTact.Util.
+
 Require Import Chord.Chord.
+Require Import Chord.HandlerLemmas.
+Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
+
+Set Bullet Behavior "Strict Subproofs".
 
 Theorem stabilize2_param_matches :
   forall gst dst h st ns p,
@@ -12,13 +22,69 @@ Proof.
 Admitted.
 
 Theorem join2_param_matches :
-  forall gst dst h st ns p,
+  forall gst,
     reachable_st gst ->
-    sigma gst h = Some st ->
-    cur_request st = Some (dst, Join2 ns, p) ->
-    dst = ns.
+    forall dst h st ns p,
+      sigma gst h = Some st ->
+      cur_request st = Some (dst, Join2 ns, p) ->
+      dst = ns.
 Proof.
-Admitted.
+  intros until 1. pattern gst.
+  eapply chord_net_invariant; try assumption; clear H gst;
+    do 2 autounfold; intros.
+  - inv_prop initial_st; expand_def.
+    destruct (In_dec addr_eq_dec h (nodes gst));
+      [|find_apply_hyp_hyp; congruence].
+    destruct (start_handler h (nodes gst)) as [[? ?] ?] eqn:?.
+    copy_eapply_prop_hyp start_handler nodes; eauto; break_and.
+    rewrite start_handler_init_state_preset in *;
+      try (pose proof succ_list_len_lower_bound; omega).
+    repeat (find_rewrite || find_injection).
+    simpl in *; congruence.
+  - repeat find_rewrite; update_destruct; rewrite_update; subst.
+    + find_injection.
+      unfold start_handler in *; simpl in *; find_injection.
+      simpl in *; congruence.
+    + eauto.
+  - repeat find_rewrite; eauto.
+  - repeat find_rewrite; update_destruct; rewrite_update; subst.
+    + find_injection.
+      repeat handler_def; simpl in *;
+        solve [congruence
+              |eauto
+              |repeat find_rewrite; try find_injection; eauto].
+    + eauto.
+  - repeat find_rewrite; update_destruct; rewrite_update; subst.
+    + find_injection.
+      repeat handler_def; simpl in *;
+        solve [congruence
+              |eauto
+              |repeat find_rewrite; try find_injection; eauto].
+    + eauto.
+  - repeat find_rewrite; update_destruct; rewrite_update; subst.
+    + find_injection.
+      repeat handler_def; simpl in *;
+        solve [congruence
+              |eauto
+              |repeat find_rewrite; try find_injection; eauto].
+    + eauto.
+  - repeat find_rewrite; update_destruct; rewrite_update; subst.
+    + find_injection.
+      repeat handler_def; simpl in *;
+        solve [congruence
+              |eauto
+              |repeat find_rewrite; try find_injection; eauto].
+    + eauto.
+  - repeat find_rewrite; update_destruct; rewrite_update; subst.
+    + find_injection.
+      repeat handler_def;
+        simpl in *;
+        solve [congruence
+              |eauto].
+    + eauto.
+  - repeat find_rewrite; eauto.
+  - repeat find_rewrite; eauto.
+Qed.
 
 Theorem succs_joined :
   forall gst h st s,
