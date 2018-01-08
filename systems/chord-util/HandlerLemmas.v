@@ -1020,17 +1020,6 @@ Proof.
 Qed.
 Hint Resolve not_ptr_between.
 
-Lemma between_bool_false_not_between :
-  forall x y z,
-    between_bool x y z = false ->
-    ~ between x y z.
-Proof.
-  intuition.
-  find_apply_lem_hyp between_between_bool_equiv.
-  congruence.
-Qed.
-Hint Resolve between_bool_false_not_between.
-
 Lemma ptr_between_bool_false :
   forall a b c,
     ptr_between_bool a b c = false ->

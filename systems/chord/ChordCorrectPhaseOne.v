@@ -1032,9 +1032,12 @@ Proof.
              destruct rest; simpl in *; try congruence
            end.
            repeat find_injection.
-           change (?a :: ?b :: ?c) with ([a] ++ b :: c) in *.
-           eapply first_succ_and_others_distinct;
+           eapply first_succ_and_second_distinct;
              eauto with datatypes.
+           destruct (joined st0) eqn:?.
+           ++ eapply live_node_characterization; eauto.
+           ++ find_eapply_lem_hyp nodes_not_joined_have_no_successors; eauto.
+              congruence.
         -- f_equal.
            eapply at_most_one_request_timeout'_uniqueness; try eassumption.
            now inv_prop cur_request_timeouts_ok'.

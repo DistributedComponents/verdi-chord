@@ -676,13 +676,57 @@ Proof.
 Qed.
 Hint Resolve live_node_in_succ_lists_invariant.
 
-Lemma first_succ_and_others_distinct :
-  forall gst h st s1 s2 xs ys,
+Lemma first_succ_and_second_distinct :
+  forall gst h st s1 s2 rest,
     reachable_st gst ->
+    live_node gst h ->
     sigma gst h = Some st ->
-    succ_list st = xs ++ s1 :: ys ->
-    In s2 (xs ++ ys) ->
+    succ_list st = s1 :: s2 :: rest ->
     addr_of s1 <> addr_of s2.
 Proof.
+  intros.
+  assert (pair_in s1 s2 (s1 :: s2 :: rest)) by constructor.
+  find_copy_apply_lem_hyp sufficient_principals_invariant.
+  unfold sufficient_principals in *; expand_def.
+  pose proof succ_list_len_lower_bound.
+  destruct x as [|p [|p' ps]]; simpl in *; try omega.
+  assert (principal gst p /\ principal gst p').
+  {
+    split;
+    inv_prop principals; break_and; rewrite -> Forall_forall in *;
+      simpl in *; intuition eauto.
+  }
+  break_and.
+  assert (p <> p').
+  {
+    inv_prop principals; expand_def.
+    inv_prop NoDup.
+    simpl in *; intuition.
+  }
+  repeat invcs_prop principal.
+  assert (not_skipped (ChordIDSpace.hash h) (map id_of (succ_list st)) (ChordIDSpace.hash p))
+    by eauto.
+  assert (not_skipped (ChordIDSpace.hash h) (map id_of (succ_list st)) (ChordIDSpace.hash p'))
+    by eauto.
+  intro.
+  assert (id_of s1 = id_of s2) by admit.
+  assert (hash p <> hash p') by admit.
+  assert (between (id_of s1) (hash p) (id_of s2) \/
+          between (id_of s1) (hash p') (id_of s2)).
+  {
+    repeat find_rewrite.
+    destruct (id_eq_dec (id_of s2) (hash p));
+      [right|left]; eapply between_xyx; congruence.
+  }
+  break_or_hyp;
+    match goal with
+    | H: not_skipped _ _ _ |- _ =>
+      eapply H; [|eassumption]
+    end;
+    repeat find_rewrite; simpl;
+      change (ChordIDSpace.hash h :: id_of s1 :: id_of s2 :: map id_of rest)
+        with ([ChordIDSpace.hash h] ++ id_of s1 :: id_of s2 :: map id_of rest);
+      repeat find_rewrite;
+      eauto.
 Admitted.
-Hint Resolve first_succ_and_others_distinct.
+Hint Resolve first_succ_and_second_distinct.

@@ -113,6 +113,7 @@ Module IDSpace(P : IDSpaceParams).
         ~ a < b ->
         x < b ->
         between a x b.
+  Hint Constructors between.
 
   Ltac inv_between :=
     match goal with
@@ -296,5 +297,144 @@ Module IDSpace(P : IDSpaceParams).
 
   Definition unroll_between_ptr (h : P.name) (a b : pointer) :=
     unroll_between (P.hash h) (ptrId a) (ptrId b).
+
+  Lemma not_between_xxy :
+    forall x y,
+      ~ between x x y.
+  Proof.
+    intros; intro.
+    inv_prop between;
+      solve [tauto | eapply lt_irrefl; eauto].
+  Qed.
+
+  Lemma not_between_xyy :
+    forall x y,
+      ~ between x y y.
+  Proof.
+    intros; intro.
+    inv_prop between;
+      solve [tauto | eapply lt_irrefl; eauto].
+  Qed.
+
+  Ltac id_auto := eauto using lt_asymm, lt_irrefl, lt_trans.
+
+  Lemma between_xyx :
+    forall x y,
+      x <> y ->
+      between x y x.
+  Proof.
+    intros.
+    pose proof (lt_total x y); repeat break_or_hyp;
+      congruence || id_auto.
+  Qed.
+
+  Lemma lt_asymm_neg :
+    forall x y,
+      ~ lt x y ->
+      lt y x \/ x = y.
+  Proof.
+    intros.
+    pose proof (lt_total x y).
+    repeat break_or_hyp; tauto.
+  Qed.
+
+  Lemma between_rot_l :
+    forall x y z,
+      x <> z ->
+      between x y z ->
+      between y z x.
+  Proof.
+    intros.
+    invcs_prop between;
+      id_auto;
+      find_copy_apply_lem_hyp lt_asymm_neg;
+      break_or_hyp;
+      congruence || id_auto.
+  Qed.
+
+  Lemma between_rot_r :
+    forall x y z,
+      x <> z ->
+      between x y z ->
+      between z x y.
+  Proof.
+    intros.
+    invcs_prop between;
+      id_auto;
+      find_copy_apply_lem_hyp lt_asymm_neg;
+      break_or_hyp;
+      congruence || id_auto.
+  Qed.
+
+  Lemma not_between_cases :
+    forall x y z,
+      ~ between x y z ->
+      x = y \/ y = z \/ between z y x.
+  Proof.
+    intros.
+    pose proof (lt_total x y).
+    pose proof (lt_total y z).
+    pose proof (lt_total z x).
+    repeat break_or_hyp;
+      intuition solve [tauto | id_auto |  congruence | find_false; id_auto].
+  Qed.
+
+  Lemma between_bool_false_not_between :
+    forall x y z,
+      between_bool x y z = false ->
+      ~ between x y z.
+  Proof.
+    intuition.
+    find_apply_lem_hyp between_between_bool_equiv.
+    congruence.
+  Qed.
+  Hint Resolve between_bool_false_not_between.
+
+  Lemma unrolled_not_between_rot :
+    forall x y z,
+      unroll_between z x y = false ->
+      ~ between x y z.
+  Proof.
+    intros.
+    unfold unroll_between in *.
+    repeat break_if; try congruence.
+    - subst.
+      apply not_between_xyy.
+    - intro.
+      eapply between_bool_false_not_between;
+        eauto using between_rot_r.
+  Qed.
+
+  Lemma not_between_swap :
+    forall x y z,
+      y <> z ->
+      ~ between x y z ->
+      between x z y.
+  Proof.
+    intros.
+    find_copy_apply_lem_hyp not_between_cases.
+    repeat break_or_hyp.
+    - now apply between_xyx.
+    - congruence.
+    - pose proof (lt_total x z).
+      pose proof (lt_total x y).
+      pose proof (lt_total y z).
+      repeat break_or_hyp;
+        intuition solve [id_auto | congruence | find_false; id_auto].
+  Qed.
+
+  Lemma not_between_between :
+    forall x y z,
+      unroll_between x y z = false ->
+      between z y x.
+  Proof.
+    unfold unroll_between.
+    intros.
+    repeat break_if; subst; try congruence.
+    - now apply between_xyx.
+    - apply between_rot_r; auto.
+      apply between_rot_r;
+        auto using not_between_swap.
+  Qed.
 
 End IDSpace.
