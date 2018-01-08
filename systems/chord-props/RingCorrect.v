@@ -436,6 +436,42 @@ Proof.
 Qed.
 Hint Resolve principal_not_failed.
 
+Lemma succ_lists_same_principal_preserved :
+  forall gst gst' h p st st',
+    principal gst p ->
+    sigma gst h = Some st ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    succ_list st = succ_list st' ->
+    joined st = joined st' ->
+    nodes gst = nodes gst' ->
+    failed_nodes gst = failed_nodes gst' ->
+    principal gst' p.
+Proof.
+  unfold principal.
+  intuition eauto.
+  - assert (live_node gst p) by eauto.
+    break_live_node.
+    destruct (addr_eq_dec p h);
+      eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto.
+    congruence.
+  - subst.
+    repeat find_rewrite; update_destruct; rewrite_update.
+    + find_injection.
+      find_reverse_rewrite.
+      eapply H7; eauto.
+      break_live_node;
+        rewrite_update;
+        eapply live_node_characterization; repeat find_rewrite; eauto.
+      rewrite_update. congruence.
+    + assert (live_node gst h0).
+      {
+        break_live_node; eapply live_node_characterization; repeat find_rewrite; eauto.
+        rewrite_update; congruence.
+      }
+      eauto.
+Qed.
+Hint Resolve succ_lists_same_principal_preserved.
+
 Theorem zave_invariant_fail :
   chord_fail_invariant zave_invariant.
 Proof.
@@ -513,19 +549,56 @@ Hint Resolve zave_invariant_recv.
 Theorem zave_invariant_tick :
   chord_tick_invariant zave_invariant.
 Proof.
-Admitted.
+  unfold zave_invariant.
+  repeat split; eauto.
+  break_and.
+  unfold sufficient_principals in *.
+  eapply some_principals_ok.
+  break_exists_exists.
+  unfold principals in *; break_and.
+  repeat split; eauto; try omega.
+  rewrite -> Forall_forall in *.
+  intros.
+  eapply succ_lists_same_principal_preserved; eauto.
+  - repeat handler_def; simpl; auto.
+  - eauto using joined_preserved_by_tick_handler.
+Qed.
 Hint Resolve zave_invariant_tick.
 
 Theorem zave_invariant_keepalive :
   chord_keepalive_invariant zave_invariant.
 Proof.
-Admitted.
+  unfold zave_invariant.
+  split; eauto.
+  break_and.
+  unfold sufficient_principals in *.
+  eapply some_principals_ok.
+  break_exists_exists.
+  unfold principals in *; break_and.
+  repeat split; eauto; try omega.
+  rewrite -> Forall_forall in *.
+  intros.
+  eapply succ_lists_same_principal_preserved; eauto;
+    repeat handler_def; simpl; auto.
+Qed.
 Hint Resolve zave_invariant_keepalive.
 
 Theorem zave_invariant_rectify :
   chord_rectify_invariant zave_invariant.
 Proof.
-Admitted.
+  unfold zave_invariant.
+  split; eauto.
+  break_and.
+  unfold sufficient_principals in *.
+  eapply some_principals_ok.
+  break_exists_exists.
+  unfold principals in *; break_and.
+  repeat split; eauto; try omega.
+  rewrite -> Forall_forall in *.
+  intros.
+  eapply succ_lists_same_principal_preserved; eauto;
+    repeat handler_def; simpl; auto.
+Qed.
 Hint Resolve zave_invariant_rectify.
 
 Theorem zave_invariant_request :
