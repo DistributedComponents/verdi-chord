@@ -458,7 +458,6 @@ Proof.
   intuition (apply Forall_forall; auto).
 Qed.
 
-
 Lemma sufficient_principals_intro :
   forall gst ps,
     NoDup ps ->
@@ -552,6 +551,24 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_init.
 
+Lemma chord_init_invariant_weaken_l :
+  forall P Q,
+    chord_init_invariant (fun gst => P gst /\ Q gst) ->
+    chord_init_invariant P.
+Proof.
+  simpl; autounfold; intros; find_apply_hyp_hyp; tauto.
+Qed.
+Hint Resolve chord_init_invariant_weaken_l.
+
+Lemma chord_init_invariant_weaken_r :
+  forall P Q,
+    chord_init_invariant (fun gst => P gst /\ Q gst) ->
+    chord_init_invariant Q.
+Proof.
+  simpl; autounfold; intros; find_apply_hyp_hyp; tauto.
+Qed.
+Hint Resolve chord_init_invariant_weaken_r.
+
 Lemma live_node_not_just_started :
   forall h gst gst' k st ms nts,
     ~ In h (nodes gst) ->
@@ -624,49 +641,12 @@ Proof.
     solve [now rewrite_update | in_crush].
 Qed.
 
-Theorem zave_invariant_start :
-  chord_start_invariant zave_invariant.
+Theorem live_node_invariant_start :
+  chord_start_invariant (fun gst => live_node_in_succ_lists gst /\
+                                 live_node_in_msg_succ_lists gst).
 Proof.
   autounfold; intros.
   repeat split; break_and.
-  + unfold sufficient_principals in *.
-    break_exists_exists.
-    break_and; split; eauto.
-    inv_prop principals; break_and.
-    apply principals_intro; auto; intros.
-    * inv_prop principals; expand_def.
-      eapply principals_involves_joined_node_state_only; eauto.
-      eapply Forall_forall; eauto.
-      intros.
-      intuition; inv_prop live_node; expand_def.
-      -- eapply live_node_characterization; eauto;
-           repeat find_rewrite;
-           try rewrite_update;
-           in_crush || eauto.
-      -- repeat find_rewrite; rewrite_update; auto.
-      -- repeat find_rewrite; update_destruct;
-           subst; rewrite_update;
-             repeat find_injection.
-         cut (joined x0 = false); [congruence|].
-         eapply joining_start_handler_st_joined; eauto.
-         eapply live_node_characterization; eauto; in_crush.
-      -- repeat find_rewrite; update_destruct;
-           subst; rewrite_update;
-             repeat find_injection.
-         cut (joined x0 = false); [congruence|].
-         eapply joining_start_handler_st_joined; eauto.
-         rewrite_update; auto.
-    * find_eapply_prop In.
-      inv_prop principal.
-      split; eauto using live_after_start_was_live.
-      intros.
-      inv_prop principal.
-      assert (live_node gst p) by eauto using live_after_start_was_live.
-      assert (live_node gst' h0) by eauto using live_before_start_stays_live.
-      inv_prop (live_node gst' h0); expand_def.
-      find_eapply_prop not_skipped; eauto.
-      assert (h0 <> h) by eauto using live_node_not_just_started.
-      repeat find_rewrite; rewrite_update; congruence.
   + unfold live_node_in_succ_lists in *.
     intros; repeat split.
     repeat find_rewrite.
@@ -675,12 +655,108 @@ Proof.
       repeat find_rewrite; rewrite_update; repeat find_injection.
       find_eapply_lem_hyp joining_start_handler_st_joined.
       congruence.
-    * eapply_lem_prop_hyp adding_nodes_did_not_affect_live_node live_node; eauto.
+    * break_and.
+      eapply_lem_prop_hyp adding_nodes_did_not_affect_live_node live_node; eauto.
       find_apply_hyp_hyp.
       break_exists_exists.
       eapply adding_nodes_does_not_affect_best_succ; eauto.
   + admit. (* easy, only one message sent by start handler *)
 Admitted.
+Hint Resolve live_node_invariant_start.
+
+Lemma chord_start_pre_post_conj :
+  forall Pre P Q,
+    chord_start_pre_post Pre P ->
+    chord_start_pre_post Pre Q ->
+    chord_start_pre_post Pre (fun gst => P gst /\ Q gst).
+Proof.
+  eauto.
+Qed.
+Hint Resolve chord_start_pre_post_conj.
+
+Lemma chord_start_pre_post_weaken_l :
+  forall Pre P Q,
+    chord_start_pre_post Pre (fun gst => P gst /\ Q gst) ->
+    chord_start_pre_post Pre P.
+Proof.
+  autounfold; intros.
+  cut (P gst' /\ Q gst'); [tauto|eauto].
+Qed.
+Hint Resolve chord_start_pre_post_weaken_l.
+
+Lemma chord_start_pre_post_weaken_r :
+  forall Pre P Q,
+    chord_start_pre_post Pre (fun gst => P gst /\ Q gst) ->
+    chord_start_pre_post Pre Q.
+Proof.
+  autounfold; intros.
+  cut (P gst' /\ Q gst'); [tauto|eauto].
+Qed.
+Hint Resolve chord_start_pre_post_weaken_r.
+
+Lemma chord_start_pre_post_strengthen_l :
+  forall P Q Post,
+    chord_start_pre_post P Post ->
+    chord_start_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intros; intuition eauto.
+Qed.
+Hint Resolve chord_start_pre_post_strengthen_l.
+
+Lemma chord_start_pre_post_strengthen_r :
+  forall P Q Post,
+    chord_start_pre_post Q Post ->
+    chord_start_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intros; intuition eauto.
+Qed.
+Hint Resolve chord_start_pre_post_strengthen_r.
+
+Theorem zave_invariant_start :
+  chord_start_invariant zave_invariant.
+Proof.
+  unfold chord_start_invariant, zave_invariant.
+  repeat apply chord_start_pre_post_conj; eauto.
+  do 2 autounfold_one; intros; break_and.
+  unfold sufficient_principals in *.
+  break_exists_exists.
+  break_and; split; eauto.
+  inv_prop principals; break_and.
+  apply principals_intro; auto; intros.
+  - inv_prop principals; expand_def.
+    eapply principals_involves_joined_node_state_only; eauto.
+    eapply Forall_forall; eauto.
+    intros.
+    intuition; inv_prop live_node; expand_def.
+    + eapply live_node_characterization; eauto;
+        repeat find_rewrite;
+        try rewrite_update;
+        in_crush || eauto.
+    + repeat find_rewrite; rewrite_update; auto.
+    + repeat find_rewrite; update_destruct;
+        subst; rewrite_update;
+          repeat find_injection.
+      cut (joined x0 = false); [congruence|].
+      eapply joining_start_handler_st_joined; eauto.
+      eapply live_node_characterization; eauto; in_crush.
+    + repeat find_rewrite; update_destruct;
+        subst; rewrite_update;
+          repeat find_injection.
+      cut (joined x0 = false); [congruence|].
+      eapply joining_start_handler_st_joined; eauto.
+      rewrite_update; auto.
+  - find_eapply_prop In.
+    inv_prop principal.
+    split; eauto using live_after_start_was_live.
+    intros.
+    inv_prop principal.
+    assert (live_node gst p) by eauto using live_after_start_was_live.
+    assert (live_node gst' h0) by eauto using live_before_start_stays_live.
+    inv_prop (live_node gst' h0); expand_def.
+    find_eapply_prop not_skipped; eauto.
+    assert (h0 <> h) by eauto using live_node_not_just_started.
+    repeat find_rewrite; rewrite_update; congruence.
+Qed.
 Hint Resolve zave_invariant_start.
 
 Lemma principal_preserved :
@@ -722,64 +798,121 @@ Proof.
 Qed.
 Hint Resolve principal_not_failed.
 
+Lemma chord_fail_pre_post_conj :
+  forall Pre P Q,
+    chord_fail_pre_post Pre P ->
+    chord_fail_pre_post Pre Q ->
+    chord_fail_pre_post Pre (fun gst => P gst /\ Q gst).
+Proof.
+  eauto.
+Qed.
+Hint Resolve chord_fail_pre_post_conj.
+
+Lemma chord_fail_pre_post_weaken_l :
+  forall Pre P Q,
+    chord_fail_pre_post Pre (fun gst => P gst /\ Q gst) ->
+    chord_fail_pre_post Pre P.
+Proof.
+  autounfold; intros.
+  cut (P gst' /\ Q gst'); [tauto|eauto].
+Qed.
+Hint Resolve chord_fail_pre_post_weaken_l.
+
+Lemma chord_fail_pre_post_weaken_r :
+  forall Pre P Q,
+    chord_fail_pre_post Pre (fun gst => P gst /\ Q gst) ->
+    chord_fail_pre_post Pre Q.
+Proof.
+  autounfold; intros.
+  cut (P gst' /\ Q gst'); [tauto|eauto].
+Qed.
+Hint Resolve chord_fail_pre_post_weaken_r.
+
+Lemma chord_fail_pre_post_strengthen_l :
+  forall P Q Post,
+    chord_fail_pre_post P Post ->
+    chord_fail_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intros; intuition eauto.
+Qed.
+Hint Resolve chord_fail_pre_post_strengthen_l.
+
+Lemma chord_fail_pre_post_strengthen_r :
+  forall P Q Post,
+    chord_fail_pre_post Q Post ->
+    chord_fail_pre_post (fun gst => P gst /\ Q gst) Post.
+Proof.
+  autounfold; intros; intuition eauto.
+Qed.
+Hint Resolve chord_fail_pre_post_strengthen_r.
+
+Theorem live_node_invariant_fail :
+  chord_fail_invariant (fun gst => live_node_in_succ_lists gst /\
+                                live_node_in_msg_succ_lists gst).
+Proof.
+  autounfold.
+  intros.
+  break_and.
+  split; inv_prop failure_constraint; tauto.
+Qed.
+Hint Resolve live_node_invariant_fail.
+
 Theorem zave_invariant_fail :
   chord_fail_invariant zave_invariant.
 Proof.
   autounfold.
   intros.
+  eapply chord_fail_pre_post_conj; eauto.
+  autounfold; intros; break_and.
+  inv_prop failure_constraint.
+  unfold principal_failure_constraint in *.
+  unfold sufficient_principals in *.
   break_and.
-  split.
-  - inv_prop failure_constraint.
-    unfold principal_failure_constraint in *.
-    unfold sufficient_principals in *.
-    break_and.
-    eapply some_principals_ok.
-    destruct (principal_dec gst h).
-    + concludes.
-      break_exists_name ps; break_and.
-      exists (remove addr_eq_dec h ps); repeat split.
-      * inv_prop principals; auto using remove_NoDup.
-      * inv_prop principals.
-        pose proof (principal_preserved gst gst').
-        econcludes.
-        forwards.
-        intros. repeat find_rewrite. in_crush.
-        concludes.
-        econcludes.
-        break_and.
-        rewrite -> ?Forall_forall in *; intros.
-        repeat find_rewrite.
-        eauto.
-        find_eapply_prop principal; eauto using in_remove.
-        simpl.
-        destruct (addr_eq_dec h x);
-          intro; break_or_hyp; try solve [eapply remove_In; eauto].
-        assert (principal gst x) by eauto using in_remove.
-        inv_prop principal; inv_prop live_node; tauto.
-      * inv_prop principals; break_and.
-        assert (length ps = SUCC_LIST_LEN + 1 -> False) by eauto.
-        cut (length (remove addr_eq_dec h ps) > SUCC_LIST_LEN); [omega|].
-        eapply gt_S_n.
-        rewrite remove_length_in; eauto.
-        omega.
-    + unfold principals in * |- ; break_exists_exists; expand_def.
-      rewrite -> ?Forall_forall in *.
-      assert (~ In h x) by eauto.
-      split; auto.
-      unfold principals in *; break_and.
-      intuition eauto; try omega.
-      eapply principal_preserved; try symmetry; try eassumption; eauto.
+  eapply some_principals_ok.
+  destruct (principal_dec gst h).
+  - concludes.
+    break_exists_name ps; break_and.
+    exists (remove addr_eq_dec h ps); repeat split.
+    + inv_prop principals; auto using remove_NoDup.
+    + inv_prop principals.
+      pose proof (principal_preserved gst gst').
+      econcludes.
+      forwards.
+      intros. repeat find_rewrite. in_crush.
+      concludes.
+      econcludes.
+      break_and.
+      rewrite -> ?Forall_forall in *; intros.
       repeat find_rewrite.
-      intros.
-      in_crush.
-      find_rewrite.
-      in_crush.
-      assert (principal gst x0) by eauto.
-      inv_prop principal.
-      inv_prop live_node.
-      tauto.
-  - inv_prop failure_constraint.
-    easy.
+      eauto.
+      find_eapply_prop principal; eauto using in_remove.
+      simpl.
+      destruct (addr_eq_dec h x);
+        intro; break_or_hyp; try solve [eapply remove_In; eauto].
+      assert (principal gst x) by eauto using in_remove.
+      inv_prop principal; inv_prop live_node; tauto.
+    + inv_prop principals; break_and.
+      assert (length ps = SUCC_LIST_LEN + 1 -> False) by eauto.
+      cut (length (remove addr_eq_dec h ps) > SUCC_LIST_LEN); [omega|].
+      eapply gt_S_n.
+      rewrite remove_length_in; eauto.
+      omega.
+  - unfold principals in * |- ; break_exists_exists; expand_def.
+    rewrite -> ?Forall_forall in *.
+    assert (~ In h x) by eauto.
+    split; auto.
+    unfold principals in *; break_and.
+    intuition eauto; try omega.
+    eapply principal_preserved; try symmetry; try eassumption; eauto.
+    repeat find_rewrite.
+    intros.
+    in_crush.
+    find_rewrite.
+    in_crush.
+    assert (principal gst x0) by eauto.
+    inv_prop principal.
+    inv_prop live_node.
+    tauto.
 Qed.
 Hint Resolve zave_invariant_fail.
 
@@ -954,6 +1087,19 @@ Proof.
   all:exact None.
 Qed.
 Hint Resolve live_node_in_msg_succ_lists_app_cons.
+
+Lemma live_node_in_msg_succ_lists_app_cons_split :
+  forall gst x xs,
+    live_node_in_msg_succ_lists' gst [x] ->
+    live_node_in_msg_succ_lists' gst xs ->
+    live_node_in_msg_succ_lists' gst (x :: xs).
+Proof.
+  autounfold; intros.
+  simpl in *; intuition eauto.
+  Unshelve.
+  all:exact None.
+Qed.
+Hint Resolve live_node_in_msg_succ_lists_app_cons_split.
 
 Lemma live_node_exists_after_simple_change :
   forall h src dst l succs gst gst' st st',
@@ -1357,11 +1503,136 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_recv.
 
+Theorem live_node_invariant_tick_live_node_in_succ_lists :
+  chord_tick_pre_post
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst)
+    live_node_in_succ_lists.
+Proof.
+  autounfold_one; intros.
+  simpl in *; break_and.
+  unfold live_node_in_succ_lists; intros.
+  find_copy_apply_lem_hyp joined_preserved_by_tick_handler.
+  assert (succ_list st' = succ_list st)
+    by now repeat handler_def.
+  assert (exists s, best_succ gst h0 s).
+  {
+    repeat find_rewrite; update_destruct; rewrite_update; try find_injection;
+      eapply_prop live_node_in_succ_lists; eauto;
+        break_live_node; eapply live_node_characterization; eauto;
+          repeat find_rewrite; rewrite_update; congruence.
+  }
+  break_exists_exists; eapply best_succ_preserved; eauto.
+Qed.
+Hint Resolve live_node_invariant_tick_live_node_in_succ_lists.
+
+Lemma live_node_preserved_by_tick :
+  forall h,
+    chord_tick_invariant (fun gst => live_node gst h).
+Proof.
+  do 2 autounfold; intros.
+  break_live_node.
+  find_copy_apply_lem_hyp joined_preserved_by_tick_handler.
+  destruct (addr_eq_dec h h0);
+    eapply live_node_characterization;
+    repeat find_rewrite; rewrite_update; eauto; congruence.
+Qed.
+Hint Resolve live_node_preserved_by_tick.
+
+Theorem live_node_invariant_tick_live_node_in_msg_succ_lists :
+  chord_tick_pre_post
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst)
+    live_node_in_msg_succ_lists.
+Proof.
+  autounfold_one; intros.
+  simpl in *; break_and.
+  unfold live_node_in_msg_succ_lists; repeat find_rewrite.
+  apply live_node_in_msg_succ_lists_app; autounfold; intros.
+  - exfalso; repeat handler_def; unfold send in *; simpl in *;
+      find_apply_lem_hyp option_map_Some; expand_def; congruence.
+  - assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
+    {
+      eapply_prop live_node_in_msg_succ_lists; eauto.
+      repeat find_rewrite.
+      break_or_hyp; auto.
+      right.
+      break_exists; break_and.
+      update_destruct; rewrite_update; subst; try solve [eexists; eauto].
+      exists st.
+      split; auto; find_injection.
+      erewrite -> joined_preserved_by_tick_handler; eauto.
+    }
+    apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+    break_and; split; auto.
+    eapply live_node_preserved_by_tick; eauto.
+Qed.
+Hint Resolve live_node_invariant_tick_live_node_in_msg_succ_lists.
+
 Theorem zave_invariant_tick :
   chord_tick_invariant zave_invariant.
 Proof.
 Admitted.
 Hint Resolve zave_invariant_tick.
+
+Lemma live_node_preserved_by_keepalive :
+  forall h,
+    chord_keepalive_invariant (fun gst => live_node gst h).
+Proof.
+  do 2 autounfold; intros.
+  break_live_node.
+  handler_def.
+  destruct (addr_eq_dec h h0);
+    eapply live_node_characterization;
+    repeat find_rewrite; rewrite_update; eauto; congruence.
+Qed.
+Hint Resolve live_node_preserved_by_keepalive.
+
+Theorem live_node_invariant_keepalive :
+  chord_keepalive_invariant
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst).
+Proof.
+  do 2 autounfold_one; simpl; intuition;
+    unfold live_node_in_msg_succ_lists, live_node_in_succ_lists; intros.
+  - handler_def.
+    assert (exists s, best_succ gst h0 s).
+    {
+      repeat find_rewrite; update_destruct; rewrite_update; try find_injection;
+        eapply_prop live_node_in_succ_lists; eauto;
+          break_live_node; eapply live_node_characterization; eauto;
+            repeat find_rewrite; rewrite_update; congruence.
+    }
+    break_exists_exists; eapply best_succ_preserved; eauto.
+  - repeat find_rewrite.
+    apply live_node_in_msg_succ_lists_app; autounfold; intros.
+    + repeat handler_def;
+        repeat match goal with
+               | H: In _ (map _ _) |- _ =>
+                 erewrite in_map_iff in H; expand_def
+               | H: context[send_keepalives] |- _ =>
+                 unfold send_keepalives in H
+               | H: send _ _ = _ |- _ =>
+                 unfold send in H
+               | H: (_, (_, _)) = (_, (_, _)) |- _ =>
+                 congruence
+               end.
+    + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
+      {
+        eapply_prop live_node_in_msg_succ_lists; eauto.
+        repeat find_rewrite.
+        break_or_hyp; auto.
+        right.
+        break_exists; break_and.
+        update_destruct; rewrite_update; subst; try solve [eexists; eauto].
+        exists st; find_injection; auto.
+        handler_def; auto.
+      }
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+      break_and; split; eauto.
+      eapply live_node_preserved_by_keepalive; eauto.
+Qed.
+Hint Resolve live_node_invariant_keepalive.
 
 Theorem zave_invariant_keepalive :
   chord_keepalive_invariant zave_invariant.
@@ -1369,11 +1640,148 @@ Proof.
 Admitted.
 Hint Resolve zave_invariant_keepalive.
 
+Lemma live_node_preserved_by_rectify :
+  forall h,
+    chord_rectify_invariant (fun gst => live_node gst h).
+Proof.
+  do 2 autounfold; intros.
+  break_live_node.
+  repeat handler_def;
+    destruct (addr_eq_dec h h0);
+    eapply live_node_characterization;
+    repeat find_rewrite; rewrite_update; eauto; congruence.
+Qed.
+Hint Resolve live_node_preserved_by_keepalive.
+
+Theorem live_node_invariant_rectify :
+  chord_rectify_invariant
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst).
+Proof.
+  do 2 autounfold_one; simpl; intros; break_and.
+  find_copy_apply_lem_hyp joined_preserved_by_do_rectify.
+  assert (succ_list st = succ_list st')
+    by now repeat handler_def.
+  split; unfold live_node_in_msg_succ_lists, live_node_in_succ_lists; intros.
+  - assert (exists s, best_succ gst h0 s).
+    {
+      repeat find_rewrite; update_destruct; rewrite_update; try find_injection;
+        eapply_prop live_node_in_succ_lists; eauto;
+          break_live_node; eapply live_node_characterization; eauto;
+            repeat find_rewrite; rewrite_update; congruence.
+    }
+    break_exists_exists; eapply best_succ_preserved; eauto.
+  - repeat find_rewrite.
+    apply live_node_in_msg_succ_lists_app; autounfold; intros.
+    + repeat handler_def; simpl in *; intuition;
+        repeat match goal with
+               | H: option_map _ _ = Some _ |- _ =>
+                 apply option_map_Some in H; destruct H as [? [? ?]]
+               | H: In _ (map _ _) |- _ =>
+                 erewrite in_map_iff in H; expand_def
+               | H: context[send_keepalives] |- _ =>
+                 unfold send_keepalives in H
+               | H: send _ _ = _ |- _ =>
+                 unfold send in H
+               | H: (_, (_, _)) = (_, (_, _)) |- _ =>
+                 congruence
+               end.
+    + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
+      {
+        eapply_prop live_node_in_msg_succ_lists; eauto.
+        repeat find_rewrite.
+        break_or_hyp; auto.
+        right.
+        break_exists; break_and.
+        update_destruct; rewrite_update; subst; try solve [eexists; eauto].
+        exists st; find_injection; auto.
+        handler_def; auto.
+      }
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+      break_and; split; eauto.
+      eapply live_node_preserved_by_rectify; eauto.
+Qed.
+Hint Resolve live_node_invariant_rectify.
+
 Theorem zave_invariant_rectify :
   chord_rectify_invariant zave_invariant.
 Proof.
 Admitted.
 Hint Resolve zave_invariant_rectify.
+
+Lemma joined_preserved_by_request_timeout_handler :
+  forall h st dst req st' ms nts cts eff,
+    request_timeout_handler h st dst req = (st', ms, nts, cts, eff) ->
+    joined st = joined st'.
+Proof.
+  intros; repeat (handler_def || handler_simpl).
+Qed.
+Hint Resolve joined_preserved_by_request_timeout_handler.
+
+Lemma live_node_preserved_by_request :
+  forall h,
+    chord_request_invariant (fun gst => live_node gst h).
+Proof.
+  do 2 autounfold; intros.
+  break_live_node.
+  destruct (addr_eq_dec h h0);
+    try solve [eapply live_node_characterization;
+               repeat find_rewrite; rewrite_update; eauto; congruence].
+  subst.
+  eapply live_node_characterization;
+    repeat find_rewrite; rewrite_update; simpl; eauto.
+  find_injection.
+  erewrite <- joined_preserved_by_request_timeout_handler; eauto.
+Qed.
+Hint Resolve live_node_preserved_by_request.
+
+Theorem live_node_invariant_request :
+  chord_request_invariant
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst).
+Proof.
+  do 2 autounfold_one; simpl; intros; break_and.
+  assert (joined st' = joined st) by (symmetry; eauto).
+  find_copy_apply_lem_hyp joined_preserved_by_request_timeout_handler.
+  split; unfold live_node_in_msg_succ_lists, live_node_in_succ_lists; intros.
+  - assert (exists s, best_succ gst h0 s).
+    {
+      repeat find_rewrite; update_destruct; rewrite_update; try find_injection;
+        eapply_prop live_node_in_succ_lists; eauto;
+          break_live_node; eapply live_node_characterization; eauto;
+            repeat find_rewrite; rewrite_update; congruence.
+    }
+    admit. (* actually interesting *)
+  - repeat find_rewrite.
+    apply live_node_in_msg_succ_lists_app; autounfold; intros.
+    + repeat handler_def; simpl in *; intuition;
+        repeat match goal with
+               | H: option_map _ _ = Some _ |- _ =>
+                 apply option_map_Some in H; destruct H as [? [? ?]]
+               | H: In _ (map _ _) |- _ =>
+                 erewrite in_map_iff in H; expand_def
+               | H: context[send_keepalives] |- _ =>
+                 unfold send_keepalives in H
+               | H: send _ _ = _ |- _ =>
+                 unfold send in H
+               | H: (_, (_, _)) = (_, (_, _)) |- _ =>
+                 congruence
+               end.
+    + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
+      {
+        eapply_prop live_node_in_msg_succ_lists; eauto.
+        repeat find_rewrite.
+        break_or_hyp; auto.
+        right.
+        break_exists; break_and.
+        update_destruct; rewrite_update; subst; try solve [eexists; eauto].
+        exists st; find_injection; eauto.
+      }
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+      break_and; split; eauto.
+      eapply live_node_preserved_by_request; subst; eauto.
+Admitted.
+Hint Resolve live_node_invariant_request.
 
 Theorem zave_invariant_request :
   chord_request_invariant zave_invariant.
@@ -1381,17 +1789,72 @@ Proof.
 Admitted.
 Hint Resolve zave_invariant_request.
 
+Theorem live_node_invariant_input :
+  chord_input_invariant
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst).
+Proof.
+  unfold chord_input_invariant, chord_input_pre_post; intros; break_and.
+  unfold send in *; subst.
+  split.
+  - unfold live_node_in_succ_lists; intros.
+    simpl in *.
+    assert (exists s, best_succ gst h0 s) by eauto.
+    break_exists_exists; eauto using coarse_best_succ_characterization.
+  - autounfold_one; simpl.
+    eapply live_node_in_msg_succ_lists_app_cons_split; autounfold; intros.
+    + inv_prop client_payload; simpl in *; intuition congruence.
+    + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))))
+        by eauto.
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists; tauto.
+Qed.
+Hint Resolve live_node_invariant_input.
+
 Theorem zave_invariant_input :
   chord_input_invariant zave_invariant.
 Proof.
 Admitted.
 Hint Resolve zave_invariant_input.
 
+Theorem live_node_invariant_output :
+  chord_output_invariant
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst).
+Proof.
+  unfold chord_output_invariant, chord_output_pre_post; intros; break_and.
+  unfold send in *; subst.
+  split.
+  - unfold live_node_in_succ_lists; intros.
+    simpl in *.
+    assert (exists s, best_succ gst h s) by eauto.
+    break_exists_exists; eauto using coarse_best_succ_characterization.
+  - autounfold_one; simpl.
+    eapply live_node_in_msg_succ_lists_app; autounfold; intros;
+      assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))))
+      by (eapply_prop live_node_in_msg_succ_lists; repeat find_rewrite;
+          intuition eauto with datatypes);
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists; tauto.
+Qed.
+Hint Resolve live_node_invariant_output.
+
 Theorem zave_invariant_output :
   chord_output_invariant zave_invariant.
 Proof.
 Admitted.
 Hint Resolve zave_invariant_output.
+
+Theorem live_node_invariant_holds :
+  forall gst,
+    reachable_st gst ->
+    live_node_in_succ_lists gst /\
+    live_node_in_msg_succ_lists gst.
+Proof.
+  apply chord_net_invariant;
+    solve [eauto
+          |autounfold_one; eauto].
+Qed.
+Hint Resolve live_node_invariant_holds.
+Print Assumptions live_node_invariant_holds.
 
 Theorem zave_invariant_holds :
   forall gst,

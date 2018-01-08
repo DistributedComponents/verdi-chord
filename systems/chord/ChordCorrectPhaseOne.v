@@ -514,27 +514,6 @@ Proof.
 Qed.
 Hint Resolve get_open_request_to_from_open_stabilize_request.
 
-Lemma option_map_Some :
-  forall A B (f : A -> B) a b,
-    option_map f a = Some b ->
-    exists a', a = Some a' /\
-          f a' = b.
-Proof.
-  intros.
-  destruct a; simpl in *; try congruence.
-  find_injection.
-  eexists; eauto.
-Qed.
-
-Lemma option_map_None :
-  forall A B (f : A -> B) a,
-    option_map f a = None ->
-    a = None.
-Proof.
-  intros.
-  destruct a; simpl in *; congruence.
-Qed.
-
 Lemma make_request_Stabilize_needs_succ_list :
   forall h st dst m,
     make_request h st Stabilize = Some (dst, m) ->
