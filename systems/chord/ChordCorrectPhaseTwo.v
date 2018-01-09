@@ -29,6 +29,7 @@ Require Import Chord.NodesAlwaysHaveLiveSuccs.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.PtrCorrectInvariant.
 Require Import Chord.QueriesEventuallyStop.
+Require Import Chord.QueryTargetsJoined.
 Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.PredNeverSelfInvariant.
 Require Import Chord.PtrsJoined.
@@ -1074,32 +1075,6 @@ Proof.
     + eapply has_first_succ_sigma; eauto.
 Qed.
 
-Lemma stabilize2_arg_is_dest :
-  forall gst,
-    reachable_st gst ->
-    forall h s s' st p,
-      sigma gst h = Some st ->
-      cur_request st = Some (s, Stabilize2 s', p) ->
-      s = s'.
-Proof.
-  induction 1; intros.
-  - unfold initial_st in *.
-    find_apply_lem_hyp sigma_initial_st_start_handler; eauto.
-    subst.
-    unfold start_handler in *. repeat break_match; simpl in *; congruence.
-  - inversion H0; subst; eauto.
-    + subst. simpl in *.
-      update_destruct; subst; rewrite_update; simpl in *; eauto.
-      find_inversion. simpl in *. congruence.
-    + simpl in *.
-      update_destruct; subst; rewrite_update; simpl in *; eauto.
-      repeat (handler_def || handler_simpl).
-    + repeat (handler_def || handler_simpl;
-              try (update_destruct; subst; rewrite_update);
-              repeat find_rewrite;
-              repeat find_inversion; simpl in *; eauto; try congruence).
-Qed.
-
 Lemma hd_error_make_succs :
   forall x l,
     hd_error (make_succs x l) = Some x.
@@ -1245,7 +1220,7 @@ Proof using.
       find_eapply_lem_hyp WfPtrSuccListInvariant.wf_ptr_succ_list_invariant; eauto.
       repeat find_reverse_rewrite.
       find_apply_lem_hyp wf_ptr_eq. auto.
-    + find_copy_eapply_lem_hyp stabilize2_arg_is_dest; eauto. subst.
+    + find_copy_eapply_lem_hyp stabilize2_param_matches; eauto. subst.
       find_eapply_lem_hyp stabilize2_query_to_better_succ; eauto.
       find_copy_apply_lem_hyp ptr_correct; auto.
       repeat find_rewrite.

@@ -599,12 +599,36 @@ Theorem live_node_was_live_or_no_succs :
     step_dynamic gst gst' ->
     live_node gst' h ->
     live_node gst h \/
+    ~ In h (nodes gst) \/
     exists st,
       sigma gst h = Some st /\
       succ_list st = [] /\
       joined st = false.
 Proof.
-Admitted.
+  intros.
+  inv_prop step_dynamic; repeat find_rewrite; simpl in *; intuition eauto.
+  - break_live_node; simpl in *.
+    update_destruct; rewrite_update;
+      unfold live_node; repeat find_rewrite; intuition eauto.
+  - break_live_node; simpl in *.
+    unfold live_node.
+    repeat find_rewrite; intuition eauto.
+  - break_live_node; simpl in *.
+    update_destruct; rewrite_update;
+      unfold live_node; repeat find_rewrite; intuition eauto.
+    subst.
+    assert (joined st = joined st')
+      by repeat (handler_def; simpl; try congruence).
+    repeat find_injection.
+    repeat find_rewrite; intuition eauto.
+  - break_live_node; simpl in *.
+    update_destruct; rewrite_update;
+      unfold live_node; repeat find_rewrite; intuition eauto.
+    subst.
+    destruct (joined d) eqn:?; intuition eauto.
+    find_apply_lem_hyp nodes_not_joined_have_no_successors; eauto.
+    intuition eauto.
+Qed.
 
 Lemma not_skipped_nil :
   forall h n,
@@ -653,8 +677,9 @@ Proof.
         -- apply in_msgs_in_channel.
            find_rewrite; simpl; in_crush.
         -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
-           break_or_hyp.
+           repeat break_or_hyp.
            ++ eauto.
+           ++ intuition eauto.
            ++ break_exists; break_and.
               replace (succ_list st) with (@nil pointer) by congruence.
               eauto.
@@ -662,8 +687,9 @@ Proof.
         -- apply in_msgs_in_channel.
            find_rewrite; simpl; in_crush.
         -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
-           break_or_hyp.
+           repeat break_or_hyp.
            ++ eauto.
+           ++ intuition eauto.
            ++ break_exists; break_and.
               replace (succ_list st) with (@nil pointer) by congruence.
               eauto.
@@ -671,8 +697,9 @@ Proof.
         -- apply in_msgs_in_channel.
            find_rewrite; simpl; in_crush.
         -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
-           break_or_hyp.
+           repeat break_or_hyp.
            ++ eauto.
+           ++ intuition eauto.
            ++ break_exists; break_and.
               replace (succ_list st) with (@nil pointer) by congruence.
               eauto.
@@ -681,8 +708,9 @@ Proof.
           try solve [eapply in_msgs_in_channel; repeat find_rewrite; in_crush; intuition eauto
                     |eassumption]; eauto.
         find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
-        break_or_hyp.
+        repeat break_or_hyp.
         ++ eauto.
+        ++ intuition eauto.
         ++ break_exists; break_and.
            replace (succ_list st) with (@nil pointer) by congruence.
            eauto.
@@ -691,8 +719,9 @@ Proof.
           try solve [eapply in_msgs_in_channel; repeat find_rewrite; in_crush; intuition eauto
                     |eassumption]; eauto.
         find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
-        break_or_hyp.
+        repeat break_or_hyp.
         ++ eauto.
+        ++ intuition eauto.
         ++ break_exists; break_and.
            replace (succ_list st) with (@nil pointer) by congruence.
            eauto.
