@@ -66,12 +66,42 @@ Proof.
           try solve [find_apply_lem_hyp in_remove; eauto];
           try solve [unfold hd_error in *; break_match; simpl in *; try solve_by_inversion;
                      repeat find_inversion; eauto];
-          try solve [find_apply_lem_hyp in_remove_all_was_in;
-                     find_apply_lem_hyp in_remove;
+          try solve [try find_apply_lem_hyp in_remove_all_was_in;
+                     try find_apply_lem_hyp in_remove;
                      eapply_prop_hyp sigma sigma; eauto; break_exists; intuition; congruence];
           try solve [exfalso; find_apply_lem_hyp in_remove_all_was_in;
                      eapply at_most_one_request_timeout'_remove_drops_all; [| |eauto]; eauto;
                      find_eapply_lem_hyp at_most_one_request_timeout_invariant; eauto].
+      * find_copy_apply_lem_hyp cur_request_timeouts_related_invariant_elim; eauto.
+        inv_prop cur_request_timeouts_ok; try congruence.
+        repeat find_rewrite. repeat find_inversion.
+        in_crush.
+        -- unfold timeouts_in in *. break_match; try solve_by_inversion.
+           repeat break_let. in_crush. repeat find_inversion.
+           eapply_prop_hyp sigma sigma; eauto. repeat find_rewrite. eauto.
+        -- find_apply_lem_hyp in_remove_all_was_in; eauto.
+           eapply_prop_hyp sigma sigma; eauto; repeat find_rewrite; eauto.
+      * find_copy_apply_lem_hyp cur_request_timeouts_related_invariant_elim; eauto.
+        inv_prop cur_request_timeouts_ok; try congruence.
+        repeat find_rewrite. repeat find_inversion.
+        unfold timeouts_in in *. repeat find_rewrite. simpl in *.
+        exfalso.
+        eapply at_most_one_request_timeout'_remove_drops_all; [| |eauto]; eauto.
+      * find_copy_apply_lem_hyp cur_request_timeouts_related_invariant_elim; eauto.
+        inv_prop cur_request_timeouts_ok; try congruence.
+        repeat find_rewrite. repeat find_inversion.
+        unfold timeouts_in in *. repeat find_rewrite. simpl in *.
+        exfalso.
+        find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; [| |eauto]; eauto.
+      * find_copy_apply_lem_hyp cur_request_timeouts_related_invariant_elim; eauto.
+        inv_prop cur_request_timeouts_ok; try congruence.
+        repeat find_rewrite. repeat find_inversion.
+        unfold timeouts_in in *. repeat find_rewrite. simpl in *.
+        exfalso.
+        find_apply_lem_hyp in_remove.
+        eapply at_most_one_request_timeout'_remove_drops_all; [| |eauto]; eauto.
+Qed.        
 (*
 This lemma says that if we have an appropriate Request timeout, we
 have all the other trappings of a Stabilize request. It's going to be
@@ -82,4 +112,3 @@ some work to prove because we have to show that
 DIFFICULTY: 3
 USED: In phase one.
 *)
-Admitted.
