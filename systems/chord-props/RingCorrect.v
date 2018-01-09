@@ -606,6 +606,17 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_rectify.
 
+Lemma not_skipped_initial_not_between :
+  forall a b p rest,
+    not_skipped a (b :: rest) p ->
+    ~ between a p b.
+Proof.
+  intros.
+  unfold not_skipped in *.
+  eauto.
+  specialize (H a b [] rest). simpl in *. auto.
+Qed.
+
 Lemma remove_list_element_still_not_skipped :
   forall h s rest p,
     s <> p ->
@@ -613,7 +624,43 @@ Lemma remove_list_element_still_not_skipped :
     not_skipped h rest p.
 Proof.
   (* This is for Doug *)
-Admitted.
+  destruct rest; intros; simpl in *.
+  - unfold not_skipped. intros.
+    destruct xs; simpl in *; try congruence.
+    destruct xs; simpl in *; congruence.
+  - find_copy_apply_lem_hyp not_skipped_initial_not_between.
+    find_apply_lem_hyp not_skipped_initial.
+    find_copy_apply_lem_hyp not_skipped_initial_not_between.
+    find_eapply_lem_hyp not_skipped_initial.
+    eapply not_skipped_initial'; eauto.
+    destruct (id_eq_dec h s); [subst; exfalso; intuition; eauto using between_xyx|].
+    destruct (id_eq_dec s i); [subst; exfalso; intuition; eauto using between_xyx|].
+    find_apply_lem_hyp not_between_cases;
+      intuition; subst; eauto; try solve [find_apply_lem_hyp not_between_xyy; eauto].
+    find_apply_lem_hyp not_between_cases;
+      intuition; subst; eauto; try solve [find_apply_lem_hyp not_between_xxy; eauto].
+    repeat invcs_prop between;
+      try solve [match goal with
+      | H : lt ?a ?b, H' : lt ?b ?a |- _ =>
+        specialize (lt_asymm _ _ H H'); eauto
+                 end].
+    + repeat find_apply_lem_hyp lt_asymm_neg.
+      intuition; subst; auto;
+        try solve [eapply lt_asymm; eauto].
+      match goal with
+      | H1 : lt ?a ?b, H2 : lt ?b ?c, H3 : lt ?c ?a |- _ =>
+        specialize (lt_trans _ _ _ H1 H2) as Hcontra;
+          specialize (lt_asymm _ _ H3 Hcontra); eauto
+      end. 
+    + repeat find_apply_lem_hyp lt_asymm_neg.
+      intuition; subst; auto;
+        try solve [eapply lt_asymm; eauto].
+      match goal with
+      | H1 : lt ?a ?b, H2 : lt ?b ?c, H3 : lt ?c ?a |- _ =>
+        specialize (lt_trans _ _ _ H1 H2) as Hcontra;
+          specialize (lt_asymm _ _ H3 Hcontra); eauto
+      end.
+Qed.
 Hint Resolve remove_list_element_still_not_skipped.
 
 Theorem zave_invariant_request :
