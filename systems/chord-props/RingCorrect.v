@@ -559,12 +559,74 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_fail.
 
+Inductive succs_msg : payload -> list pointer -> Prop :=
+| SuccsMsgGotSuccList :
+    forall succs, succs_msg (GotSuccList succs) succs
+| SuccsMsgGotPredAndSuccs :
+    forall p succs,
+      succs_msg (GotPredAndSuccs p succs) succs.
+Hint Constructors succs_msg.
+
+Theorem not_skipped_means_incoming_succs_not_skipped :
+  forall gst h s m st succs,
+    reachable_st gst ->
+    succs_msg m succs ->
+    In m (channel gst (addr_of s) h) ->
+    sigma gst h = Some st ->
+    ~ In h (failed_nodes gst) ->
+    forall p,
+      not_skipped (hash h) (map id_of (succ_list st)) p ->
+      not_skipped (hash h) (map id_of (make_succs s succs)) p.
+Proof.
+Admitted.
+
+Lemma live_node_preserved_by_recv :
+  forall h,
+    chord_recv_handler_invariant (fun gst => live_node gst h).
+Proof.
+  repeat autounfold; intros.
+  unfold live_node.
+  repeat find_rewrite; update_destruct; rewrite_update; auto; subst.
+  repeat split; eauto.
+  break_live_node.
+  eexists; split; eauto.
+  eapply joined_preserved_by_recv_handler; eauto; congruence.
+Qed.
+
+Theorem live_node_was_live_or_no_succs :
+  forall gst gst' h,
+    reachable_st gst ->
+    step_dynamic gst gst' ->
+    live_node gst' h ->
+    live_node gst h \/
+    exists st,
+      sigma gst h = Some st /\
+      succ_list st = [] /\
+      joined st = false.
+Proof.
+Admitted.
+
+Lemma not_skipped_nil :
+  forall h n,
+    not_skipped h [] n.
+Proof.
+  unfold not_skipped; intros.
+  exfalso.
+  find_eapply_lem_hyp (f_equal (@length id)).
+  rewrite -> !app_length in *.
+  simpl in *; omega.
+Qed.
+Hint Resolve not_skipped_nil.
+
 Theorem zave_invariant_recv_sufficient_principals :
   chord_recv_handler_pre_post
     zave_invariant
     sufficient_principals.
 Proof.
   autounfold_one; unfold zave_invariant; intros.
+  assert (forall h, live_node gst h -> live_node gst' h)
+    by (intros; eapply live_node_preserved_by_recv; eauto).
+  intros.
   break_and.
   destruct (list_eq_dec pointer_eq_dec (succ_list st) (succ_list st')).
   - destruct (Bool.bool_dec (joined st) (joined st')).
@@ -577,22 +639,67 @@ Proof.
       repeat find_rewrite.
       exfalso; eapply in_nil.
       rewrite -> e; eapply hd_in_chop_succs.
-  - find_copy_apply_lem_hyp recv_handler_updating_succ_list; auto.
-    handler_def.
-    assert (succ_list x6 = succ_list x2)
-      by (match goal with H: context[handle_msg] |- _ => clear H end;
-          repeat handler_def; auto).
-    match goal with H: context[do_delayed_queries] |- _ => clear H end.
-    expand_def.
+  - eapply some_principals_ok.
+    unfold sufficient_principals, principals in *; break_exists_exists.
+    break_and; repeat split; omega || eauto.
+    rewrite -> Forall_forall in *; intros.
+    assert (principal gst x0) by eauto.
+    unfold principal in *; intuition eauto.
+    subst.
+    repeat find_rewrite; update_destruct; rewrite_update; subst.
     + repeat (handler_def; simpl in *; try congruence);
-        repeat find_injection; simpl in *.
-      * admit.
-      * admit.
-      * admit.
-    + repeat (handler_def; simpl in *; try congruence).
-      * admit.
-      * admit.
-Admitted.
+        repeat (find_rewrite || find_injection); simpl.
+      * eapply not_skipped_means_incoming_succs_not_skipped; eauto.
+        -- apply in_msgs_in_channel.
+           find_rewrite; simpl; in_crush.
+        -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
+           break_or_hyp.
+           ++ eauto.
+           ++ break_exists; break_and.
+              replace (succ_list st) with (@nil pointer) by congruence.
+              eauto.
+      * eapply not_skipped_means_incoming_succs_not_skipped; eauto.
+        -- apply in_msgs_in_channel.
+           find_rewrite; simpl; in_crush.
+        -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
+           break_or_hyp.
+           ++ eauto.
+           ++ break_exists; break_and.
+              replace (succ_list st) with (@nil pointer) by congruence.
+              eauto.
+      * eapply not_skipped_means_incoming_succs_not_skipped; eauto.
+        -- apply in_msgs_in_channel.
+           find_rewrite; simpl; in_crush.
+        -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
+           break_or_hyp.
+           ++ eauto.
+           ++ break_exists; break_and.
+              replace (succ_list st) with (@nil pointer) by congruence.
+              eauto.
+      * find_copy_eapply_lem_hyp stabilize2_param_matches; eauto; subst.
+        eapply (@not_skipped_means_incoming_succs_not_skipped gst);
+          try solve [eapply in_msgs_in_channel; repeat find_rewrite; in_crush; intuition eauto
+                    |eassumption]; eauto.
+        find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
+        break_or_hyp.
+        ++ eauto.
+        ++ break_exists; break_and.
+           replace (succ_list st) with (@nil pointer) by congruence.
+           eauto.
+      * find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
+        eapply (@not_skipped_means_incoming_succs_not_skipped gst);
+          try solve [eapply in_msgs_in_channel; repeat find_rewrite; in_crush; intuition eauto
+                    |eassumption]; eauto.
+        find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
+        break_or_hyp.
+        ++ eauto.
+        ++ break_exists; break_and.
+           replace (succ_list st) with (@nil pointer) by congruence.
+           eauto.
+    + find_eapply_prop not_skipped; eauto.
+      eapply live_node_equivalence; eauto.
+      repeat find_rewrite; rewrite_update; eauto.
+Qed.
 Hint Resolve zave_invariant_recv_sufficient_principals.
 
 Theorem zave_invariant_recv :
