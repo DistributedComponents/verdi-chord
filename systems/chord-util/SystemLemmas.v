@@ -73,6 +73,19 @@ Proof using.
   intuition.
 Qed.
 
+Definition live_node_dec :
+  forall gst h,
+    {live_node gst h} + {~ live_node gst h}.
+Proof.
+  intros.
+  destruct (In_dec addr_eq_dec h (nodes gst));
+    destruct (In_dec addr_eq_dec h (failed_nodes gst));
+    destruct (sigma gst h) as [st|] eqn:?;
+    try destruct (joined st) eqn:?;
+        try solve [left; eapply live_node_characterization; eassumption
+                  |right; intro; inv_prop live_node; expand_def; congruence].
+Defined.
+
 Definition live_addrs (gst : global_state) : list addr :=
   filter (live_node_bool gst) (nodes gst).
 

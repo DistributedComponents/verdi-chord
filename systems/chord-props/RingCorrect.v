@@ -37,19 +37,6 @@ Definition have_principals (gst : global_state) (n : nat) : Prop :=
     Forall (principal gst) ps /\
     length ps >= n.
 
-Definition live_node_dec :
-  forall gst h,
-    {live_node gst h} + {~ live_node gst h}.
-Proof.
-  intros.
-  destruct (In_dec addr_eq_dec h (nodes gst));
-    destruct (In_dec addr_eq_dec h (failed_nodes gst));
-    destruct (sigma gst h) as [st|] eqn:?;
-    try destruct (joined st) eqn:?;
-        try solve [left; eapply live_node_characterization; eassumption
-                  |right; intro; inv_prop live_node; expand_def; congruence].
-Defined.
-
 Fixpoint not_skipped_bool (h : id) (succs : list id) (n : id) :=
   match succs with
   | [] => true
