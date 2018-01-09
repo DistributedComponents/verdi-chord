@@ -13,13 +13,30 @@ Require Import Chord.SystemReachable.
 Set Bullet Behavior "Strict Subproofs".
 
 Theorem stabilize2_param_matches :
-  forall gst dst h st ns p,
+  forall gst,
     reachable_st gst ->
-    sigma gst h = Some st ->
-    cur_request st = Some (dst, Stabilize2 ns, p) ->
-    dst = ns.
+    forall h s s' st p,
+      sigma gst h = Some st ->
+      cur_request st = Some (s, Stabilize2 s', p) ->
+      s = s'.
 Proof.
-Admitted.
+  induction 1; intros.
+  - unfold initial_st in *.
+    find_apply_lem_hyp sigma_initial_st_start_handler; eauto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; congruence.
+  - inversion H0; subst; eauto.
+    + subst. simpl in *.
+      update_destruct; subst; rewrite_update; simpl in *; eauto.
+      find_inversion. simpl in *. congruence.
+    + simpl in *.
+      update_destruct; subst; rewrite_update; simpl in *; eauto.
+      repeat (handler_def || handler_simpl).
+    + repeat (handler_def || handler_simpl;
+              try (update_destruct; subst; rewrite_update);
+              repeat find_rewrite;
+              repeat find_inversion; simpl in *; eauto; try congruence).
+Qed.
 
 Theorem join2_param_matches :
   forall gst,
