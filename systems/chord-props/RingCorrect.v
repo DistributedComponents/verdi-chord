@@ -477,6 +477,28 @@ Proof.
 Qed.
 Hint Resolve succ_lists_same_principal_preserved.
 
+Lemma succ_lists_same_sufficient_principals_preserved :
+  forall gst gst' h st st',
+    sufficient_principals gst ->
+    sigma gst h = Some st ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    succ_list st = succ_list st' ->
+    joined st = joined st' ->
+    nodes gst = nodes gst' ->
+    failed_nodes gst = failed_nodes gst' ->
+    sufficient_principals gst'.
+Proof.
+  intros.
+  eapply some_principals_ok.
+  unfold have_principals, sufficient_principals, principals in *.
+  break_exists_exists;
+    break_and; repeat split; eauto;
+      rewrite -> Forall_forall in *;
+        solve [eauto using succ_lists_same_principal_preserved
+              |intros; omega].
+Qed.
+Hint Resolve succ_lists_same_sufficient_principals_preserved.
+
 Theorem zave_invariant_fail :
   chord_fail_invariant zave_invariant.
 Proof.
@@ -488,6 +510,7 @@ Proof.
   unfold principal_failure_constraint in *.
   unfold sufficient_principals in *.
   break_and.
+  eauto.
   eapply some_principals_ok.
   destruct (principal_dec gst h).
   - concludes.
@@ -541,6 +564,34 @@ Theorem zave_invariant_recv_sufficient_principals :
     zave_invariant
     sufficient_principals.
 Proof.
+  autounfold_one; unfold zave_invariant; intros.
+  break_and.
+  destruct (list_eq_dec pointer_eq_dec (succ_list st) (succ_list st')).
+  - destruct (Bool.bool_dec (joined st) (joined st')).
+    + eapply succ_lists_same_sufficient_principals_preserved; eauto.
+    + destruct (joined st) eqn:?, (joined st') eqn:?;
+        try (find_apply_lem_hyp joined_preserved_by_recv_handler; auto; congruence).
+      find_apply_lem_hyp recv_handler_sets_succ_list_when_setting_joined; eauto.
+      expand_def.
+      find_apply_lem_hyp nodes_not_joined_have_no_successors; eauto.
+      repeat find_rewrite.
+      exfalso; eapply in_nil.
+      rewrite -> e; eapply hd_in_chop_succs.
+  - find_copy_apply_lem_hyp recv_handler_updating_succ_list; auto.
+    handler_def.
+    assert (succ_list x6 = succ_list x2)
+      by (match goal with H: context[handle_msg] |- _ => clear H end;
+          repeat handler_def; auto).
+    match goal with H: context[do_delayed_queries] |- _ => clear H end.
+    expand_def.
+    + repeat (handler_def; simpl in *; try congruence);
+        repeat find_injection; simpl in *.
+      * admit.
+      * admit.
+      * admit.
+    + repeat (handler_def; simpl in *; try congruence).
+      * admit.
+      * admit.
 Admitted.
 Hint Resolve zave_invariant_recv_sufficient_principals.
 
@@ -557,14 +608,7 @@ Proof.
   unfold zave_invariant.
   repeat split; eauto.
   break_and.
-  unfold sufficient_principals in *.
-  eapply some_principals_ok.
-  break_exists_exists.
-  unfold principals in *; break_and.
-  repeat split; eauto; try omega.
-  rewrite -> Forall_forall in *.
-  intros.
-  eapply succ_lists_same_principal_preserved; eauto.
+  eapply succ_lists_same_sufficient_principals_preserved; eauto.
   - repeat handler_def; simpl; auto.
   - eauto using joined_preserved_by_tick_handler.
 Qed.
@@ -576,14 +620,7 @@ Proof.
   unfold zave_invariant.
   split; eauto.
   break_and.
-  unfold sufficient_principals in *.
-  eapply some_principals_ok.
-  break_exists_exists.
-  unfold principals in *; break_and.
-  repeat split; eauto; try omega.
-  rewrite -> Forall_forall in *.
-  intros.
-  eapply succ_lists_same_principal_preserved; eauto;
+  eapply succ_lists_same_sufficient_principals_preserved; eauto;
     repeat handler_def; simpl; auto.
 Qed.
 Hint Resolve zave_invariant_keepalive.
@@ -594,14 +631,7 @@ Proof.
   unfold zave_invariant.
   split; eauto.
   break_and.
-  unfold sufficient_principals in *.
-  eapply some_principals_ok.
-  break_exists_exists.
-  unfold principals in *; break_and.
-  repeat split; eauto; try omega.
-  rewrite -> Forall_forall in *.
-  intros.
-  eapply succ_lists_same_principal_preserved; eauto;
+  eapply succ_lists_same_sufficient_principals_preserved; eauto;
     repeat handler_def; simpl; auto.
 Qed.
 Hint Resolve zave_invariant_rectify.
