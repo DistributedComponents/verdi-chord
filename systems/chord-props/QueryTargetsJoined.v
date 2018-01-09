@@ -9,6 +9,7 @@ Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
+Require Import Chord.SystemPointers.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -103,15 +104,64 @@ Proof.
   - repeat find_rewrite; eauto.
 Qed.
 
-Theorem succs_joined :
-  forall gst h st s,
+Lemma sigma_some_in_nodes :
+  forall gst h st,
     reachable_st gst ->
     sigma gst h = Some st ->
-    In s (succ_list st) ->
-    exists st__s,
-      sigma gst (addr_of s) = Some st__s /\
-      joined st__s = true.
+    In h (nodes gst).
 Proof.
+  intros.
+  induct_reachable_st; intros.
+  - unfold initial_st in *.
+    intuition.
+    destruct (in_dec addr_eq_dec h (nodes gst)); auto.
+    eapply_prop_hyp In In. congruence.
+  - invcs H0; simpl in *; eauto;
+      update_destruct; subst; rewrite_update; simpl in *; eauto.
+Qed.
+
+Theorem succs_joined :
+  forall gst,
+    reachable_st gst ->
+    forall h st s,
+      sigma gst h = Some st ->
+      In s (succ_list st) ->
+      exists st__s,
+        sigma gst (addr_of s) = Some st__s /\
+        joined st__s = true.
+Proof.
+  induction 1; intros; simpl in *; eauto.
+  - find_apply_lem_hyp initial_succ_list; auto; [|admit].
+    repeat find_rewrite.
+    admit.
+  - inversion H0; subst; simpl in *; eauto.
+    + update_destruct_hyp; subst; rewrite_update; simpl in *.
+      * find_inversion. simpl in *. intuition.
+      * update_destruct; subst; rewrite_update; simpl in *; eauto.
+        exfalso. eapply_prop_hyp succ_list succ_list; eauto.
+        break_exists. intuition.
+        find_eapply_lem_hyp sigma_some_in_nodes; eauto.
+    + repeat (handler_def || handler_simpl);
+        try solve [eapply_prop_hyp succ_list succ_list; eauto; break_exists;
+                   intuition; repeat find_rewrite; repeat find_inversion;
+                   eexists; intuition eauto].
+      * copy_eapply_prop_hyp sigma sigma; repeat find_rewrite; [|constructor 2; eauto].
+        break_exists. intuition. repeat find_rewrite. find_inversion.
+        eexists; intuition eauto.
+      * copy_eapply_prop_hyp sigma sigma; repeat find_rewrite; [|constructor 2; eauto].
+        break_exists. intuition. repeat find_rewrite.
+        eexists; intuition eauto.
+      * copy_eapply_prop_hyp sigma sigma; repeat find_rewrite; [|constructor 2; eauto].
+        break_exists. intuition. repeat find_rewrite. find_inversion.
+        eexists; intuition eauto.
+      * copy_eapply_prop_hyp sigma sigma; repeat find_rewrite; [|constructor 2; eauto].
+        break_exists. intuition. repeat find_rewrite.
+        eexists; intuition eauto.
+    + repeat (handler_def || handler_simpl);
+        try solve [eapply_prop_hyp succ_list succ_list; eauto; break_exists;
+                   intuition; repeat find_rewrite; repeat find_inversion;
+                   eexists; intuition eauto].
+
 Admitted.
 
 Theorem stabilize_target_joined :
@@ -146,6 +196,9 @@ Theorem join2_target_joined :
       joined st__d = true.
 Proof.
 Admitted.
+succs_joined
+Lemma valid_ptr_live_node_or_dead_node :
+  forall 
 
 Theorem live_node_in_succs_best_succ :
   forall gst h st l,
@@ -155,5 +208,6 @@ Theorem live_node_in_succs_best_succ :
     In l (map addr_of (succ_list st)) ->
     exists s, best_succ gst h s.
 Proof.
+  
   intros.
 Admitted.
