@@ -8,6 +8,7 @@ Require Import StructTact.Util.
 Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.HashInjective.
+Require Import Chord.NodesHaveState.
 Require Import Chord.PairIn.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
@@ -16,8 +17,10 @@ Require Import Chord.ValidPointersInvariant.
 Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.QueryTargetsJoined.
+Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodeInSuccLists.
 Require Import Chord.LiveNodePreservation.
+Require Import Chord.StabilizeOnlyWithFirstSucc.
 Require Import Chord.WfPtrSuccListInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
@@ -603,10 +606,105 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_rectify.
 
+Lemma remove_list_element_still_not_skipped :
+  forall h s rest p,
+    s <> p ->
+    not_skipped h (s :: rest) p ->
+    not_skipped h rest p.
+Proof.
+  (* This is for Doug *)
+Admitted.
+Hint Resolve remove_list_element_still_not_skipped.
+
 Theorem zave_invariant_request :
   chord_request_invariant zave_invariant.
 Proof.
-Admitted.
+  autounfold; intros.
+  break_and; split; eauto.
+  find_copy_eapply_lem_hyp cur_request_timeouts_related_invariant; auto.
+  assert (succ_list st = succ_list st' \/
+          req = GetPredAndSuccs /\
+          exists s1 rest,
+            succ_list st = s1 :: rest /\
+            succ_list st' = rest).
+  {
+    repeat handler_def; simpl; intuition eauto;
+      repeat find_rewrite;
+      invcs_prop cur_request_timeouts_ok; try congruence;
+        inv_prop query_request;
+        try congruence;
+        assert (Request (addr_of dstp) GetPredAndSuccs = Request (addr_of x) req) by eauto;
+        find_injection;
+        right; intuition eauto.
+  }
+  break_or_hyp.
+  - unfold sufficient_principals in *.
+    eapply some_principals_ok.
+    break_exists_exists.
+    unfold principals in *; break_and.
+    repeat split; eauto; try omega.
+    rewrite -> Forall_forall in *.
+    intros.
+    eapply succ_lists_same_principal_preserved; eauto;
+      repeat handler_def; simpl; auto.
+  - break_and.
+    unfold sufficient_principals in *.
+    eapply some_principals_ok.
+    break_exists_exists.
+    unfold principals in *; break_and.
+    repeat split; eauto; try omega.
+    rewrite -> Forall_forall in *.
+    intros.
+    assert (principal gst x0) by eauto.
+    inv_prop principal.
+    break_exists_name s1; break_exists_name rest; break_and.
+    assert (live_node gst h).
+    {
+      eapply live_node_characterization; eauto.
+      destruct (joined st) eqn:?; auto.
+      find_apply_lem_hyp nodes_not_joined_have_no_successors; eauto.
+      congruence.
+    }
+    split; intuition eauto.
+    + eapply live_node_preserved_by_request; eauto.
+    + assert (not_skipped (ChordIDSpace.hash h)
+                          (map id_of (s1 :: succ_list st'))
+                          (ChordIDSpace.hash x0))
+        by (find_eapply_prop not_skipped; eauto || congruence).
+      repeat find_rewrite; update_destruct; rewrite_update; subst.
+      * find_injection; repeat find_rewrite.
+        eapply remove_list_element_still_not_skipped; eauto.
+        intro.
+        repeat invcs_prop principal.
+        repeat break_live_node.
+        repeat find_rewrite; rewrite_update; repeat find_injection.
+        inv_prop timeout_constraint.
+        assert (dst = addr_of s1).
+        {
+          eapply_lem_prop_hyp (stabilize_only_with_first_succ gst) Request; eauto.
+          break_exists; break_and.
+          repeat find_rewrite; simpl in *; congruence.
+        }
+        cut (dst = x0); [intro; subst; eauto|].
+        inv_prop cur_request_timeouts_ok; repeat find_rewrite.
+        -- exfalso; intuition eauto.
+        -- eapply_lem_prop_hyp (stabilize_only_with_first_succ gst) Request; eauto.
+           break_exists; break_and.
+           repeat find_rewrite.
+           simpl in *; repeat find_injection.
+           assert (wf_ptr x4)
+             by (eapply wf_ptr_succ_list_invariant' with (h:=h0); eauto;
+                 find_rewrite; in_crush).
+           eapply hash_injective_invariant; eauto using in_failed_in_nodes.
+           inv_prop wf_ptr.
+           repeat find_rewrite; auto.
+      * cut (not_skipped (ChordIDSpace.hash h0)
+                          (map id_of (succ_list st0))
+                          (ChordIDSpace.hash x0)); eauto.
+        find_eapply_prop not_skipped; eauto.
+        break_live_node; eapply live_node_characterization;
+          repeat find_rewrite; rewrite_update; eauto || congruence.
+Qed.
 Hint Resolve zave_invariant_request.
 
 Theorem zave_invariant_input :
