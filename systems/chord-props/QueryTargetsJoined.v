@@ -196,9 +196,11 @@ Theorem join2_target_joined :
       joined st__d = true.
 Proof.
 Admitted.
+(*
 succs_joined
 Lemma valid_ptr_live_node_or_dead_node :
   forall 
+*)
 
 Theorem live_node_in_succs_best_succ :
   forall gst h st l,
