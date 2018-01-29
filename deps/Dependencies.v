@@ -1,79 +1,91 @@
 Require Import dpdgraph.dpdgraph.
-Require Import Chord.Chord.
-Require Import Chord.ChordCorrectPhaseTwo.
-Require Import Chord.ChordCorrectPhaseThree.
-Require Import Chord.ChordCorrectPhaseOne.
-Require Import Chord.ChordStabilization.
-Require Import Chord.RingCorrect.
-Require Import Chord.StabilizeOnlyWithFirstSucc.
-Require Import Chord.LiveNodeInSuccLists.
-Require Import Chord.DeadNodesGoQuiet.
-Require Import Chord.ValidPointersInvariant.
-Require Import Chord.SuccessorNodesAlwaysValid.
-Require Import Chord.TickInvariant.
-Require Import Chord.LiveNodePreservation.
-Require Import Chord.QueryInvariant.
-Require Import Chord.WfPtrSuccListInvariant.
-Require Import Chord.FirstSuccNeverSelf.
-Require Import Chord.LiveNodeHasTickInTimeouts.
-Require Import Chord.QueryTargetsJoined.
-Require Import Chord.LiveNodesStayLive.
-Require Import Chord.TimeoutMeansActive.
-Require Import Chord.NodesNotJoinedHaveNoSuccessors.
-Require Import Chord.NodesAlwaysHaveLiveSuccs.
-Require Import Chord.QueriesEventuallyStop.
-Require Import Chord.PtrCorrectInvariant.
-Require Import Chord.LiveNodesNotClients.
-Require Import Chord.NodesHaveState.
-Require Import Chord.PtrsJoined.
-Require Import Chord.HashInjective.
-Require Import Chord.PredNeverSelfInvariant.
-Require Import Chord.LabeledLemmas.
-Require Import Chord.SystemReachable.
-Require Import Chord.SystemPointers.
-Require Import Chord.SystemLemmas.
-Require Import Chord.LabeledMeasures.
-Require Import Chord.PairIn.
-Require Import Chord.HandlerLemmas.
 
-Set DependGraph File "chord_all.dpd".
-Print FileDependGraph
-Chord.Chord
-Chord.ChordCorrectPhaseTwo
+Require Import
+Chord.LabeledLemmas
+Chord.LabeledMeasures
+Chord.SystemReachable
+Chord.PairIn
+Chord.SystemLemmas
+Chord.HandlerLemmas
+Chord.SystemPointers
 Chord.ChordCorrectPhaseThree
+Chord.ChordCorrectPhaseTwo
 Chord.ChordCorrectPhaseOne
 Chord.ChordStabilization
-Chord.RingCorrect
-Chord.StabilizeOnlyWithFirstSucc
-Chord.LiveNodeInSuccLists
-Chord.DeadNodesGoQuiet
-Chord.ValidPointersInvariant
+Chord.Chord
 Chord.SuccessorNodesAlwaysValid
-Chord.TickInvariant
-Chord.LiveNodePreservation
-Chord.QueryInvariant
-Chord.WfPtrSuccListInvariant
-Chord.FirstSuccNeverSelf
-Chord.LiveNodeHasTickInTimeouts
 Chord.QueryTargetsJoined
 Chord.LiveNodesStayLive
-Chord.TimeoutMeansActive
+Chord.RingCorrect
 Chord.NodesNotJoinedHaveNoSuccessors
-Chord.NodesAlwaysHaveLiveSuccs
+Chord.ValidPointersInvariant
 Chord.QueriesEventuallyStop
+Chord.LiveNodeInSuccLists
+Chord.HashInjective
+Chord.PredNeverSelfInvariant
 Chord.PtrCorrectInvariant
 Chord.LiveNodesNotClients
 Chord.NodesHaveState
+Chord.StabilizeOnlyWithFirstSucc
+Chord.NodesAlwaysHaveLiveSuccs
+Chord.QueryInvariant
+Chord.LiveNodeHasTickInTimeouts
+Chord.LiveNodePreservation
+Chord.FirstSuccNeverSelf
 Chord.PtrsJoined
+Chord.TickInvariant
+Chord.DeadNodesGoQuiet
+Chord.WfPtrSuccListInvariant
+Chord.TimeoutMeansActive
+Chord.Sorting
+Chord.Bitvectors
+Chord.InfSeqTactics
+Chord.IDSpace
+Verdi.DynamicNet.
+
+Set DependGraph File "deps/chord_all.dpd".
+Print FileDependGraph
+Chord.LabeledLemmas
+Chord.LabeledMeasures
+Chord.SystemReachable
+Chord.PairIn
+Chord.SystemLemmas
+Chord.HandlerLemmas
+Chord.SystemPointers
+Chord.ChordCorrectPhaseThree
+Chord.ChordCorrectPhaseTwo
+Chord.ChordCorrectPhaseOne
+Chord.ChordStabilization
+Chord.Chord
+Chord.SuccessorNodesAlwaysValid
+Chord.QueryTargetsJoined
+Chord.LiveNodesStayLive
+Chord.RingCorrect
+Chord.NodesNotJoinedHaveNoSuccessors
+Chord.ValidPointersInvariant
+Chord.QueriesEventuallyStop
+Chord.LiveNodeInSuccLists
 Chord.HashInjective
 Chord.PredNeverSelfInvariant
-Chord.LabeledLemmas
-Chord.SystemReachable
-Chord.SystemPointers
-Chord.SystemLemmas
-Chord.LabeledMeasures
-Chord.PairIn
-Chord.HandlerLemmas.
+Chord.PtrCorrectInvariant
+Chord.LiveNodesNotClients
+Chord.NodesHaveState
+Chord.StabilizeOnlyWithFirstSucc
+Chord.NodesAlwaysHaveLiveSuccs
+Chord.QueryInvariant
+Chord.LiveNodeHasTickInTimeouts
+Chord.LiveNodePreservation
+Chord.FirstSuccNeverSelf
+Chord.PtrsJoined
+Chord.TickInvariant
+Chord.DeadNodesGoQuiet
+Chord.WfPtrSuccListInvariant
+Chord.TimeoutMeansActive
+Chord.Sorting
+Chord.Bitvectors
+Chord.InfSeqTactics
+Chord.IDSpace
+Verdi.DynamicNet.
 
-Set DependGraph File "chord_stabilization.dpd".
-Print DependGraph chord_stabilization.
+Set DependGraph File "deps/chord_phase_two.dpd".
+Print FileDependGraph Chord.ChordCorrectPhaseTwo.

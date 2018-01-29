@@ -13,3 +13,7 @@ Makefile.coq.conf
 *.vio
 *.pyc
 .vagrant
+
+deps/*.dpd
+deps/*.dot
+deps/*.svg
