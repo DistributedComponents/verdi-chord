@@ -120,6 +120,7 @@ Proof.
       update_destruct; subst; rewrite_update; simpl in *; eauto.
 Qed.
 
+(*
 Theorem succs_joined :
   forall gst,
     reachable_st gst ->
@@ -163,6 +164,7 @@ Proof.
                    eexists; intuition eauto].
 
 Admitted.
+*)
 
 Theorem stabilize_target_joined :
   forall gst h st dst m,
@@ -196,11 +198,6 @@ Theorem join2_target_joined :
       joined st__d = true.
 Proof.
 Admitted.
-(*
-succs_joined
-Lemma valid_ptr_live_node_or_dead_node :
-  forall 
-*)
 
 Theorem live_node_in_succs_best_succ :
   forall gst h st l,

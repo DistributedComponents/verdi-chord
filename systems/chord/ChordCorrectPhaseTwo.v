@@ -839,35 +839,6 @@ USED: In phase two.
 *)
 Admitted.
 
-
-Lemma notify_when_pred_dead_eventually_improves :
-  forall ex,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    always (~_ (now circular_wait)) ex ->
-    always (now phase_one) ex ->
-    always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
-
-    forall h p p',
-      wf_ptr h ->
-      wf_ptr p ->
-      wf_ptr p' ->
-      has_pred (occ_gst (hd ex)) (addr_of h) (Some p) ->
-      In (addr_of p) (failed_nodes (occ_gst (hd ex))) ->
-      In Notify (channel (occ_gst (hd ex)) (addr_of p') (addr_of h)) ->
-      until
-        (now (fun o => has_pred (occ_gst o) (addr_of h) (Some p)))
-        (pred_improves h) ex.
-Proof.
-(*
-This assumes rectiying works, so that's several more proofs that need to be done.
-
-DIFFICULTY: Ryan
-USED: In phase two.
-*)
-Admitted.
-
 Lemma notify_when_pred_worse_eventually_improves :
   forall ex,
     lb_execution ex ->
@@ -1300,30 +1271,6 @@ Section MergePoint.
       + tauto.
   Qed.
 
-  Lemma pred_changing_suffices :
-    forall ex h p p',
-      lb_execution ex ->
-      reachable_st (occ_gst (hd ex)) ->
-      strong_local_fairness ex ->
-      always (~_ (now circular_wait)) ex ->
-      always (now phase_one) ex ->
-      always (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex ->
-
-      p <> p' ->
-      has_pred (occ_gst (hd ex)) h p ->
-      eventually (now (fun o => has_pred (occ_gst o) h p')) ex ->
-      eventually (pred_or_succ_improves (make_pointer h)) ex.
-  Proof.
-  (*
-  If the predecessor changed, the pred or successor improved.
-  Pretty obvious given earlier admits about predecessors changing, but I'm not
-  sure how much work the proof actually is.
-
-  DIFFICULTY: 3
-  USED: In phase two.
-  *)
-  Admitted.
-
   Lemma pred_same_until_improvement :
     forall ex h p,
       lb_execution ex ->
@@ -1338,7 +1285,7 @@ Section MergePoint.
                  (pred_improves (make_pointer h)) ex.
   Proof.
   (*
-  This should be a consequence of pred_changing_suffices or at least a similar argument.
+  Implied by pred error nonincreasing (or maybe the other way around?)
 
   DIFFICULTY: 4
   USED: In phase two.
@@ -2374,6 +2321,7 @@ Proof.
   repeat break_if; congruence.
 Qed.
 
+(*
 Lemma open_request_from_better_pred_eventually_improves_error :
   forall ex h p p',
     lb_execution ex ->
@@ -2415,21 +2363,7 @@ Proof using.
     find_apply_lem_hyp hd_error_tl_exists. break_exists.
     congruence.
 Admitted.
-
-Lemma succ_error_means_merge_point :
-  forall gst,
-    reachable_st gst ->
-    ~ first_succs_correct gst ->
-    exists a b j,
-      merge_point gst a b j.
-Proof.
-(*
-This leans on the entire ring invariant. Try reducing it to that first.
-
-DIFFICULTY: Ryan
-USED: Crucially in phase two.
 *)
-Admitted.
 
 Definition wrong_pred (gst : global_state) (h : pointer) : Prop :=
   exists p p',
@@ -2484,32 +2418,6 @@ Proof.
     intuition.
     apply between_xyx; auto.
   - auto using better_pred_better_succ; eauto.
-Admitted.
-
-Lemma best_first_succ_is_best_pred :
-  forall gst p s,
-    wf_ptr p ->
-    live_node gst (addr_of p) ->
-    first_succ_correct gst p (Some s) ->
-    pred_correct gst s (Some p).
-Proof.
-  unfold first_succ_correct, pred_correct.
-  intros.
-  break_exists. break_and.
-  find_injection.
-  eexists; split; eauto; intros.
-  assert (ptrId p' <> ptrId p).
-  {
-    intro.
-    unfold not in *; find_false.
-    admit.
-  }
-  destruct (pointer_eq_dec x p').
-  - subst.
-    unfold better_succ, better_pred in *.
-    intuition.
-    apply between_xyx; auto.
-  - auto using better_succ_better_pred; eauto.
 Admitted.
 
 Fixpoint max_cmp {A : Type} (cmp : A -> A -> bool) (l : list A) (x : option A) :=
@@ -3083,6 +2991,7 @@ Lemma error_decreases_when_succs_right :
     wrong_pred (occ_gst (hd ex)) h ->
     eventually (pred_improves h) ex.
 Proof.
+(*
   intros.
   find_copy_apply_lem_hyp all_first_succs_correct_finds_pred; auto using phase_one_all_first_succs_best.
   break_exists_name p. break_and.
@@ -3133,6 +3042,7 @@ Proof.
     + apply E_next, IHeventually; invar_eauto; eauto;
         (* these are all manageable *)
         admit.
+*)
 Admitted.
 
 Lemma error_means_merge_point_or_wrong_pred :
@@ -3149,10 +3059,16 @@ Lemma error_means_merge_point_or_wrong_pred :
       merge_point gst a b j.
 Proof.
 (*
-This should follow from first_succ_error_means_merge_point.
+This should follow from something like this:
 
-DIFFICULTY: 2
-USED: In phase two.
+    forall gst,
+      reachable_st gst ->
+      ~ first_succs_correct gst ->
+      exists a b j,
+        merge_point gst a b j.
+
+DIFFICULTY: Ryan
+USED: Crucially in phase two.
 *)
 Admitted.
 

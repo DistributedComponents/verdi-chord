@@ -20,6 +20,7 @@ Proof.
   eexists; eauto.
 Qed.
 
+(*
 Theorem first_succ_never_self :
   forall gst h s,
     reachable_st gst ->
@@ -33,3 +34,4 @@ DIFFCULTY: 1
 USED: In phase two.
 *)
 Admitted.
+*)

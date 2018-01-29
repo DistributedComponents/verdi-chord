@@ -20,6 +20,7 @@ Proof.
   eauto.
 Qed.
 
+(*
 Theorem pred_never_self :
   forall gst h p,
     reachable_st gst ->
@@ -33,3 +34,4 @@ DIFFCULTY: 1
 USED: In phase two.
 *)
 Admitted.
+*)
