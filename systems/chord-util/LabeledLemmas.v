@@ -430,6 +430,7 @@ Qed.
 
 Lemma RecvMsg_enabled_until_occurred :
   forall s,
+    reachable_st (occ_gst (hd s)) ->
     lb_execution s ->
     forall src dst m,
       l_enabled (RecvMsg src dst m) (hd s) ->
@@ -444,35 +445,29 @@ Proof using.
   inv_prop lb_execution.
   destruct (label_eq_dec (RecvMsg src dst m) (occ_label o));
     try (apply W0; assumption).
-  inv_labeled_step;
-    clean_up_labeled_step_cases.
-  - find_apply_lem_hyp timeout_handler_l_definition; expand_def.
-    eapply W_tl.
-    + repeat find_rewrite.
-      assumption.
-    + apply c; auto.
-      unfold l_enabled in *; simpl in *.
-      repeat find_rewrite.
-      inv_prop (enabled (RecvMsg src dst m)).
-      eapply labeled_step_dynamic_timeout_enabled; eauto.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  apply W_tl.
+  simpl.
+  eauto.
+  apply c; eauto.
+  - econstructor 2; eauto using labeled_step_is_unlabeled_step.
+  - find_eapply_lem_hyp RecvMsg_stays_enabled_after_other_label; eauto.
+Qed.
 
 Lemma RecvMsg_eventually_occurred :
-  forall s, lb_execution s ->
-            weak_local_fairness s ->
-            forall src dst m d,
-              In dst (nodes (occ_gst (hd s))) ->
-              ~ In dst (failed_nodes (occ_gst (hd s))) ->
-              ~ client_addr dst ->
-              In (src, (dst, m)) (msgs (occ_gst (hd s))) ->
-              sigma (occ_gst (hd s)) dst = Some d ->
-              eventually (now (occurred (RecvMsg src dst m))) s.
+  forall s,
+    lb_execution s ->
+    reachable_st (occ_gst (hd s)) ->
+    weak_local_fairness s ->
+    forall src dst m d,
+      In dst (nodes (occ_gst (hd s))) ->
+      ~ In dst (failed_nodes (occ_gst (hd s))) ->
+      ~ client_addr dst ->
+      In (src, (dst, m)) (msgs (occ_gst (hd s))) ->
+      sigma (occ_gst (hd s)) dst = Some d ->
+      eventually (now (occurred (RecvMsg src dst m))) s.
 Proof using.
   intros.
-  pose proof (RecvMsg_enabled_until_occurred _ ltac:(eauto) src dst m).
+  pose proof (RecvMsg_enabled_until_occurred _ ltac:(eauto) ltac:(eauto) src dst m).
   find_copy_apply_lem_hyp weak_until_until_or_always;
     eauto using l_enabled_RecvMsg_In_msgs.
   break_or_hyp.
