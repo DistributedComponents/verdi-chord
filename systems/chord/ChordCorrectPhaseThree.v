@@ -458,9 +458,42 @@ Lemma has_succ_has_pred_inv :
     preds_and_first_succs_correct gst ->
     wf_ptr h ->
     wf_ptr s ->
-    has_first_succ gst (addr_of s) h ->
-    has_pred gst (addr_of h) (Some s).
+    has_first_succ gst (addr_of h) s ->
+    has_pred gst (addr_of s) (Some h).
 Proof.
+  intros.
+  unfold preds_and_first_succs_correct, preds_correct, first_succs_correct in *.
+  break_and.
+  assert (live_node gst (addr_of h)) by admit.
+  assert (live_node gst (addr_of s)) by admit.
+  assert (first_succ_correct gst h (Some s)).
+  {
+    inv_prop has_first_succ; break_and.
+    repeat find_reverse_rewrite; eauto.
+  }
+  assert (pred_correct gst s (Some h)).
+  {
+    invcs_prop first_succ_correct.
+    break_and; find_injection.
+    exists h; split; auto.
+    intuition eauto using better_succ_better_pred.
+    eapply better_succ_better_pred; eauto.
+    { admit. }
+    destruct (pointer_eq_dec x p').
+    - admit.
+    - eauto.
+  }
+  unfold has_pred.
+  inv_prop live_node; expand_def.
+  eexists; split; eauto.
+  assert (pred_correct gst s (pred x)) by eauto.
+  destruct (pred x);
+    try solve [inv_prop pred_correct; break_and; congruence].
+  f_equal; symmetry; eapply correct_pred_unique; eauto.
+  { admit. }
+  inv_prop pred_correct; break_and.
+  find_injection.
+  admit.
 Admitted.
 
 Lemma stabilize_res_after_phase_two_now :
