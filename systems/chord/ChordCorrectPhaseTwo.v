@@ -97,67 +97,6 @@ Proof.
   apply in_nil.
 Qed.
 
-Lemma length_filter_by_cmp_same_eq :
-  forall A (l : list A) cmp x y,
-    (forall a b c, In a l -> In b l -> In c l ->
-              cmp a b = true ->
-              cmp b c = true ->
-              cmp a c = true) ->
-    (forall a b, In a l -> In b l ->
-            cmp a b = true ->
-            cmp b a = true ->
-            a = b) ->
-    In x l ->
-    In y l ->
-    length (filter (cmp x) l) = length (filter (cmp y) l) ->
-    x = y.
-Proof.
-(*
-If we filter a list by comparing to two different elements, both of which are in
-the list, and get two lists of the same length, then the elements are the same.
-
-This is probably not that hard but it's not worth doing until
-counting_opt_error_inj is done.
-
-DIFFICULTY: 2
-USED: In the proof of counting_opt_error_inj, which isn't currently used
-      anywhere else.
-*)
-Admitted.
-
-Lemma counting_opt_error_inj :
-  forall gst cmp x y l,
-    l = live_ptrs gst ->
-    (forall a b c, In a l -> In b l -> In c l ->
-              cmp a b = true ->
-              cmp b c = true ->
-              cmp a c = true) ->
-    (forall a b, In a l -> In b l ->
-            cmp a b = true ->
-            cmp b a = true ->
-            a = b) ->
-    wf_ptr x ->
-    wf_ptr y ->
-    counting_opt_error gst (Some x) cmp = counting_opt_error gst (Some y) cmp ->
-    x = y \/ ~ live_node gst (addr_of x) /\ ~ live_node gst (addr_of y).
-Proof.
-  unfold counting_opt_error.
-  intros.
-  subst.
-  pose proof (filter_length_bound (cmp x) (live_ptrs gst)).
-  pose proof (filter_length_bound (cmp y) (live_ptrs gst)).
-  repeat break_match;
-    try solve [eauto with zarith | tauto].
-  - left.
-    apply live_node_equiv_live_node_bool in Heqb.
-    apply live_node_equiv_live_node_bool in Heqb0.
-    eauto using length_filter_by_cmp_same_eq, live_In_live_ptrs.
-  - right.
-    move/negP/live_node_equiv_live_node_bool: Heqb => H_l.
-    move/negP/live_node_equiv_live_node_bool: Heqb0 => H_l'.
-    by split.
-Qed.
-
 (** Predecessor phase two definitions *)
 Definition better_pred (gst : global_state) (h p p' : pointer) : Prop :=
   wf_ptr h /\
@@ -1607,7 +1546,7 @@ Section MergePoint.
 
   DIFFICULTY: Ryan
   USED: In phase two.
-  *)
+   *)
   Admitted.
 
   Ltac eapply_prop' P :=
