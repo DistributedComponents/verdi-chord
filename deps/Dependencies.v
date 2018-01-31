@@ -87,5 +87,5 @@ Chord.InfSeqTactics
 Chord.IDSpace
 Verdi.DynamicNet.
 
-Set DependGraph File "deps/chord_phase_two.dpd".
-Print FileDependGraph Chord.ChordCorrectPhaseTwo.
+Set DependGraph File "deps/chord_stabilization.dpd".
+Print DependGraph chord_stabilization.

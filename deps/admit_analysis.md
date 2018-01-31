@@ -1,34 +1,52 @@
-```diff
-% diff -u stabilization_admits.txt all_used_admits.txt 
---- stabilization_admits.txt	2018-01-25 15:45:04.395871563 -0500
-+++ all_used_admits.txt	2018-01-25 15:45:09.109204864 -0500
-@@ -1,7 +1,8 @@
- adopting_succs_decreases_succs_error
- at_most_one_request_timeout_invariant
-+best_pred_is_best_first_succ
-+better_pred_bool_total'
- better_pred_eventually_improves_succ
--Classical_Prop:classic
- constrained_Request_not_cleared_by_recv_handler
- dead_node_channel_empties_out
- dead_nodes_go_quiet
-@@ -16,9 +17,11 @@
- initial_esl_is_sorted_nodes_chopped
- join2_target_joined
- joins_stop
-+length_filter_by_cmp_same_eq
- live_node_in_succs_best_succ
- merge_points_preserved_until_error_drops
- notify_when_pred_None_eventually_improves
-+notify_when_pred_worse_eventually_improves
- not_skipped_means_incoming_succs_not_skipped
- open_stabilize_request_until_response
- phase_one_error_continuously_nonincreasing
- ```
+I've admitted the top level phase two theorem and commented the rest of the file
+out. This leaves 28 admits.
 
- This means that the following lemmas are used in other proofs but aren't
- connected to the top-level theorem:
- - `best_pred_is_best_first_succ`
- - `better_pred_bool_total'`
- - `notify_when_pred_worse_eventually_improves`
- - `length_filter_by_cmp_same_eq`
+Out of those 28, we won't try to prove
+(1 admit) The phase two admit
+- `phase_two_without_phase_one`
+
+(4 admits) facts about pointers never getting worse.
+- `phase_one_error_continuously_nonincreasing`
+- `succs_error_nonincreasing`
+- `succs_error_helper_invar`
+- `has_first_succ_stable`
+
+(7 admits) facts about pointers pointing to live and/or joined nodes
+- `valid_ptrs_global_inductive`
+- `wf_ptr_succ_list_invariant'`
+- `successors_are_live_nodes`
+- `stabilize2_target_joined`
+- `join2_target_joined`
+- `stabilize_target_joined`
+- `successor_nodes_always_valid`
+
+(1 'admit') An axiom saying SUCC_LIST_LEN >= 2
+- `succ_list_len_lower_bound`
+
+This leaves the following 15 admits, which I think are provable in two months'
+worth of work.
+
+2 tricky facts
+- `open_stabilize_request_until_response`
+- `not_skipped_means_incoming_succs_not_skipped`
+
+5 things of a list lemma flavor
+- `in_concat`
+- `initial_esl_is_sorted_nodes_chopped`
+- `sorted_list_elements_not_between`
+- `live_node_in_succs_best_succ`
+- `has_succ_has_pred_inv`
+
+2 grab bag
+- `adopting_succs_decreases_succs_error`
+- `constrained_Request_not_cleared_by_recv_handler`
+
+2 grindy invariants
+- `query_message_ok_invariant`
+- `at_most_one_request_timeout_invariant`
+
+4 eventually... arguments
+- `joins_stop`
+- `queries_eventually_stop`
+- `dead_node_channel_empties_out`
+- `dead_nodes_go_quiet`

@@ -153,6 +153,7 @@ Definition first_succ_error (h : addr) (gst : global_state) : nat :=
     S (length (active_nodes gst))
   end.
 
+(*
 Lemma succ_between_improves_error :
   forall h gst gst' st st' s s',
     sigma gst h = Some st ->
@@ -179,6 +180,7 @@ DIFFICULTY: Ryan.
 USED: in a_before_pred_merge_point below
 *)
 Admitted.
+*)
 
 (** First successor and predecessor combined phase two definitions *)
 Definition pred_and_first_succ_correct (gst : global_state) (h : pointer) (st : data) : Prop :=
@@ -423,6 +425,7 @@ Proof.
     intuition.
 Qed.
 
+(*
 Lemma phase_two_zero_error_locally_correct :
   forall gst h st,
     reachable_st gst ->
@@ -468,7 +471,9 @@ DIFFICULTY: Ryan
 USED: Crucial to the phase 2 argument.
 *)
 Admitted.
+*)
 
+(*
 Lemma phase_two_zero_error_correct :
   forall gst,
     reachable_st gst ->
@@ -481,7 +486,8 @@ Proof.
   eapply sum_of_nats_zero_means_all_zero; eauto.
   apply in_map_iff.
   eexists; split; eauto using live_node_in_active.
-Qed.
+Admitted.
+*)
 
 Definition no_joins (gst gst' : global_state) :=
   forall h,
@@ -506,6 +512,7 @@ USED: In phase two.
 *)
 Admitted.
 
+(*
 Lemma pred_error_nonincreasing :
   forall gst l gst' h,
     reachable_st gst ->
@@ -521,7 +528,9 @@ DIFFICULTY: Ryan
 USED: In phase two
 *)
 Admitted.
+*)
 
+(*
 Lemma pred_error_always_nonincreasing :
   forall ex h,
     reachable_st (occ_gst (hd ex)) ->
@@ -542,7 +551,9 @@ Proof.
   - apply c; invar_eauto.
     eapply active_nodes_invar; eauto.
 Qed.
+*)
 
+(*
 Lemma first_succ_error_nonincreasing :
   forall gst l gst' h,
     reachable_st gst ->
@@ -558,7 +569,9 @@ DIFFICULTY: Ryan
 USED: In phase two
 *)
 Admitted.
+*)
 
+(*
 Lemma first_succ_error_always_nonincreasing :
   forall ex h,
     reachable_st (occ_gst (hd ex)) ->
@@ -579,6 +592,7 @@ Proof.
   - apply c; invar_eauto.
     eapply active_nodes_invar; eauto.
 Qed.
+*)
 
 Lemma nonincreasing_always_nonincreasing :
   forall meas,
@@ -606,6 +620,7 @@ Proof.
     apply c; invar_eauto.
 Qed.
 
+(*
 Lemma pred_error_continuously_nonincreasing :
   forall ex,
     reachable_st (occ_gst (hd ex)) ->
@@ -674,6 +689,7 @@ Proof.
   - apply E_next.
     apply IHeventually; invar_eauto.
 Qed.
+*)
 
 Definition pred_or_succ_improves (h : pointer) : infseq occurrence -> Prop :=
   consecutive (measure_decreasing (pred_and_first_succ_error (addr_of h))).
@@ -706,6 +722,7 @@ Proof.
   omega.
 Qed.
 
+(*
 Lemma pred_improvement_suffices :
   forall ex,
     lb_execution ex ->
@@ -753,7 +770,9 @@ Proof.
   - apply E_next.
     apply IHeventually; invar_eauto.
 Qed.
+*)
 
+(*
 Lemma notify_when_pred_None_eventually_improves :
   forall ex,
     lb_execution ex ->
@@ -777,7 +796,9 @@ DIFFICULTY: Ryan
 USED: In phase two.
 *)
 Admitted.
+*)
 
+(*
 Lemma notify_when_pred_worse_eventually_improves :
   forall ex,
     lb_execution ex ->
@@ -801,6 +822,7 @@ DIFFICULTY: Ryan
 USED: in phase two
 *)
 Admitted.
+*)
 
 Definition merge_point (gst : global_state) (a b j : pointer) : Prop :=
   ptr_between a b j /\
@@ -826,6 +848,7 @@ Proof.
   tauto.
 Qed.
 
+(*
 Lemma better_pred_eventually_improves_succ :
   forall ex,
     lb_execution ex ->
@@ -853,6 +876,7 @@ DIFFICULTY: Ryan
 USED: In phase two.
 *)
 Admitted.
+*)
 
 Lemma open_stabilize_request_until_response :
   forall ex h j,
@@ -1210,6 +1234,7 @@ Section MergePoint.
       + tauto.
   Qed.
 
+  (*
   Lemma pred_same_until_improvement :
     forall ex h p,
       lb_execution ex ->
@@ -1230,7 +1255,9 @@ Section MergePoint.
   USED: In phase two.
   *)
   Admitted.
+  *)
 
+  (*
   Lemma first_succ_same_until_improvement :
     forall ex h p,
       lb_execution ex ->
@@ -1251,6 +1278,7 @@ Section MergePoint.
   USED: In phase two.
   *)
   Admitted.
+  *)
 
   Lemma counting_opt_error_depends_on_live_addrs :
     forall gst gst' p bb,
@@ -1529,6 +1557,7 @@ Section MergePoint.
                        (ptr_between p p' h \/ p = p')))
              ex.
 
+  (*
   Lemma pred_bound_pred_not_worse :
     forall ex p,
       lb_execution ex ->
@@ -1548,6 +1577,7 @@ Section MergePoint.
   USED: In phase two.
    *)
   Admitted.
+  *)
 
   Ltac eapply_prop' P :=
     match goal with
@@ -1558,6 +1588,7 @@ Section MergePoint.
     | H: context[P] |- _ => eapply H
     end.
 
+  (*
   Lemma a_before_pred_merge_point :
     forall ex,
       lb_execution ex ->
@@ -1653,6 +1684,7 @@ Section MergePoint.
           find_apply_lem_hyp hd_error_None.
           eapply (nodes_have_nonempty_succ_lists (occ_gst o')); invar_eauto.
   Qed.
+  *)
 
   Lemma recv_GotPredAndSuccs_with_a_after_p_causes_Notify :
     forall ex,
@@ -1713,6 +1745,7 @@ Section MergePoint.
     erewrite ptr_correct, <- wf_ptr_eq; eauto.
   Qed.
 
+  (*
   Lemma recv_GotPredAndSuccs_with_a_after_p_causes_improvement :
     forall o ex,
       lb_execution (Cons o ex) ->
@@ -1748,7 +1781,7 @@ Section MergePoint.
     unfold Chord.ChordIDParams.hash in *.
     by rewrite (wf_ptr_hash_eq a).
   Qed.
-
+  *)
 
   Lemma occurred_is_step :
     forall l o o' ex,
@@ -1767,6 +1800,7 @@ Section MergePoint.
     pred_or_succ_improves j.
   Hint Unfold pred_or_succ_improves_abj.
 
+  (*
   Lemma merge_points_preserved_until_error_drops :
     forall ex,
       lb_execution ex ->
@@ -1783,7 +1817,9 @@ Section MergePoint.
   DIFFICULTY: Ryan
   *)
   Admitted.
+  *)
 
+  (*
   Lemma merge_point_gone_improved_something :
     forall ex,
       lb_execution ex ->
@@ -1809,6 +1845,7 @@ Section MergePoint.
         intuition auto using E_next, E0.
       + tauto.
   Qed.
+  *)
 
   Lemma pred_improves_pred_and_succ_improves :
     forall h ex,
@@ -1866,6 +1903,7 @@ Section MergePoint.
     intuition auto using first_succ_improves_pred_and_succ_improves.
   Qed.
 
+  (*
   Lemma incoming_GotPredAndSuccs_with_a_after_p_causes_improvement :
     forall ex,
       lb_execution ex ->
@@ -1914,7 +1952,9 @@ Section MergePoint.
       all:admit.
   (* This might not be provable??? *)
   Admitted.
+  *)
 
+  (*
   Lemma recv_GotPredAndSuccs_with_pred_None_causes_improvement :
     forall o ex,
       lb_execution (Cons o ex) ->
@@ -2197,6 +2237,7 @@ Section MergePoint.
       eapply E_next, IHeventually;
         invar_eauto.
   Qed.
+  *)
 
 End MergePoint.
 
@@ -2333,6 +2374,7 @@ Proof.
   apply between_rot_l; auto.
 Qed.
 
+(*
 Lemma best_pred_is_best_first_succ :
   forall gst p s,
     wf_ptr s ->
@@ -2358,6 +2400,7 @@ Proof.
     apply between_xyx; auto.
   - auto using better_pred_better_succ; eauto.
 Admitted.
+*)
 
 Fixpoint max_cmp {A : Type} (cmp : A -> A -> bool) (l : list A) (x : option A) :=
   match l with
@@ -2574,6 +2617,7 @@ Proof.
   eauto using ptr_between_bool_antisym'.
 Qed.
 
+(*
 Lemma better_pred_bool_total':
   forall h a b : pointer,
     wf_ptr h ->
@@ -2586,7 +2630,9 @@ Proof.
   destruct (better_pred_bool h a b) eqn:?; auto.
   eauto using better_pred_bool_antisymmetric.
 Admitted.
+*)
 
+(*
 Lemma correct_pred_exists' :
   forall gst h l,
     wf_ptr h ->
@@ -2610,6 +2656,7 @@ Proof.
   + find_apply_lem_hyp max_cmp_empty.
     congruence.
 Qed.
+*)
 
 Lemma live_ptrs_possible_preds_lst :
   forall gst,
@@ -2734,6 +2781,7 @@ Proof.
   eapply live_ptrs_not_empty; eauto.
 Qed.
 
+(*
 Lemma correct_pred_exists :
   forall gst h,
     reachable_st gst ->
@@ -2753,6 +2801,7 @@ any invariants besides "there are at least 2 live joined nodes in the network".
 
 DIFFICULTY: 3
 USED: In phase two.
+*)
 *)
 
 Lemma correct_pred_unique :
@@ -2847,6 +2896,7 @@ USED: In phase two.
 *)
 Qed.
 
+(*
 Lemma all_first_succs_correct_finds_pred :
   forall gst h,
     reachable_st gst ->
@@ -2867,6 +2917,7 @@ Proof.
   eapply first_succs_correct_succ_right; auto.
   now apply best_pred_is_best_first_succ.
 Qed.
+*)
 
 Lemma open_stabilize_request_to_open_request_to :
   forall gst src dst,
@@ -2915,6 +2966,7 @@ Proof.
   find_eapply_lem_hyp always_now. simpl in *. auto.
 Qed.
 
+(*
 Lemma error_decreases_when_succs_right :
   forall ex h,
     lb_execution ex ->
@@ -2983,7 +3035,9 @@ Proof.
         admit.
 *)
 Admitted.
+*)
 
+(*
 Lemma error_means_merge_point_or_wrong_pred :
   forall gst,
     phase_two_error gst > 0 ->
@@ -3010,7 +3064,9 @@ DIFFICULTY: Ryan
 USED: Crucially in phase two.
 *)
 Admitted.
+*)
 
+(*
 Lemma always_zero_phase_two_error_phase_two :
   forall ex,
     lb_execution ex ->
@@ -3055,6 +3111,7 @@ Lemma phase_two_nonzero_error_causes_measure_drop :
 
     nonzero_error_causes_measure_drop pred_and_first_succ_error ex.
 Proof.
+  (*
   intros; intro.
   assert (all_first_succs_best (occ_gst (hd ex)))
     by (inv_prop always; destruct ex; auto).
@@ -3067,8 +3124,11 @@ Proof.
     unfold pred_or_succ_improves_abj in *.
     repeat (find_apply_lem_hyp eventually_or_tl_or; auto; try break_or_hyp);
       eexists; eauto using live_node_in_active.
-Qed.
+*)
+Admitted.
+*)
 
+(*
 Lemma phase_two_nonzero_error_continuous_drop :
   forall ex,
     lb_execution ex ->
@@ -3078,6 +3138,7 @@ Lemma phase_two_nonzero_error_continuous_drop :
     always (now phase_one) ex ->
     continuously (nonzero_error_causes_measure_drop pred_and_first_succ_error) ex.
 Proof.
+  (*
   intros.
   find_copy_apply_lem_hyp joins_stop; auto.
   induction 0.
@@ -3091,8 +3152,11 @@ Proof.
     + simpl.
       apply c; invar_eauto.
   - apply E_next, IHeventually; invar_eauto.
-Qed.
+*)
+Admitted.
+*)
 
+(*
 Lemma phase_two_continuously :
   forall ex,
     lb_execution ex ->
@@ -3106,7 +3170,8 @@ Proof.
   apply continuously_zero_phase_two_error_phase_two; auto.
   apply local_measure_causes_measure_zero_continuosly;
     auto using phase_two_error_continuously_nonincreasing, phase_two_nonzero_error_continuous_drop.
-Qed.
+Admitted.
+*)
 
 Lemma phase_two_without_phase_one :
   forall ex : infseq occurrence,
@@ -3116,6 +3181,7 @@ Lemma phase_two_without_phase_one :
     always (~_ now circular_wait) ex ->
     continuously (now phase_two) ex.
 Proof.
+  (*
   intros.
   find_copy_eapply_lem_hyp phase_one_continuously; eauto.
   apply eventually_idempotent.
@@ -3124,4 +3190,5 @@ Proof.
     unfold and_tl in *; break_and.
     repeat (split; invar_eauto).
   - firstorder.
-Qed.
+*)
+Admitted.
