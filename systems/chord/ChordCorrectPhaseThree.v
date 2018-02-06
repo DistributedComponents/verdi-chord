@@ -537,15 +537,6 @@ Proof.
   omega.
 Qed.
 
-Lemma has_first_succ_stable :
-  forall gst l gst' h s,
-    preds_and_first_succs_correct gst ->
-    labeled_step_dynamic gst l gst' ->
-    has_first_succ gst h s ->
-    has_first_succ gst' h s.
-Proof.
-Admitted.
-
 Lemma stabilize_res_after_phase_two :
   forall ex h s err,
     reachable_st (occ_gst (hd ex)) ->

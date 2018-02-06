@@ -878,6 +878,123 @@ USED: In phase two.
 Admitted.
 *)
 
+Lemma until_weak_until_eventually :
+  forall T J P (s : infseq T),
+    weak_until J P s ->
+    eventually P s ->
+    until J P s.
+Proof.
+  intros.
+  induction 0.
+  - constructor; eauto.
+  - inv_prop weak_until;
+      solve [constructor; eauto].
+Qed.
+
+Lemma has_first_succ_stable :
+  forall gst l gst' h s,
+    preds_and_first_succs_correct gst ->
+    labeled_step_dynamic gst l gst' ->
+    has_first_succ gst h s ->
+    has_first_succ gst' h s.
+Proof.
+Admitted.
+
+
+Lemma open_stabilize_request_until_step :
+  forall gst h j,
+    reachable_st gst ->
+    all_first_succs_best gst ->
+    wf_ptr j ->
+    has_first_succ gst h j ->
+    open_stabilize_request_to_first_succ gst h ->
+    forall gst' l,
+      labeled_step_dynamic gst l gst' ->
+      all_first_succs_best gst' ->
+      open_stabilize_request_to_first_succ gst' h /\
+      has_first_succ gst' h j \/
+      open_request_to gst' h (addr_of j) GetPredAndSuccs /\
+      has_first_succ gst' h j /\
+      (exists p succs,
+          In (GotPredAndSuccs p succs)
+             (channel gst' (addr_of j) h) /\
+          has_pred gst' (addr_of j) p /\
+          has_succs gst' (addr_of j) succs).
+Proof.
+  intros.
+  inv_prop labeled_step_dynamic.
+  - left. simpl. admit.
+  - admit.
+  - admit.
+  - admit.
+Admitted.
+
+Lemma open_stabilize_request_until_response_weak :
+  forall ex h j,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
+    wf_ptr j ->
+    has_first_succ (occ_gst (hd ex)) h j ->
+    open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    weak_until
+      (now (fun occ =>
+              open_stabilize_request_to_first_succ (occ_gst occ) h /\
+              has_first_succ (occ_gst occ) h j))
+      (now (fun occ =>
+              open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
+              has_first_succ (occ_gst occ) h j /\
+              (exists p succs,
+                  In (GotPredAndSuccs p succs)
+                     (channel (occ_gst occ) (addr_of j) h) /\
+                  has_pred (occ_gst occ) (addr_of j) p /\
+                  has_succs (occ_gst occ) (addr_of j) succs)))
+      ex.
+Proof.
+  cofix c.
+  intros.
+  destruct ex as [o [o' ex]].
+  inv_prop lb_execution.
+  assert (phase_one o)
+    by repeat (invcs_prop always; eauto).
+  assert (phase_one o')
+    by repeat (invcs_prop always; eauto).
+  find_eapply_lem_hyp open_stabilize_request_until_step; try eassumption.
+  break_or_hyp.
+  - break_and.
+    constructor;
+      solve [simpl in *; eauto|apply c; invar_eauto].
+  - constructor;
+      solve [simpl in *; eauto|constructor; auto].
+Qed.
+Hint Resolve open_stabilize_request_until_response_weak.
+
+Lemma open_stabilize_request_eventual_response :
+  forall ex h j,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    always (~_ (now circular_wait)) ex ->
+    always (now phase_one) ex ->
+    wf_ptr j ->
+    has_first_succ (occ_gst (hd ex)) h j ->
+    open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    eventually
+      (now (fun occ =>
+              open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
+              has_first_succ (occ_gst occ) h j /\
+              (exists p succs,
+                  In (GotPredAndSuccs p succs)
+                     (channel (occ_gst occ) (addr_of j) h) /\
+                  has_pred (occ_gst occ) (addr_of j) p /\
+                  has_succs (occ_gst occ) (addr_of j) succs)))
+      ex.
+Proof.
+Admitted.
+Hint Resolve open_stabilize_request_eventual_response.
+
 Lemma open_stabilize_request_until_response :
   forall ex h j,
     lb_execution ex ->
@@ -902,13 +1019,9 @@ Lemma open_stabilize_request_until_response :
                   has_succs (occ_gst occ) (addr_of j) succs)))
       ex.
 Proof.
-(*
-This is a problem and needs to be reduced to something less big.
-
-DIFFICULTY: Ryan
-USED: In phase two.
-*)
-Admitted.
+  intros.
+  eapply until_weak_until_eventually; eauto.
+Qed.
 
 Lemma open_stabilize_request_eventually_gets_response :
   forall ex h j,
