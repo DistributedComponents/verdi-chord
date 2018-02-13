@@ -900,14 +900,13 @@ Lemma has_first_succ_stable :
 Proof.
 Admitted.
 
-
 Lemma open_stabilize_request_until_step :
   forall gst h j,
     reachable_st gst ->
     all_first_succs_best gst ->
     wf_ptr j ->
     has_first_succ gst h j ->
-    open_stabilize_request_to_first_succ gst h ->
+    open_request_to gst h (addr_of j) GetPredAndSuccs ->
     forall gst' l,
       labeled_step_dynamic gst l gst' ->
       all_first_succs_best gst' ->
@@ -938,10 +937,11 @@ Lemma open_stabilize_request_until_response_weak :
     always (now phase_one) ex ->
     wf_ptr j ->
     has_first_succ (occ_gst (hd ex)) h j ->
-    open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    open_request_to (occ_gst (hd ex)) h (addr_of j) GetPredAndSuccs ->
     weak_until
       (now (fun occ =>
-              open_stabilize_request_to_first_succ (occ_gst occ) h /\
+              (* open_stabilize_request_to_first_succ (occ_gst occ) h /\ *)
+              open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
               has_first_succ (occ_gst occ) h j))
       (now (fun occ =>
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
@@ -980,7 +980,7 @@ Lemma open_stabilize_request_eventual_response :
     always (now phase_one) ex ->
     wf_ptr j ->
     has_first_succ (occ_gst (hd ex)) h j ->
-    open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    open_request_to (occ_gst (hd ex)) h (addr_of j) GetPredAndSuccs ->
     eventually
       (now (fun occ =>
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
@@ -1004,10 +1004,11 @@ Lemma open_stabilize_request_until_response :
     always (now phase_one) ex ->
     wf_ptr j ->
     has_first_succ (occ_gst (hd ex)) h j ->
-    open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    open_request_to (occ_gst (hd ex)) h (addr_of j) GetPredAndSuccs ->
     until
       (now (fun occ =>
-              open_stabilize_request_to_first_succ (occ_gst occ) h /\
+              (* open_stabilize_request_to_first_succ (occ_gst occ) h /\ *)
+              open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
               has_first_succ (occ_gst occ) h j))
       (now (fun occ =>
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\

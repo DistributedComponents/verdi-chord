@@ -553,13 +553,11 @@ Lemma stabilize_res_after_phase_two :
     has_first_succ (occ_gst (hd ex)) h s ->
 
     open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
-    In GetPredAndSuccs (channel (occ_gst (hd ex)) h (addr_of s)) ->
     phase_three_error (occ_gst (hd ex)) <= S err ->
 
     until
       (fun ex =>
-         open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs /\
-         In GetPredAndSuccs (channel (occ_gst (hd ex)) h (addr_of s)))
+         open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs)
       (fun ex =>
          exists succs,
            succs_error_helper (occ_gst (hd ex)) s [] succs Chord.SUCC_LIST_LEN <= S err /\
@@ -569,18 +567,12 @@ Lemma stabilize_res_after_phase_two :
 Proof.
   intros.
   find_copy_apply_lem_hyp open_stabilize_request_until_response; eauto.
-  match goal with
-  | H: In GetPredAndSuccs _ |- _ => clear H
-  end.
   induction 0 as [[o ex]|o [o' ex]].
   - apply U0.
     simpl in *; expand_def.
     eapply stabilize_res_after_phase_two_now; eauto.
   - simpl in *.
     break_and.
-    assert (In GetPredAndSuccs (channel (occ_gst o) h (addr_of s)) /\
-            open_request_to (occ_gst o) h (addr_of s) GetPredAndSuccs)
-      by eauto using open_stabilize_request_to_first_succ_elim.
     apply U_next; [tauto|].
     match goal with
     | H : until _ _ _ |- _ =>
@@ -630,7 +622,6 @@ Lemma stabilize_res_after_phase_two_to_err_drop :
     has_first_succ (occ_gst (hd ex)) h s ->
 
     open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
-    In GetPredAndSuccs (channel (occ_gst (hd ex)) h (addr_of s)) ->
     phase_three_error (occ_gst (hd ex)) <= S err ->
 
     eventually (now (fun occ => succs_error h (occ_gst occ) <= err)) ex.
