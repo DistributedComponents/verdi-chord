@@ -910,7 +910,7 @@ Lemma open_stabilize_request_until_step :
     forall gst' l,
       labeled_step_dynamic gst l gst' ->
       all_first_succs_best gst' ->
-      open_stabilize_request_to_first_succ gst' h /\
+      open_request_to gst' h (addr_of j) GetPredAndSuccs /\
       has_first_succ gst' h j \/
       open_request_to gst' h (addr_of j) GetPredAndSuccs /\
       has_first_succ gst' h j /\
@@ -921,8 +921,25 @@ Lemma open_stabilize_request_until_step :
           has_succs gst' (addr_of j) succs).
 Proof.
   intros.
+  assert (~ In (addr_of j) (failed_nodes gst)) by admit.
   inv_prop labeled_step_dynamic.
-  - left. simpl. admit.
+  - left.
+    destruct (addr_eq_dec h0 h); subst.
+    + inv_prop open_request_to; expand_def.
+      inv_prop has_first_succ; break_and.
+      unfold open_request_to.
+      unfold timeout_constraint in *.
+      inv_prop _timeout_constraint.
+      * admit.
+      * admit.
+      * admit.
+      * assert (Request dst p = (Request (addr_of j) GetPredAndSuccs))
+          by eauto using at_most_one_request_timeout_invariant.
+        find_injection.
+        tauto.
+    + split.
+      * unfold open_request_to; simpl; rewrite_update; eauto.
+      * unfold has_first_succ; simpl; rewrite_update; eauto.
   - admit.
   - admit.
   - admit.
