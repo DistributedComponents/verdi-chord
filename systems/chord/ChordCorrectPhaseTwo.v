@@ -900,6 +900,36 @@ Lemma has_first_succ_stable :
 Proof.
 Admitted.
 
+Lemma open_request_to_preserved :
+  forall gst gst' h s m st st',
+    open_request_to gst h s m ->
+    sigma gst h = Some st ->
+    sigma gst' h = Some st' ->
+    cur_request st = cur_request st' ->
+    (forall dst m, In (Request dst m) (timeouts gst h) -> In (Request dst m) (timeouts gst' h)) \/
+    In (Request s m) (timeouts gst' h) ->
+    open_request_to gst' h s m.
+Proof.
+  unfold open_request_to.
+  intros; expand_def;
+    intuition (repeat eexists; eauto);
+    congruence.
+Qed.
+
+Lemma has_first_succ_preserved :
+  forall gst gst' h s st st',
+    has_first_succ gst h s ->
+    sigma gst h = Some st ->
+    sigma gst' h = Some st' ->
+    succ_list st = succ_list st' ->
+    has_first_succ gst' h s.
+Proof.
+  intros.
+  inv_prop has_first_succ; expand_def.
+  eapply has_first_succ_intro;
+    eauto; congruence.
+Qed.
+
 Lemma open_stabilize_request_until_step :
   forall gst h j,
     reachable_st gst ->
@@ -927,22 +957,40 @@ Proof.
     destruct (addr_eq_dec h0 h); subst.
     + inv_prop open_request_to; expand_def.
       inv_prop has_first_succ; break_and.
-      unfold open_request_to.
       unfold timeout_constraint in *.
       inv_prop _timeout_constraint.
-      * admit.
-      * admit.
-      * admit.
+      * split.
+        -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
+           simpl in *; repeat (find_rewrite || find_injection).
+           repeat handler_def; congruence.
+           repeat handler_def; simpl; try congruence;
+             intuition eauto using remove_preserve.
+        -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
+           repeat (handler_def; try congruence).
+      * split.
+        -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
+           simpl in *; repeat (find_rewrite || find_injection).
+           repeat handler_def; congruence.
+           repeat handler_def; simpl; try congruence;
+             intuition eauto using remove_preserve.
+        -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
+           repeat (handler_def; try congruence).
+      * split.
+        -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
+           simpl in *; repeat (find_rewrite || find_injection).
+           repeat handler_def; congruence.
+           repeat handler_def; simpl; try congruence;
+             intuition eauto using remove_preserve.
+        -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
+           repeat (handler_def; try congruence).
       * assert (Request dst p = (Request (addr_of j) GetPredAndSuccs))
           by eauto using at_most_one_request_timeout_invariant.
         find_injection.
         tauto.
-    + split.
-      * unfold open_request_to; simpl; rewrite_update; eauto.
-      * unfold has_first_succ; simpl; rewrite_update; eauto.
+    + unfold open_request_to, has_first_succ; simpl; rewrite_update; auto.
   - admit.
-  - admit.
-  - admit.
+  - eauto.
+  - eauto.
 Admitted.
 
 Lemma open_stabilize_request_until_response_weak :
