@@ -937,11 +937,13 @@ Lemma open_stabilize_request_until_step :
     wf_ptr j ->
     has_first_succ gst h j ->
     open_request_to gst h (addr_of j) GetPredAndSuccs ->
+    (forall p succs, ~ In (GotPredAndSuccs p succs) (channel gst (addr_of j) h)) ->
     forall gst' l,
       labeled_step_dynamic gst l gst' ->
       all_first_succs_best gst' ->
       open_request_to gst' h (addr_of j) GetPredAndSuccs /\
-      has_first_succ gst' h j \/
+      has_first_succ gst' h j /\
+      (forall p succs, ~ In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h)) \/
       open_request_to gst' h (addr_of j) GetPredAndSuccs /\
       has_first_succ gst' h j /\
       (exists p succs,
@@ -952,6 +954,8 @@ Lemma open_stabilize_request_until_step :
 Proof.
   intros.
   assert (~ In (addr_of j) (failed_nodes gst)) by admit.
+  assert (h <> addr_of j) by admit.
+  assert (~ client_addr (addr_of j)) by admit.
   inv_prop labeled_step_dynamic.
   - left.
     destruct (addr_eq_dec h0 h); subst.
@@ -959,7 +963,7 @@ Proof.
       inv_prop has_first_succ; break_and.
       unfold timeout_constraint in *.
       inv_prop _timeout_constraint.
-      * split.
+      * repeat break_and_goal.
         -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
            simpl in *; repeat (find_rewrite || find_injection).
            repeat handler_def; congruence.
@@ -967,7 +971,13 @@ Proof.
              intuition eauto using remove_preserve.
         -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
            repeat (handler_def; try congruence).
-      * split.
+        -- intuition.
+           find_apply_lem_hyp in_channel_in_msgs.
+           find_apply_lem_hyp in_app_or.
+           unfold send in *.
+           break_or_hyp; eauto.
+           find_apply_lem_hyp in_map_iff; expand_def.
+      * repeat break_and_goal.
         -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
            simpl in *; repeat (find_rewrite || find_injection).
            repeat handler_def; congruence.
@@ -975,7 +985,13 @@ Proof.
              intuition eauto using remove_preserve.
         -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
            repeat (handler_def; try congruence).
-      * split.
+        -- intuition.
+           find_apply_lem_hyp in_channel_in_msgs.
+           find_apply_lem_hyp in_app_or.
+           unfold send in *.
+           break_or_hyp; eauto.
+           find_apply_lem_hyp in_map_iff; expand_def.
+      * repeat break_and_goal.
         -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
            simpl in *; repeat (find_rewrite || find_injection).
            repeat handler_def; congruence.
@@ -983,14 +999,122 @@ Proof.
              intuition eauto using remove_preserve.
         -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
            repeat (handler_def; try congruence).
+        -- intuition.
+           find_apply_lem_hyp in_channel_in_msgs.
+           find_apply_lem_hyp in_app_or.
+           unfold send in *.
+           break_or_hyp; eauto.
+           find_apply_lem_hyp in_map_iff; expand_def.
       * assert (Request dst p = (Request (addr_of j) GetPredAndSuccs))
           by eauto using at_most_one_request_timeout_invariant.
         find_injection.
         tauto.
-    + unfold open_request_to, has_first_succ; simpl; rewrite_update; auto.
-  - admit.
-  - eauto.
-  - eauto.
+    + repeat break_and_goal;
+        unfold open_request_to, has_first_succ; simpl; rewrite_update; eauto.
+      intuition.
+      find_apply_lem_hyp in_channel_in_msgs.
+      find_apply_lem_hyp in_app_or.
+      unfold send in *.
+      break_or_hyp; eauto.
+      find_apply_lem_hyp in_map_iff; expand_def.
+      repeat handler_def.
+      * unfold make_request in *.
+        find_apply_lem_hyp option_map_Some; expand_def.
+        simpl in *; intuition congruence.
+      * unfold send_keepalives in *.
+        find_apply_lem_hyp in_map_iff; expand_def.
+      * unfold make_request in *.
+        find_apply_lem_hyp option_map_Some; expand_def.
+        simpl in *; intuition congruence.
+      * unfold make_request in *.
+        find_apply_lem_hyp option_map_Some; expand_def.
+        simpl in *; intuition congruence.
+      * simpl in *; intuition congruence.
+  - destruct (addr_eq_dec (fst (snd m)) h); subst.
+    + left.
+      repeat break_and_goal.
+      * admit.
+      * admit.
+      * intuition.
+        find_apply_lem_hyp in_channel_in_msgs.
+        find_apply_lem_hyp in_app_or; break_or_hyp.
+        -- find_apply_lem_hyp in_map_iff; expand_def.
+           unfold send in *; congruence.
+        -- simpl in *.
+           find_apply_lem_hyp in_app_or.
+           find_eapply_prop channel.
+           eapply in_msgs_in_channel.
+           find_rewrite.
+           intuition eauto with datatypes.
+    + remember (apply_handler_result (fst (snd m)) (st, ms, newts, clearedts) [ChordSemantics.e_recv m] (update_msgs gst (xs ++ ys))) as gst'.
+      assert (open_request_to gst' h (addr_of j) GetPredAndSuccs /\
+              has_first_succ gst' h j)
+        by admit.
+      cut ((forall p succs, ~ In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h)) \/ (exists (p : option pointer) (succs : list pointer), In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h) /\ has_pred gst' (addr_of j) p /\ has_succs gst' (addr_of j) succs));
+      [tauto|].
+      destruct (addr_eq_dec (fst (snd m)) (addr_of j)).
+      * cut ((forall dst p succs, ~ In (dst, GotPredAndSuccs p succs) ms) \/
+             (exists p succs, In (h, GotPredAndSuccs p succs) ms /\
+                         has_pred gst' (addr_of j) p /\
+                         has_succs gst' (addr_of j) succs)).
+        { intros; break_or_hyp; [left|right]; intuition.
+          - find_apply_lem_hyp channel_contents.
+            simpl in *.
+            repeat find_rewrite.
+            find_apply_lem_hyp in_app_or; break_or_hyp.
+            + admit.
+            + find_eapply_prop channel.
+              apply channel_contents.
+              repeat find_rewrite.
+              find_apply_lem_hyp in_app_or; break_or_hyp;
+                eauto with datatypes.
+          - expand_def.
+            do 2 eexists.
+            repeat split; eauto.
+            apply channel_contents.
+            apply in_or_app; left.
+            apply in_map_iff.
+            repeat find_rewrite.
+            eexists; eauto.
+        }
+        destruct (addr_eq_dec (fst m) h); subst.
+        -- admit.
+        -- admit.
+      * left.
+        unfold open_request_to, has_first_succ.
+        inv_prop open_request_to; inv_prop has_first_succ; expand_def.
+        repeat break_and_goal;
+          simpl; rewrite_update;
+            try solve [eauto|do 3 eexists; eauto].
+        intuition.
+        find_eapply_lem_hyp in_channel_in_msgs.
+        find_apply_lem_hyp in_app_or; break_or_hyp.
+        -- find_apply_lem_hyp in_map_iff; expand_def.
+           unfold send in *; congruence.
+        -- simpl in *.
+           find_apply_lem_hyp in_app_or.
+           find_eapply_prop channel.
+           eapply in_msgs_in_channel.
+           repeat find_rewrite.
+           intuition eauto with datatypes.
+  - left; repeat break_and_goal; eauto.
+    intuition.
+    find_eapply_prop channel.
+    find_apply_lem_hyp in_channel_in_msgs.
+    apply in_msgs_in_channel.
+    simpl in *; unfold send in *.
+    eauto.
+    intuition eauto using in_channel_in_msgs, in_msgs_in_channel.
+    find_injection; tauto.
+  - left; repeat break_and_goal; eauto.
+    intuition.
+    find_apply_lem_hyp in_channel_in_msgs.
+    simpl in *; unfold send in *.
+    find_eapply_prop channel.
+    apply in_msgs_in_channel.
+    repeat find_rewrite.
+    find_apply_lem_hyp in_app_or.
+    intuition eauto with datatypes.
 Admitted.
 
 Lemma open_stabilize_request_until_response_weak :
@@ -1003,9 +1127,14 @@ Lemma open_stabilize_request_until_response_weak :
     wf_ptr j ->
     has_first_succ (occ_gst (hd ex)) h j ->
     open_request_to (occ_gst (hd ex)) h (addr_of j) GetPredAndSuccs ->
+    (forall p succs,
+        ~ In (GotPredAndSuccs p succs)
+          (channel (occ_gst (hd ex)) (addr_of j) h)) ->
     weak_until
       (now (fun occ =>
-              (* open_stabilize_request_to_first_succ (occ_gst occ) h /\ *)
+              (forall p succs,
+                  ~ In (GotPredAndSuccs p succs)
+                     (channel (occ_gst occ) (addr_of j) h)) /\
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
               has_first_succ (occ_gst occ) h j))
       (now (fun occ =>
@@ -1046,6 +1175,9 @@ Lemma open_stabilize_request_eventual_response :
     wf_ptr j ->
     has_first_succ (occ_gst (hd ex)) h j ->
     open_request_to (occ_gst (hd ex)) h (addr_of j) GetPredAndSuccs ->
+    (forall p succs,
+        ~ In (GotPredAndSuccs p succs)
+          (channel (occ_gst (hd ex)) (addr_of j) h)) ->
     eventually
       (now (fun occ =>
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
@@ -1070,9 +1202,14 @@ Lemma open_stabilize_request_until_response :
     wf_ptr j ->
     has_first_succ (occ_gst (hd ex)) h j ->
     open_request_to (occ_gst (hd ex)) h (addr_of j) GetPredAndSuccs ->
+    (forall p succs,
+        ~ In (GotPredAndSuccs p succs)
+          (channel (occ_gst (hd ex)) (addr_of j) h)) ->
     until
       (now (fun occ =>
-              (* open_stabilize_request_to_first_succ (occ_gst occ) h /\ *)
+              (forall p succs,
+                  ~ In (GotPredAndSuccs p succs)
+                     (channel (occ_gst occ) (addr_of j) h)) /\
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\
               has_first_succ (occ_gst occ) h j))
       (now (fun occ =>
@@ -1099,6 +1236,9 @@ Lemma open_stabilize_request_eventually_gets_response :
     wf_ptr j ->
     has_first_succ (occ_gst (hd ex)) h j ->
     open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
+    (forall p succs,
+        ~ In (GotPredAndSuccs p succs)
+          (channel (occ_gst (hd ex)) (addr_of j) h)) ->
     eventually
       (now (fun occ =>
               open_request_to (occ_gst occ) h (addr_of j) GetPredAndSuccs /\

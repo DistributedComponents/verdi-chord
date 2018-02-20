@@ -551,6 +551,7 @@ Lemma stabilize_res_after_phase_two :
     live_node (occ_gst (hd ex)) (addr_of s) ->
     wf_ptr s ->
     has_first_succ (occ_gst (hd ex)) h s ->
+    (forall p succs, ~ In (GotPredAndSuccs p succs) (channel (occ_gst (hd ex)) (addr_of s) h)) ->
 
     open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
     phase_three_error (occ_gst (hd ex)) <= S err ->
@@ -587,6 +588,7 @@ Proof.
     + apply IHuntil; invar_eauto.
       * eapply has_first_succ_stable; invar_eauto.
       * simpl in *; break_and; eauto.
+      * simpl in *; break_and; eauto.
       * find_apply_lem_hyp phase_three_error_nonincreasing_Cons; invar_eauto.
         simpl in *; omega.
 Qed.
@@ -622,12 +624,16 @@ Lemma stabilize_res_after_phase_two_to_err_drop :
     has_first_succ (occ_gst (hd ex)) h s ->
 
     open_request_to (occ_gst (hd ex)) h (addr_of s) GetPredAndSuccs ->
+    (forall p succs, ~ In (GotPredAndSuccs p succs) (channel (occ_gst (hd ex)) (addr_of s) h)) ->
     phase_three_error (occ_gst (hd ex)) <= S err ->
 
     eventually (now (fun occ => succs_error h (occ_gst occ) <= err)) ex.
 Proof.
   intros.
   find_copy_apply_lem_hyp (stabilize_res_after_phase_two ex h s); auto.
+  match goal with
+  | H: context[~ In _ (channel _ _ _)] |- _ => clear H
+  end.
   induction 0 as [[o ex]|o [o' ex]].
   - expand_def.
     eapply stabilize_res_on_wire_eventually_err_bounded;
@@ -735,6 +741,7 @@ Proof.
     assert (wf_ptr s) by eauto using wf_ptr_succ_list_invariant.
     eapply (stabilize_res_after_phase_two_to_err_drop (Cons o ex) h s err);
       eauto.
+    admit.
   - apply E_next, IHeventually; invar_eauto.
     find_apply_lem_hyp local_always_nonincreasing_causes_max_always_nonincreasing; invar_eauto.
     find_apply_lem_hyp always_now.
@@ -742,7 +749,7 @@ Proof.
     cbn in *.
     unfold phase_three_error in *.
     omega.
-Qed.
+Admitted.
 
 Lemma not_joined_zero_succs_error :
   forall gst h st,
