@@ -31,6 +31,7 @@ Require Import Chord.PtrCorrectInvariant.
 Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.QueryTargetsJoined.
 Require Import Chord.FirstSuccNeverSelf.
+Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.PredNeverSelfInvariant.
 Require Import Chord.PtrsJoined.
 Require Import Chord.RingCorrect.
@@ -930,6 +931,53 @@ Proof.
     eauto; congruence.
 Qed.
 
+Lemma no_response_when_busy :
+  forall src dst msg st st' sends nts cts,
+    cur_request st' <> None ->
+    recv_handler src dst st msg = (st', sends, nts, cts) ->
+    forall h res,
+      response_payload res ->
+      res <> Busy ->
+      res <> Pong ->
+      ~ In (h, res) sends.
+Proof.
+  intros.
+  repeat handler_def; simpl; eauto;
+    try intuition (inv_prop response_payload); simpl in *; congruence.
+Qed.
+Hint Resolve no_response_when_busy.
+
+Lemma all_first_succs_best_first_succ_not_failed :
+  forall gst h s,
+    all_first_succs_best gst ->
+    has_first_succ gst h s ->
+    live_node gst h ->
+    ~ In (addr_of s) (failed_nodes gst).
+Proof.
+Admitted.
+
+Lemma open_stabilize_request_until_step_recv_half :
+  forall gst h j,
+    reachable_st gst ->
+    all_first_succs_best gst ->
+    wf_ptr j ->
+    has_first_succ gst h j ->
+    open_request_to gst h (addr_of j) GetPredAndSuccs ->
+    live_node gst h ->
+    (forall p succs, ~ In (GotPredAndSuccs p succs) (channel gst (addr_of j) h)) ->
+    forall gst' src dst msg,
+      labeled_step_dynamic gst (RecvMsg src dst msg) gst' ->
+      all_first_succs_best gst' ->
+      open_request_to gst' h (addr_of j) GetPredAndSuccs /\
+      has_first_succ gst' h j.
+Proof.
+  intros.
+  inv_prop labeled_step_dynamic;
+    unfold label_input, label_output in *;
+    try handler_def; try congruence.
+  split.
+Admitted.
+
 Lemma open_stabilize_request_until_step :
   forall gst h j,
     reachable_st gst ->
@@ -937,6 +985,7 @@ Lemma open_stabilize_request_until_step :
     wf_ptr j ->
     has_first_succ gst h j ->
     open_request_to gst h (addr_of j) GetPredAndSuccs ->
+    live_node gst h ->
     (forall p succs, ~ In (GotPredAndSuccs p succs) (channel gst (addr_of j) h)) ->
     forall gst' l,
       labeled_step_dynamic gst l gst' ->
@@ -953,9 +1002,18 @@ Lemma open_stabilize_request_until_step :
           has_succs gst' (addr_of j) succs).
 Proof.
   intros.
-  assert (~ In (addr_of j) (failed_nodes gst)) by admit.
-  assert (h <> addr_of j) by admit.
-  assert (~ client_addr (addr_of j)) by admit.
+  assert (~ In (addr_of j) (failed_nodes gst))
+    by eauto using all_first_succs_best_first_succ_not_failed.
+  assert (h <> addr_of j)
+    by eauto using first_succ_never_self.
+  assert (~ client_addr (addr_of j)).
+  {
+    eapply nodes_not_clients; eauto.
+    find_apply_lem_hyp successor_nodes_always_valid.
+    inv_prop has_first_succ.
+    eapply H; intuition eauto.
+    destruct (succ_list _); simpl in *; intuition congruence.
+  }
   inv_prop labeled_step_dynamic.
   - left.
     destruct (addr_eq_dec h0 h); subst.
@@ -1049,9 +1107,13 @@ Proof.
     + remember (apply_handler_result (fst (snd m)) (st, ms, newts, clearedts) [ChordSemantics.e_recv m] (update_msgs gst (xs ++ ys))) as gst'.
       assert (open_request_to gst' h (addr_of j) GetPredAndSuccs /\
               has_first_succ gst' h j)
-        by admit.
-      cut ((forall p succs, ~ In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h)) \/ (exists (p : option pointer) (succs : list pointer), In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h) /\ has_pred gst' (addr_of j) p /\ has_succs gst' (addr_of j) succs));
-      [tauto|].
+        by (handler_def; eauto using open_stabilize_request_until_step_recv_half).
+      cut ((forall p succs,
+               ~ In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h)) \/
+           (exists p succs,
+               In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h) /\
+               has_pred gst' (addr_of j) p /\ has_succs gst' (addr_of j) succs));
+        [tauto|].
       destruct (addr_eq_dec (fst (snd m)) (addr_of j)).
       * cut ((forall dst p succs, ~ In (dst, GotPredAndSuccs p succs) ms) \/
              (exists p succs, In (h, GotPredAndSuccs p succs) ms /\
@@ -1062,7 +1124,8 @@ Proof.
             simpl in *.
             repeat find_rewrite.
             find_apply_lem_hyp in_app_or; break_or_hyp.
-            + admit.
+            + find_apply_lem_hyp in_map_iff; expand_def.
+              unfold send in *; find_injection; eauto.
             + find_eapply_prop channel.
               apply channel_contents.
               repeat find_rewrite.
@@ -1125,6 +1188,7 @@ Lemma open_stabilize_request_until_response_weak :
     always (~_ (now circular_wait)) ex ->
     always (now phase_one) ex ->
     wf_ptr j ->
+    live_node (occ_gst (hd ex)) h ->
     has_first_succ (occ_gst (hd ex)) h j ->
     open_request_to (occ_gst (hd ex)) h (addr_of j) GetPredAndSuccs ->
     (forall p succs,
@@ -1200,6 +1264,7 @@ Lemma open_stabilize_request_until_response :
     always (~_ (now circular_wait)) ex ->
     always (now phase_one) ex ->
     wf_ptr j ->
+    live_node (occ_gst (hd ex)) h ->
     has_first_succ (occ_gst (hd ex)) h j ->
     open_request_to (occ_gst (hd ex)) h (addr_of j) GetPredAndSuccs ->
     (forall p succs,
@@ -1234,6 +1299,7 @@ Lemma open_stabilize_request_eventually_gets_response :
     always (~_ (now circular_wait)) ex ->
     always (now phase_one) ex ->
     wf_ptr j ->
+    live_node (occ_gst (hd ex)) h ->
     has_first_succ (occ_gst (hd ex)) h j ->
     open_stabilize_request_to_first_succ (occ_gst (hd ex)) h ->
     (forall p succs,
