@@ -975,7 +975,6 @@ Proof.
   inv_prop labeled_step_dynamic;
     unfold label_input, label_output in *;
     try handler_def; try congruence.
-  split.
 Admitted.
 
 Lemma open_stabilize_request_until_step :
@@ -1020,53 +1019,26 @@ Proof.
     + inv_prop open_request_to; expand_def.
       inv_prop has_first_succ; break_and.
       unfold timeout_constraint in *.
-      inv_prop _timeout_constraint.
-      * repeat break_and_goal.
-        -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
-           simpl in *; repeat (find_rewrite || find_injection).
-           repeat handler_def; congruence.
-           repeat handler_def; simpl; try congruence;
-             intuition eauto using remove_preserve.
-        -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
-           repeat (handler_def; try congruence).
-        -- intuition.
-           find_apply_lem_hyp in_channel_in_msgs.
-           find_apply_lem_hyp in_app_or.
-           unfold send in *.
-           break_or_hyp; eauto.
-           find_apply_lem_hyp in_map_iff; expand_def.
-      * repeat break_and_goal.
-        -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
-           simpl in *; repeat (find_rewrite || find_injection).
-           repeat handler_def; congruence.
-           repeat handler_def; simpl; try congruence;
-             intuition eauto using remove_preserve.
-        -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
-           repeat (handler_def; try congruence).
-        -- intuition.
-           find_apply_lem_hyp in_channel_in_msgs.
-           find_apply_lem_hyp in_app_or.
-           unfold send in *.
-           break_or_hyp; eauto.
-           find_apply_lem_hyp in_map_iff; expand_def.
-      * repeat break_and_goal.
-        -- eapply open_request_to_preserved; simpl; rewrite_update; eauto.
-           simpl in *; repeat (find_rewrite || find_injection).
-           repeat handler_def; congruence.
-           repeat handler_def; simpl; try congruence;
-             intuition eauto using remove_preserve.
-        -- eapply has_first_succ_preserved; simpl; rewrite_update; eauto.
-           repeat (handler_def; try congruence).
-        -- intuition.
-           find_apply_lem_hyp in_channel_in_msgs.
-           find_apply_lem_hyp in_app_or.
-           unfold send in *.
-           break_or_hyp; eauto.
-           find_apply_lem_hyp in_map_iff; expand_def.
-      * assert (Request dst p = (Request (addr_of j) GetPredAndSuccs))
-          by eauto using at_most_one_request_timeout_invariant.
-        find_injection.
-        tauto.
+      inv_prop _timeout_constraint;
+        try solve [
+              repeat break_and_goal;
+              [eapply open_request_to_preserved; simpl; rewrite_update; eauto;
+               [simpl in *; repeat (find_rewrite || find_injection);
+                repeat handler_def; congruence
+               |repeat handler_def; simpl; try congruence;
+                intuition eauto using remove_preserve]
+              |eapply has_first_succ_preserved; simpl; rewrite_update; eauto;
+               repeat (handler_def; try congruence)
+              |intuition;
+               find_apply_lem_hyp in_channel_in_msgs;
+               find_apply_lem_hyp in_app_or;
+               unfold send in *;
+               break_or_hyp; eauto;
+               find_apply_lem_hyp in_map_iff; expand_def]].
+      assert (Request dst p = (Request (addr_of j) GetPredAndSuccs))
+        by eauto using at_most_one_request_timeout_invariant.
+      find_injection.
+      tauto.
     + repeat break_and_goal;
         unfold open_request_to, has_first_succ; simpl; rewrite_update; eauto.
       intuition.
@@ -1075,47 +1047,36 @@ Proof.
       unfold send in *.
       break_or_hyp; eauto.
       find_apply_lem_hyp in_map_iff; expand_def.
-      repeat handler_def.
-      * unfold make_request in *.
-        find_apply_lem_hyp option_map_Some; expand_def.
-        simpl in *; intuition congruence.
-      * unfold send_keepalives in *.
-        find_apply_lem_hyp in_map_iff; expand_def.
-      * unfold make_request in *.
-        find_apply_lem_hyp option_map_Some; expand_def.
-        simpl in *; intuition congruence.
-      * unfold make_request in *.
-        find_apply_lem_hyp option_map_Some; expand_def.
-        simpl in *; intuition congruence.
-      * simpl in *; intuition congruence.
-  - destruct (addr_eq_dec (fst (snd m)) h); subst.
-    + left.
-      repeat break_and_goal.
-      * admit.
-      * admit.
-      * intuition.
-        find_apply_lem_hyp in_channel_in_msgs.
-        find_apply_lem_hyp in_app_or; break_or_hyp.
-        -- find_apply_lem_hyp in_map_iff; expand_def.
-           unfold send in *; congruence.
-        -- simpl in *.
-           find_apply_lem_hyp in_app_or.
-           find_eapply_prop channel.
-           eapply in_msgs_in_channel.
-           find_rewrite.
-           intuition eauto with datatypes.
+      repeat handler_def;
+        unfold make_request, send_keepalives in *;
+        try find_apply_lem_hyp option_map_Some; expand_def;
+        try find_apply_lem_hyp in_map_iff; expand_def;
+          simpl in *; intuition congruence.
+  - remember (apply_handler_result (fst (snd m)) (st, ms, newts, clearedts) [ChordSemantics.e_recv m] (update_msgs gst (xs ++ ys))) as gst'.
+    assert (open_request_to gst' h (addr_of j) GetPredAndSuccs /\
+            has_first_succ gst' h j)
+      by (handler_def; eauto using open_stabilize_request_until_step_recv_half).
+    cut ((forall p succs,
+             ~ In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h)) \/
+         (exists p succs,
+             In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h) /\
+             has_pred gst' (addr_of j) p /\ has_succs gst' (addr_of j) succs));
+      [tauto|].
+    destruct (addr_eq_dec (fst (snd m)) h); subst.
+    + left; intuition.
+      find_apply_lem_hyp channel_contents.
+      simpl in *.
+      find_apply_lem_hyp in_app_or; intuition.
+      * find_apply_lem_hyp in_map_iff; expand_def.
+        unfold send in *; find_injection.
+        congruence.
+      * find_eapply_prop channel.
+        apply channel_contents.
+        find_rewrite.
+        intuition eauto with *.
     + remember (apply_handler_result (fst (snd m)) (st, ms, newts, clearedts) [ChordSemantics.e_recv m] (update_msgs gst (xs ++ ys))) as gst'.
-      assert (open_request_to gst' h (addr_of j) GetPredAndSuccs /\
-              has_first_succ gst' h j)
-        by (handler_def; eauto using open_stabilize_request_until_step_recv_half).
-      cut ((forall p succs,
-               ~ In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h)) \/
-           (exists p succs,
-               In (GotPredAndSuccs p succs) (channel gst' (addr_of j) h) /\
-               has_pred gst' (addr_of j) p /\ has_succs gst' (addr_of j) succs));
-        [tauto|].
       destruct (addr_eq_dec (fst (snd m)) (addr_of j)).
-      * cut ((forall dst p succs, ~ In (dst, GotPredAndSuccs p succs) ms) \/
+      * cut ((forall p succs, ~ In (h, GotPredAndSuccs p succs) ms) \/
              (exists p succs, In (h, GotPredAndSuccs p succs) ms /\
                          has_pred gst' (addr_of j) p /\
                          has_succs gst' (addr_of j) succs)).
@@ -1140,9 +1101,33 @@ Proof.
             repeat find_rewrite.
             eexists; eauto.
         }
-        destruct (addr_eq_dec (fst m) h); subst.
-        -- admit.
-        -- admit.
+        assert (Hexdec: {Forall (fun x => forall p succs, fst x <> h \/ snd x <> GotPredAndSuccs p succs) ms} +
+                        {Exists (fun x => ~ (forall p succs, fst x <> h \/ snd x <> GotPredAndSuccs p succs)) ms}).
+        {
+          apply Forall_Exists_dec.
+          destruct x as [h' msg];
+            destruct (addr_eq_dec h h'); subst;
+              destruct msg; simpl;
+                try (left; intuition congruence).
+          right; intro Hneq; do 2 insterU Hneq; break_or_hyp; eauto.
+        }
+        destruct Hexdec.
+        -- pose proof (iffLR (Forall_forall _ _) f).
+           left; intuition.
+           eapply_prop_hyp In In.
+           tauto.
+        -- find_apply_lem_hyp Exists_exists; expand_def.
+           right.
+           destruct x, (addr_eq_dec a h), _p; subst;
+             try solve [simpl in *; exfalso; eapply_prop not; intuition congruence
+                       |exfalso; intuition].
+           do 2 eexists; split; eauto.
+           handler_def.
+           find_eapply_lem_hyp recv_handler_GotPredAndSuccs_response_accurate; eauto.
+           break_and; split;
+             [eapply has_pred_intro
+             |eapply has_succs_intro];
+             simpl; try rewrite_update; eauto.
       * left.
         unfold open_request_to, has_first_succ.
         inv_prop open_request_to; inv_prop has_first_succ; expand_def.
@@ -1178,7 +1163,7 @@ Proof.
     repeat find_rewrite.
     find_apply_lem_hyp in_app_or.
     intuition eauto with datatypes.
-Admitted.
+Qed.
 
 Lemma open_stabilize_request_until_response_weak :
   forall ex h j,
