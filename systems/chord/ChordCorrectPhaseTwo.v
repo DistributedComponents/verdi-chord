@@ -27,6 +27,7 @@ Require Import Chord.ValidPointersInvariant.
 Require Import Chord.QueryInvariant.
 Require Import Chord.NodesAlwaysHaveLiveSuccs.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
+Require Import Chord.NodesHaveState.
 Require Import Chord.PtrCorrectInvariant.
 Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.QueryTargetsJoined.
@@ -985,38 +986,89 @@ Proof.
   inv_prop labeled_step_dynamic;
     unfold label_input, label_output in *;
     try handler_def; try congruence.
-  destruct (addr_eq_dec (fst (snd m)) h); split.
-  - inv_prop open_request_to; expand_def.
-    handler_def; handler_def; try congruence.
+  destruct (addr_eq_dec (fst (snd m)) h).
+  - assert (forall m,
+               m = msg0 ->
+               ~response_payload m).
+    {
+      intros; subst.
+      assert (In m (msgs gst)) by (repeat find_rewrite; eauto with datatypes).
+      destruct m as [src' [dst' p']].
+      find_apply_lem_hyp sent_message_means_in_nodes_or_client; auto.
+      break_or_hyp.
+      + cut (no_responses (channel gst src' dst')).
+        {
+          find_injection.
+          assert (In p' (channel gst src' dst')).
+          apply in_msgs_in_channel.
+          repeat find_rewrite; eauto with datatypes.
+          eauto.
+        }
+        find_apply_lem_hyp nodes_have_state; eauto.
+        break_exists_name st__src.
+        inv_prop open_request_to; expand_def.
+        simpl in *.
+        find_copy_eapply_lem_hyp (query_message_ok_invariant gst ltac:(eauto) dst' src'); eauto.
+        inv_prop query_message_ok; try congruence; eauto.
+        repeat (find_rewrite || find_injection).
+        inv_prop request_response_pair.
+        exfalso; intuition eauto.
+      + intuition.
+        repeat (find_rewrite || find_injection).
+        inv_prop client_payload; inv_prop response_payload.
+    }
+    split.
     + inv_prop open_request_to; expand_def.
+    handler_def; handler_def; try congruence.
+    * inv_prop open_request_to; expand_def.
       eapply open_request_to_preserved; simpl; rewrite_update; eauto.
       find_eapply_lem_hyp cur_request_preserved_by_do_delayed_queries; congruence.
       handler_def;
         eauto using remove_preserve with datatypes.
-    + inv_prop open_request_to; expand_def.
+    * inv_prop open_request_to; expand_def.
       eapply open_request_to_preserved; simpl; rewrite_update; eauto.
-      * repeat handler_def; simpl; congruence.
-      * intros.
+      -- repeat handler_def; simpl; congruence.
+      -- intros.
         right.
-        admit.
-    + admit.
-    + assert ((snd (snd m)) = Notify \/ ~response_payload (snd (snd m))).
-      { admit. }
+        do 2 handler_def;
+          simpl; autorewrite with list;
+            eauto using remove_preserve with datatypes.
+    * inv_prop open_request_to; expand_def.
+      eapply open_request_to_preserved; simpl; rewrite_update; eauto.
+      -- repeat handler_def; simpl; congruence.
+      -- intros; right.
+        do 2 handler_def;
+          simpl; autorewrite with list;
+            eauto using remove_preserve with datatypes.
+    * assert ((snd (snd m)) = Notify \/ ~response_payload (snd (snd m)))
+        by (find_injection; eauto).
       find_eapply_lem_hyp not_request_is_response.
       tauto.
-    + assert ((snd (snd m)) = Notify \/ ~response_payload (snd (snd m))).
-      { admit. }
+    * assert ((snd (snd m)) = Notify \/ ~response_payload (snd (snd m)))
+        by (find_injection; eauto).
       find_eapply_lem_hyp not_request_is_response.
       tauto.
-  - admit.
-  - inv_prop open_request_to; expand_def.
-    eapply open_request_to_preserved; eauto.
-    + simpl; rewrite_update; auto.
-    + simpl; rewrite_update; auto.
-  - inv_prop has_first_succ; expand_def.
-    eapply has_first_succ_preserved; eauto.
-    simpl; rewrite_update; auto.
-Admitted.
+    + eapply has_first_succ_preserved; simpl; rewrite_update;
+        try eassumption.
+      repeat find_rewrite; eauto.
+      eauto.
+      handler_def.
+      find_apply_lem_hyp succ_list_preserved_by_do_delayed_queries.
+      handler_def; try congruence.
+      * repeat handler_def; simpl in *; congruence.
+      * repeat handler_def; simpl in *; congruence.
+      * assert (~response_payload (snd (snd m)))
+          by (find_injection; eauto).
+        find_eapply_lem_hyp not_request_is_response.
+        tauto.
+  - split.
+    + inv_prop open_request_to; expand_def.
+      eapply open_request_to_preserved; eauto;
+        simpl; rewrite_update; auto.
+    + inv_prop has_first_succ; expand_def.
+      eapply has_first_succ_preserved; eauto.
+      simpl; rewrite_update; auto.
+Qed.
 
 Lemma open_stabilize_request_until_step :
   forall gst h j,
