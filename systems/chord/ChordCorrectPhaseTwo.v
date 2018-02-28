@@ -956,6 +956,16 @@ Lemma all_first_succs_best_first_succ_not_failed :
 Proof.
 Admitted.
 
+Lemma not_request_is_response :
+  forall p,
+    is_request p = false ->
+    response_payload p \/ p = Notify.
+Proof.
+  destruct p;
+    solve [eauto
+          |simpl; congruence].
+Qed.
+
 Lemma open_stabilize_request_until_step_recv_half :
   forall gst h j,
     reachable_st gst ->
@@ -975,6 +985,37 @@ Proof.
   inv_prop labeled_step_dynamic;
     unfold label_input, label_output in *;
     try handler_def; try congruence.
+  destruct (addr_eq_dec (fst (snd m)) h); split.
+  - inv_prop open_request_to; expand_def.
+    handler_def; handler_def; try congruence.
+    + inv_prop open_request_to; expand_def.
+      eapply open_request_to_preserved; simpl; rewrite_update; eauto.
+      find_eapply_lem_hyp cur_request_preserved_by_do_delayed_queries; congruence.
+      handler_def;
+        eauto using remove_preserve with datatypes.
+    + inv_prop open_request_to; expand_def.
+      eapply open_request_to_preserved; simpl; rewrite_update; eauto.
+      * repeat handler_def; simpl; congruence.
+      * intros.
+        right.
+        admit.
+    + admit.
+    + assert ((snd (snd m)) = Notify \/ ~response_payload (snd (snd m))).
+      { admit. }
+      find_eapply_lem_hyp not_request_is_response.
+      tauto.
+    + assert ((snd (snd m)) = Notify \/ ~response_payload (snd (snd m))).
+      { admit. }
+      find_eapply_lem_hyp not_request_is_response.
+      tauto.
+  - admit.
+  - inv_prop open_request_to; expand_def.
+    eapply open_request_to_preserved; eauto.
+    + simpl; rewrite_update; auto.
+    + simpl; rewrite_update; auto.
+  - inv_prop has_first_succ; expand_def.
+    eapply has_first_succ_preserved; eauto.
+    simpl; rewrite_update; auto.
 Admitted.
 
 Lemma open_stabilize_request_until_step :
