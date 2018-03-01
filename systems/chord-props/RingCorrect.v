@@ -192,21 +192,501 @@ Definition zave_invariant (gst : global_state) : Prop :=
   live_node_in_msg_succ_lists gst.
 Hint Unfold zave_invariant.
 
+Lemma sorted_trans :
+  forall A (le : A -> A -> bool),
+    (forall x y z, le x y = true -> le y z = true -> le x z = true) ->
+    forall x y l,
+      Sorting.sorted A le (x :: l) ->
+      In y l ->
+      le x y = true.
+Proof.
+  intros. prep_induction H0.
+  induction H0; intros; simpl in *; auto.
+  - solve_by_inversion.
+  - find_inversion. intuition.
+  - intuition. find_inversion. simpl in *.
+    intuition; subst; eauto.
+Qed.
+
+Lemma sorted_trans_app :
+  forall A (le : A -> A -> bool),
+    (forall x y z, le x y = true -> le y z = true -> le x z = true) ->
+    forall x y l' l,
+      Sorting.sorted A le (l' ++ l) ->
+      In y l ->
+      In x l' ->
+      le x y = true.
+Proof.
+  intros. prep_induction H0.
+  induction H0; intros; simpl in *; auto.
+  - destruct l', l; subst; simpl in *; solve_by_inversion.
+  - destruct l', l; subst; simpl in *; try solve_by_inversion.
+    find_inversion. destruct l'; simpl in *; solve_by_inversion.
+  - intuition.
+    destruct l'; intuition; simpl in *. find_inversion. intuition.
+    + subst. destruct l'; simpl in *; intuition.
+      * subst. in_crush. eauto using sorted_trans.
+      * find_inversion.
+        eapply H1; eauto.
+        eapply sorted_trans; eauto. in_crush.
+    + destruct l'; simpl in *; intuition; subst.
+      * find_inversion.
+        eapply sorted_trans; eauto. in_crush.
+      * find_inversion.
+        specialize (H5 x0 y0 (a0 :: l') l0).
+        intuition.
+Qed.
+
+Lemma between_trans :
+  forall a b c d,
+    between a b c ->
+    between a c d ->
+    between a b d.
+Proof.
+  intros.
+  invcs H; invcs H0;
+    try solve [econstructor; eauto using lt_trans];
+    congruence.
+Qed.
+
+Lemma unroll_between_trans :
+  forall a b c d,
+    unroll_between a b c = true ->
+    unroll_between a c d = true ->
+    unroll_between a b d = true.
+Proof.
+  unfold unroll_between; intros.
+  repeat break_if; eauto; try congruence.
+  repeat find_apply_lem_hyp between_bool_between.
+  apply between_between_bool_equiv.
+  eauto using between_trans.
+Qed.
+
+Lemma unroll_between_ptr_trans :
+  forall a b c d,
+    unroll_between_ptr a b c = true ->
+    unroll_between_ptr a c d = true ->
+    unroll_between_ptr a b d = true.
+Proof.
+  unfold unroll_between_ptr in *.
+  eauto using unroll_between_trans.
+Qed.
+
+Lemma between_trans' :
+  forall a b c d,
+    between a b c ->
+    between b d c ->
+    between a d c.
+Proof.
+  intros.
+  invcs H; invcs H0;
+    try solve [econstructor; eauto using lt_trans];
+    congruence.
+Qed.
+
+Lemma between_swap_not :
+  forall x y z,
+    between x z y ->
+    ~ between x y z.
+Proof.
+  unfold not.
+  intros.
+  repeat invcs_prop between;
+    solve [id_auto | eapply Chord.ChordIDSpace.lt_asymm; eauto].
+Qed.
+
+Lemma between_not_between :
+  forall h a b c,
+    between h a b ->
+    between h b c ->
+    ~ between a c b.
+Proof.
+  intros. intro.
+  find_eapply_lem_hyp between_trans'; eauto.
+  find_eapply_lem_hyp between_swap_not; eauto.
+Qed.
+
+
+Lemma between_not_between' :
+  forall h a b c,
+    between h a b ->
+    between h c a  ->
+    ~ between a c b.
+Proof.
+  intros. intro.
+  specialize (between_not_between h c a b). intros. intuition.
+  destruct (id_eq_dec a b); subst.
+  - find_apply_lem_hyp not_between_xyy. auto.
+  - find_apply_lem_hyp between_rot_l; auto.
+Qed.
+
+Require Import Chord.Sorting.
+
+Lemma sorted_map :
+  forall A B (f : A -> B) (leA : A -> A -> bool) (leB : B -> B -> bool),
+    (forall x y, leA x y = leB (f x) (f y)) ->
+    forall l,
+      sorted A leA l -> sorted B leB (map f l).
+Proof.
+  induction l; intros; simpl in *; auto.
+  - constructor.
+  - inv_prop sorted.
+    + simpl. constructor.
+    + intuition. simpl. constructor; eauto.
+Qed.
+
+Lemma sorted_prepend_zero :
+  forall A (le : A -> A -> bool) z,
+    (forall x, le z x = true) ->
+    forall l,
+      sorted A le l ->
+      sorted A le (z :: l).
+Proof.
+  induction l; intros.
+  - constructor.
+  - constructor; auto.
+Qed.
+
+Lemma sorted_chop_succs :
+  forall a n l,
+    sorted _ (unroll_between_ptr a) l ->
+    sorted _ (unroll_between_ptr a) (firstn n l).
+Proof.
+  induction n; intros; simpl.
+  - constructor.
+  - break_match; try solve [constructor].
+    inv_prop sorted.
+    + destruct n; simpl; constructor.
+    + destruct n; simpl; try solve [constructor].
+      constructor; auto.
+      eapply_prop_hyp sorted sorted. simpl in *. auto.
+Qed.
+
+Lemma sorted_find_succs :
+  forall a b l,
+    sorted _ (unroll_between_ptr b) l ->
+    sorted _ (unroll_between_ptr b) (find_succs a l).
+Proof.
+  induction l; intros; simpl.
+  - constructor.
+  - simpl. break_if; subst.
+    + inv_prop sorted; simpl; intuition.
+      constructor.
+    + eauto using sorted_chop_succs.
+Qed.
+
+Lemma sort_by_between_sorted :
+  forall h l,
+    sorted _ (unroll_between_ptr h) (sort_by_between h l).
+Proof.
+  intros. unfold sort_by_between.
+  apply sorted_sort.
+  intros. unfold unroll_between_ptr, unroll_between.
+  repeat (break_if; auto).
+  match goal with
+  | |- context [between_bool ?x ?y ?z] => specialize (between_bool_yz_total x y z)
+  end. intros. intuition.
+Qed.
+
+Lemma chop_succs_partition :
+  forall l,
+  exists xs,
+    l = chop_succs l ++ xs.
+Proof.
+  intros. unfold chop_succs.
+  eexists; eauto using firstn_skipn.
+Qed.
+
+Lemma find_succs_partition :
+  forall h l,
+  exists xs ys,
+    l = xs ++ (find_succs h l) ++ ys /\
+    (forall x, In x xs -> x = make_pointer h).
+Proof.
+  intros.
+  induction l; simpl.
+  - repeat eexists; intuition; eauto. in_crush.
+  - break_exists_name xs. break_exists_name ys.
+    intuition.
+    break_if.
+    + exists (make_pointer h :: xs). exists ys.
+      intuition; simpl; try congruence.
+      in_crush.
+    + exists []. simpl.
+      pose proof (chop_succs_partition (a :: l)). break_exists_exists.
+      intuition.
+Qed.
+
+Lemma sorted_by_find_succs_in :
+  forall p h' h l,
+    In p l ->
+    sorted _ (unroll_between_ptr h') l ->
+    p = make_pointer h \/ In p (find_succs h l) \/ (forall a, In a (find_succs h l) -> unroll_between_ptr h' a p = true).
+Proof.
+  intros.
+  pose proof (find_succs_partition h l). break_exists. intuition.
+  rewrite H2 in H. in_crush. right. right.
+  intros.
+  assert (In a (x ++ (find_succs h l))) by in_crush.
+  eapply sorted_trans_app; eauto using unroll_between_ptr_trans.
+  rewrite app_ass. congruence.
+Qed.
+
+Lemma pair_in_sorted :
+  forall A (le : A -> A -> bool) l a b,
+    sorted _ le l ->
+    pair_in a b l ->
+    le a b = true.
+Proof.
+  intros. induction H.
+  - inv_prop @pair_in.
+  - repeat inv_prop @pair_in.
+  - inv_prop @pair_in; eauto.
+Qed.
+
+Lemma pair_in_right :
+  forall A (a : A) b l,
+    pair_in a b l ->
+    In a l.
+Proof.
+  intros. induction H.
+  - in_crush.
+  - in_crush.
+Qed.
+
+Lemma pair_in_left :
+  forall A (a : A) b l,
+    pair_in a b l ->
+    In b l.
+Proof.
+  intros. induction H.
+  - in_crush.
+  - in_crush.
+Qed.
+
+Lemma pair_in_sorted_in :
+  forall A (le : A -> A -> bool) l a b x,
+    (forall x y z, le x y = true -> le y z = true -> le x z = true) ->
+    sorted _ le l ->
+    pair_in a b l ->
+    In x l ->
+    x = a \/ x = b \/
+    le x a = true \/
+    le b x = true.
+Proof.
+  intros. induction H0.
+  - solve_by_inversion.
+  - in_crush. inv_prop @pair_in. solve_by_inversion.
+  - inv_prop @pair_in.
+    + in_crush.
+       eauto using sorted_trans.
+    + intuition. in_crush. inv_prop @pair_in; intuition.
+      right. right. left. eauto using sorted_trans, pair_in_right.
+Qed.
+
+Lemma NoDup_pair :
+  forall A (l : list A) a b,
+    NoDup l ->
+    pair_in a b l ->
+    a <> b.
+Proof.
+  intros. induction l.
+  - solve_by_inversion.
+  - inv_prop NoDup. inv_prop @pair_in; eauto.
+    intro. subst. intuition.
+Qed.
+
+Lemma sorted_zero_prefix :
+  forall A (le : A -> A -> bool) (wf : A -> Prop) (A_eq_dec: forall x y : A, {x = y} + {x <> y}) l a,
+    (forall x y z, le x y = true -> le y z = true -> le x z = true) ->
+    (forall b, le a b = true) ->
+    (forall b, wf b -> le b a = true -> b = a) ->
+    (forall x, In x l -> wf x) ->
+    sorted _ le l ->
+    exists xs ys,
+      l = xs ++ ys /\
+      (forall x, In x xs -> x = a) /\
+      (forall y, In y ys -> y <> a).
+Proof.
+  intros.
+  induction H3.
+  - exists [],[]. in_crush.
+  - destruct (A_eq_dec x a); subst.
+    + exists [a],[]. in_crush.
+    + exists [],[x]. in_crush.
+  - destruct (A_eq_dec x a); subst.
+    + conclude_using in_crush.
+      break_exists_name xs.
+      exists (a :: xs). simpl.
+      break_exists_exists. intuition. congruence.
+    + conclude_using in_crush.
+      break_exists_name xs.
+      assert (xs = []). {
+        destruct xs; intuition.
+        break_exists; intuition. simpl in *. find_inversion.
+        find_false.
+        apply H1; intuition. specialize (H5 a0). intuition. subst. auto.
+      } subst. simpl in *.
+      exists [].
+      break_exists_name ys.
+      exists (x :: ys).
+      simpl. intuition; subst; eauto.
+Qed.
+
+Lemma firstn_in :
+  forall A n (l : list A) x,
+    In x (firstn n l) ->
+    In x l.
+Proof.
+  induction n; intros; simpl in *; intuition.
+  break_match; simpl in *; intuition.
+Qed.
+
+Lemma NoDup_chop_succs :
+  forall l,
+    NoDup l ->
+    NoDup (chop_succs l).
+Proof.
+  unfold chop_succs.
+  induction SUCC_LIST_LEN; intros; simpl in *; eauto.
+  break_match; eauto. inv_prop NoDup.
+  constructor; auto.
+  intro. eauto using firstn_in.
+Qed.
+
+Lemma NoDup_find_succs :
+  forall l h,
+    NoDup l ->
+    NoDup (find_succs h l).
+Proof.
+  intros. induction l; simpl in *; eauto.
+  inv_prop NoDup. intuition.
+  break_if; simpl in *; auto.
+  eauto using NoDup_chop_succs.
+Qed.
+
+Lemma unroll_between_zero :
+  forall h x,
+    unroll_between_ptr h (make_pointer h) x = true.
+Proof.
+  intros. unfold unroll_between_ptr, unroll_between.
+  break_if; intuition.
+Qed.
+
+Definition hash_injective_on_pair a b :=
+  id_of a = id_of b -> a = b.
+
+Lemma unroll_between_zero' :
+  forall h x,
+    wf_ptr h ->
+    wf_ptr x ->
+    hash_injective_on_pair h x ->
+    unroll_between_ptr (addr_of h) x h = true ->
+    x = h.
+Proof.
+  intros. unfold unroll_between_ptr, unroll_between in *.
+  repeat (break_if; intuition); try discriminate;
+    unfold wf_ptr, hash_injective_on_pair, id_of, addr_of in *;
+    try solve [repeat find_rewrite; intuition|find_false; auto].
+Qed.
+
+Definition wf h x := wf_ptr x /\ hash_injective_on_pair (make_pointer h) x.
+
+Lemma find_succs_on_partition :
+  forall h a xs ys,
+    (forall x, In x xs -> x = make_pointer h) ->
+    make_pointer h <> a ->
+    find_succs h (xs ++ a :: ys) = chop_succs (a :: ys).
+Proof.
+  induction xs; intros; simpl in *; auto.
+  - break_if; congruence.
+  - break_if; intuition. find_false. intuition.
+Qed.
+
+
+Lemma find_succs_all_h :
+  forall h l,
+    (forall x, In x l -> x = make_pointer h) ->
+    find_succs h l = [].
+Proof.
+  induction l; intros; simpl in *; auto.
+  break_if; simpl in *; auto. intuition. find_false. intuition.
+Qed.
+
+Lemma in_chop_succs :
+  forall x l,
+    In x (chop_succs l) ->
+    In x l.
+Proof.
+  eauto using in_firstn.
+Qed.
+
+Lemma find_succs_sort_by_between :
+  forall l h,
+    (forall x, In x l -> wf h x) ->
+    sorted _ (unroll_between_ptr h) l ->
+    ~ In (make_pointer h) (find_succs h l).
+Proof.
+  intros.
+  find_copy_eapply_lem_hyp sorted_zero_prefix. 6:eauto.
+  all:eauto using pointer_eq_dec, unroll_between_zero, unroll_between_zero',
+      unroll_between_ptr_trans;
+    try solve [unfold wf; intuition; apply unroll_between_zero';
+               intuition eauto using make_pointer_wf].
+  break_exists_name xs. break_exists_name ys.
+  intuition. subst.
+  destruct ys; subst; simpl in *; repeat find_rewrite_lem app_nil_r.
+  - find_erewrite_lem find_succs_all_h. in_crush.
+  - find_erewrite_lem find_succs_on_partition.
+    find_apply_lem_hyp in_chop_succs. eauto.
+Qed.
+
 Lemma initial_succ_lists_all_principal :
   forall p l,
+    NoDup l ->
     In p l ->
     forall h a b,
       pair_in a b (hash h :: map id_of (find_succs h (sort_by_between h (map make_pointer l)))) ->
       ~ between a (hash p) b.
 Proof.
   intros.
-  rewrite initial_esl_is_sorted_nodes_chopped in H0.
-  pose proof (sorted_list_chopped_elements_not_between (make_pointer p) (map make_pointer (h :: l))).
-  forwards. apply in_map; auto with datatypes. concludes.
-  find_apply_lem_hyp pair_in_map; expand_def.
-  change (hash p) with (id_of (make_pointer p)).
-  unfold not in *; eauto.
-Qed.
+  assert (sorted _ (unroll_between_ptr h) (find_succs h (sort_by_between h (map make_pointer l)))) by
+      eauto using sort_by_between_sorted, sorted_find_succs.
+
+  assert (sorted _ (unroll_between (hash h)) (map id_of (find_succs h (sort_by_between h (map make_pointer l))))).
+  {
+    eapply sorted_map; eauto.
+    unfold unroll_between_ptr. auto.
+  }
+
+  assert (sorted _ (unroll_between (hash h)) (hash h ::map id_of (find_succs h (sort_by_between h (map make_pointer l))))).
+  {
+    eapply sorted_prepend_zero; eauto.
+    unfold unroll_between. break_if; intuition.
+  }
+  assert (In (make_pointer p) (map make_pointer l)) by in_crush.
+  assert (In (make_pointer p) (sort_by_between h (map make_pointer l))).
+  {
+    eapply Permutation.Permutation_in; [eapply sort_by_between_permutes|]; eauto.
+  }
+  pose proof (sorted_by_find_succs_in (make_pointer p) h h).
+  assert (a <> b).
+  {
+    eapply NoDup_pair; [|eauto].
+    constructor.
+    - intro. find_eapply_lem_hyp in_map_iff.
+      break_exists. intuition.
+      eapply find_succs_sort_by_between; eauto.
+    find_copy_eapply_lem_hyp NoDup_
+  find_copy_eapply_lem_hyp pair_in_sorted; eauto.
+  eapply_prop_hyp In In; eauto using sort_by_between_sorted. intuition.
+  - assert (hash p = hash h) by (unfold make_pointer in *; congruence).
+    repeat find_rewrite.
+    unfold unroll_between in *.
+    repeat break_if; subst;
+      try solve [eapply not_between_xyy; eauto|eapply not_between_xxy; eauto].
+    eapply not_between_xxy; eauto.
+Admitted.
 Hint Resolve initial_succ_lists_all_principal.
 
 Lemma initial_nodes_principal :
@@ -220,8 +700,9 @@ Proof.
   - auto.
   - unfold not_skipped; intros.
     find_apply_lem_hyp initial_succ_list; eauto.
+    unfold initial_st in *. intuition.
     repeat find_rewrite; repeat find_injection.
-    simpl in *; eauto.
+    simpl in *; eapply initial_succ_lists_all_principal; eauto.
 Qed.
 Hint Resolve initial_nodes_principal.
 

@@ -95,13 +95,6 @@ Definition all_succs_correct (gst : global_state) : Prop :=
     correct_succs gst h st /\
     length (succ_list st) = Chord.SUCC_LIST_LEN.
 
-Lemma length_chop_succs :
-  forall l,
-    length (chop_succs l) <= SUCC_LIST_LEN.
-Proof.
-  intros. unfold chop_succs. apply firstn_le_length.
-Qed.
-
 Lemma length_find_succs :
   forall h l,
     length (find_succs h l) <= SUCC_LIST_LEN.
