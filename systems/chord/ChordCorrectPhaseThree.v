@@ -95,12 +95,11 @@ Definition all_succs_correct (gst : global_state) : Prop :=
     correct_succs gst h st /\
     length (succ_list st) = Chord.SUCC_LIST_LEN.
 
-Lemma length_find_succs :
-  forall h l,
-    length (find_succs h l) <= SUCC_LIST_LEN.
+Lemma length_tl :
+  forall A (l : list A),
+    length (List.tl l) = List.length l - 1.
 Proof.
-  intros. induction l; simpl; try omega.
-  break_if; eauto using length_chop_succs.
+  intros. induction l; simpl; omega.
 Qed.
 
 Lemma succ_list_bounded_by_succ_list_len :
@@ -113,7 +112,7 @@ Proof.
   intros. induct_reachable_st; intros; simpl in *.
   - find_apply_lem_hyp sigma_initial_st_start_handler; auto.
     subst. unfold start_handler. repeat break_match; simpl; try omega.
-    repeat break_match; eauto using length_chop_succs, length_find_succs.
+    repeat break_match; eauto using length_chop_succs, length_tl.
   - concludes. inv_prop step_dynamic; simpl in *; eauto.
     + update_destruct; subst; rewrite_update; simpl in *; eauto.
       find_inversion. simpl. omega.
@@ -123,7 +122,7 @@ Proof.
         find_apply_hyp_hyp; repeat find_rewrite; simpl in *; omega.
     + update_destruct; subst; rewrite_update; simpl in *; eauto.
       repeat (handler_def || handler_simpl;
-              eauto using length_chop_succs, length_find_succs).
+              eauto using length_chop_succs, length_tl).
 Qed.
 
 Lemma succs_error_helper_length:

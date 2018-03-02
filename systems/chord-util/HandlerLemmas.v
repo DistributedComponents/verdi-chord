@@ -1681,37 +1681,6 @@ Proof.
   eauto using firstn_all2.
 Qed.
   
-Lemma initial_esl_is_sorted_nodes_chopped :
-  forall h ns,
-    In h ns ->
-    hash h :: map id_of (find_succs h (sort_by_between h (map make_pointer ns))) =
-    map id_of (chop_succs (sort_by_between h (map make_pointer (h :: ns)))).
-Proof.
-  intros. generalize h.
-  induction ns; intros; simpl in *; auto.
-  - rewrite sort_one_element. simpl.
-    rewrite chop_succs_short_list; simpl; auto.
-    pose proof succ_list_len_lower_bound; omega.
-  - 
-Admitted.
-
-Lemma in_find_succs :
-  forall x h l,
-    In x (find_succs h l) ->
-    In x l.
-Proof.
-  move => x h.
-  elim => //=.
-  move => a l IH.
-  break_if => H_in.
-  - by right; apply IH.
-  - rewrite /chop_succs in H_in.
-    apply in_firstn in H_in.
-    rewrite /= in H_in.
-    break_or_hyp; first by left.
-    by right.
-Qed.
-
 Lemma in_sort_by_between :
   forall x h l,
     In x (sort_by_between h l) ->

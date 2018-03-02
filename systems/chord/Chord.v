@@ -629,15 +629,6 @@ Module ChordSystem <: DynamicSystem.
       eauto using unrolling_reflexive, unrolling_transitive, unrolling_total.
   Qed.
 
-  Fixpoint find_succs (h : addr) (sorted_ring : list pointer) : list pointer :=
-    match sorted_ring with
-    | [] => []
-    | s :: rest =>
-      if pointer_eq_dec s (make_pointer h)
-      then find_succs h rest
-      else chop_succs (s :: rest)
-    end.
-
   Fixpoint find_pred (h : addr) (sorted_ring : list pointer) : option pointer :=
     hd_error (rev sorted_ring).
 
@@ -649,7 +640,7 @@ Module ChordSystem <: DynamicSystem.
     | [k] =>
       pi (start_query h (init_state_join h (addr_of k)) (Join k))
     | sorted_ring =>
-      let succs := find_succs h sorted_ring in
+      let succs := chop_succs (List.tl sorted_ring) in
       let pred := find_pred h sorted_ring in
       (init_state_preset h pred succs, [], [Tick])
     end.
