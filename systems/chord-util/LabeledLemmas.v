@@ -841,6 +841,18 @@ Lemma constrained_Request_not_cleared_by_recv_handler :
     recv_handler src h st p = (st', ms, nts, cts) ->
     In (Request dst req) nts \/ ~ In (Request dst req) cts.
 Proof using.
+  intros.
+  find_copy_apply_lem_hyp cur_request_timeouts_related_invariant_elim; auto.
+  inv_prop cur_request_timeouts_ok.
+  - intuition eauto.
+  - inv_prop timeout_constraint.
+    assert (Request dst req = Request (addr_of dstp) req0)
+      by eauto using at_most_one_request_timeout_uniqueness.
+    find_injection.
+    eapply recv_msg_not_right_response_never_removes_request_timeout; eauto.
+    assert (src = (addr_of dstp)) by admit; subst.
+    intro; invcs_prop query_response; invcs_prop query_request;
+      intuition eauto using request_response_pair.
 (*
 This should be doable using some stuff from QueryInvariant to restrict cur_request st.
 
