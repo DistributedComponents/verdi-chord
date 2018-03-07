@@ -635,11 +635,71 @@ Proof.
   eauto using in_firstn.
 Qed.
 
+Lemma unroll_between_contra :
+  forall h a b c,
+    hash_injective_on_pair a b ->
+    a <> b ->
+    unroll_between_ptr h a b = true ->
+    unroll_between_ptr h b c = true ->
+    ~ ptr_between a c b.
+Proof.
+  intros. unfold unroll_between_ptr, unroll_between, ptr_between in *.
+  repeat break_if; auto; repeat find_rewrite; eauto using not_between_xxy, not_between_xyy, between_bool_between, between_swap_not, between_not_between.
+Qed.
+
+Lemma unroll_between_contra' :
+  forall h a b c,
+    hash_injective_on_pair a b ->
+    a <> b ->
+    unroll_between_ptr h a b = true ->
+    unroll_between_ptr h c a = true ->
+    ~ ptr_between a c b.
+Proof.
+  intros. unfold unroll_between_ptr, unroll_between, ptr_between in *.
+  repeat break_if; auto; repeat find_rewrite; eauto using not_between_xxy, not_between_xyy, between_bool_between, between_swap_not, between_not_between, between_rot_l.
+  repeat find_apply_lem_hyp between_bool_between.
+  intro. find_apply_lem_hyp between_rot_l; eauto.
+  eapply between_not_between;
+    [| |eauto]; eauto.
+Qed.
+
+Lemma sorted_h_in :
+  forall h l,
+    In h l ->
+    exists xs,
+      sort_by_between h (map make_pointer l) = make_pointer h :: xs.
+Admitted.
+
+Lemma NoDup_prepend_h_chop_succs_tl :
+  forall h l,
+    In h l ->
+    NoDup l ->
+    NoDup (make_pointer h :: (chop_succs (List.tl (sort_by_between h (map make_pointer l))))).
+Proof.
+  intros.
+  assert (NoDup (map make_pointer l)).
+  { apply NoDup_map_injective; auto.
+    intros. unfold make_pointer in *. find_inversion. auto.
+  }
+  assert (NoDup (sort_by_between h (map make_pointer l))).
+  {
+    eapply NoDup_Permutation_NoDup; eauto.
+    unfold sort_by_between. eapply sort_permutes; eauto.
+  }
+  find_copy_apply_lem_hyp sorted_h_in. break_exists.
+  repeat find_rewrite. inv_prop NoDup.
+  simpl.
+  constructor; eauto using NoDup_chop_succs.
+  eauto using in_chop_succs.
+Qed.    
+
 Lemma initial_succ_lists_all_principal :
   forall p l,
+    (forall a b, In a l -> In b l -> hash a = hash b -> a = b) ->
     NoDup l ->
     In p l ->
     forall h a b,
+      In h l ->
       pair_in a b (hash h :: map id_of (chop_succs (List.tl (sort_by_between h (map make_pointer l))))) ->
       ~ between a (hash p) b.
 Proof.
@@ -650,18 +710,21 @@ Proof.
   change (between (id_of x) (hash p) (id_of x0)) with (ptr_between x (make_pointer p) x0).
   assert (sorted _ (unroll_between_ptr h) (sort_by_between h (map make_pointer l))) by
       eauto using sort_by_between_sorted.
-  assert (sorted _ (unroll_between (hash h)) (map id_of (List.tl (chop_succs (sort_by_between h (map make_pointer l)))))).
+  assert (sorted _ (unroll_between_ptr h) (tl (sort_by_between h (map make_pointer l)))) by
+      eauto using sorted_tl.
+  assert (sorted _ (unroll_between_ptr h) (chop_succs (tl (sort_by_between h (map make_pointer l))))) by
+      eauto using sorted_chop_succs.
+  assert (sorted _ (unroll_between_ptr h) (make_pointer h :: (chop_succs (tl (sort_by_between h (map make_pointer l)))))).
   {
-    eapply sorted_map; eauto using sorted_tl, sorted_chop_succs.
-    unfold unroll_between_ptr. auto.
+    eapply sorted_prepend_zero; eauto. intros.
+    unfold unroll_between_ptr, unroll_between. break_if; auto.
   }
-  assert (sorted _ (unroll_between (hash h)) (hash h ::map id_of (List.tl (chop_succs (sort_by_between h (map make_pointer l)))))).
+  find_copy_eapply_lem_hyp pair_in_sorted; eauto.
+  assert (x <> x0).
   {
-    eapply sorted_prepend_zero; eauto.
-    unfold unroll_between. break_if; intuition.
+    eapply NoDup_pair; [|eauto].
+    apply NoDup_prepend_h_chop_succs_tl; eauto.
   }
-
-  eapply sorted_by_between_list_elements_between_pair_eq_tl_chop in H1; eauto.
 Admitted.
 Hint Resolve initial_succ_lists_all_principal.
 
