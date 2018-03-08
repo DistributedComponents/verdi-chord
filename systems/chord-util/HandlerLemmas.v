@@ -1561,8 +1561,12 @@ Lemma in_concat :
       In xs l /\
       In x xs.
 Proof.
-Admitted.
-
+  induction l; intros; simpl in *; auto.
+  - intuition.
+  - in_crush; eauto.
+    break_exists_exists. intuition.
+Qed.
+    
 Lemma handle_query_req_GotPredAndSuccs_response_accurate :
   forall st src m ms,
     handle_query_req st src m = ms ->
