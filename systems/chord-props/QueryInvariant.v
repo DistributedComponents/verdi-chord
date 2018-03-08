@@ -279,13 +279,6 @@ Definition Request_payload_has_response (gst : global_state) : Prop :=
     exists m,
       request_response_pair p m.
 
-Theorem at_most_one_request_timeout_invariant :
-  forall gst h,
-    reachable_st gst ->
-    at_most_one_request_timeout gst h.
-Proof.
-Admitted.
-
 (* TODO(ryan) move to Chord.v *)
 Definition query_response_dec :
   forall q p,
@@ -920,3 +913,10 @@ Proof.
     
 Admitted.
 Hint Resolve query_message_ok_invariant.
+
+Theorem at_most_one_request_timeout_invariant :
+  forall gst h,
+    reachable_st gst ->
+    at_most_one_request_timeout gst h.
+Proof.
+Admitted.
