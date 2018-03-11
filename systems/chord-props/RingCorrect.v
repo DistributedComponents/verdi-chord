@@ -669,6 +669,8 @@ Lemma sorted_h_in :
     exists xs,
       sort_by_between h (map make_pointer l) = make_pointer h :: xs /\
       sorted _ (unroll_between_ptr h) (make_pointer h :: xs).
+Proof.
+  intros.
 Admitted.
 
 Lemma NoDup_prepend_h_chop_succs_tl :
@@ -711,16 +713,69 @@ Proof.
   intros. inv_prop @pair_in; intuition.
 Qed.
 
+Lemma sorted_pair_in_in' :
+  forall A (le : A -> A -> bool) (l1 l2 : list A) a b c,
+    (forall x y z, le x y = true -> le y z = true -> le x z = true) ->
+    pair_in a b l1 ->
+    sorted A le (l1 ++ l2) ->
+    In c l2 ->
+    le c a = true \/ le b c = true \/ c = a \/ c = b.
+Proof.
+  intros.
+  find_apply_lem_hyp pair_in_left.
+  right. left. eapply sorted_trans_app; eauto.
+Qed.
+
+Lemma sorted_pair_in_in'' :
+  forall A (le : A -> A -> bool) (l : list A) a b c,
+    (forall x y z, le x y = true -> le y z = true -> le x z = true) ->
+    pair_in a b l ->
+    sorted A le l ->
+    In c l ->
+    le c a = true \/ le b c = true \/ c = a \/ c = b.
+Proof.
+  induction 2.
+  - intros. in_crush.
+    inv_prop sorted. inv_prop sorted; in_crush.
+    right.left.
+    eapply sorted_trans; eauto. in_crush.
+  - intros. in_crush.
+    + find_apply_lem_hyp pair_in_right.
+      eauto using sorted_trans.
+    + inv_prop sorted; in_crush.
+Qed.
+
+Lemma sorted_app_l :
+  forall A le l1 l2,
+    sorted A le (l1 ++ l2) ->
+    sorted A le l1.
+Proof.
+  intros. induction l1; simpl in *; auto.
+  - constructor.
+  - inv_prop sorted.
+    + match goal with
+      | H : [] = _ |- _ => symmetry in H
+      end.
+      find_apply_lem_hyp app_eq_nil.
+      intuition. subst. constructor.
+    + repeat find_rewrite.
+      destruct l1; simpl in *; auto.
+      * constructor.
+      * find_inversion. intuition. constructor; auto.
+Qed.
+
 Lemma sorted_pair_in_in :
   forall A (le : A -> A -> bool) (l1 l2 : list A) a b c,
     (forall x y z, le x y = true -> le y z = true -> le x z = true) ->
     pair_in a b l1 ->
     sorted A le (l1 ++ l2) ->
-    pair_in a b l1 ->
     In c (l1 ++ l2) ->
     le c a = true \/ le b c = true \/ c = a \/ c = b.
 Proof.
-Admitted.
+  in_crush.
+  - eapply sorted_pair_in_in''; eauto using sorted_app_l.
+  - eapply sorted_pair_in_in'; eauto.
+Qed.
       
 Lemma initial_succ_lists_all_principal :
   forall p l,
