@@ -63,7 +63,12 @@ Lemma map_pair_in :
     b = f b0 ->
     pair_in a b (map f l).
 Proof.
-Admitted.
+  induction 0; intros.
+  - repeat inv_prop (@pair_in A).
+  - inv_prop (@pair_in A).
+    + constructor; eauto.
+    + constructor; eauto.
+Qed.
 
 Lemma pair_in_firstn :
   forall (A : Type) (a b : A) k l,
