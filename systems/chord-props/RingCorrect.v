@@ -663,15 +663,53 @@ Proof.
     [| |eauto]; eauto.
 Qed.
 
+Lemma sort_by_between_in :
+  forall h l p,
+    In p l ->
+    In p (sort_by_between h l).
+Proof.
+  intros. unfold sort_by_between.
+  eauto using sort_permutes, Permutation.Permutation_in.
+Qed.
+
 Lemma sorted_h_in :
   forall h l,
+    (forall a b, In a l -> In b l -> hash a = hash b -> a = b) ->
     In h l ->
     exists xs,
       sort_by_between h (map make_pointer l) = make_pointer h :: xs /\
       sorted _ (unroll_between_ptr h) (make_pointer h :: xs).
 Proof.
   intros.
-Admitted.
+  assert (sorted _ (unroll_between_ptr h) (sort_by_between h (map make_pointer l)))
+    by eauto using sort_by_between_sorted.
+  match goal with
+  | H : sorted _ _ _ |- _ =>
+    eapply sorted_zero_prefix with (wf := (wf h)) in H  
+  end;
+    eauto using pointer_eq_dec, unroll_between_zero, unroll_between_ptr_trans.
+  - break_exists_name xs. break_exists_name ys.
+    destruct xs.
+    + intuition. exfalso.
+      assert (In (make_pointer h) (sort_by_between h (map make_pointer l))).
+      {
+        apply sort_by_between_in. in_crush.
+      }
+      repeat find_rewrite. simpl in *. eauto.
+    + intuition. simpl in *.
+      assert (p = make_pointer h) by auto.
+      subst.
+      simpl in *. exists (xs ++ ys). intuition.
+      repeat find_reverse_rewrite.
+      eauto using sort_by_between_sorted.
+  - intros.
+    unfold wf in *. intuition.
+    apply unroll_between_zero'; eauto using make_pointer_wf.
+  - intros.
+    find_apply_lem_hyp in_sort_by_between. in_crush.
+    unfold wf. intuition; eauto using make_pointer_wf.
+    unfold hash_injective_on_pair. simpl. intros. f_equal. eauto.
+Qed.
 
 Lemma NoDup_prepend_h_chop_succs_tl :
   forall h l,
@@ -696,14 +734,6 @@ Proof.
   eauto using in_chop_succs.
 Qed.    
 
-Lemma sort_by_between_in :
-  forall h l p,
-    In p l ->
-    In p (sort_by_between h l).
-Proof.
-  intros. unfold sort_by_between.
-  eauto using sort_permutes, Permutation.Permutation_in.
-Qed.
 
 Lemma pair_in_cons :
   forall A (a : A) b c l,
