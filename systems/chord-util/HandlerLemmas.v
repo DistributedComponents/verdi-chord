@@ -1661,32 +1661,30 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma initial_esl_is_sorted_nodes_chopped :
-  forall h ns,
-    hash h :: map id_of (find_succs h (sort_by_between h (map make_pointer ns))) =
-    map id_of (chop_succs (sort_by_between h (map make_pointer (h :: ns)))).
+Lemma sort_one_element :
+  forall h x,
+    sort_by_between h [x] = [x].
 Proof.
-move => h ns.
-rewrite map_cons /= {2}/sort_by_between.
-Admitted.
-
-Lemma in_find_succs :
-  forall x h l,
-    In x (find_succs h l) ->
-    In x l.
-Proof.
-  move => x h.
-  elim => //=.
-  move => a l IH.
-  break_if => H_in.
-  - by right; apply IH.
-  - rewrite /chop_succs in H_in.
-    apply in_firstn in H_in.
-    rewrite /= in H_in.
-    break_or_hyp; first by left.
-    by right.
+  intros. unfold sort_by_between, Sorting.sort, Sorting.iter_merge.
+  reflexivity.
 Qed.
 
+
+Lemma length_chop_succs :
+  forall l,
+    length (chop_succs l) <= SUCC_LIST_LEN.
+Proof.
+  intros. unfold chop_succs. apply firstn_le_length.
+Qed.
+
+Lemma chop_succs_short_list :
+  forall l,
+    length l <= SUCC_LIST_LEN ->
+    chop_succs l = l.
+Proof.
+  eauto using firstn_all2.
+Qed.
+  
 Lemma in_sort_by_between :
   forall x h l,
     In x (sort_by_between h l) ->
@@ -1698,25 +1696,4 @@ Proof.
   eapply sort_by_between_permutes.
   eauto.
   eauto.
-Qed.
-
-Lemma sorted_list_elements_not_between :
-  forall p l,
-    In p l ->
-    forall a b h,
-      pair_in a b (sort_by_between h l) ->
-      ~ ptr_between a p b.
-Proof.
-Admitted.
-
-Lemma sorted_list_chopped_elements_not_between :
-  forall p l,
-    In p l ->
-    forall a b h,
-      pair_in a b (chop_succs (sort_by_between h l)) ->
-      ~ ptr_between a p b.
-Proof.
-  intros.
-  unfold chop_succs in *.
-  eauto using pair_in_firstn, sorted_list_elements_not_between.
 Qed.

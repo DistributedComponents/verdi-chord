@@ -56,6 +56,15 @@ Proof.
         do 2 eexists; repeat split; try constructor; eauto.
 Qed.
 
+Lemma map_pair_in :
+  forall A B (f : A -> B) a b a0 b0 l,
+    pair_in a0 b0 l ->
+    a = f a0 ->
+    b = f b0 ->
+    pair_in a b (map f l).
+Proof.
+Admitted.
+
 Lemma pair_in_firstn :
   forall (A : Type) (a b : A) k l,
     pair_in a b (firstn k l) ->

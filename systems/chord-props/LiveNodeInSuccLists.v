@@ -18,6 +18,14 @@ Require Import Chord.StabilizeOnlyWithFirstSucc.
 
 Set Bullet Behavior "Strict Subproofs".
 
+Lemma in_tl :
+  forall A x (l : list A),
+    In x (tl l) ->
+    In x l.
+Proof.
+  induction l; simpl; tauto.
+Qed.
+
 Theorem live_node_invariant_init :
   chord_init_invariant (fun gst => live_node_in_succ_lists gst /\
                                 live_node_in_msg_succ_lists gst).
@@ -43,9 +51,10 @@ Proof.
          congruence.
       * intros; simpl in *; tauto.
       * eapply initial_nodes_live; eauto.
-         assert (In p (find_succs h (sort_by_between h (map make_pointer (nodes gst)))))
+         assert (In p (chop_succs (List.tl (sort_by_between h (map make_pointer (nodes gst))))))
            by (cut (In p (p :: l)); [congruence | auto with datatypes]).
-         find_apply_lem_hyp in_find_succs.
+         find_apply_lem_hyp in_firstn.
+         find_apply_lem_hyp in_tl.
          find_apply_lem_hyp in_sort_by_between.
          find_apply_lem_hyp in_map_iff; expand_def.
          easy.

@@ -4,10 +4,9 @@
 
 ## Configuration options for coqproject.sh
 DEPS=(StructTact InfSeqExt Verdi)
-DIRS=(core deps systems/chord systems/chord-util systems/chord-props lib extraction/chord/coq)
+DIRS=(core systems/chord systems/chord-util systems/chord-props lib extraction/chord/coq)
 NAMESPACE_core="Verdi"
 NAMESPACE_systems="Chord"
-NAMESPACE_deps="Chord"
 NAMESPACE_lib="Chord"
 NAMESPACE_systems_chord_util="Chord"
 NAMESPACE_systems_chord_props="Chord"

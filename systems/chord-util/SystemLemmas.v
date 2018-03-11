@@ -735,7 +735,7 @@ Lemma start_handler_init_state_preset :
     start_handler h knowns =
     (init_state_preset h
                        (find_pred h (sort_by_between h (map make_pointer knowns)))
-                       (find_succs h (sort_by_between h (map make_pointer knowns))),
+                       (chop_succs (List.tl (sort_by_between h (map make_pointer knowns)))),
      nil,
      Tick :: nil).
 Proof.
@@ -823,7 +823,7 @@ Theorem initial_succ_list :
     initial_st gst ->
     In h (nodes gst) ->
     sigma gst h = Some st ->
-    succ_list st = find_succs h (sort_by_between h (map make_pointer (nodes gst))).
+    succ_list st = chop_succs (List.tl (sort_by_between h (map make_pointer (nodes gst)))).
 Proof.
   intros.
   inv_prop initial_st; break_and.
@@ -859,7 +859,7 @@ Qed.
 Lemma initial_successor_lists_full :
   forall h gst,
     initial_st gst ->
-    length (find_succs h (sort_by_between h (map make_pointer (nodes gst)))) = SUCC_LIST_LEN.
+    length (chop_succs (List.tl (sort_by_between h (map make_pointer (nodes gst))))) = SUCC_LIST_LEN.
 Proof.
   intros.
   pose proof (sorted_knowns_same_length h (nodes gst)).
@@ -873,29 +873,14 @@ Proof.
   rewrite -/mm in H_nd.
   apply NoDup_Permutation_NoDup in H_pm => //.
   move: H_pm H_le.
-  set l := sort_by_between _ _.
-  case: l => /=.
-  - move => H_nd' H_le.
-    by omega.
-  - move => a l H_nd' H_le.
-    have H_le': length l >= SUCC_LIST_LEN by omega.
-    break_if.
-    * inversion H_nd'.
-      subst.
-      move: H11 H_le' {H12 H_nd' H_le}.
-      case: l => /=.
-      + move => H_in H_le.
-        by auto with arith.
-      + move => a l H_in H_le.
-        have H_neq: a <> make_pointer h by auto.
-        break_if => //.
-        rewrite /chop_succs.
-        rewrite firstn_length /=.
-        by rewrite min_l.
-    * rewrite /chop_succs.
-      rewrite firstn_length /=.
-      rewrite min_l //.
-      by auto with arith.
+  destruct (sort_by_between _ _) eqn:?.
+  - subst; move => H_nd' H_le.
+    simpl in *; omega.
+  - intros.
+    simpl in *.
+    rewrite /chop_succs.
+    rewrite firstn_length /=.
+    rewrite min_l; omega.
 Qed.
 
 Lemma best_succ_preserved :
