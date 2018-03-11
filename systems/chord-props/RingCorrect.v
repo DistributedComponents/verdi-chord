@@ -713,6 +713,7 @@ Qed.
 
 Lemma NoDup_prepend_h_chop_succs_tl :
   forall h l,
+    (forall a b, In a l -> In b l -> hash a = hash b -> a = b) ->
     In h l ->
     NoDup l ->
     NoDup (make_pointer h :: (chop_succs (List.tl (sort_by_between h (map make_pointer l))))).
@@ -727,7 +728,7 @@ Proof.
     eapply NoDup_Permutation_NoDup; eauto.
     unfold sort_by_between. eapply sort_permutes; eauto.
   }
-  find_copy_apply_lem_hyp sorted_h_in. break_exists. intuition.
+  find_copy_apply_lem_hyp sorted_h_in; eauto. break_exists. intuition.
   repeat find_rewrite. inv_prop NoDup.
   simpl.
   constructor; eauto using NoDup_chop_succs.
@@ -767,7 +768,7 @@ Proof.
   induction 2.
   - intros. in_crush.
     inv_prop sorted. inv_prop sorted; in_crush.
-    right.left.
+    right. left.
     eapply sorted_trans; eauto. in_crush.
   - intros. in_crush.
     + find_apply_lem_hyp pair_in_right.
@@ -855,7 +856,7 @@ Proof.
   assert (In (make_pointer p) (map make_pointer l)) by in_crush.
   assert (In (make_pointer p) (sort_by_between h (map make_pointer l)))
     by eauto using sort_by_between_in.
-  find_copy_apply_lem_hyp sorted_h_in. break_exists. break_and.
+  find_copy_apply_lem_hyp sorted_h_in; eauto. break_exists. break_and.
   repeat find_rewrite.
   pose proof chop_succs_partition x1. break_exists.
   cbv [tl] in *.
