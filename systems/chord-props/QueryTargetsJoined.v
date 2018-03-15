@@ -10,6 +10,7 @@ Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
+Require Import Chord.SuccessorNodesAlwaysValid.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -199,14 +200,77 @@ Theorem join2_target_joined :
 Proof.
 Admitted.
 
+
+Lemma first_elem_in :
+  forall A (P Q : A -> Prop) l,
+    (forall y, In y l -> P y \/ Q y) ->
+    (forall y, In y l -> Q y -> ~ P y) ->
+    (forall y, In y l -> P y -> ~ Q y) ->
+    forall x,
+    In x l ->
+    P x ->
+    exists y xs ys,
+      l = xs ++ y :: ys /\
+      (forall z, In z xs -> Q z) /\
+      P y.
+Proof.
+  induction l; intros; try solve_by_inversion.
+  in_crush.
+  - exists x. exists []. exists l. intuition.
+    solve_by_inversion.
+  - assert (P a \/ Q a); intuition.
+    + exists a. exists []. exists l. intuition. solve_by_inversion.
+    + repeat conclude_using in_crush.
+      forward IHl; [firstorder|]. concludes.
+      forward IHl; [firstorder|]. concludes.
+      specialize (IHl x). intuition.
+      break_exists_name y. exists y.
+      break_exists_name xs. exists (a :: xs).
+      break_exists_exists.
+      intuition; simpl; try congruence.
+      in_crush.
+Qed.
+
+Lemma live_node_not_dead_node :
+  forall gst x,
+    live_node gst x -> ~ dead_node gst x.
+Proof.
+  unfold live_node, dead_node. intuition.
+Qed.
+
+Lemma dead_node_not_live_node :
+  forall gst x,
+    dead_node gst x -> ~ live_node gst x.
+Proof.
+  unfold live_node, dead_node. intuition.
+Qed.
+
 Theorem live_node_in_succs_best_succ :
   forall gst h st l,
     reachable_st gst ->
     sigma gst h = Some st ->
     live_node gst l ->
+    live_node gst h ->
     In l (map addr_of (succ_list st)) ->
     exists s, best_succ gst h s.
 Proof.
-  
   intros.
-Admitted.
+  pose proof (first_elem_in _ (live_node gst) (dead_node gst) (map addr_of (succ_list st))).
+  forwards.
+  {
+    intros. 
+    find_apply_lem_hyp in_map_iff.
+    break_exists. intuition. subst.
+    find_apply_lem_hyp successor_nodes_always_valid.
+    eapply_prop_hyp successor_nodes_valid In; conclude_using eauto.
+    intuition.
+    unfold live_node, dead_node.
+    destruct (in_dec addr_eq_dec (addr_of x) (failed_nodes gst)); intuition.
+    right. intuition. 
+    break_exists_exists. intuition.
+  } repeat conclude_using ltac:(eauto using live_node_not_dead_node, dead_node_not_live_node).
+  clear H5. eapply_prop_hyp In In; eauto.
+  break_exists_exists.
+  unfold best_succ. exists st. break_exists_exists.
+  intuition.
+Qed.
