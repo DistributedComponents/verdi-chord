@@ -8,6 +8,9 @@ Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
+Require Import Chord.TimeoutMeansActive.
+Require Import Chord.NodesHaveState.
+
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -919,4 +922,19 @@ Theorem at_most_one_request_timeout_invariant :
     reachable_st gst ->
     at_most_one_request_timeout gst h.
 Proof.
-Admitted.
+  intros.
+  find_copy_apply_lem_hyp timeout_means_active_inductive.
+  destruct (timeouts gst h) eqn:?.
+  - unfold at_most_one_request_timeout, at_most_one_request_timeout'.
+    intuition. repeat find_rewrite. destruct xs; simpl in *; congruence.
+  - match goal with
+    | H : timeout_means_active_invariant _ |- _ =>
+      specialize (H h t)
+    end.
+    forwards; [repeat find_rewrite; in_crush|].
+    concludes.
+    find_copy_apply_lem_hyp nodes_have_state; eauto.
+    break_exists.
+    find_eapply_lem_hyp cur_request_timeouts_related_invariant_elim; eauto.
+    inv_prop cur_request_timeouts_ok; intuition.
+Qed.
