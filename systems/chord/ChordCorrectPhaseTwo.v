@@ -496,6 +496,35 @@ Definition no_joins (gst gst' : global_state) :=
     live_node gst' h ->
     live_node gst h.
 
+Definition n_unjoined_nodes gst := length (nodes gst) - length (live_addrs gst).
+
+Lemma n_unjoined_nodes_nonincreasing :
+  forall ex,
+    lb_execution ex ->
+    always (consecutive (measure_nonincreasing n_unjoined_nodes)) ex.
+Admitted.
+
+Lemma eventually_n_unjoined_nodes_stable :
+  forall ex,
+    lb_execution ex ->
+    exists x,
+      continuously (now (fun o => n_unjoined_nodes (occ_gst o) = x)) ex.
+Proof.
+  intros. eauto using n_unjoined_nodes_nonincreasing, measure_nonincreasing_eventually_stable.
+Qed.
+
+Lemma always_now_consecutive :
+  forall T P (s : infseq T),
+    always (now P) s ->
+    always (consecutive (fun o o' => P o /\ P o')) s.
+Proof.
+  cofix. intros.
+  destruct s.
+  constructor.
+  - destruct s. simpl. do 2 inv_prop always. simpl in *. auto.
+  - simpl. inversion H. simpl in *. eauto.
+Qed.
+
 Theorem joins_stop :
   forall ex,
     lb_execution ex ->
@@ -504,6 +533,25 @@ Theorem joins_stop :
     strong_local_fairness ex ->
     continuously (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex.
 Proof.
+  intros.
+  find_copy_eapply_lem_hyp eventually_n_unjoined_nodes_stable.
+  break_exists.
+  unfold continuously in *.
+  eapply eventually_monotonic_simple; [|eauto]; eauto.
+  intros.
+  find_eapply_lem_hyp always_now_consecutive.
+  assert (always lb_execution ex) by eauto using always_inv,lb_execution_invar.
+  
+  {
+    apply always_inv; eauto using lb_execution_invar.
+  }
+  eapply always_monotonic; [|eauto].
+  intros.
+  eapply consecutive_monotonic; [|eauto].
+  intros. simpl in *.
+  intuition. 
+  eapply continuously_monotonic; [|eauto]; eauto.
+  
 (*
 Since nodes only set joined=true some time after they are added to the network
 and no new nodes are added to the network in an lb_execution, joins have to
