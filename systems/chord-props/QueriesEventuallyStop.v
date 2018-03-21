@@ -1,6 +1,7 @@
 Require Import List.
 Import ListNotations.
 Require Import Relations.
+Require Import Omega.
 
 Require Import StructTact.StructTactics.
 Require Import InfSeqExt.infseq.
@@ -10,13 +11,14 @@ Require Import Chord.Chord.
 
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
+Require Import Chord.LabeledLemmas.
 Require Import Chord.QueryInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
 
-(* The (waits_on gst) relation relates a live node h to a node s when
+(* The (blocked_by s h) relation relates a live node h to a node s when
    a message from h is stored in the delayed_queries list at s. *)
-Definition waits_on (gst : global_state) (h s : addr) : Prop :=
+Definition blocked_by (gst : global_state) (s h : addr) : Prop :=
   In h (nodes gst) /\
   In s (nodes gst) /\
   exists st__h st__s dstp q m,
@@ -32,10 +34,10 @@ Definition has_cycle {A : Type} (R : A -> A -> Prop) : Prop :=
   exists x,
     clos_trans_1n A R x x.
 
-(* A circular wait (in a given state) is a cycle in the waits_on
+(* A circular wait (in a given state) is a cycle in the blocked_by
    relation (for that state). *)
 Definition circular_wait (occ : occurrence) : Prop :=
-  has_cycle (waits_on (occ_gst occ)).
+  has_cycle (blocked_by (occ_gst occ)).
 
 Inductive fin_chain {A : Type} (R : A -> A -> Prop) : list A -> Prop :=
 | FinChainNil : fin_chain R []
@@ -44,6 +46,7 @@ Inductive fin_chain {A : Type} (R : A -> A -> Prop) : list A -> Prop :=
     R x y ->
     fin_chain R (y :: l) ->
     fin_chain R (x :: y :: l).
+Hint Constructors fin_chain.
 
 Theorem pigeon_cycle :
   forall A (R : A -> A -> Prop) l,
@@ -79,7 +82,7 @@ Theorem never_stopping_means_stuck_on_a_single_query :
       cur_request st = Some (dstp, q, m) ->
       always (~_ (now circular_wait)) ex ->
       always (now (fun o => forall st',
-                           sigma (occ_gst o) h = Some st' /\
+                           sigma (occ_gst o) h = Some st' ->
                            cur_request st' <> None)) ex ->
       exists dstp' q' m',
         continuously (now (fun o =>
@@ -106,9 +109,95 @@ Theorem stuck_on_a_single_query_means_target_is_too :
     exists dstp' q' m',
       continuously (now (fun o =>
                            forall st',
-                             sigma (occ_gst o) (addr_of dstp') = Some st' ->
+                             sigma (occ_gst o) (addr_of dstp) = Some st' ->
                              cur_request st' = Some (dstp', q', m')))
                    ex.
+Proof.
+Admitted.
+
+Lemma now_const :
+  forall T (P : T -> Prop),
+    (forall t, P t) ->
+    forall ex,
+      (now P) ex.
+Proof.
+  destruct ex.
+  simpl; auto.
+Qed.
+Hint Resolve now_const.
+
+Lemma always_const :
+  forall T (P : infseq T -> Prop),
+    (forall s, P s) ->
+    forall ex,
+      always P ex.
+Proof.
+  intros.
+  eapply always_monotonic; [|eapply always_true].
+  auto.
+Qed.
+Hint Resolve always_const.
+
+Theorem query_always_stuck_gives_chain :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    always (~_ (now circular_wait)) ex ->
+    forall dstp q m,
+      always (now (fun o => forall st,
+                       sigma (occ_gst o) h = Some st ->
+                       cur_request st = Some (dstp, q, m)))
+           ex ->
+    forall k,
+      k >= 1 ->
+      exists c,
+        length c = k /\
+        In h c /\
+        continuously
+          (now (fun occ => fin_chain (blocked_by (occ_gst occ)) c)) ex.
+Proof.
+  intros.
+  generalizeEverythingElse k.
+  induction k as [|[|?]]; intros.
+  - omega.
+  - exists [h]; intuition.
+    constructor; eauto.
+  - find_copy_eapply_lem_hyp IHk; eauto; [|omega].
+    break_exists_name c; intuition.
+    induction H9; intros; subst.
+    + destruct c as [|w [|w' c]];
+        [simpl in * |-; tauto| |].
+      * assert (w = h) by (simpl in *; tauto); subst.
+        exists [addr_of dstp; h]; intuition.
+        simpl in *; congruence.
+        find_copy_apply_lem_hyp stuck_on_a_single_query_means_target_is_too; eauto.
+        break_exists.
+        admit.
+      * admit.
+    + assert (exists c : list addr,
+                 length c = S (S n) /\
+                 In h c /\
+                 continuously (now (fun occ : occurrence => fin_chain (blocked_by (occ_gst occ)) c)) s)
+        by (eapply IHeventually; invar_eauto).
+      break_exists_exists; intuition.
+      constructor; now auto.
+Admitted.
+
+Theorem queries_dont_always_not_stop :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    forall st dstp q m,
+      sigma (occ_gst (hd ex)) h = Some st ->
+      cur_request st = Some (dstp, q, m) ->
+      always (~_ (now circular_wait)) ex ->
+      ~ always (now (fun o => forall st',
+                         sigma (occ_gst o) h = Some st' ->
+                         cur_request st' <> None)) ex.
 Proof.
 Admitted.
 
@@ -123,24 +212,18 @@ Theorem queries_eventually_stop' :
       cur_request st = Some (dstp, q, m) ->
       always (~_ (now circular_wait)) ex ->
       eventually (now (fun o => forall st',
-                           sigma (occ_gst o) h = Some st' /\
+                           sigma (occ_gst o) h = Some st' ->
                            cur_request st' = None)) ex.
 Proof.
   intros.
-  assert (exists st__dst, sigma (occ_gst (hd ex)) (addr_of dstp) = Some st__dst) by admit.
-  break_exists_name st__dst.
-  set (gst := occ_gst (hd ex)).
-  assert (query_message_ok h (addr_of dstp) (cur_request st) (delayed_queries st__dst)
-                           (channel gst h (addr_of dstp)) (channel gst (addr_of dstp) h))
-    by eauto using query_message_ok_invariant.
-  inv_prop query_message_ok.
-  - congruence.
-  - congruence.
-  - repeat (find_rewrite || find_injection).
-    admit.
-  - admit.
-  - admit.
-Admitted.
+  find_eapply_lem_hyp queries_dont_always_not_stop; eauto.
+  eapply not_always_eventually_not in H5.
+  eapply eventually_monotonic_simple; [|eassumption].
+  unfold not_tl; destruct s; simpl.
+  intros.
+  apply Classical_Prop.NNPP.
+  firstorder.
+Qed.
 
 (** the big assumption for inf_often stabilization *)
 Theorem queries_eventually_stop :
