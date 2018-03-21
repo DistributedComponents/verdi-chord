@@ -6,6 +6,7 @@ Require Import Omega.
 Require Import StructTact.StructTactics.
 Require Import InfSeqExt.infseq.
 Require Import InfSeqExt.classical.
+Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
 
@@ -57,7 +58,7 @@ Theorem pigeon_cycle :
     has_cycle R.
 Proof.
 (* not sure I need this machinery yet *)
-Abort.
+Admitted.
 
 Definition busy_if_live (h : addr) (occ : occurrence) :=
   forall st,
@@ -71,29 +72,7 @@ Definition not_busy_if_live (h : addr) (occ : occurrence) :=
     sigma (occ_gst occ) h = Some st ->
     cur_request st = None.
 
-Theorem never_stopping_means_stuck_on_a_single_query :
-  forall ex h,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    live_node (occ_gst (hd ex)) h ->
-    forall st dstp q m,
-      sigma (occ_gst (hd ex)) h = Some st ->
-      cur_request st = Some (dstp, q, m) ->
-      always (~_ (now circular_wait)) ex ->
-      always (now (fun o => forall st',
-                           sigma (occ_gst o) h = Some st' ->
-                           cur_request st' <> None)) ex ->
-      exists dstp' q' m',
-        continuously (now (fun o =>
-                             forall st',
-                               sigma (occ_gst o) h = Some st' ->
-                               cur_request st' = Some (dstp', q', m')))
-                     ex.
-Proof.
-Admitted.
-
-Theorem stuck_on_a_single_query_means_target_is_too :
+Theorem stuck_on_a_single_query_means_blocked :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
@@ -106,12 +85,7 @@ Theorem stuck_on_a_single_query_means_target_is_too :
                      sigma (occ_gst o) h = Some st ->
                      cur_request st = Some (dstp, q, m)))
              ex ->
-    exists dstp' q' m',
-      continuously (now (fun o =>
-                           forall st',
-                             sigma (occ_gst o) (addr_of dstp) = Some st' ->
-                             cur_request st' = Some (dstp', q', m')))
-                   ex.
+      continuously (now (fun o => blocked_by (occ_gst o) (addr_of dstp) h)) ex.
 Proof.
 Admitted.
 
@@ -138,8 +112,30 @@ Proof.
 Qed.
 Hint Resolve always_const.
 
+Lemma blocking_node_continuously_also_blocked :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    forall h s,
+      always (now (fun o => blocked_by (occ_gst o) s h)) ex ->
+      exists w,
+        continuously (now (fun o => blocked_by (occ_gst o) w s)) ex.
+Proof.
+Admitted.
+
+Lemma now_and_tl_comm :
+  forall T (P Q : T -> Prop) s,
+    (now P /\_ now Q) s = now (fun o => P o /\ Q o) s.
+Proof.
+  intros.
+  destruct s.
+  reflexivity.
+Qed.
+Hint Rewrite now_and_tl_comm.
+
 Theorem query_always_stuck_gives_chain :
-  forall ex h,
+  forall k ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
     strong_local_fairness ex ->
@@ -150,7 +146,6 @@ Theorem query_always_stuck_gives_chain :
                        sigma (occ_gst o) h = Some st ->
                        cur_request st = Some (dstp, q, m)))
            ex ->
-    forall k,
       k >= 1 ->
       exists c,
         length c = k /\
@@ -158,8 +153,6 @@ Theorem query_always_stuck_gives_chain :
         continuously
           (now (fun occ => fin_chain (blocked_by (occ_gst occ)) c)) ex.
 Proof.
-  intros.
-  generalizeEverythingElse k.
   induction k as [|[|?]]; intros.
   - omega.
   - exists [h]; intuition.
@@ -172,10 +165,27 @@ Proof.
       * assert (w = h) by (simpl in *; tauto); subst.
         exists [addr_of dstp; h]; intuition.
         simpl in *; congruence.
-        find_copy_apply_lem_hyp stuck_on_a_single_query_means_target_is_too; eauto.
-        break_exists.
-        admit.
-      * admit.
+        find_copy_eapply_lem_hyp stuck_on_a_single_query_means_blocked; eauto.
+        find_apply_lem_hyp always_continuously.
+        find_continuously_and_tl.
+        eapply continuously_monotonic; try eassumption.
+        intro s0; rewrite now_and_tl_comm.
+        apply now_monotonic; intuition eauto.
+      * assert (always (now (fun o => blocked_by (occ_gst o) w w')) s).
+        {
+          eapply always_monotonic;
+            [eapply now_monotonic|eassumption].
+          intros; now inv_prop @fin_chain.
+        }
+        find_eapply_lem_hyp blocking_node_continuously_also_blocked; eauto.
+        break_exists_name w0.
+        exists (w0 :: w :: w' :: c).
+        intuition; simpl in *; try omega.
+        find_apply_lem_hyp always_continuously.
+        find_continuously_and_tl.
+        eapply continuously_monotonic; try eassumption.
+        intro s0; rewrite now_and_tl_comm.
+        apply now_monotonic; intuition eauto.
     + assert (exists c : list addr,
                  length c = S (S n) /\
                  In h c /\
@@ -183,6 +193,28 @@ Proof.
         by (eapply IHeventually; invar_eauto).
       break_exists_exists; intuition.
       constructor; now auto.
+Qed.
+
+Theorem never_stopping_means_stuck_on_a_single_query :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    forall st dstp q m,
+      sigma (occ_gst (hd ex)) h = Some st ->
+      cur_request st = Some (dstp, q, m) ->
+      always (~_ (now circular_wait)) ex ->
+      always (now (fun o => forall st',
+                           sigma (occ_gst o) h = Some st' ->
+                           cur_request st' <> None)) ex ->
+      exists dstp' q' m',
+        continuously (now (fun o =>
+                             forall st',
+                               sigma (occ_gst o) h = Some st' ->
+                               cur_request st' = Some (dstp', q', m')))
+                     ex.
+Proof.
 Admitted.
 
 Theorem queries_dont_always_not_stop :
@@ -199,7 +231,43 @@ Theorem queries_dont_always_not_stop :
                          sigma (occ_gst o) h = Some st' ->
                          cur_request st' <> None)) ex.
 Proof.
-Admitted.
+  intuition.
+  cut (eventually (now circular_wait) ex).
+  {
+    intros.
+    clear H3.
+    induction H7.
+    -  repeat find_apply_lem_hyp always_now'.
+       unfold not_tl in *.
+       destruct s; auto.
+    - apply IHeventually; invar_eauto.
+  }
+  find_eapply_lem_hyp never_stopping_means_stuck_on_a_single_query; eauto; break_exists.
+  match goal with
+  | H: sigma _ h = Some _ |- _ => clear H
+  end.
+  match goal with
+  | H: continuously _ _ |- _ => induction H
+  end.
+  - remember (length (nodes (occ_gst (hd s)))) as k.
+    find_eapply_lem_hyp (query_always_stuck_gives_chain (S k)); omega || eauto.
+    break_exists; break_and.
+    match goal with
+    | H: continuously _ _ |- _ => induction H
+    end.
+    + destruct s; apply E0.
+      find_apply_lem_hyp always_now'; simpl in *.
+      eapply pigeon_cycle with (l := nodes (occ_gst o));
+        [|eassumption|omega].
+      intros; inv_prop blocked_by; tauto.
+    + eapply E_next, IHeventually; invar_eauto.
+      inv_prop lb_execution.
+      inv_prop labeled_step_dynamic;
+        simpl;
+        repeat (find_rewrite || find_injection);
+        auto using apply_handler_result_nodes.
+  - eapply E_next, IHeventually; invar_eauto.
+Qed.
 
 Theorem queries_eventually_stop' :
   forall ex h,
