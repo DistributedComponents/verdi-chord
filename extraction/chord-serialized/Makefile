@@ -7,7 +7,8 @@ default: chordserialized.native client.native
 $(CHORDSERIALIZEDMLFILES):
 	+$(MAKE) -C ../.. extraction/chord-serialized/$@
 
-chordserialized.native: $(CHORDSERIALIZEDMLFILES) ml/*.ml
+chordserialized.native: $(CHORDSERIALIZEDMLFILES) ml/*.ml scripts/remove_module.pl
+	perl scripts/remove_module.pl coq/ExtractedChordSerialized
 	$(OCAMLBUILD) chordserialized.native
 
 client.native: $(CHORDSERIALIZEDMLFILES) ml/client.ml

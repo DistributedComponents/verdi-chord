@@ -116,9 +116,15 @@ module ChordSerializedArrangement (C : ChordSerializedConfig) = struct
   let timeout_handler n s t =
     rebracket4 (handleTimeout n s t)
 
-  let deserialize_msg b = Marshal.from_bytes b 0
-
-  let serialize_msg msg = Marshal.to_bytes msg []
+  let deserialize_msg b =
+    match (Serializer_primitives.deserialize_top
+             ExtractedChordSerialized.payload_deserialize
+             b) with
+    | Some a -> a
+    | _ -> failwith "Received undeserializable message"
+                        
+  let serialize_msg msg = Serializer_primitives.wire_wrap (ExtractedChordSerialized.payload_serialize msg)
+  (* Marshal.to_bytes msg [] *)
 
   let fuzzy_timeout t =
     let fuzz = max (t /. 5.0) 2.0 in

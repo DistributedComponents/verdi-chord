@@ -9,6 +9,8 @@ Require Import ExtrOcamlNatInt.
 Require Import Chord.ChordSerialized.
 Import ChordSerialized.
 
+Require Import Cheerios.ExtrOcamlCheeriosBasic.
+
 Extract Inlined Constant ChordSerialized.SUCC_LIST_LEN => "3".
 
 (* We use the ocaml standard library implementation of MD5 to compute IDs. Since
@@ -40,4 +42,7 @@ Extraction "extraction/chord-serialized/coq/ExtractedChordSerialized.ml"
            is_request
            ascii_to_id
            id_to_ascii
-           forge_pointer.
+           forge_pointer
+
+           payload_serialize
+           payload_deserialize.

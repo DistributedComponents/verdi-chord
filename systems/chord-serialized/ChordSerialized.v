@@ -1064,7 +1064,7 @@ Proof.
 Qed.
 
 (* payload *)
-Definition payload_serialize (pl : payload) :=
+Definition payload_serialize (pl : ChordSerializedSystem.payload) :=
   match pl with
   | Busy => serialize x00
   | GetBestPredecessor ptr => serialize x01 +$+ serialize ptr
