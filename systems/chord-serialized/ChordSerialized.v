@@ -1192,3 +1192,127 @@ Proof.
              deserialize := query_deserialize;
              serialize_deserialize_id := query_serialize_deserialize_id |}.
 Qed.
+
+Module Type SerializableSystem.
+  Include DynamicSystem.
+  Parameter payload_serializer : Serializer payload.
+  Parameter default_payload : payload. (* in case deserialization fails but value needed (avoid) *)
+End SerializableSystem.
+
+
+Module SerializedSystem (S : SerializableSystem) <: DynamicSystem.
+  Definition addr := S.addr.
+  Definition client_addr := S.client_addr.
+  Definition client_addr_dec := S.client_addr_dec.
+  Definition addr_eq_dec := S.addr_eq_dec.
+  Definition payload := IOStreamWriter.wire.
+  Definition payload_eq_dec := IOStreamWriter.wire_eq_dec.
+
+  Inductive serialized_client_payload (p : payload) : Prop :=
+  | aoeiu (x : exists p', deserialize_top deserialize p = Some p' /\ S.client_payload p').
+
+  Definition client_payload := serialized_client_payload.
+
+  Lemma client_payload_dec : forall (p : payload), {client_payload p} + {~ client_payload p}.
+  Proof.
+    intros.
+    destruct (deserialize_top deserialize p) eqn:H.
+    - destruct (S.client_payload_dec p0) eqn:G.
+      + unfold client_payload.
+        left.
+        constructor.
+        exists p0.
+        auto.
+      + right.
+        unfold not.
+        intros.
+        unfold client_payload in *.
+        unfold client_payload in *.
+        match goal with
+        | H : context[serialized_client_payload] |- _ => destruct H
+        end.
+        break_exists.
+        break_and.
+        find_rewrite.
+        find_inversion.
+        congruence.
+    - right.
+      unfold not.
+      intros.
+      unfold client_payload in *.
+      match goal with
+      | H : context[serialized_client_payload] |- _ => destruct H
+      end.
+      break_exists.
+      break_and.
+      congruence.
+  Qed.
+
+  Definition data := S.data.
+  Definition timeout := S.timeout.
+  Definition timeout_eq_dec := S.timeout_eq_dec.
+  Definition label := S.label.
+  Definition label_eq_dec := S.label_eq_dec.
+
+  Definition serialize_msg (a : addr * S.payload) :=
+    match a with
+    | (a, p) => (a, serialize_top (serialize p))
+    end.
+
+  Definition start_handler a l :=
+    match S.start_handler a l with
+    | (st, ms, ts) => (st, map serialize_msg ms, ts)
+    end.
+
+  Definition res := (data * list (addr * payload) * list timeout * list timeout)%type.
+
+  Definition serialize_res (r : S.res) : res := match r with
+                                                | (st, msgs, ts1, ts2) =>
+                                                  (st, map serialize_msg msgs, ts1, ts2)
+                                                end.
+
+  Definition try_deserialize p := match deserialize_top deserialize p with
+                               | Some p' => p'
+                               | None => S.default_payload
+                               end.
+
+  Definition recv_handler (src : addr) (dst : addr) (st : data) (p : payload) : res :=
+    serialize_res (S.recv_handler src dst st (try_deserialize p)).
+
+  Definition timeout_handler h st t :=
+    serialize_res (S.timeout_handler h st t).
+
+  Definition recv_handler_l src dst st p :=
+    match S.recv_handler_l src dst st (try_deserialize p) with
+    | (r, l) => (serialize_res r, l)
+    end.
+
+  Definition timeout_handler_l h st t :=
+    match S.timeout_handler_l h st t with
+    | (r, l) => (serialize_res r, l)
+    end.
+
+  Definition label_input src dst p :=
+    S.label_input src dst (try_deserialize p).
+
+  Definition label_output src dst p :=
+    S.label_output src dst (try_deserialize p).
+
+  Lemma recv_handler_labeling : forall src dst st p r,
+      (recv_handler src dst st p = r ->
+       exists l,
+         recv_handler_l src dst st p = (r, l)) /\
+      (forall l,
+          recv_handler_l src dst st p = (r, l) ->
+          recv_handler src dst st p = r).
+  Admitted.
+
+  Lemma timeout_handler_labeling : forall h st t r,
+      (timeout_handler h st t = r ->
+       exists l,
+         timeout_handler_l h st t = (r, l)) /\
+      (forall l,
+          timeout_handler_l h st t = (r, l) ->
+          timeout_handler h st t = r).
+  Admitted.
+End SerializedSystem.
