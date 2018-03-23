@@ -11,7 +11,6 @@ Require Import Chord.SystemReachable.
 Require Import Chord.TimeoutMeansActive.
 Require Import Chord.NodesHaveState.
 
-
 Set Bullet Behavior "Strict Subproofs".
 
 Definition at_most_one_request_timeout' (ts : list timeout) :=

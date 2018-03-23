@@ -4,15 +4,18 @@ Require Import Relations.
 Require Import Omega.
 
 Require Import StructTact.StructTactics.
+Require Import StructTact.Update.
 Require Import InfSeqExt.infseq.
 Require Import InfSeqExt.classical.
 Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
 
+Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
 Require Import Chord.LabeledLemmas.
+Require Import Chord.LiveNodesNotClients.
 Require Import Chord.QueryInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
@@ -72,23 +75,6 @@ Definition not_busy_if_live (h : addr) (occ : occurrence) :=
     sigma (occ_gst occ) h = Some st ->
     cur_request st = None.
 
-Theorem stuck_on_a_single_query_means_blocked :
-  forall ex h,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    live_node (occ_gst (hd ex)) h ->
-    forall dstp q m,
-      always (now
-                (fun o =>
-                   forall st,
-                     sigma (occ_gst o) h = Some st ->
-                     cur_request st = Some (dstp, q, m)))
-             ex ->
-      continuously (now (fun o => blocked_by (occ_gst o) (addr_of dstp) h)) ex.
-Proof.
-Admitted.
-
 Lemma now_const :
   forall T (P : T -> Prop),
     (forall t, P t) ->
@@ -111,6 +97,99 @@ Proof.
   auto.
 Qed.
 Hint Resolve always_const.
+
+Theorem joined_nodes_never_run_join :
+  forall gst h st,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    joined st = true ->
+    forall dst q m k,
+      cur_request st = Some (dst, q, m) ->
+      q <> Join k.
+Proof.
+Admitted.
+
+Lemma continuously_false_false :
+  forall T (s : infseq T),
+    continuously (fun _ => False) s ->
+    False.
+Proof.
+  intros.
+  induction 0 as [[o s] ?|o s];
+    now inv_prop always.
+Qed.
+
+Theorem never_stuck_on_non_stabilize_with_res_on_wire :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    forall dstp q m res,
+      q <> Stabilize ->
+      query_response q res ->
+      In res (channel (occ_gst (hd ex)) (addr_of dstp) h) ->
+      always (now
+                (fun o =>
+                   forall st,
+                     sigma (occ_gst o) h = Some st ->
+                     cur_request st = Some (dstp, q, m)))
+             ex ->
+      False.
+Proof.
+  intros.
+  cut (continuously (fun _ => False) ex);
+    [eauto using continuously_false_false|].
+  find_copy_apply_lem_hyp live_node_means_state_exists;
+    break_exists_name st__h.
+  find_apply_lem_hyp in_channel_in_msgs.
+  find_eapply_lem_hyp RecvMsg_eventually_occurred;
+    eauto using strong_local_fairness_weak.
+  match goal with
+  | H: In _ (msgs _) |- _ => clear H
+  end.
+  induction 0.
+  - destruct s as [o [o' [o'' s]]]; simpl in *.
+    break_and; do 2 invcs_prop lb_execution.
+    assert (exists st, sigma (occ_gst o') h = Some st /\ cur_request st = None).
+    {
+      unfold occurred in *; repeat find_reverse_rewrite.
+      inv_prop (labeled_step_dynamic (occ_gst o)); clean_up_labeled_step_cases.
+      recover_msg_from_recv_step_equality.
+      subst; simpl in *.
+      find_apply_lem_hyp always_now'; simpl in * |-.
+      repeat find_rewrite; simpl in *.
+      eexists; rewrite_update; split; eauto.
+      eapply recv_handler_response_clears_cur_request_q_single;
+        try eapply recv_handler_labeling; eauto.
+      intros.
+      eapply joined_nodes_never_run_join; invar_eauto.
+      inv_prop live_node; expand_def; congruence.
+    }
+    break_exists; expand_def.
+    find_apply_lem_hyp always_invar; find_apply_lem_hyp always_now'; simpl in *.
+    repeat find_rewrite.
+    assert (cur_request x = Some (dstp, q, m)) by eauto.
+    congruence.
+  - eapply E_next, IHeventually; invar_eauto.
+Qed.
+
+Theorem stuck_on_a_single_query_means_blocked :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    forall dstp q m,
+      always (now
+                (fun o =>
+                   forall st,
+                     sigma (occ_gst o) h = Some st ->
+                     cur_request st = Some (dstp, q, m)))
+             ex ->
+      continuously (now (fun o => blocked_by (occ_gst o) (addr_of dstp) h)) ex.
+Proof.
+Admitted.
 
 Lemma blocking_node_continuously_also_blocked :
   forall ex,
@@ -189,7 +268,7 @@ Proof.
     + assert (exists c : list addr,
                  length c = S (S n) /\
                  In h c /\
-                 continuously (now (fun occ : occurrence => fin_chain (blocked_by (occ_gst occ)) c)) s)
+                 continuously (now (fun occ => fin_chain (blocked_by (occ_gst occ)) c)) s)
         by (eapply IHeventually; invar_eauto).
       break_exists_exists; intuition.
       constructor; now auto.

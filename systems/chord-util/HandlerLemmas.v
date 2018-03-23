@@ -102,11 +102,13 @@ Lemma handle_query_res_definition :
         q = Join2 new_succ /\
         p = GotSuccList succs /\
         add_tick (end_query (update_for_join st (make_succs new_succ succs), [], [], [])) = (st', ms, newts, clearedts)) \/
-    st' = st /\ ms = [] /\ newts = [] /\ clearedts = [].
+    st' = st /\ ms = [] /\ newts = [] /\ clearedts = [] /\
+    ~ query_response q p.
 Proof using.
   unfold handle_query_res.
   intros.
-  repeat break_match; try tuple_inversion; try tauto.
+  repeat break_match; try tuple_inversion;
+    try intuition (try inv_prop query_response).
   - do 2 right. left. eexists; intuition eauto.
   - do 2 right. left. eexists; intuition eauto.
   - intuition eauto.
@@ -1669,7 +1671,6 @@ Proof.
   reflexivity.
 Qed.
 
-
 Lemma length_chop_succs :
   forall l,
     length (chop_succs l) <= SUCC_LIST_LEN.
@@ -1697,3 +1698,58 @@ Proof.
   eauto.
   eauto.
 Qed.
+
+Lemma query_request_request :
+  forall q p,
+    query_request q p ->
+    request_payload p.
+Proof.
+  intros; inv_prop query_request; eauto.
+Qed.
+Hint Resolve query_request_request.
+
+Lemma query_response_response :
+  forall q p,
+    query_response q p ->
+    response_payload p.
+Proof.
+  intros; inv_prop query_response; eauto.
+Qed.
+Hint Resolve query_response_response.
+
+Hint Resolve request_response_mutually_exclusive.
+
+Lemma recv_handler_response_clears_cur_request_q_single :
+  forall h st dst q req res st' ms nts cts,
+    recv_handler (addr_of dst) h st res = (st', ms, nts, cts) ->
+    cur_request st = Some (dst, q, req) ->
+    query_response q res ->
+    q <> Stabilize ->
+    (forall k, q <> Join k) ->
+    cur_request st' = None.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl);
+    try find_copy_apply_lem_hyp is_request_same_as_request_payload;
+    solve [exfalso; eauto
+          |inv_prop query_response].
+Qed.
+Hint Resolve recv_handler_response_clears_cur_request_q_single.
+
+Lemma recv_handler_response_changes_cur_request_q_Stabilize :
+  forall h st dst p succs st' ms nts cts,
+    recv_handler (addr_of dst) h st (GotPredAndSuccs p succs) = (st', ms, nts, cts) ->
+    cur_request st = Some (dst, Stabilize, GetPredAndSuccs) ->
+    cur_request st' = None \/
+    exists ns,
+      p = Some ns /\
+      ptr_between (ptr st) ns (make_pointer (addr_of dst)) /\
+      cur_request st' = Some (ns, Stabilize2 ns, GetSuccList).
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl);
+    try solve [exfalso; eauto; inv_prop request_response_pair].
+  repeat find_rewrite || find_injection.
+  exfalso; eauto.
+Qed.
+Hint Resolve recv_handler_response_changes_cur_request_q_Stabilize.
