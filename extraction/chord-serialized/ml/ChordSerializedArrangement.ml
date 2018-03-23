@@ -23,33 +23,33 @@ let caps_bool b =
 let show_opt_pointer p =
   Util.map_default show_pointer "None" p
 
-let show_msg = function
-  | ChordSerializedSystem.GetBestPredecessor p -> "GetBestPredecessor " ^ show_pointer p
-  | ChordSerializedSystem.GotBestPredecessor p -> "GotBestPredecessor " ^ show_pointer p
-  | ChordSerializedSystem.GetSuccList -> "GetSuccList"
-  | ChordSerializedSystem.GotSuccList ps -> "GotSuccList " ^ show_pointer_list ps
-  | ChordSerializedSystem.GetPredAndSuccs -> "GetPredAndSuccs"
-  | ChordSerializedSystem.GotPredAndSuccs (pred, succs) -> "GotPredAndSuccs " ^ show_opt_pointer pred ^ " " ^ show_pointer_list succs
-  | ChordSerializedSystem.Notify -> "Notify"
-  | ChordSerializedSystem.Ping -> "Ping"
-  | ChordSerializedSystem.Pong -> "Pong"
-  | ChordSerializedSystem.Busy -> "Busy"
+let show_msg : ChordSystem.payload -> string  = function
+  | ChordSystem.GetBestPredecessor p -> "GetBestPredecessor " ^ show_pointer p
+  | ChordSystem.GotBestPredecessor p -> "GotBestPredecessor " ^ show_pointer p
+  | ChordSystem.GetSuccList -> "GetSuccList"
+  | ChordSystem.GotSuccList ps -> "GotSuccList " ^ show_pointer_list ps
+  | ChordSystem.GetPredAndSuccs -> "GetPredAndSuccs"
+  | ChordSystem.GotPredAndSuccs (pred, succs) -> "GotPredAndSuccs " ^ show_opt_pointer pred ^ " " ^ show_pointer_list succs
+  | ChordSystem.Notify -> "Notify"
+  | ChordSystem.Ping -> "Ping"
+  | ChordSystem.Pong -> "Pong"
+  | ChordSystem.Busy -> "Busy"
 
 let show_query = function
-  | ChordSerializedSystem.Rectify p -> "Rectify " ^ show_pointer p
-  | ChordSerializedSystem.Stabilize -> "Stabilize"
-  | ChordSerializedSystem.Stabilize2 p -> "Stabilize2 " ^ show_pointer p
-  | ChordSerializedSystem.Join p -> "Join " ^ show_pointer p
-  | ChordSerializedSystem.Join2 p -> "Join2 " ^ show_pointer p
+  | ChordSystem.Rectify p -> "Rectify " ^ show_pointer p
+  | ChordSystem.Stabilize -> "Stabilize"
+  | ChordSystem.Stabilize2 p -> "Stabilize2 " ^ show_pointer p
+  | ChordSystem.Join p -> "Join " ^ show_pointer p
+  | ChordSystem.Join2 p -> "Join2 " ^ show_pointer p
 
 let show_st_ptr st =
-  show_pointer st.ChordSerializedSystem.ptr
+  show_pointer st.ChordSystem.ptr
 
 let show_request ((ptr, q), _) =
   Printf.sprintf "query(%s, %s)" (show_pointer ptr) (show_query q)
 
 let show_st_cur_request st =
-  Util.map_default show_request "None" st.ChordSerializedSystem.cur_request
+  Util.map_default show_request "None" st.ChordSystem.cur_request
 
 let log_info_from st msg =
   let prefix = Printf.sprintf "node(%s):" (show_st_ptr st) in
@@ -61,11 +61,11 @@ let log_dbg_from st msg =
 
 let log_st st =
   let log = log_info_from st in
-  log ("succ_list := " ^ show_pointer_list st.ChordSerializedSystem.succ_list);
-  log ("pred := " ^ show_opt_pointer st.ChordSerializedSystem.pred);
-  log ("known := " ^ show_pointer st.ChordSerializedSystem.known);
-  log ("joined := " ^ caps_bool st.ChordSerializedSystem.joined);
-  log ("rectify_with := " ^ show_opt_pointer st.ChordSerializedSystem.rectify_with);
+  log ("succ_list := " ^ show_pointer_list st.ChordSystem.succ_list);
+  log ("pred := " ^ show_opt_pointer st.ChordSystem.pred);
+  log ("known := " ^ show_pointer st.ChordSystem.known);
+  log ("joined := " ^ caps_bool st.ChordSystem.joined);
+  log ("rectify_with := " ^ show_opt_pointer st.ChordSystem.rectify_with);
   log ("cur_request := " ^ show_st_cur_request st)
 
 let log_recv st src msg =
@@ -77,12 +77,12 @@ let log_send st dst msg =
   log ("send to " ^ show_addr dst ^ ":" ^ show_msg msg)
 
 let log_timeout st = function
-  | ChordSerializedSystem.Tick -> log_dbg_from st "ticked"
-  | ChordSerializedSystem.RectifyTick -> log_dbg_from st "ticked for rectify"
-  | ChordSerializedSystem.KeepaliveTick -> log_dbg_from st "ticked for keepalive"
-  | ChordSerializedSystem.Request (dead, msg) ->
+  | ChordSystem.Tick -> log_dbg_from st "ticked"
+  | ChordSystem.RectifyTick -> log_dbg_from st "ticked for rectify"
+  | ChordSystem.KeepaliveTick -> log_dbg_from st "ticked for keepalive"
+  | ChordSystem.Request (dead, msg) ->
     log_dbg_from st ("request " ^ show_msg msg
-                     ^ " from " ^ show_pointer st.ChordSerializedSystem.ptr
+                     ^ " from " ^ show_pointer st.ChordSystem.ptr
                      ^ " to " ^ show_addr dead ^ " timed out")
 
 let rebracket4 (((a, b), c), d) = (a, b, c, d)
@@ -97,10 +97,10 @@ end
 
 module ChordSerializedArrangement (C : ChordSerializedConfig) = struct
   type addr = string
-  type name = ChordSerializedSystem.addr
-  type state = ChordSerializedSystem._data
+  type name = ChordSystem.addr
+  type state = ChordSystem._data
   type msg = ChordSerializedSystem.payload
-  type timeout = ExtractedChordSerialized.ChordSerializedSystem._timeout
+  type timeout = ExtractedChordSerialized.ChordSystem._timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let port = chord_default_port
   let addr_of_name n =
@@ -116,33 +116,29 @@ module ChordSerializedArrangement (C : ChordSerializedConfig) = struct
   let timeout_handler n s t =
     rebracket4 (handleTimeout n s t)
 
-  let deserialize_msg b =
-    match (Serializer_primitives.deserialize_top
-             ExtractedChordSerialized.payload_deserialize
-             b) with
-    | Some a -> a
-    | _ -> failwith "Received undeserializable message"
-                        
-  let serialize_msg msg = Serializer_primitives.wire_wrap (ExtractedChordSerialized.payload_serialize msg)
-  (* Marshal.to_bytes msg [] *)
+  let deserialize_msg (b : msg) : Serializer_primitives.wire = b                        
+  let serialize_msg msg = msg
 
   let fuzzy_timeout t =
     let fuzz = max (t /. 5.0) 2.0 in
     t +. Random.float fuzz
 
   let set_timeout = function
-    | ChordSerializedSystem.Tick -> fuzzy_timeout C.tick_timeout
-    | ChordSerializedSystem.RectifyTick -> fuzzy_timeout C.tick_timeout
+    | ChordSystem.Tick -> fuzzy_timeout C.tick_timeout
+    | ChordSystem.RectifyTick -> fuzzy_timeout C.tick_timeout
     (* must be less than the request timeout *)
-    | ChordSerializedSystem.KeepaliveTick -> C.keepalive_timeout
-    | ChordSerializedSystem.Request (a, b) -> C.request_timeout
+    | ChordSystem.KeepaliveTick -> C.keepalive_timeout
+    | ChordSystem.Request (a, b) -> C.request_timeout
 
   let default_timeout = 1.0
   let debug = C.debug
-  let debug_recv st (src, msg) =
+  let debug_recv (st : state) ((src, msg) : name * msg) =
     log_st st;
-    log_recv st src msg;
-    flush_all ()
+
+    log_recv st src (deserialize_msg msg);
+    (*
+    flush_all () *)
+    ()
   let debug_send st (dst, msg) =
     log_st st;
     log_send st dst msg;

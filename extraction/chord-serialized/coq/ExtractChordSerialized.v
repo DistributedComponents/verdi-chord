@@ -6,43 +6,42 @@ Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
 Require Import ExtrOcamlNatInt.
 
+Require Import Chord.Chord.
 Require Import Chord.ChordSerialized.
 Import ChordSerialized.
 
 Require Import Cheerios.ExtrOcamlCheeriosBasic.
 
-Extract Inlined Constant ChordSerialized.SUCC_LIST_LEN => "3".
+Extract Inlined Constant Chord.SUCC_LIST_LEN => "3".
 
 (* We use the ocaml standard library implementation of MD5 to compute IDs. Since
  * Coq extracts strings to the ocaml type char list, we have to wrap the hash in
  * a conversion function from verdi-runtime. *)
-Extract Constant ChordSerialized.ocaml_hash =>
+Extract Constant Chord.ocaml_hash =>
   "(fun s ->
      (Util.char_list_of_string
       (Digest.string
         (Util.string_of_char_list s))))".
 (* MD5 digests are 16 bytes. *)
-Extract Inlined Constant ChordSerialized.N => "16".
+Extract Inlined Constant Chord.N => "16".
 
 Extract Constant VectorEq.eqb => "(fun _ _ _ -> (=))".
 
 Definition handleNet : addr -> addr -> data -> payload -> res :=
-  recv_handler.
+  ChordSerializedSystem.recv_handler.
 
 Definition init : addr -> list addr -> data * list (addr * payload) * list timeout :=
-  start_handler.
+  ChordSerializedSystem.start_handler.
 
 Definition handleTimeout : addr -> data -> timeout -> res :=
-  timeout_handler.
+  ChordSerializedSystem.timeout_handler.
 
 Extraction "extraction/chord-serialized/coq/ExtractedChordSerialized.ml"
            init
            handleNet
            handleTimeout
+
            is_request
            ascii_to_id
            id_to_ascii
-           forge_pointer
-
-           payload_serialize
-           payload_deserialize.
+           forge_pointer.
