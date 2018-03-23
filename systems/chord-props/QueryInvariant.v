@@ -937,3 +937,14 @@ Proof.
     find_eapply_lem_hyp cur_request_timeouts_related_invariant_elim; eauto.
     inv_prop cur_request_timeouts_ok; intuition.
 Qed.
+
+Theorem requests_get_correct_response :
+  forall gst h st dstp q m r,
+    sigma gst h = Some st ->
+    cur_request st = Some (dstp, q, m) ->
+    In r (channel gst (addr_of dstp) h) ->
+    query_response q r ->
+    request_response_pair m r.
+Proof.
+Admitted.
+Hint Resolve requests_get_correct_response.

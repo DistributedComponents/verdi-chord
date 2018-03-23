@@ -880,19 +880,6 @@ USED: In phase two.
 Admitted.
 *)
 
-Lemma until_weak_until_eventually :
-  forall T J P (s : infseq T),
-    weak_until J P s ->
-    eventually P s ->
-    until J P s.
-Proof.
-  intros.
-  induction 0.
-  - constructor; eauto.
-  - inv_prop weak_until;
-      solve [constructor; eauto].
-Qed.
-
 Lemma has_first_succ_stable :
   forall gst l gst' h s,
     preds_and_first_succs_correct gst ->

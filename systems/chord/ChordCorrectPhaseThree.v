@@ -387,8 +387,6 @@ Proof.
       {
         find_eapply_lem_hyp RecvMsg_stays_enabled_after_other_label;
           eauto using when_RecvMsg_enabled.
-        inv_prop enabled.
-        eauto using recv_implies_msg_in_before.
       }
       apply IHeventually; simpl; invar_eauto.
 Qed.

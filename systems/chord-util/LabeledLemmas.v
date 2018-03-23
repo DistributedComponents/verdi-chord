@@ -453,6 +453,49 @@ Proof using.
   - find_eapply_lem_hyp RecvMsg_stays_enabled_after_other_label; eauto.
 Qed.
 
+Lemma until_weak_until_eventually :
+  forall T J P (s : infseq T),
+    weak_until J P s ->
+    eventually P s ->
+    until J P s.
+Proof.
+  intros.
+  induction 0.
+  - constructor; eauto.
+  - inv_prop weak_until;
+      solve [constructor; eauto].
+Qed.
+
+Lemma RecvMsg_strong_until_occurred :
+  forall s,
+    lb_execution s ->
+    reachable_st (occ_gst (hd s)) ->
+    weak_local_fairness s ->
+    forall src dst m d,
+      In dst (nodes (occ_gst (hd s))) ->
+      ~ In dst (failed_nodes (occ_gst (hd s))) ->
+      ~ client_addr dst ->
+      In (src, (dst, m)) (msgs (occ_gst (hd s))) ->
+      sigma (occ_gst (hd s)) dst = Some d ->
+      until (now (l_enabled (RecvMsg src dst m)))
+            (now (occurred (RecvMsg src dst m)))
+            s.
+Proof using.
+  intros.
+  pose proof (RecvMsg_enabled_until_occurred _ ltac:(eauto) ltac:(eauto) src dst m).
+  find_copy_apply_lem_hyp weak_until_until_or_always;
+    eauto using l_enabled_RecvMsg_In_msgs.
+  break_or_hyp.
+  - eauto.
+  - destruct s.
+    find_copy_apply_lem_hyp always_now; simpl in *.
+    eapply until_weak_until_eventually; eauto.
+    eapply always_now'; eauto.
+    unfold weak_local_fairness in *.
+    find_eapply_lem_hyp always_continuously.
+    now find_apply_hyp_hyp.
+Qed.
+
 Lemma RecvMsg_eventually_occurred :
   forall s,
     lb_execution s ->
