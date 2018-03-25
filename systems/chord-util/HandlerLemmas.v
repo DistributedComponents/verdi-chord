@@ -701,6 +701,23 @@ Proof.
   eauto with datatypes.
 Qed.
 
+Lemma requests_get_responses_recv_handler' :
+  forall src dst st req st' sends nts cts,
+    recv_handler src dst st req = (st', sends, nts, cts) ->
+    request_payload req ->
+    cur_request st = None \/ req = Ping ->
+    exists res,
+      In (src, res) sends /\
+      request_response_pair req res.
+Proof.
+  intros.
+  destruct (payload_eq_dec req Ping); subst.
+  - find_apply_lem_hyp pings_always_get_pongs_recv_handler.
+    eexists; split; eauto || constructor.
+  - break_or_hyp; try congruence.
+    eauto using real_requests_get_responses_recv_handler.
+Qed.
+
 Lemma requests_are_always_responded_to :
   forall src dst req st st' sends nts cts,
     request_payload req ->
@@ -721,6 +738,29 @@ Proof.
   - destruct (cur_request st) eqn:?H.
     + find_copy_eapply_lem_hyp real_requests_get_busy_response; eauto.
       * left; repeat split; assumption || congruence.
+      * congruence.
+    + find_apply_lem_hyp real_requests_get_responses_recv_handler; auto.
+Qed.
+
+Lemma requests_get_response_or_queued :
+  forall src dst req st st' sends nts cts,
+    request_payload req ->
+    recv_handler src dst st req = (st', sends, nts, cts) ->
+
+    cur_request st <> None /\
+    req <> Ping /\
+    In (src, req) (delayed_queries st') \/
+    exists res,
+      In (src, res) sends /\
+      request_response_pair req res.
+Proof.
+  intros.
+  destruct (payload_eq_dec req Ping); subst.
+  - right.
+    eexists; eauto using pings_always_get_pongs_recv_handler, pair_Ping.
+  - destruct (cur_request st) eqn:?H.
+    + find_apply_lem_hyp real_requests_get_queued; eauto.
+      * left; repeat split; try congruence.
       * congruence.
     + find_apply_lem_hyp real_requests_get_responses_recv_handler; auto.
 Qed.

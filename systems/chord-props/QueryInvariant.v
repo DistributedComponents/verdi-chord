@@ -870,6 +870,7 @@ Inductive query_message_ok
       no_responses inbound ->
       no_requests outbound ->
       (forall m, ~ In (src, m) dqs) ->
+      query_request q req ->
       query_message_ok src dst (Some (dstp, q, req)) dqs outbound inbound
 | CIreq :
     forall outbound inbound dqs dstp q req,
@@ -877,6 +878,7 @@ Inductive query_message_ok
       (forall xs ys, outbound = xs ++ req :: ys -> no_requests (xs ++ ys)) ->
       no_responses inbound ->
       (forall m, ~ In (src, m) dqs) ->
+      query_request q req ->
       query_message_ok src (addr_of dstp) (Some (dstp, q, req)) dqs outbound inbound
 | CIres :
     forall outbound inbound res dqs dstp q req,
@@ -885,6 +887,7 @@ Inductive query_message_ok
       (forall xs ys, inbound = xs ++ res :: ys -> no_responses (xs ++ ys)) ->
       no_requests outbound ->
       (forall m, ~ In (src, m) dqs) ->
+      query_request q req ->
       query_message_ok src (addr_of dstp) (Some (dstp, q, req)) dqs outbound inbound
 | CIdelayed :
     forall outbound inbound dqs dstp q req,
@@ -892,6 +895,7 @@ Inductive query_message_ok
       (forall xs ys req', dqs = xs ++ (src, req) :: ys -> ~ In (src, req') (xs ++ ys)) ->
       no_responses inbound ->
       no_requests outbound ->
+      query_request q req ->
       query_message_ok src (addr_of dstp) (Some (dstp, q, req)) dqs outbound inbound.
 
 Theorem query_message_ok_invariant :

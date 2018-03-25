@@ -120,6 +120,137 @@ Proof.
     now inv_prop always.
 Qed.
 
+Theorem l_enabled_RecvMsg_means_in_msgs :
+  forall src dst m occ,
+    l_enabled (RecvMsg src dst m) occ ->
+    In (src, (dst, m)) (msgs (occ_gst occ)).
+Proof.
+  intros.
+  inv_prop l_enabled.
+  inv_labeled_step.
+  handler_def.
+  repeat find_rewrite; destruct m0 as [? [? ?]];
+    repeat find_rewrite || find_injection;
+    eauto with datatypes.
+Qed.
+Hint Resolve l_enabled_RecvMsg_means_in_msgs.
+
+Theorem cur_request_constant_when_res_on_wire :
+  forall gst l gst' h st st' dstp q m,
+    labeled_step_dynamic gst l gst' ->
+    sigma gst h = Some st ->
+    sigma gst' h = Some st' ->
+    cur_request st = Some (dstp, q, m) ->
+    query_request q m ->
+    In (h, (addr_of dstp, m)) (msgs gst) ->
+    ~ In (addr_of dstp) (failed_nodes gst) -> 
+    cur_request st' = Some (dstp, q, m).
+Proof.
+Admitted.
+
+Theorem req_on_wire_until_response :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    forall dstp q m st,
+      sigma (occ_gst (hd ex)) h = Some st ->
+      cur_request st = Some (dstp, q, m) ->
+      query_request q m ->
+      In m (channel (occ_gst (hd ex)) h (addr_of dstp)) ->
+      live_node (occ_gst (hd ex)) (addr_of dstp) ->
+      until (now (fun o =>
+                    In m (channel (occ_gst o) h (addr_of dstp))))
+            (next (now (fun o =>
+                          blocked_by (occ_gst o) (addr_of dstp) h \/
+                          exists res,
+                            request_response_pair m res /\
+                            In res (channel (occ_gst o) (addr_of dstp) h))))
+            ex.
+Proof.
+  intros.
+  assert (until (now (l_enabled (RecvMsg h (addr_of dstp) m)))
+                (now (occurred (RecvMsg h (addr_of dstp) m))) ex).
+  {
+    find_apply_lem_hyp in_channel_in_msgs.
+    inv_prop live_node; expand_def; eauto.
+    eapply RecvMsg_strong_until_occurred;
+      eauto using strong_local_fairness_weak.
+  }
+  assert (forall st, sigma (occ_gst (hd ex)) h = Some st -> cur_request st = Some (dstp, q, m))
+    by (intros; congruence).
+  repeat match goal with
+         | H: In _ (channel _ _ _) |- _ => clear H
+         | H: sigma _ _ = _ |- _ => clear H
+         | H: cur_request st = _ |- _ => clear H
+         end.
+  match goal with
+  | H: until _ _ _ |- _ => induction H
+  end.
+  - destruct s as [o [o' s]].
+    eapply U0; simpl in *.
+    unfold occurred in *;
+      inv_lb_execution;
+      inv_labeled_step;
+      clean_up_labeled_step_cases.
+    handler_def.
+    destruct m0 as [? [? ?]]; repeat find_rewrite || find_injection.
+    simpl (fst _) in *; simpl (snd _) in *.
+    find_copy_apply_lem_hyp requests_get_response_or_queued; eauto.
+    break_or_hyp; break_and.
+    + left.
+      repeat split; invar_eauto.
+      simpl.
+      assert (live_node (occ_gst o') a) by invar_eauto.
+      assert (live_node (occ_gst o') (addr_of dstp)) by invar_eauto.
+      assert (live_node (occ_gst o) a) by invar_eauto.
+      assert (live_node (occ_gst o) (addr_of dstp)) by invar_eauto.
+      do 4 invcs_prop live_node; expand_def.
+      pose proof (query_message_ok_invariant (occ_gst o') ltac:(invar_eauto) a (addr_of dstp)) as Qi'.
+      do 2 insterU Qi'.
+      forwards; eauto. concludes.
+      forwards; eauto. concludes.
+      pose proof (query_message_ok_invariant (occ_gst o) ltac:(invar_eauto) a (addr_of dstp)) as Qi.
+      do 2 insterU Qi.
+      forwards; eauto. concludes.
+      forwards; eauto. concludes.
+
+      rewrite update_same.
+      assert (cur_request x1 = Some (dstp, q, p)) by eauto.
+      assert (cur_request st0 = cur_request d).
+      {
+        destruct (cur_request x2) as [[[? ?] ?]|] eqn:?.
+        - repeat find_rewrite || find_injection.
+          simpl in *.
+          do 4 find_inversion.
+          repeat find_reverse_rewrite.
+          eapply recv_msg_not_right_response_preserves_cur_request; eauto.
+        - congruence.
+      }
+      destruct_update.
+      * repeat (find_rewrite; find_injection).
+        repeat eexists; eauto.
+        instantiate (1:=q).
+        congruence.
+      * repeat eexists; eauto.
+    + right.
+      break_exists_exists; intuition eauto.
+      apply in_msgs_in_channel; simpl.
+      apply in_or_app; left.
+      apply in_map_iff; eauto.
+  - destruct s as [o [o' s]]; simpl in *.
+    apply U_next; eauto.
+    + simpl.
+      eapply in_msgs_in_channel, l_enabled_RecvMsg_means_in_msgs.
+      eauto.
+    + apply IHuntil; invar_eauto.
+      intros.
+      inv_prop lb_execution.
+      repeat invcs_prop live_node; expand_def.
+      eapply cur_request_constant_when_res_on_wire; invar_eauto.
+Qed.
+
 Theorem have_cur_request_msg_on_wire_preserves :
   forall h dst ex q m r,
     reachable_st (occ_gst (hd ex)) ->
@@ -194,21 +325,6 @@ Proof.
            intuition eauto with datatypes.
       * admit.
 Admitted.
-
-Theorem l_enabled_RecvMsg_means_in_msgs :
-  forall src dst m occ,
-    l_enabled (RecvMsg src dst m) occ ->
-    In (src, (dst, m)) (msgs (occ_gst occ)).
-Proof.
-  intros.
-  inv_prop l_enabled.
-  inv_labeled_step.
-  handler_def.
-  repeat find_rewrite; destruct m0 as [? [? ?]];
-    repeat find_rewrite || find_injection;
-    eauto with datatypes.
-Qed.
-Hint Resolve l_enabled_RecvMsg_means_in_msgs.
 
 Theorem never_stuck_on_non_stabilize_with_res_on_wire :
   forall ex h,
