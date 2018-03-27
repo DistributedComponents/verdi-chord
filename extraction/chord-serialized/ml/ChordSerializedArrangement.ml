@@ -133,16 +133,19 @@ module ChordSerializedArrangement (C : ChordSerializedConfig) = struct
   let default_timeout = 1.0
   let debug = C.debug
   let debug_recv (st : state) ((src, msg) : name * msg) =
-    log_st st;
+    match deserializePayload msg with
+    | Some msg -> log_st st;
+                  log_recv st src msg;
+                  flush_all ()
+    | None -> failwith "received undeserializable message"
 
-    log_recv st src (deserialize_msg msg);
-    (*
-    flush_all () *)
-    ()
   let debug_send st (dst, msg) =
-    log_st st;
-    log_send st dst msg;
-    flush_all ()
+    match deserializePayload msg with
+    | Some msg -> log_st st;
+                  log_send st dst msg;
+                  flush_all ()
+    | None -> failwith "sent undeserializable message"
+            
   let debug_timeout st t =
     log_timeout st t;
     flush_all ()

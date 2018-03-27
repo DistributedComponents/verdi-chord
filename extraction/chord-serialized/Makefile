@@ -1,4 +1,4 @@
-OCAMLBUILD = ocamlbuild -package verdi-runtime -I ml -I coq -cflag -g
+OCAMLBUILD = ocamlbuild -pkgs 'verdi-runtime cheerios-runtime' -I ml -I coq -cflag -g
 
 CHORDSERIALIZEDMLFILES = coq/ExtractedChordSerialized.ml coq/ExtractedChordSerialized.mli
 

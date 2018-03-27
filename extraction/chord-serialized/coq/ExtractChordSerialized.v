@@ -10,6 +10,7 @@ Require Import Chord.Chord.
 Require Import Chord.ChordSerialized.
 Import ChordSerialized.
 
+Require Import Cheerios.Cheerios.
 Require Import Cheerios.ExtrOcamlCheeriosBasic.
 
 Extract Inlined Constant Chord.SUCC_LIST_LEN => "3".
@@ -36,10 +37,15 @@ Definition init : addr -> list addr -> data * list (addr * payload) * list timeo
 Definition handleTimeout : addr -> data -> timeout -> res :=
   ChordSerializedSystem.timeout_handler.
 
+(* for debugging *)
+Definition deserializePayload w : option ChordSystem.payload :=
+  deserialize_top deserialize w.
+
 Extraction "extraction/chord-serialized/coq/ExtractedChordSerialized.ml"
            init
            handleNet
            handleTimeout
+           deserializePayload
 
            is_request
            ascii_to_id

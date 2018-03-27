@@ -40,13 +40,13 @@ module Client : ClientSig = struct
 
   let lookup bind node id =
     let p = forge_pointer id in
-    match query bind node (GetBestPredecessor p) with
-    | GotBestPredecessor p -> p
+    match query bind node (ChordSystem.GetBestPredecessor p) with
+    | ChordSystem.GotBestPredecessor p -> p
     | r -> raise (Wrong_response (ChordSerializedArrangement.show_msg r))
 
   let get_pred_and_succs bind node =
-    match query bind node GetPredAndSuccs with
-    | GotPredAndSuccs (p, ss) -> (p, ss)
+    match query bind node ChordSystem.GetPredAndSuccs with
+    | ChordSystem.GotPredAndSuccs (p, ss) -> (p, ss)
     | r -> raise (Wrong_response (ChordSerializedArrangement.show_msg r))
 end
 
