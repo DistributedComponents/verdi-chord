@@ -22,15 +22,7 @@ Import DeserializerNotations.
 Module Type SerializableSystem.
   Include ConstrainedDynamicSystem.
   Parameter payload_serializer : Serializer payload.
-  Parameter default_payload : payload. (* in case deserialization fails but value needed (avoid) *)
-
-  Parameter timeout' : Type.
-  Parameter timeout'_eq_dec : forall a b : timeout', {a = b} + {~ a = b}.
-  Parameter f : timeout -> timeout'.
-  Parameter g : timeout' -> option timeout.
-  Parameter timeout_spec : forall t, g (f t) = Some t.
-  Parameter default_timeout : timeout.
-End SerializableSystem.
+  Parameter default_payload : payload. (* in case deserialization fails but value needed (avoid) *)End SerializableSystem.
 
 Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   Definition addr := S.addr.
@@ -87,15 +79,8 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   Qed.
 
   Definition data := S.data.
-  Definition timeout := S.timeout'.
-
-  Definition revert_timeout (t' : S.timeout') :=
-    match S.g t' with
-    | Some t => t
-    | None => S.default_timeout
-    end.
-
-  Definition timeout_eq_dec := S.timeout'_eq_dec.
+  Definition timeout := S.timeout.
+  Definition timeout_eq_dec := S.timeout_eq_dec.
 
   Definition label := S.label.
   Definition label_eq_dec := S.label_eq_dec.
@@ -107,21 +92,21 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
 
   Definition start_handler a l :=
     match S.start_handler a l with
-    | (st, ms, ts) => (st, map serialize_msg ms, map S.f ts)
+    | (st, ms, ts) => (st, map serialize_msg ms, ts)
     end.
 
   Definition res := (data * list (addr * payload) * list timeout * list timeout)%type.
 
   Definition serialize_res (r : S.res) : res := match r with
                                                 | (st, msgs, ts1, ts2) =>
-                                                  (st, map serialize_msg msgs, map S.f ts1, map S.f ts2)
+                                                  (st, map serialize_msg msgs, ts1, ts2)
                                                 end.
 
   Definition recv_handler (src : addr) (dst : addr) (st : data) (p : payload) : res :=
     serialize_res (S.recv_handler src dst st (revert_payload p)).
 
   Definition timeout_handler h st t :=
-    serialize_res (S.timeout_handler h st (revert_timeout t)).
+    serialize_res (S.timeout_handler h st t).
 
   Definition recv_handler_l src dst st p :=
     match S.recv_handler_l src dst st (revert_payload p) with
@@ -129,7 +114,7 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
     end.
 
   Definition timeout_handler_l h st t :=
-    match S.timeout_handler_l h st (revert_timeout t) with
+    match S.timeout_handler_l h st t with
     | (r, l) => (serialize_res r, l)
     end.
 
@@ -216,11 +201,11 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   | e_timeout : addr -> timeout -> event
   | e_fail : addr -> event.
 
-  Definition revert_event (e : event) : S.event :=
+  Definition revert_event e :=
     match e with
     | e_send m => S.e_send (revert_msg m)
     | e_recv m => S.e_recv (revert_msg m)
-    | e_timeout h t => S.e_timeout h (revert_timeout t)
+    | e_timeout h t => S.e_timeout h t
     | e_fail h => S.e_fail h
     end.
 
@@ -236,18 +221,14 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   Definition revert_global_state (gst : global_state) : S.global_state :=
     {| S.nodes := nodes gst;
        S.failed_nodes := failed_nodes gst;
-       S.timeouts := fun h =>  map revert_timeout (timeouts gst h);
+       S.timeouts := fun h =>  (timeouts gst h);
        S.sigma := sigma gst;
        S.msgs := map revert_msg (msgs gst);
        S.trace := map revert_event (trace gst) |}.
 
-
   (* are these too weak, since the revert functions "fail" silently with default values? *)
-  Definition timeout'_constraint (gst : global_state) (h : addr) (t' : S.timeout') :=
-    exists t, S.g t' = t /\
-              S.timeout_constraint (revert_global_state gst) h (revert_timeout t').
-
-  Definition timeout_constraint := timeout'_constraint.
+  Definition timeout_constraint gst h t :=
+    S.timeout_constraint (revert_global_state gst) h t.
 
   Definition failure_constraint gst h gst' :=
     S.failure_constraint (revert_global_state gst) h (revert_global_state gst').
@@ -416,174 +397,12 @@ Module ChordSerializable <: SerializableSystem.
   Include ConstrainedChord.
   Definition payload_serializer := payload_Serializer.
   Definition default_payload := Busy.
-
-  (* ideally timeout would just take payload type as a parameter *)
-  (* or, does this even need to have the serialized payload? *)
-  Inductive _timeout' :=
-  | Tick' : _timeout'
-  | RectifyTick' : _timeout'
-  | KeepaliveTick' : _timeout'
-  | Request' : addr -> IOStreamWriter.wire -> _timeout'.
-  Definition timeout' := _timeout'.
-
-  Lemma timeout'_eq_dec : forall x y : timeout', {x = y} + {~ x = y}.
-    decide equality.
-    - apply IOStreamWriter.wire_eq_dec.
-    - apply addr_eq_dec.
-  Qed.
-
-  Definition f t :=
-    match t with
-    | Tick => Tick'
-    | RectifyTick => RectifyTick'
-    | KeepaliveTick => KeepaliveTick'
-    | Request h p => Request' h (serialize_top (serialize p))
-    end.
-
-  Definition g t' :=
-    match t' with
-    | Tick' => Some Tick
-    | RectifyTick' => Some RectifyTick
-    | KeepaliveTick' => Some KeepaliveTick
-    | Request' h p => (match deserialize_top deserialize p with
-                                 | Some p => Some (Request h p)
-                                 | None => None
-                                 end)
-    end.
 End ChordSerializable.
 
-Module ChordSerializedSystem <: DynamicSystem := SerializedSystem(ChordSerializable).
-Export ChordSerializedSystem.
+Module ChordSerialized <: DynamicSystem := SerializedSystem(ChordSerializable).
+Export ChordSerialized.
 
-Module ConstrainedChordSerialized <: ConstrainedDynamicSystem.
-  Include ChordSerializedSystem.
-  Definition msg : Type := (addr * (addr * payload))%type.
-
-  Inductive event : Type :=
-  | e_send : msg -> event
-  | e_recv : msg -> event
-  | e_timeout : addr -> timeout -> event
-  | e_fail : addr -> event.
-
-  Record global_state :=
-    { nodes : list addr;
-      failed_nodes : list addr;
-      timeouts : addr -> list timeout;
-      sigma : addr -> option data;
-      msgs : list msg;
-      trace : list event
-    }.
-
-
-  Inductive request_response_pair : payload -> payload -> Prop :=
-  | pair_GetBestPredecessor : forall n p,
-      request_response_pair (serialize_top (serialize (GetBestPredecessor n)))
-                            (serialize_top (serialize (GotBestPredecessor p)))
-  | pair_GetSuccList : forall l,
-      request_response_pair (serialize_top (serialize GetSuccList))
-                            (serialize_top (serialize (GotSuccList l)))
-  | pair_GetPredAndSuccs : forall p l,
-      request_response_pair (serialize_top (serialize GetPredAndSuccs))
-                            (serialize_top (serialize (GotPredAndSuccs p l)))
-  | pair_Ping : request_response_pair (serialize_top (serialize Ping))
-                                      (serialize_top (serialize Pong)).
-
-  Definition _timeout_constraint : global_state -> addr -> timeout -> Prop.
-  Admitted.
-(*
-  | Tick_unconstrained : forall gst h,
-      _timeout_constraint gst h Tick
-  | KeepaliveTick_unconstrained : forall gst h,
-      _timeout_constraint gst h KeepaliveTick
-  | RectifyTick_unconstrained : forall gst h,
-      _timeout_constraint gst h RectifyTick
-  | Request_needs_dst_dead_and_no_msgs : forall gst dst h p,
-      In dst (failed_nodes gst) ->
-      (forall m, request_response_pair p m -> ~ In (dst, (h, m)) (msgs gst)) ->
-      _timeout_constraint gst h (Request dst p).
-*)
-  Definition timeout_constraint := _timeout_constraint.
-
-  Definition start_constraint (gst : global_state) (h : addr) : Prop :=
-    ~ In (hash h) (map hash (nodes gst)).
-
-  Definition live_node (gst : global_state) (h : addr) : Prop :=
-    In h (nodes gst) /\
-    ~ In h (failed_nodes gst) /\
-    exists st,
-      sigma gst h = Some st /\
-      joined st = true.
-
-  Definition dead_node (gst : global_state) (h : addr) : Prop :=
-    In h (nodes gst) /\
-    In h (failed_nodes gst) /\
-    exists st,
-      sigma gst h = Some st.
-
-  Definition best_succ (gst : global_state) (h s : addr) : Prop :=
-    exists st xs ys,
-      live_node gst h /\
-      sigma gst h = Some st /\
-      map ChordIDSpace.addr_of (succ_list st) = xs ++ s :: ys /\
-      (forall o, In o xs -> dead_node gst o) /\
-      live_node gst s.
-
-  Definition live_node_in_msg_succ_lists' (gst : global_state) (ms : list msg) : Prop :=
-    forall src dst succs p,
-      In (src, (dst, serialize_top (serialize (GotPredAndSuccs p succs)))) ms \/
-      In (src, (dst, serialize_top (serialize (GotSuccList succs)))) ms ->
-      length succs > 0 \/ (exists st, sigma gst src = Some st /\ joined st = true) ->
-      Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))).
-  Hint Unfold live_node_in_msg_succ_lists'.
-
-  Definition live_node_in_msg_succ_lists (gst : global_state) : Prop :=
-    live_node_in_msg_succ_lists' gst (msgs gst).
-  Hint Unfold live_node_in_msg_succ_lists.
-
-  Definition live_node_in_succ_lists (gst : global_state) : Prop :=
-    forall h st,
-      sigma gst h = Some st ->
-      live_node gst h ->
-      exists s,
-        best_succ gst h s.
-
-  Definition not_skipped (h : id) (succs : list id) (n : id) : Prop :=
-    forall a b xs ys,
-      h :: succs = xs ++ [a; b] ++ ys ->
-      ~ between a n b.
-
-  (* "A principal node is a member that is not skipped by any member's
-     extended successor list" *)
-  Definition principal (gst : global_state) (p : addr) : Prop :=
-    live_node gst p /\
-    forall h st succs,
-      live_node gst h ->
-      sigma gst h = Some st ->
-      succs = map ChordIDSpace.id_of (succ_list st) ->
-      not_skipped (hash h) succs (hash p).
-
-  Definition principals (gst : global_state) (ps : list addr) : Prop :=
-    NoDup ps /\
-    Forall (principal gst) ps /\
-    forall p,
-      principal gst p ->
-      In p ps.
-
-  (* f can fail unless it's the (SUCC_LIST_LEN+1)th principal. *)
-  Definition principal_failure_constraint (gst : global_state) (f : addr) : Prop :=
-    principal gst f ->
-    forall ps,
-      principals gst ps ->
-      length ps = SUCC_LIST_LEN + 1 ->
-      False.
-
-  Definition failure_constraint (gst : global_state) (f : addr) (gst' : global_state) : Prop :=
-    live_node_in_msg_succ_lists gst' /\
-    live_node_in_succ_lists gst' /\
-    principal_failure_constraint gst f.
-End ConstrainedChordSerialized.
-
-Module ChordSemantics := DynamicSemantics(ConstrainedChord).
+Module ChordSemantics := DynamicSemantics(ChordSerialized).
 
 Export ChordSemantics.
-Export ConstrainedChordSerialized.
+Export ChordSerialized.
