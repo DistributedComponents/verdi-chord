@@ -22,7 +22,8 @@ Import DeserializerNotations.
 Module Type SerializableSystem.
   Include ConstrainedDynamicSystem.
   Parameter payload_serializer : Serializer payload.
-  Parameter default_payload : payload. (* in case deserialization fails but value needed (avoid) *)End SerializableSystem.
+  Parameter default_payload : payload. (* in case deserialization fails but value needed (avoid) *)
+End SerializableSystem.
 
 Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   Definition addr := S.addr.
@@ -85,21 +86,21 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   Definition label := S.label.
   Definition label_eq_dec := S.label_eq_dec.
 
-  Definition serialize_msg (a : addr * S.payload) :=
+  Definition serialize_dst_msg (a : addr * S.payload) :=
     match a with
     | (a, p) => (a, serialize_top (serialize p))
     end.
 
   Definition start_handler a l :=
     match S.start_handler a l with
-    | (st, ms, ts) => (st, map serialize_msg ms, ts)
+    | (st, ms, ts) => (st, map serialize_dst_msg ms, ts)
     end.
 
   Definition res := (data * list (addr * payload) * list timeout * list timeout)%type.
 
   Definition serialize_res (r : S.res) : res := match r with
                                                 | (st, msgs, ts1, ts2) =>
-                                                  (st, map serialize_msg msgs, ts1, ts2)
+                                                  (st, map serialize_dst_msg msgs, ts1, ts2)
                                                 end.
 
   Definition recv_handler (src : addr) (dst : addr) (st : data) (p : payload) : res :=
@@ -402,5 +403,51 @@ End ChordSerializable.
 Module ChordSerializedSystem <: DynamicSystem := SerializedSystem(ChordSerializable).
 Export ChordSerializedSystem.
 
-Module ChordSemantics := DynamicSemantics(ChordSerializedSystem).
-Export ChordSemantics.
+Module ChordSerializedSemantics := DynamicSemantics(ChordSerializedSystem).
+Export ChordSerializedSemantics.
+
+Definition serialize_msg (m : ChordSemantics.msg) : ChordSerializedSemantics.msg :=
+  match m with
+  | (src, (dst, m)) => (src, (dst, serialize_top (serialize m)))
+  end.
+
+Definition serialize_event (e : ChordSemantics.event) :=
+  match e with
+  | ChordSemantics.e_send m => e_send (serialize_msg m)
+  | ChordSemantics.e_recv m => e_send (serialize_msg m)
+  | ChordSemantics.e_timeout h t => e_timeout h t
+  | ChordSemantics.e_fail h => e_fail h
+  end.
+
+Definition serialize_global_state (gst : ChordSemantics.global_state) :=
+  {| nodes := ChordSemantics.nodes gst;
+     failed_nodes := ChordSemantics.failed_nodes gst;
+     timeouts := ChordSemantics.timeouts gst;
+     sigma := ChordSemantics.sigma gst;
+     msgs := map serialize_msg (ChordSemantics.msgs gst);
+     trace := map serialize_event (ChordSemantics.trace gst) |}.
+
+Definition a: forall  (gst gst' : ChordSemantics.global_state),
+    ChordSemantics.step_dynamic gst gst' ->
+    ChordSerializedSemantics.step_dynamic (serialize_global_state gst)
+                                          (serialize_global_state gst').
+Proof.
+  intros.
+  inversion H.
+  - apply (Start h _ _ k);
+      simpl;
+      try assumption.
+    unfold serialize_global_state.
+    rewrite H5. simpl.
+    unfold send.
+    rewrite map_app.
+    simpl.
+    reflexivity.
+  - apply (Fail h);
+      simpl;
+      auto;
+      unfold serialize_global_state.
+    + rewrite H2.
+      reflexivity.
+    + admit.
+Admitted.
