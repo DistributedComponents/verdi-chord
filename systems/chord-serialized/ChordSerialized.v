@@ -20,21 +20,34 @@ Import DeserializerNotations.
 
 (* types *)
 Module Type SerializableSystem.
-  Include DynamicSystem.
+  Include ConstrainedDynamicSystem.
   Parameter payload_serializer : Serializer payload.
   Parameter default_payload : payload. (* in case deserialization fails but value needed (avoid) *)
+
+  Parameter timeout' : Type.
+  Parameter timeout'_eq_dec : forall a b : timeout', {a = b} + {~ a = b}.
+  Parameter f : timeout -> timeout'.
+  Parameter g : timeout' -> option timeout.
+  Parameter timeout_spec : forall t, g (f t) = Some t.
+  Parameter default_timeout : timeout.
 End SerializableSystem.
 
-Module SerializedSystem (S : SerializableSystem) <: DynamicSystem.
+Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   Definition addr := S.addr.
   Definition client_addr := S.client_addr.
   Definition client_addr_dec := S.client_addr_dec.
   Definition addr_eq_dec := S.addr_eq_dec.
+
   Definition payload := IOStreamWriter.wire.
   Definition payload_eq_dec := IOStreamWriter.wire_eq_dec.
 
-  Inductive serialized_client_payload (p : payload) : Prop :=
-  | aoeiu (x : exists p', deserialize_top deserialize p = Some p' /\ S.client_payload p').
+  Definition revert_payload p := match deserialize_top deserialize p with
+                                 | Some p => p
+                                 | None => S.default_payload
+                                 end.
+
+  Definition serialized_client_payload (p : payload) : Prop :=
+    exists p', deserialize_top deserialize p = Some p' /\ S.client_payload p'.
 
   Definition client_payload := serialized_client_payload.
 
@@ -45,7 +58,7 @@ Module SerializedSystem (S : SerializableSystem) <: DynamicSystem.
     - destruct (S.client_payload_dec p0) eqn:G.
       + unfold client_payload.
         left.
-        constructor.
+        unfold serialized_client_payload.
         exists p0.
         auto.
       + right.
@@ -74,8 +87,16 @@ Module SerializedSystem (S : SerializableSystem) <: DynamicSystem.
   Qed.
 
   Definition data := S.data.
-  Definition timeout := S.timeout.
-  Definition timeout_eq_dec := S.timeout_eq_dec.
+  Definition timeout := S.timeout'.
+
+  Definition revert_timeout (t' : S.timeout') :=
+    match S.g t' with
+    | Some t => t
+    | None => S.default_timeout
+    end.
+
+  Definition timeout_eq_dec := S.timeout'_eq_dec.
+
   Definition label := S.label.
   Definition label_eq_dec := S.label_eq_dec.
 
@@ -86,42 +107,37 @@ Module SerializedSystem (S : SerializableSystem) <: DynamicSystem.
 
   Definition start_handler a l :=
     match S.start_handler a l with
-    | (st, ms, ts) => (st, map serialize_msg ms, ts)
+    | (st, ms, ts) => (st, map serialize_msg ms, map S.f ts)
     end.
 
   Definition res := (data * list (addr * payload) * list timeout * list timeout)%type.
 
   Definition serialize_res (r : S.res) : res := match r with
                                                 | (st, msgs, ts1, ts2) =>
-                                                  (st, map serialize_msg msgs, ts1, ts2)
+                                                  (st, map serialize_msg msgs, map S.f ts1, map S.f ts2)
                                                 end.
 
-  Definition try_deserialize p := match deserialize_top deserialize p with
-                               | Some p' => p'
-                               | None => S.default_payload
-                               end.
-
   Definition recv_handler (src : addr) (dst : addr) (st : data) (p : payload) : res :=
-    serialize_res (S.recv_handler src dst st (try_deserialize p)).
+    serialize_res (S.recv_handler src dst st (revert_payload p)).
 
   Definition timeout_handler h st t :=
-    serialize_res (S.timeout_handler h st t).
+    serialize_res (S.timeout_handler h st (revert_timeout t)).
 
   Definition recv_handler_l src dst st p :=
-    match S.recv_handler_l src dst st (try_deserialize p) with
+    match S.recv_handler_l src dst st (revert_payload p) with
     | (r, l) => (serialize_res r, l)
     end.
 
   Definition timeout_handler_l h st t :=
-    match S.timeout_handler_l h st t with
+    match S.timeout_handler_l h st (revert_timeout t) with
     | (r, l) => (serialize_res r, l)
     end.
 
   Definition label_input src dst p :=
-    S.label_input src dst (try_deserialize p).
+    S.label_input src dst (revert_payload p).
 
   Definition label_output src dst p :=
-    S.label_output src dst (try_deserialize p).
+    S.label_output src dst (revert_payload p).
 
   Lemma recv_handler_labeling : forall (src dst : addr) st p r,
       (recv_handler src dst st p = r ->
@@ -185,6 +201,58 @@ Module SerializedSystem (S : SerializableSystem) <: DynamicSystem.
       find_inversion.
       reflexivity.
   Qed.
+
+  (* ConstrainedDynamicSystem fields *)
+  Definition msg := (addr * (addr * payload))%type.
+
+  Definition revert_msg (m : msg) :=
+    match m with
+    | (src, (dst, p)) => (src, (dst, (revert_payload p)))
+    end.
+
+  Inductive event : Type :=
+  | e_send : msg -> event
+  | e_recv : msg -> event
+  | e_timeout : addr -> timeout -> event
+  | e_fail : addr -> event.
+
+  Definition revert_event (e : event) : S.event :=
+    match e with
+    | e_send m => S.e_send (revert_msg m)
+    | e_recv m => S.e_recv (revert_msg m)
+    | e_timeout h t => S.e_timeout h (revert_timeout t)
+    | e_fail h => S.e_fail h
+    end.
+
+  Record global_state :=
+    { nodes : list addr;
+      failed_nodes : list addr;
+      timeouts : addr -> list timeout;
+      sigma : addr -> option data;
+      msgs : list msg;
+      trace : list event
+    }.
+
+  Definition revert_global_state (gst : global_state) : S.global_state :=
+    {| S.nodes := nodes gst;
+       S.failed_nodes := failed_nodes gst;
+       S.timeouts := fun h =>  map revert_timeout (timeouts gst h);
+       S.sigma := sigma gst;
+       S.msgs := map revert_msg (msgs gst);
+       S.trace := map revert_event (trace gst) |}.
+
+
+  (* are these too weak, since the revert functions "fail" silently with default values? *)
+  Definition timeout'_constraint (gst : global_state) (h : addr) (t' : S.timeout') :=
+    exists t, S.g t' = t /\
+              S.timeout_constraint (revert_global_state gst) h (revert_timeout t').
+
+  Definition timeout_constraint := timeout'_constraint.
+
+  Definition failure_constraint gst h gst' :=
+    S.failure_constraint (revert_global_state gst) h (revert_global_state gst').
+
+  Definition start_constraint gst h := S.start_constraint (revert_global_state gst) h.
 End SerializedSystem.
 
 (* serializers *)
@@ -345,18 +413,52 @@ Proof.
 Qed.
 
 Module ChordSerializable <: SerializableSystem.
-  Include ChordSystem.
+  Include ConstrainedChord.
   Definition payload_serializer := payload_Serializer.
   Definition default_payload := Busy.
+
+  (* ideally timeout would just take payload type as a parameter *)
+  (* or, does this even need to have the serialized payload? *)
+  Inductive _timeout' :=
+  | Tick' : _timeout'
+  | RectifyTick' : _timeout'
+  | KeepaliveTick' : _timeout'
+  | Request' : addr -> IOStreamWriter.wire -> _timeout'.
+  Definition timeout' := _timeout'.
+
+  Lemma timeout'_eq_dec : forall x y : timeout', {x = y} + {~ x = y}.
+    decide equality.
+    - apply IOStreamWriter.wire_eq_dec.
+    - apply addr_eq_dec.
+  Qed.
+
+  Definition f t :=
+    match t with
+    | Tick => Tick'
+    | RectifyTick => RectifyTick'
+    | KeepaliveTick => KeepaliveTick'
+    | Request h p => Request' h (serialize_top (serialize p))
+    end.
+
+  Definition g t' :=
+    match t' with
+    | Tick' => Some Tick
+    | RectifyTick' => Some RectifyTick
+    | KeepaliveTick' => Some KeepaliveTick
+    | Request' h p => (match deserialize_top deserialize p with
+                                 | Some p => Some (Request h p)
+                                 | None => None
+                                 end)
+    end.
 End ChordSerializable.
-  
+
 Module ChordSerializedSystem <: DynamicSystem := SerializedSystem(ChordSerializable).
 Export ChordSerializedSystem.
 
 Module ConstrainedChordSerialized <: ConstrainedDynamicSystem.
   Include ChordSerializedSystem.
   Definition msg : Type := (addr * (addr * payload))%type.
-  
+
   Inductive event : Type :=
   | e_send : msg -> event
   | e_recv : msg -> event
