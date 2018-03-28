@@ -491,10 +491,167 @@ Proof.
 Admitted.
 *)
 
+
 Definition no_joins (gst gst' : global_state) :=
   forall h,
     live_node gst' h ->
     live_node gst h.
+
+Definition n_unjoined_nodes gst := length (dedup addr_eq_dec (nodes gst)) -
+                                   length (dedup addr_eq_dec (live_addrs gst)).
+
+Lemma length_dedup_le :
+  forall A (eq_dec : forall x y : A, {x = y} + {x <> y}) l1 l2,
+    (forall x, In x l1 -> In x l2) ->
+    length (dedup eq_dec l1) <= length (dedup eq_dec l2).
+Proof.
+  intros.
+  apply NoDup_incl_length; eauto using NoDup_dedup.
+  unfold incl.
+  intros.
+  eauto using dedup_In, in_dedup_was_in.
+Qed.
+
+Lemma n_unjoined_nodes_nonincreasing :
+  forall ex,
+    lb_execution ex ->
+    always (consecutive (measure_nonincreasing n_unjoined_nodes)) ex.
+Proof.
+  cofix c. intros. inv_prop lb_execution.
+  apply Always; eauto.
+  simpl. unfold measure_nonincreasing.
+  unfold n_unjoined_nodes.
+  find_copy_apply_lem_hyp labeled_step_dynamic_preserves_nodes.
+  repeat find_rewrite.
+  cut (length (dedup addr_eq_dec (live_addrs (occ_gst o))) <=
+       length (dedup addr_eq_dec (live_addrs (occ_gst o'))));
+    [omega|].
+  apply length_dedup_le.
+  intros.
+  eauto using In_live_addrs_live, live_addr_In_live_addrs, LiveNodesStayLive.live_node_invariant.
+Qed.
+
+Lemma NoDup_cons_elim :
+  forall A (x : A) l,
+    NoDup (x :: l) ->
+    NoDup l /\
+    ~ In x l.
+Proof.
+  intros. inv_prop NoDup; auto.
+Qed.
+
+Lemma incl_cons :
+  forall A (x : A) l1 l2,
+    incl (x :: l1) l2 ->
+    incl l1 l2.
+Proof.
+  unfold incl.
+  intros. simpl in *. intuition.
+Qed.
+  
+
+Lemma NoDup_list_diff :
+  forall A (eq_dec : forall x y : A, {x = y} + {x <> y}) (l2 l1 : list A),
+    NoDup l1 ->
+    NoDup l2 ->
+    incl l1 l2 ->
+    length l2 = length l1 ->
+    incl l2 l1.
+Proof.
+  unfold incl. intros.
+  destruct (in_dec eq_dec a l1); intuition.
+  assert (incl (a :: l1) l2).
+  + unfold incl. simpl. intuition. subst. auto.
+  + find_apply_lem_hyp NoDup_incl_length; simpl in *; try omega.
+    constructor; auto.
+Qed.
+
+Lemma length_live_addrs_le_length_nodes :
+  forall gst,
+    length (dedup addr_eq_dec (live_addrs gst)) <=
+    length (dedup addr_eq_dec (nodes gst)).
+Proof.
+  intros. apply NoDup_incl_length; eauto using NoDup_dedup.
+  unfold incl. intros. apply dedup_In.
+  find_apply_lem_hyp in_dedup_was_in.
+  unfold live_addrs in *. find_apply_lem_hyp filter_In. intuition.
+Qed.
+
+Lemma unjoined_nodes_no_joins :
+  forall gst l gst',
+    labeled_step_dynamic gst l gst' ->
+    n_unjoined_nodes gst = n_unjoined_nodes gst' ->
+    no_joins gst gst'.
+Proof.
+  unfold no_joins, n_unjoined_nodes. simpl. intros.
+  pose proof length_live_addrs_le_length_nodes gst.
+  pose proof length_live_addrs_le_length_nodes gst'.
+  find_copy_apply_lem_hyp labeled_step_dynamic_preserves_nodes.
+  repeat find_rewrite.
+  match goal with
+  | H : ?a - ?b = ?a - ?c |- _ =>
+    assert ((b <= a) /\ (c <= a)) by intuition
+  end. intuition.
+  assert (length (dedup addr_eq_dec (live_addrs gst')) =
+          length (dedup addr_eq_dec (live_addrs gst))) by omega.
+  find_apply_lem_hyp NoDup_list_diff; eauto using NoDup_dedup, addr_eq_dec.
+  + unfold incl in *.
+    apply In_live_addrs_live. apply (in_dedup_was_in addr_eq_dec).
+    eauto using In_live_addrs_live, live_addr_In_live_addrs, dedup_In.
+  + unfold incl. intros.
+    eapply dedup_In. find_apply_lem_hyp in_dedup_was_in.
+    eauto using In_live_addrs_live, live_addr_In_live_addrs, LiveNodesStayLive.live_node_invariant.
+Qed.
+
+
+Lemma eventually_n_unjoined_nodes_stable :
+  forall ex,
+    lb_execution ex ->
+    exists x,
+      continuously (now (fun o => n_unjoined_nodes (occ_gst o) = x)) ex.
+Proof.
+  intros. eauto using n_unjoined_nodes_nonincreasing, measure_nonincreasing_eventually_stable.
+Qed.
+
+Lemma always_now_consecutive :
+  forall T P (s : infseq T),
+    always (now P) s ->
+    always (consecutive (fun o o' => P o /\ P o')) s.
+Proof.
+  cofix. intros.
+  destruct s.
+  constructor.
+  - destruct s. simpl. do 2 inv_prop always. simpl in *. auto.
+  - simpl. inversion H. simpl in *. eauto.
+Qed.
+
+Lemma always_monotonic_complex :
+  forall T (J P Q : infseq T -> Prop),
+    (forall s, J s -> P s -> Q s) ->
+    (forall x s, J (Cons x s) -> J s) ->
+    forall s,
+      J s ->
+      always P s ->
+      always Q s.
+Proof.
+  intros T J P Q PQ Jinvar.  cofix cf. intros (x, s) HJ HP.
+  generalize (@always_Cons _ x s P HP); simpl; intros (a1, a2).
+  constructor; simpl; eauto.
+Qed.
+
+Lemma consecutive_monotonic_extra :
+  forall T (J P Q : T -> T -> Prop),
+    (forall x y, J x y -> P x y -> Q x y) ->
+    forall s,
+      consecutive J s ->
+      consecutive P s ->
+      consecutive Q s.
+Proof.
+  intros T J P Q JPQ (x, (y, s)) nJ nP; simpl. eauto.
+Qed.
+
+Definition is_step x y :=
+  exists l, labeled_step_dynamic (occ_gst x) l (occ_gst y).
 
 Theorem joins_stop :
   forall ex,
@@ -504,6 +661,21 @@ Theorem joins_stop :
     strong_local_fairness ex ->
     continuously (consecutive (fun o o' => no_joins (occ_gst o) (occ_gst o'))) ex.
 Proof.
+  intros.
+  find_copy_eapply_lem_hyp eventually_n_unjoined_nodes_stable.
+  break_exists.
+  unfold continuously in *.
+  eapply eventually_monotonic with (J := lb_execution).
+  4:eauto.
+  all:eauto using lb_execution_invar.
+  intros.
+  find_eapply_lem_hyp always_now_consecutive.
+  eapply always_monotonic_complex with (J := lb_execution).
+  4:eauto.
+  all:eauto using lb_execution_invar.
+  intros. destruct s0. destruct s0. simpl in *.
+  inv_prop lb_execution. intuition. subst.
+  eauto using unjoined_nodes_no_joins.
 (*
 Since nodes only set joined=true some time after they are added to the network
 and no new nodes are added to the network in an lb_execution, joins have to
@@ -512,7 +684,8 @@ eventually stop. That implies this lemma.
 DIFFICULTY: Ryan
 USED: In phase two.
 *)
-Admitted.
+Qed.
+
 
 (*
 Lemma pred_error_nonincreasing :
