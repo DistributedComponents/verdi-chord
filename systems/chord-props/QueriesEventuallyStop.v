@@ -407,19 +407,87 @@ Proof.
     + eapply E_next, IHuntil; invar_eauto.
 Qed.
 
-Inductive query_order : data -> data -> Prop :=
+Definition stuck {T : Type} (R : T -> T -> Prop) (t : T) :=
+  forall t',
+    R t t' ->
+    False.
+
+Inductive query_order (h : addr) : global_state -> global_state -> Prop :=
   QONone :
-    forall st dstp q m st',
+    forall gst gst' st st' dstp q m,
+      sigma gst h = Some st ->
+      sigma gst' h = Some st' ->
       cur_request st = Some (dstp, q, m) ->
       cur_request st' = None ->
-      query_order st st'
+      query_order h gst gst'
 | QOStabilizeStabilize2 :
-    forall st dstp m dstp' ns m' st',
+    forall gst gst' st st' dstp m dstp' ns m',
+      sigma gst h = Some st ->
+      sigma gst' h = Some st' ->
       cur_request st = Some (dstp, Stabilize, m) ->
       cur_request st' = Some (dstp', Stabilize2 ns, m') ->
-      query_order st st'.
+      query_order h gst gst'
+| QOStabilizeStabilize :
+    forall gst gst' st st' dstp m dstp' m' s rest,
+      sigma gst h = Some st ->
+      sigma gst' h = Some st' ->
+      cur_request st = Some (dstp, Stabilize, m) ->
+      succ_list st = s :: rest ->
+      cur_request st' = Some (dstp', Stabilize, m') ->
+      succ_list st' = rest ->
+      query_order h gst gst'.
 
-Definition channel_order (src dst : addr) : global_state -> global_state -> Prop.
+Lemma none_best_cur_request :
+  forall h gst,
+    stuck (query_order h) gst ->
+    forall st,
+      sigma gst h = Some st ->
+      cur_request st = None.
+Proof.
+  intros.
+  destruct (cur_request st) as [[[dstp q] m]|] eqn:?; auto.
+  set (st' := clear_query st).
+  set (gst' := {| nodes := nodes gst;
+                  failed_nodes := failed_nodes gst;
+                  timeouts := timeouts gst;
+                  sigma := update addr_eq_dec (sigma gst) h (Some st');
+                  msgs := msgs gst;
+                  trace := trace gst |}).
+  find_eapply_lem_hyp (QONone h gst gst'); simpl; rewrite_update; eauto.
+  firstorder.
+Qed.
+
+Inductive channel_order (src dst : addr) : global_state -> global_state -> Prop :=
+  COReqRes :
+    forall gst gst' req res,
+      request_response_pair req res ->
+      In req (channel gst src dst) ->
+      In res (channel gst' dst src) ->
+      channel_order src dst gst gst'
+| COReqDelayed :
+    forall gst gst' req st,
+      request_payload req ->
+      In req (channel gst src dst) ->
+      sigma gst' dst = Some st ->
+      In (src, req) (delayed_queries st) ->
+      channel_order src dst gst gst'
+| CODelayedRes :
+    forall gst gst' req res st,
+      request_response_pair req res ->
+      sigma gst dst = Some st ->
+      In (src, req) (delayed_queries st) ->
+      In res (channel gst' dst src) ->
+      channel_order src dst gst gst'.
+
+Lemma res_best_channel_config :
+  forall src dst gst,
+    stuck (channel_order src dst) gst ->
+    no_requests (channel gst src dst) /\
+    (forall st req,
+        sigma gst dst = Some st ->
+        request_payload req ->
+        ~ In (src, req) (delayed_queries st)).
+Proof.
 Admitted.
 
 Theorem eventually_done_or_always_blocked :
