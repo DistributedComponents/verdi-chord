@@ -1,6 +1,78 @@
 Require Import InfSeqExt.infseq.
 Require Import StructTact.StructTactics.
 
+Definition rel (T : Type) : Type :=
+  T -> T -> Prop.
+
+Set Implicit Arguments.
+
+Section lex.
+  (* This development of the lexicographic product follows one given
+    by Arthur Azevedo De Amorim on StackOverflow:
+    https://stackoverflow.com/questions/42520130/lexicographical-comparison-of-tuples-of-nats#42520191
+    ...which itself is an adaptation of the standard library's version
+    to remove awkward sigma types. *)
+
+  Variables (U V : Type) (R R' : rel U) (S : rel V).
+
+  Inductive lex : rel (U * V) :=
+  | LexL : forall x y x' y',
+      R x x' ->
+      lex (x, y) (x', y')
+  | LexR : forall x y y',
+      S y y' ->
+      lex (x, y) (x, y').
+
+  Lemma lex_wf :
+    well_founded R ->
+    well_founded S ->
+    well_founded lex.
+  Proof.
+    unfold well_founded; intros.
+    destruct a as [a b].
+    generalize dependent b.
+    assert (Haacc: Acc _ a) by auto.
+    induction Haacc; intros b.
+    assert (Hbacc: Acc _ b) by auto.
+    induction Hbacc; subst.
+    constructor; intros.
+    inv_prop lex; eauto.
+  Qed.
+
+End lex.
+(* hints don't survive sections *)
+Hint Resolve lex_wf.
+
+Definition diag {U : Type} (R : rel (U * U)) (x y : U) :=
+  R (x, x) (y, y).
+
+Definition lex_diag {U : Type} (R R' : rel U) : rel U :=
+  diag (lex R R').
+
+Lemma diag_wf :
+  forall U (R : rel (U * U)),
+    well_founded R ->
+    well_founded (diag R).
+Proof.
+  unfold well_founded; intros.
+  assert (Hacc: Acc R (a, a)) by auto.
+  remember (a, a) as da.
+  generalize dependent a.
+  induction Hacc; intros; subst.
+  constructor; eauto.
+Qed.
+Hint Resolve diag_wf.
+
+Lemma lex_diag_wf :
+  forall U (R S : rel (U * U)),
+    well_founded R ->
+    well_founded S ->
+    well_founded (diag (lex R S)).
+Proof.
+  eauto.
+Qed.
+Hint Resolve lex_diag_wf.
+
 Section wf_liveness.
   Variable T : Type.
   Variable R : T -> T -> Prop.
@@ -15,7 +87,7 @@ Section wf_liveness.
     forall t, {stuck t} + {~ stuck t}.
 
   Lemma eventual_drop_means_eventually_stuck :
-    forall (ex: infseq T),
+    forall ex,
       ~ stuck (hd ex) ->
       always (fun s =>
                 ~ stuck (hd s) ->
