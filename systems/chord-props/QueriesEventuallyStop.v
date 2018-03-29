@@ -33,6 +33,23 @@ Definition blocked_by (gst : global_state) (s h : addr) : Prop :=
     addr_of dstp = s /\
     In (h, m) (delayed_queries st__s).
 
+Lemma blocked_by_intro :
+  forall gst s h,
+    In h (nodes gst) ->
+    In s (nodes gst) ->
+    forall st__h st__s dstp q m,
+      sigma gst h = Some st__h ->
+      sigma gst s = Some st__s ->
+      cur_request st__h = Some (dstp, q, m) ->
+      addr_of dstp = s ->
+      In (h, m) (delayed_queries st__s) ->
+      blocked_by gst s h.
+Proof.
+  unfold blocked_by.
+  intuition (repeat eexists; eauto).
+Qed.
+Hint Resolve blocked_by_intro.
+
 (* There is a cycle in a relation iff there's an element related to
    itself by the transitive closure of the relation. *)
 Definition has_cycle {A : Type} (R : A -> A -> Prop) : Prop :=
@@ -406,6 +423,27 @@ Proof.
     + eapply E_next, IHuntil; invar_eauto.
 Qed.
 
+Theorem always_stuck_blocked_always_blocked :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    strong_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    forall dstp q m,
+      live_node (occ_gst (hd ex)) (addr_of dstp) ->
+      always (now
+                (fun o =>
+                   forall st,
+                     sigma (occ_gst o) h = Some st ->
+                     cur_request st = Some (dstp, q, m)))
+             ex ->
+      blocked_by (occ_gst (hd ex)) (addr_of dstp) h ->
+      always (now (fun o => blocked_by (occ_gst o) (addr_of dstp) h)) ex.
+Proof.
+  intros.
+  inv_prop blocked_by.
+Admitted.
+
 Theorem stuck_on_a_single_query_means_blocked :
   forall ex h,
     lb_execution ex ->
@@ -413,6 +451,7 @@ Theorem stuck_on_a_single_query_means_blocked :
     strong_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     forall dstp q m,
+      live_node (occ_gst (hd ex)) (addr_of dstp) ->
       always (now
                 (fun o =>
                    forall st,
@@ -421,6 +460,29 @@ Theorem stuck_on_a_single_query_means_blocked :
              ex ->
       continuously (now (fun o => blocked_by (occ_gst o) (addr_of dstp) h)) ex.
 Proof.
+  intros.
+  destruct ex as [o ex].
+
+  pose proof (query_message_ok_invariant
+                (occ_gst o) ltac:(eauto) h (addr_of dstp))
+    as Qok.
+  set (gst := occ_gst o).
+  set (dst := addr_of dstp).
+  find_copy_apply_lem_hyp (live_node_means_state_exists gst h).
+  break_exists_name st__h.
+  find_copy_apply_lem_hyp (live_node_means_state_exists gst dst).
+  break_exists_name st__dst.
+  specialize (Qok st__h st__dst ltac:(eauto) ltac:(eauto)).
+
+  find_copy_apply_lem_hyp always_now; simpl in *.
+
+  inv_prop query_message_ok.
+  - find_apply_hyp_hyp; congruence.
+  - find_apply_hyp_hyp; congruence.
+  - admit.
+  - admit.
+  - eapply always_continuously, always_stuck_blocked_always_blocked;
+      invar_eauto.
 Admitted.
 
 Lemma blocking_node_continuously_also_blocked :
@@ -482,6 +544,7 @@ Proof.
         eapply continuously_monotonic; try eassumption.
         intro s0; rewrite now_and_tl_comm.
         apply now_monotonic; intuition eauto.
+        admit.
       * assert (always (now (fun o => blocked_by (occ_gst o) w w')) s).
         {
           eapply always_monotonic;
@@ -504,7 +567,7 @@ Proof.
         by (eapply IHeventually; invar_eauto).
       break_exists_exists; intuition.
       constructor; now auto.
-Qed.
+Admitted.
 
 Theorem never_stopping_means_stuck_on_a_single_query :
   forall ex h,
