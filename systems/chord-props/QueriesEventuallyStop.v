@@ -8,6 +8,7 @@ Require Import StructTact.Update.
 Require Import InfSeqExt.infseq.
 Require Import InfSeqExt.classical.
 Require Import Chord.InfSeqTactics.
+Require Import Chord.LabeledWF.
 
 Require Import Chord.Chord.
 
@@ -412,22 +413,22 @@ Definition stuck {T : Type} (R : T -> T -> Prop) (t : T) :=
     R t t' ->
     False.
 
-Inductive query_order (h : addr) : global_state -> global_state -> Prop :=
-  QONone :
+Inductive cr_order (h : addr) : global_state -> global_state -> Prop :=
+| CRNone :
     forall gst gst' st st' dstp q m,
       sigma gst h = Some st ->
       sigma gst' h = Some st' ->
       cur_request st = Some (dstp, q, m) ->
       cur_request st' = None ->
-      query_order h gst gst'
-| QOStabilizeStabilize2 :
+      cr_order h gst gst'
+| CRStabilizeStabilize2 :
     forall gst gst' st st' dstp m dstp' ns m',
       sigma gst h = Some st ->
       sigma gst' h = Some st' ->
       cur_request st = Some (dstp, Stabilize, m) ->
       cur_request st' = Some (dstp', Stabilize2 ns, m') ->
-      query_order h gst gst'
-| QOStabilizeStabilize :
+      cr_order h gst gst'
+| CRStabilizeStabilize :
     forall gst gst' st st' dstp m dstp' m' s rest,
       sigma gst h = Some st ->
       sigma gst' h = Some st' ->
@@ -435,11 +436,11 @@ Inductive query_order (h : addr) : global_state -> global_state -> Prop :=
       succ_list st = s :: rest ->
       cur_request st' = Some (dstp', Stabilize, m') ->
       succ_list st' = rest ->
-      query_order h gst gst'.
+      cr_order h gst gst'.
 
 Lemma none_best_cur_request :
   forall h gst,
-    stuck (query_order h) gst ->
+    stuck (cr_order h) gst ->
     forall st,
       sigma gst h = Some st ->
       cur_request st = None.
@@ -453,42 +454,68 @@ Proof.
                   sigma := update addr_eq_dec (sigma gst) h (Some st');
                   msgs := msgs gst;
                   trace := trace gst |}).
-  find_eapply_lem_hyp (QONone h gst gst'); simpl; rewrite_update; eauto.
+  find_eapply_lem_hyp (CRNone h gst gst'); simpl; rewrite_update; eauto.
   firstorder.
 Qed.
 
-Inductive channel_order (src dst : addr) : global_state -> global_state -> Prop :=
+Inductive channel_order (src : addr) : global_state -> global_state -> Prop :=
   COReqRes :
-    forall gst gst' req res,
+    forall dst gst gst' req res,
       request_response_pair req res ->
       In req (channel gst src dst) ->
+      no_requests (channel gst' src dst) ->
       In res (channel gst' dst src) ->
-      channel_order src dst gst gst'
+      channel_order src gst gst'
 | COReqDelayed :
-    forall gst gst' req st,
+    forall dst gst gst' req st,
       request_payload req ->
       In req (channel gst src dst) ->
+      no_requests (channel gst' src dst) ->
       sigma gst' dst = Some st ->
       In (src, req) (delayed_queries st) ->
-      channel_order src dst gst gst'
+      channel_order src gst gst'
 | CODelayedRes :
-    forall gst gst' req res st,
+    forall dst gst gst' req res st st',
       request_response_pair req res ->
       sigma gst dst = Some st ->
       In (src, req) (delayed_queries st) ->
+      sigma gst' dst = Some st' ->
+      no_requests (channel gst src dst) ->
+      no_requests (channel gst' src dst) ->
+      (forall r, ~ In (src, r) (delayed_queries st')) ->
       In res (channel gst' dst src) ->
-      channel_order src dst gst gst'.
+      channel_order src gst gst'.
+
+Lemma res_exists_for_req :
+  forall req,
+    request_payload req ->
+    exists res,
+      request_response_pair req res.
+Proof.
+  intros.
+  inv_prop request_payload; eexists; constructor.
+  Unshelve.
+  all:auto using nil, None.
+Qed.
+Hint Resolve res_exists_for_req.
 
 Lemma res_best_channel_config :
-  forall src dst gst,
-    stuck (channel_order src dst) gst ->
-    no_requests (channel gst src dst) /\
-    (forall st req,
-        sigma gst dst = Some st ->
-        request_payload req ->
+  forall src gst,
+    stuck (channel_order src) gst ->
+    forall dst,
+      no_requests (channel gst src dst) /\
+      (forall st req,
+          sigma gst dst = Some st ->
+          request_payload req ->
         ~ In (src, req) (delayed_queries st)).
 Proof.
-Admitted.
+Abort.
+
+Definition occ_order (R : rel global_state) : rel occurrence :=
+  fun o o' => R (occ_gst o) (occ_gst o').
+
+Definition query_order (h : addr) :=
+  occ_order (lex_diag (cr_order h) (channel_order h)).
 
 Theorem eventually_done_or_always_blocked :
   forall ex h,
@@ -499,12 +526,20 @@ Theorem eventually_done_or_always_blocked :
     forall st dstp q m,
       sigma (occ_gst (hd ex)) h = Some st ->
       cur_request st = Some (dstp, q, m) ->
-      eventually ((now (fun o => forall st, sigma (occ_gst o) h = Some st ->
-                                    cur_request st = None)) \/_
-                  always (now (fun o =>
-                                 exists dstp',
-                                   blocked_by (occ_gst o) (addr_of dstp') h)))
-            ex.
+      eventually ((now (fun o => forall st, sigma (occ_gst o) h = Some st -> cur_request st = None))) ex \/
+      continuously (now (fun o => exists dstp', blocked_by (occ_gst o) (addr_of dstp') h)) ex.
+
+Theorem eventually_done_or_always_blocked :
+  forall ex h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    weak_local_fairness ex ->
+    live_node (occ_gst (hd ex)) h ->
+    forall st dstp q m,
+      sigma (occ_gst (hd ex)) h = Some st ->
+      cur_request st = Some (dstp, q, m) ->
+      eventually ((now (fun o => forall st, sigma (occ_gst o) h = Some st -> cur_request st = None))) ex \/
+      continuously (now (fun o => exists dstp', blocked_by (occ_gst o) (addr_of dstp') h)) ex.
 Proof.
 Admitted.
 
@@ -566,7 +601,7 @@ Proof.
     find_eapply_lem_hyp eventually_done_or_always_blocked;
     try find_eapply_prop (addr_of x1);
     eauto.
-  find_apply_lem_hyp eventually_or_tl_or; break_or_hyp.
+  break_or_hyp.
   - exfalso.
     find_eapply_lem_hyp cumul_eventually_always; eauto.
     cut (eventually (fun _ => False) (Cons o ex)).
@@ -579,7 +614,6 @@ Proof.
     unfold and_tl in *; destruct s; break_and; simpl in *.
     firstorder congruence.
   - simpl.
-    fold_continuously.
     find_eapply_lem_hyp continuously_exists.
     firstorder.
 Qed.
@@ -620,7 +654,7 @@ Proof.
             [|destruct s; repeat find_apply_lem_hyp always_now';
               simpl in *; exfalso; eauto].
         find_copy_eapply_lem_hyp eventually_done_or_always_blocked; invar_eauto.
-        find_apply_lem_hyp eventually_or_tl_or; break_or_hyp.
+        break_or_hyp.
         -- exfalso.
            eapply_lem_prop_hyp cumul_eventually_always False; eauto.
            repeat match goal with
@@ -631,7 +665,6 @@ Proof.
            ++ destruct s; firstorder eauto.
            ++ eapply IHeventually; invar_eauto.
         -- find_apply_lem_hyp always_continuously.
-           fold_continuously.
            find_apply_lem_hyp continuously_exists.
            break_exists_name dstp'.
            exists [addr_of dstp'; h].
