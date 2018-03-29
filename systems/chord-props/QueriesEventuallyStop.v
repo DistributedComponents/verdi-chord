@@ -407,6 +407,21 @@ Proof.
     + eapply E_next, IHuntil; invar_eauto.
 Qed.
 
+Inductive query_order : data -> data -> Prop :=
+  QONone :
+    forall st dstp q m st',
+      cur_request st = Some (dstp, q, m) ->
+      cur_request st' = None ->
+      query_order st st'
+| QOStabilizeStabilize2 :
+    forall st dstp m dstp' ns m' st',
+      cur_request st = Some (dstp, Stabilize, m) ->
+      cur_request st' = Some (dstp', Stabilize2 ns, m') ->
+      query_order st st'.
+
+Definition channel_order (src dst : addr) : global_state -> global_state -> Prop.
+Admitted.
+
 Theorem eventually_done_or_always_blocked :
   forall ex h,
     lb_execution ex ->
