@@ -24,12 +24,13 @@ Set Bullet Behavior "Strict Subproofs".
 (* The (blocked_by s h) relation relates a live node h to a node s when
    a message from h is stored in the delayed_queries list at s. *)
 Definition blocked_by (gst : global_state) (s h : addr) : Prop :=
-  In h (nodes gst) /\
-  In s (nodes gst) /\
+  live_node gst h /\
+  live_node gst s /\
   exists st__h st__s dstp q m,
     sigma gst h = Some st__h /\
     sigma gst s = Some st__s /\
     cur_request st__h = Some (dstp, q, m) /\
+    cur_request st__s <> None /\
     addr_of dstp = s /\
     In (h, m) (delayed_queries st__s).
 
@@ -200,8 +201,8 @@ Proof.
     find_copy_apply_lem_hyp requests_get_response_or_queued; eauto.
     break_or_hyp; break_and.
     + left.
-      repeat split; invar_eauto.
-      simpl.
+      unfold blocked_by.
+      repeat (split; invar_eauto).
       assert (live_node (occ_gst o') a) by invar_eauto.
       assert (live_node (occ_gst o') (addr_of dstp)) by invar_eauto.
       assert (live_node (occ_gst o) a) by invar_eauto.
@@ -406,34 +407,30 @@ Proof.
     + eapply E_next, IHuntil; invar_eauto.
 Qed.
 
-Theorem stuck_on_a_single_query_means_blocked :
+Theorem eventually_done_or_always_blocked :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
+    weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
-    forall dstp q m,
-      always (now
-                (fun o =>
-                   forall st,
-                     sigma (occ_gst o) h = Some st ->
-                     cur_request st = Some (dstp, q, m)))
-             ex ->
-      continuously (now (fun o => blocked_by (occ_gst o) (addr_of dstp) h)) ex.
+    forall st dstp q m,
+      sigma (occ_gst (hd ex)) h = Some st ->
+      cur_request st = Some (dstp, q, m) ->
+      eventually ((now (fun o => forall st, sigma (occ_gst o) h = Some st ->
+                                    cur_request st = None)) \/_
+                  always (now (fun o =>
+                                 exists dstp',
+                                   blocked_by (occ_gst o) (addr_of dstp') h)))
+            ex.
 Proof.
 Admitted.
 
-Lemma blocking_node_continuously_also_blocked :
-  forall ex,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    forall h s,
-      always (now (fun o => blocked_by (occ_gst o) s h)) ex ->
-      exists w,
-        continuously (now (fun o => blocked_by (occ_gst o) w s)) ex.
-Proof.
-Admitted.
+Ltac fold_continuously :=
+  match goal with
+  | H: context[eventually (always ?P)] |- _ =>
+    change (eventually (always P))
+      with (continuously P) in H
+  end.
 
 Lemma now_and_tl_comm :
   forall T (P Q : T -> Prop) s,
@@ -445,17 +442,74 @@ Proof.
 Qed.
 Hint Rewrite now_and_tl_comm.
 
+Lemma eventually_now_const :
+  forall T (s : infseq T) P,
+    eventually (now (fun _ => P)) s ->
+    P.
+Proof.
+  induction 1; destruct s; simpl in *; tauto.
+Qed.
+
+Lemma continuously_exists :
+  forall T S (s : infseq T) (P: T -> S -> Prop),
+    continuously (now (fun o => exists x, P o x)) s ->
+    exists x,
+      continuously (now (fun o => P o x)) s.
+Proof.
+Admitted.
+
+Lemma blocking_node_continuously_also_blocked :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    weak_local_fairness ex ->
+    forall h s,
+      always (now (fun o => blocked_by (occ_gst o) s h)) ex ->
+      exists w,
+        continuously (now (fun o => blocked_by (occ_gst o) w s)) ex.
+Proof.
+  intros.
+  destruct ex.
+  find_copy_apply_lem_hyp always_now.
+  simpl in *.
+  inv_prop blocked_by; break_and.
+  break_exists_name st__h.
+  break_exists_name st__dst; expand_def.
+  assert (exists dstp q m, cur_request st__dst = Some (dstp, q, m))
+    by (destruct (cur_request st__dst) as [[[dstp q] m]|] eqn:Heq;
+        intuition eauto).
+  expand_def.
+  change o with (hd (Cons o ex)) in *;
+    find_eapply_lem_hyp eventually_done_or_always_blocked;
+    try find_eapply_prop (addr_of x1);
+    eauto.
+  find_apply_lem_hyp eventually_or_tl_or; break_or_hyp.
+  - exfalso.
+    find_eapply_lem_hyp cumul_eventually_always; eauto.
+    cut (eventually (fun _ => False) (Cons o ex)).
+    {
+      repeat match goal with H:_ |- _ => clear H end.
+      induction 1; destruct ex; simpl in *; tauto.
+    }
+    eapply eventually_monotonic_simple; [|eassumption].
+    intros.
+    unfold and_tl in *; destruct s; break_and; simpl in *.
+    firstorder congruence.
+  - simpl.
+    fold_continuously.
+    find_eapply_lem_hyp continuously_exists.
+    firstorder.
+Qed.
+
 Theorem query_always_stuck_gives_chain :
   forall k ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
+    weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
-    always (~_ (now circular_wait)) ex ->
-    forall dstp q m,
-      always (now (fun o => forall st,
-                       sigma (occ_gst o) h = Some st ->
-                       cur_request st = Some (dstp, q, m)))
+    always (now (fun o => forall st,
+                     sigma (occ_gst o) h = Some st ->
+                     cur_request st <> None))
            ex ->
       k >= 1 ->
       exists c,
@@ -470,18 +524,39 @@ Proof.
     constructor; eauto.
   - find_copy_eapply_lem_hyp IHk; eauto; [|omega].
     break_exists_name c; intuition.
-    induction H9; intros; subst.
+    match goal with
+    | H: continuously _ _ |- _ =>
+      induction H; intros; subst
+    end.
     + destruct c as [|w [|w' c]];
         [simpl in * |-; tauto| |].
       * assert (w = h) by (simpl in *; tauto); subst.
-        exists [addr_of dstp; h]; intuition.
-        simpl in *; congruence.
-        find_copy_eapply_lem_hyp stuck_on_a_single_query_means_blocked; eauto.
-        find_apply_lem_hyp always_continuously.
-        find_continuously_and_tl.
-        eapply continuously_monotonic; try eassumption.
-        intro s0; rewrite now_and_tl_comm.
-        apply now_monotonic; intuition eauto.
+        find_copy_apply_lem_hyp live_node_means_state_exists;
+          break_exists_name h__st.
+        destruct (cur_request h__st) as [[[dstp q] m]|] eqn:?;
+            [|destruct s; repeat find_apply_lem_hyp always_now';
+              simpl in *; exfalso; eauto].
+        find_copy_eapply_lem_hyp eventually_done_or_always_blocked; invar_eauto.
+        find_apply_lem_hyp eventually_or_tl_or; break_or_hyp.
+        -- exfalso.
+           eapply_lem_prop_hyp cumul_eventually_always False; eauto.
+           repeat match goal with
+                  | H: eventually (now _) _ |- _ => clear H
+                  | H: context[h__st] |- _ => clear H
+                  end.
+           induction H3.
+           ++ destruct s; firstorder eauto.
+           ++ eapply IHeventually; invar_eauto.
+        -- find_apply_lem_hyp always_continuously.
+           fold_continuously.
+           find_apply_lem_hyp continuously_exists.
+           break_exists_name dstp'.
+           exists [addr_of dstp'; h].
+           simpl; intuition eauto.
+           find_continuously_and_tl.
+           eapply continuously_monotonic; try eassumption.
+           intro s0; rewrite now_and_tl_comm.
+           apply now_monotonic; intuition eauto.
       * assert (always (now (fun o => blocked_by (occ_gst o) w w')) s).
         {
           eapply always_monotonic;
@@ -506,33 +581,11 @@ Proof.
       constructor; now auto.
 Qed.
 
-Theorem never_stopping_means_stuck_on_a_single_query :
-  forall ex h,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    live_node (occ_gst (hd ex)) h ->
-    forall st dstp q m,
-      sigma (occ_gst (hd ex)) h = Some st ->
-      cur_request st = Some (dstp, q, m) ->
-      always (~_ (now circular_wait)) ex ->
-      always (now (fun o => forall st',
-                           sigma (occ_gst o) h = Some st' ->
-                           cur_request st' <> None)) ex ->
-      exists dstp' q' m',
-        continuously (now (fun o =>
-                             forall st',
-                               sigma (occ_gst o) h = Some st' ->
-                               cur_request st' = Some (dstp', q', m')))
-                     ex.
-Proof.
-Admitted.
-
 Theorem queries_dont_always_not_stop :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
+    weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     forall st dstp q m,
       sigma (occ_gst (hd ex)) h = Some st ->
@@ -553,38 +606,32 @@ Proof.
        destruct s; auto.
     - apply IHeventually; invar_eauto.
   }
-  find_eapply_lem_hyp never_stopping_means_stuck_on_a_single_query; eauto; break_exists.
-  match goal with
-  | H: sigma _ h = Some _ |- _ => clear H
-  end.
+  remember (length (nodes (occ_gst (hd ex)))) as k.
+  find_copy_eapply_lem_hyp (query_always_stuck_gives_chain (S k)); omega || eauto.
+  break_exists; break_and.
+  repeat match goal with
+         | H: sigma _ h = Some _ |- _ => clear H
+         end.
   match goal with
   | H: continuously _ _ |- _ => induction H
   end.
-  - remember (length (nodes (occ_gst (hd s)))) as k.
-    find_eapply_lem_hyp (query_always_stuck_gives_chain (S k)); omega || eauto.
-    break_exists; break_and.
-    match goal with
-    | H: continuously _ _ |- _ => induction H
-    end.
-    + destruct s; apply E0.
-      find_apply_lem_hyp always_now'; simpl in *.
-      eapply pigeon_cycle with (l := nodes (occ_gst o));
-        [|eassumption|omega].
-      intros; inv_prop blocked_by; tauto.
-    + eapply E_next, IHeventually; invar_eauto.
-      inv_prop lb_execution.
-      inv_prop labeled_step_dynamic;
-        simpl;
-        repeat (find_rewrite || find_injection);
-        auto using apply_handler_result_nodes.
-  - eapply E_next, IHeventually; invar_eauto.
+  + destruct s; apply E0.
+    find_apply_lem_hyp always_now'; simpl in *.
+    eapply pigeon_cycle with (l := nodes (occ_gst o));
+      [firstorder|eassumption|omega].
+  + eapply E_next, IHeventually; invar_eauto.
+    inv_prop lb_execution.
+    inv_prop labeled_step_dynamic;
+      simpl;
+      repeat (find_rewrite || find_injection);
+      auto using apply_handler_result_nodes.
 Qed.
 
 Theorem queries_eventually_stop' :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
+    weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     forall st dstp q m,
       sigma (occ_gst (hd ex)) h = Some st ->
@@ -609,7 +656,7 @@ Theorem queries_eventually_stop :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
+    weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     busy_if_live h (hd ex) ->
     always (~_ (now circular_wait)) ex ->
