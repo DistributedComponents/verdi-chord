@@ -1615,7 +1615,7 @@ Lemma dead_node_channel_empties_out :
 Proof.
 (*
 USED: In phase one (transitively)
-DIFFICULTY: 3
+DIFFICULTY: 3/Doug
 *)
 Admitted.
 
