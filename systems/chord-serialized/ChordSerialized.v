@@ -547,6 +547,18 @@ Proof.
   assumption.
 Qed.
 
+Lemma revert_msg_send_revert_dst_msg : forall h ms,
+    map revert_msg (map (send h) ms) =
+    map (ChordSemantics.send h) (map revert_dst_msg ms).
+Proof.
+  induction ms.
+  - reflexivity.
+  - unfold ChordSemantics.send, revert_dst_msg.
+    simpl. break_let.
+    rewrite IHms.
+    reflexivity.
+Qed.
+
 Definition labeled_step_serialized_labeled_step: forall gst l gst',
     ChordSemantics.labeled_step_dynamic gst l gst' ->
     ChordSerializedSemantics.labeled_step_dynamic (serialize_global_state gst)
@@ -696,9 +708,85 @@ Proof.
       end.
       unfold revert_global_state.
       simpl.
-      rewrite map_app.
-      admit.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+      repeat rewrite map_app.
+      unfold update at 1.
+      unfold update at 2.
+      rewrite revert_msg_send_revert_dst_msg.
+      reflexivity.
+  - apply (ChordSemantics.LDeliver_node
+             (revert_global_state gst) (revert_global_state gst')
+             (revert_msg m) h d
+             (map revert_msg xs) (map revert_msg ys) (map revert_dst_msg ms)
+             l st newts clearedts);
+      try assumption.
+    + unfold revert_global_state. simpl.
+      match goal with
+      | H : ?x = _ |- context[?x] => rewrite H
+      end.
+      rewrite map_app. reflexivity.
+    + match goal with
+      | H : ?x = _ |- ?x = _ => rewrite H
+      end.
+      unfold revert_msg. repeat break_let.
+      reflexivity.
+    + unfold revert_msg, recv_handler_l, serialize_res in *.
+      repeat break_let. simpl in *.
+      match goal with
+      | H : context[ChordSerializable.recv_handler_l] |- _ => rewrite H
+      end.
+      find_inversion.
+      rewrite serialize_revert_dst_msgs.
+      reflexivity.
+    + match goal with
+      | H : ?x = _ |- context[revert_global_state ?x] => rewrite H
+      end.
+      unfold revert_global_state. simpl.
+      repeat rewrite map_app.
+      unfold update at 1.
+      unfold update at 2.
+      rewrite revert_msg_send_revert_dst_msg.
+      reflexivity.
+  - apply (ChordSemantics.LInput
+             (revert_global_state gst) (revert_global_state gst')
+             h (revert_payload i) to (revert_msg m) l);
+      try assumption.
+    + unfold client_payload, serialized_client_payload in *.
+      break_exists. break_and.
+      unfold revert_payload.
+      match goal with
+      | H : context[deserialize] |- _ => rewrite H
+      end.
+      assumption.
+    + match goal with
+      | H : ?x = _ |- revert_msg ?x = _ => rewrite H
+      end.
+      unfold revert_msg, send, ChordSemantics.send.
+      reflexivity.
+    + match goal with
+      | H : ?x = _ |- context[revert_global_state ?x] => rewrite H
+      end.
+      unfold revert_global_state, ChordSemantics.update_msgs_and_trace. simpl.
+      repeat rewrite map_app.
+      reflexivity.
+  - apply (ChordSemantics.LDeliver_client
+             (revert_global_state gst) (revert_global_state gst')
+             h (map revert_msg xs) (revert_msg m) (map revert_msg ys) l);
+      try assumption.
+    + unfold revert_global_state. simpl.
+      match goal with
+      | H : ?x = _ |- context[?x] => rewrite H
+      end.
+      rewrite map_app. reflexivity.
+    + match goal with
+      | H : ?x = _ |- context[?x] => rewrite H
+      end.
+      unfold revert_msg. repeat break_let. reflexivity.
+    + unfold label_output, revert_msg in *. repeat break_let.
+      simpl in *. assumption.
+    + match goal with
+      | H : ?x = _ |- revert_global_state ?x = _ => rewrite H
+      end.
+      unfold revert_global_state, update_msgs_and_trace. simpl.
+      repeat rewrite map_app.
+      reflexivity.
+Qed.
