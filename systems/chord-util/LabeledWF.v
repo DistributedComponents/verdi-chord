@@ -83,6 +83,16 @@ Section wf_liveness.
   Definition stuck (t : T) : Prop :=
     forall t', t > t' -> False.
 
+  Lemma stuck_acc :
+    forall t,
+      stuck t ->
+      Acc R t.
+  Proof using T R.
+    unfold stuck.
+    constructor; intros.
+    exfalso; eauto.
+  Qed.
+
   Variable stuck_dec :
     forall t, {stuck t} + {~ stuck t}.
 
@@ -118,3 +128,5 @@ Section wf_liveness.
   Qed.
 
 End wf_liveness.
+
+Hint Resolve stuck_acc.

@@ -408,26 +408,21 @@ Proof.
     + eapply E_next, IHuntil; invar_eauto.
 Qed.
 
-Definition stuck {T : Type} (R : T -> T -> Prop) (t : T) :=
-  forall t',
-    R t t' ->
-    False.
-
-Inductive cr_order (h : addr) : global_state -> global_state -> Prop :=
+Inductive cr_order (h : addr) : rel global_state :=
 | CRNone :
     forall gst gst' st st' dstp q m,
       sigma gst h = Some st ->
       sigma gst' h = Some st' ->
       cur_request st = Some (dstp, q, m) ->
       cur_request st' = None ->
-      cr_order h gst gst'
+      cr_order h gst' gst
 | CRStabilizeStabilize2 :
     forall gst gst' st st' dstp m dstp' ns m',
       sigma gst h = Some st ->
       sigma gst' h = Some st' ->
       cur_request st = Some (dstp, Stabilize, m) ->
       cur_request st' = Some (dstp', Stabilize2 ns, m') ->
-      cr_order h gst gst'
+      cr_order h gst' gst
 | CRStabilizeStabilize :
     forall gst gst' st st' dstp m dstp' m' s rest,
       sigma gst h = Some st ->
@@ -436,7 +431,7 @@ Inductive cr_order (h : addr) : global_state -> global_state -> Prop :=
       succ_list st = s :: rest ->
       cur_request st' = Some (dstp', Stabilize, m') ->
       succ_list st' = rest ->
-      cr_order h gst gst'.
+      cr_order h gst' gst.
 
 Lemma none_best_cur_request :
   forall h gst,
@@ -457,6 +452,60 @@ Proof.
   find_eapply_lem_hyp (CRNone h gst gst'); simpl; rewrite_update; eauto.
   firstorder.
 Qed.
+Hint Resolve none_best_cur_request.
+
+Lemma stuck_if_cr_none :
+  forall h gst st,
+    sigma gst h = Some st ->
+    cur_request st = None ->
+    stuck (cr_order h) gst.
+Proof.
+  unfold stuck; intros.
+  inv_prop cr_order; congruence.
+Qed.
+Hint Resolve stuck_if_cr_none.
+
+Lemma cr_order_stabilize2_acc :
+  forall h gst st dstp ns m,
+    sigma gst h = Some st ->
+    cur_request st = Some (dstp, Stabilize2 ns, m)  ->
+    Acc (cr_order h) gst.
+Proof.
+  intros.
+  constructor; intros;
+    inv_prop cr_order;
+    congruence || eauto.
+Qed.
+Hint Resolve cr_order_stabilize2_acc.
+
+Lemma cr_order_stabilize_acc :
+  forall h gst st dstp m,
+    sigma gst h = Some st ->
+    cur_request st = Some (dstp, Stabilize, m) ->
+    Acc (cr_order h) gst.
+Proof.
+  intros.
+  remember (succ_list st) as succs.
+  generalizeEverythingElse succs.
+  induction succs;
+    constructor; intros.
+  - inv_prop cr_order;
+      solve [eauto | congruence].
+  - inv_prop cr_order; eauto.
+    eapply IHsuccs;
+      solve [eauto | congruence].
+Qed.
+Hint Resolve cr_order_stabilize_acc.
+
+Theorem cr_order_wf :
+  forall h,
+    well_founded (cr_order h).
+Proof.
+  unfold well_founded.
+  constructor.
+  intros; inv_prop cr_order; eauto.
+Qed.
+Hint Resolve cr_order_wf.
 
 Inductive channel_order (src : addr) : global_state -> global_state -> Prop :=
   COReqRes :
