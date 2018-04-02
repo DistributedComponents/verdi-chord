@@ -157,7 +157,7 @@ Theorem req_on_wire_until_response :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
+    weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     forall dstp q m st,
       sigma (occ_gst (hd ex)) h = Some st ->
@@ -841,7 +841,51 @@ Proof.
   cofix c.
   destruct ex; intros; constructor; intros;
     [|apply c; invar_eauto].
-  (* magic happens here? *)
+  assert (exists st, sigma (occ_gst o) h = Some st /\
+                exists dstp q m,
+                  cur_request st = Some (dstp, q, m)).
+  {
+    inv_prop live_node; break_and.
+    break_exists_exists; expand_def.
+    split; simpl in *; auto.
+    destruct (cur_request x) as [[[? ?] ?]|]; try eauto.
+    exfalso.
+    find_eapply_prop stuck.
+    admit.
+  }
+  break_exists_name st; break_and;
+    break_exists_name dstp;
+    break_exists_name q;
+    break_exists_name m.
+  assert (live_node (occ_gst o) (addr_of dstp))
+    by admit.
+  assert (exists st, sigma (occ_gst o) (addr_of dstp) = Some st)
+    by eauto.
+  break_exists_name st__dstp.
+  assert (query_message_ok h (addr_of dstp) (cur_request st)
+                           (delayed_queries st__dstp)
+                           (channel (occ_gst o) h (addr_of dstp))
+                           (channel (occ_gst o) (addr_of dstp) h))
+         by eauto.
+  repeat find_rewrite.
+  inv_prop query_message_ok.
+  - congruence.
+  - find_eapply_lem_hyp (req_on_wire_until_response (Cons o ex) h); eauto.
+    repeat find_rewrite || find_injection.
+    remember (Cons o ex) as ex' in *.
+    replace o with (hd ex') in *
+      by (rewrite Heqex'; reflexivity).
+    replace ex with (tl ex') in *
+      by (rewrite Heqex'; reflexivity).
+    clear o ex.
+    induction H20.
+    + destruct s.
+      admit.
+    + simpl.
+      apply E_next.
+      admit.
+  - admit.
+  - admit.
 Admitted.
 
 Lemma exists_eventually_comm :
