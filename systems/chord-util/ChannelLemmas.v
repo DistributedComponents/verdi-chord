@@ -115,12 +115,96 @@ Qed.
 Definition channel_measure from to gst :=
   length (channel gst from to).
 
+Definition channel_measure_zero_empty :
+  forall s from to,
+    now (measure_zero (channel_measure from to)) s ->
+    now (fun occ => channel (occ_gst occ) from to = []) s.
+Proof.
+  intros. destruct s. simpl in *.
+  unfold measure_zero, channel_measure in *.
+  destruct (channel (occ_gst o) from to); simpl in *; congruence.
+Qed.
+
+Lemma filterMap_map :
+  forall A B C (f : B -> option C) (g : A -> B) (l : list A),
+    filterMap f (map g l) =
+    filterMap (fun x => f (g x)) l.
+Proof.
+  intros. induction l; auto.
+  - simpl. break_match; congruence.
+Qed.
+
 Lemma channel_measure_nonincreasing :
   forall ex dead h,
+    reachable_st (occ_gst (hd ex)) ->
     lb_execution ex ->
     In dead (failed_nodes (occ_gst (hd ex))) ->
     always (consecutive (measure_nonincreasing (channel_measure dead h))) ex.
+Proof.
+  cofix c.
+  intros.
+  apply Always.
+  - clear c.
+    inv_prop lb_execution. simpl in *.
+    unfold measure_nonincreasing, channel_measure.
+    inv_prop labeled_step_dynamic.
+    + simpl in *.
+      unfold channel.
+      repeat find_rewrite. simpl.
+      rewrite filterMap_app.
+      rewrite filterMap_map.
+      simpl.
+      destruct (addr_eq_dec h0 dead); subst; try congruence.
+      simpl.
+      rewrite filterMap_all_None; intuition.
+    + simpl in *. unfold channel.
+      repeat find_rewrite. simpl.
+      rewrite filterMap_app.
+      simpl.
+      rewrite filterMap_map.
+      simpl.
+      destruct (addr_eq_dec (fst (snd m)) dead); subst; try congruence.
+      simpl.
+      rewrite filterMap_all_None; intuition.
+      simpl.
+      repeat rewrite filterMap_app. repeat rewrite app_length.
+      simpl; break_match; simpl; intuition.
+    + simpl in *. unfold channel.
+      repeat find_rewrite. simpl.
+      destruct (addr_eq_dec h0 dead); subst; [exfalso; eapply clients_not_in_failed; eauto|].
+      simpl. auto.
+    + unfold channel. repeat find_rewrite.
+      simpl.
+      repeat rewrite filterMap_app. repeat rewrite app_length.
+      simpl; break_match; simpl; intuition.
+  - inv_prop lb_execution.
+    simpl in *.
+    apply c; eauto using reachable_st_lb_execution_cons.
+    simpl in *.
+    erewrite <- labeled_step_dynamic_preserves_failed_nodes; eauto.
+Qed.
+
+Lemma channel_measure_zero_or_eventually_decreasing :
+  forall ex dead h,
+    reachable_st (occ_gst (hd ex)) ->
+    lb_execution ex ->
+    weak_local_fairness ex ->
+    In dead (failed_nodes (occ_gst (hd ex))) ->
+    live_node (occ_gst (hd ex)) h ->
+    always (zero_or_eventually_decreasing (channel_measure dead h)) ex.
+Proof.
+  cofix c.
+  intros.
+  apply Always.
+  - clear c.
+    admit.
+  - destruct ex. simpl.
+    inv_prop lb_execution.
+    apply c;
+      eauto using weak_local_fairness_invar, reachable_st_lb_execution_cons, live_node_invariant.
+    erewrite <- labeled_step_dynamic_preserves_failed_nodes; eauto.
 Admitted.
+
 
 Lemma dead_node_channel_empties_out :
   forall ex dead h,
@@ -131,11 +215,11 @@ Lemma dead_node_channel_empties_out :
     weak_local_fairness ex ->
     continuously (now (fun occ => channel (occ_gst occ) dead h = [])) ex.
 Proof.
-(*
-USED: In phase one (transitively)
-DIFFICULTY: 3/Doug
-*)
-Admitted.
+  intros.
+  eapply continuously_monotonic; [intros; eapply channel_measure_zero_empty; eauto|].
+  eapply measure_decreasing_to_zero;
+    eauto using channel_measure_nonincreasing, channel_measure_zero_or_eventually_decreasing.
+Qed.
 
 Lemma live_node_in_active :
   forall h gst,
