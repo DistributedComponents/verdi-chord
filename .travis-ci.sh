@@ -5,6 +5,7 @@ set -ev
 export MODE=$1
 
 eval $(opam config env)
+opam update
 
 case ${MODE} in
   proofalytics)
