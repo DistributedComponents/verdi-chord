@@ -1,9 +1,6 @@
 Require Import List.
 Import ListNotations.
 
-Require Import mathcomp.ssreflect.ssreflect.
-Require Import mathcomp.ssreflect.ssrbool.
-Set Bullet Behavior "Strict Subproofs".
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Util.
@@ -29,6 +26,8 @@ Require Import Chord.TimeoutMeansActive.
 Require Import Chord.ValidPointersInvariant.
 Require Import Chord.LabeledLemmas.
 Require Import Chord.LabeledMeasures.
+
+Set Bullet Behavior "Strict Subproofs".
 
 
 Lemma channel_stays_empty' :
@@ -197,13 +196,55 @@ Proof.
   intros.
   apply Always.
   - clear c.
-    admit.
+    unfold zero_or_eventually_decreasing.
+    unfold or_tl.
+    destruct (channel (occ_gst (hd ex)) dead h) eqn:?.
+    + left. destruct ex. simpl in *. unfold measure_zero, channel_measure.
+      repeat find_rewrite. auto.
+    + right.
+      find_copy_apply_lem_hyp live_node_means_state_exists. break_exists.
+      eapply eventually_monotonic with (J := lb_execution); auto.
+      eauto using lb_execution_invar.
+      2:eapply RecvMsg_eventually_occurred with (src := dead) (m := p); eauto.
+      * intros.
+        inv_prop lb_execution.
+        simpl in *.
+        unfold occurred in *.
+        repeat find_reverse_rewrite.
+        inv_prop labeled_step_dynamic.
+        -- unfold timeout_handler_l in *.
+           break_let. solve_by_inversion.
+        -- unfold recv_handler_l in *.
+           find_inversion.
+           unfold measure_decreasing, channel_measure, channel.
+           repeat find_rewrite. simpl.
+           rewrite filterMap_app.
+           simpl.
+           rewrite filterMap_map.
+           simpl.
+           destruct (addr_eq_dec (fst (snd m)) (fst m));
+             repeat find_rewrite; [exfalso; eapply live_node_not_in_failed_nodes; eauto|].
+           simpl.
+           rewrite filterMap_all_None; intuition.
+           simpl.
+           repeat rewrite filterMap_app.
+           simpl.
+           repeat match goal with
+                  | |- context [addr_eq_dec ?x ?x] =>
+                    destruct (addr_eq_dec x x); try congruence
+                  end.
+           simpl. repeat rewrite app_length. simpl. intuition.
+        -- unfold label_input in *. congruence.
+        -- unfold label_output in *. congruence.
+      * unfold live_node in *. intuition.
+        find_apply_lem_hyp clients_not_in_failed; intuition.
+      * apply in_channel_in_msgs; repeat find_rewrite; in_crush.
   - destruct ex. simpl.
     inv_prop lb_execution.
     apply c;
       eauto using weak_local_fairness_invar, reachable_st_lb_execution_cons, live_node_invariant.
     erewrite <- labeled_step_dynamic_preserves_failed_nodes; eauto.
-Admitted.
+Qed.
 
 
 Lemma dead_node_channel_empties_out :
@@ -408,7 +449,7 @@ USED: In phase two.
     by eauto with invar.
   break_exists_name st__dst'.
   assert (query_message_ok src dst (cur_request st__src) (delayed_queries st__dst)
-                           (channel gst src dst) (channel gst dst src)).
+                           (channel gst src dst) (channel gst dst src))
     by (eapply query_message_ok_invariant; eauto).
   assert (query_message_ok src dst (cur_request st__src') (delayed_queries st__dst')
                            (channel gst' src dst) (channel gst' dst src))
@@ -538,9 +579,9 @@ USED: In phase two.
       {
         repeat find_apply_lem_hyp in_split; break_exists.
         assert (no_responses (x0 ++ x2)) by eauto.
-        assert (~ In res0 x0).
+        assert (~ In res0 x0)
           by (intro; eapply_prop no_responses; [in_crush|]; eauto).
-        assert (~ In res0 x2).
+        assert (~ In res0 x2)
           by (intro; eapply_prop no_responses; [in_crush|]; eauto).
         assert (In res0 (x11 ++ res0 :: x12)) by in_crush.
         repeat find_rewrite.
