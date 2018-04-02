@@ -22,7 +22,7 @@ depends: [
   "InfSeqExt" {= "dev"}
   "verdi-runtime" {= "dev"}
   "ocamlbuild" {build}
-  "coq-dpdgraph" {>= "0.6.2"}
+#  "coq-dpdgraph" {>= "0.6.2"}
 ]
 
 authors: [
