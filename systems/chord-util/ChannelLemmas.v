@@ -29,6 +29,33 @@ Require Import Chord.LabeledMeasures.
 
 Set Bullet Behavior "Strict Subproofs".
 
+Lemma reachable_st_lb_execution_cons :
+  forall o o' ex,
+    lb_execution (Cons o (Cons o' ex)) ->
+    reachable_st (occ_gst o) ->
+    reachable_st (occ_gst o').
+Proof using.
+  intros.
+  inv_lb_execution.
+  eauto using reachableStep, labeled_step_is_unlabeled_step.
+Qed.
+
+Lemma reachable_st_always :
+  forall ex,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    always ((fun ex' => reachable_st (occ_gst (hd ex'))) /\_ lb_execution) ex.
+Proof.
+  intros.
+  eapply always_inv.
+  - intros.
+    destruct s.
+    inv_prop and_tl.
+    split;
+      eauto using lb_execution_invar, reachable_st_lb_execution_cons.
+  - firstorder.
+Qed.
+
 
 Lemma channel_stays_empty' :
   forall gst gst' src dst,
@@ -328,32 +355,6 @@ Proof.
   tauto.
 Qed.
 
-Lemma reachable_st_lb_execution_cons :
-  forall o o' ex,
-    lb_execution (Cons o (Cons o' ex)) ->
-    reachable_st (occ_gst o) ->
-    reachable_st (occ_gst o').
-Proof using.
-  intros.
-  inv_lb_execution.
-  eauto using reachableStep, labeled_step_is_unlabeled_step.
-Qed.
-
-Lemma reachable_st_always :
-  forall ex,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    always ((fun ex' => reachable_st (occ_gst (hd ex'))) /\_ lb_execution) ex.
-Proof.
-  intros.
-  eapply always_inv.
-  - intros.
-    destruct s.
-    inv_prop and_tl.
-    split;
-      eauto using lb_execution_invar, reachable_st_lb_execution_cons.
-  - firstorder.
-Qed.
 
 Lemma sent_message_means_in_nodes_or_client :
   forall gst src dst p,
