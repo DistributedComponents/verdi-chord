@@ -15,10 +15,12 @@ Require Import Chord.Chord.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
+Require Import Chord.SystemPointers.
 Require Import Chord.LabeledLemmas.
 Require Import Chord.LiveNodesNotClients.
 Require Import Chord.QueryInvariant.
 Require Import Chord.NodesHaveState.
+Require Import Chord.ValidPointersInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -509,31 +511,66 @@ Hint Resolve cr_order_wf.
 
 Inductive channel_order (src : addr) : global_state -> global_state -> Prop :=
   COReqRes :
-    forall dst gst gst' req res,
+    forall dstp q m st st' st__dstp st__dstp' gst gst' req res xs ys xs' ys',
+      sigma gst src = Some st ->
+      cur_request st = Some (dstp, q, m) ->
       request_response_pair req res ->
-      In req (channel gst src dst) ->
-      no_requests (channel gst' src dst) ->
-      In res (channel gst' dst src) ->
-      channel_order src gst gst'
+
+      channel gst src (addr_of dstp) = xs ++ req :: ys ->
+      no_requests (xs ++ ys) ->
+      no_responses (channel gst (addr_of dstp) src) ->
+      sigma gst (addr_of dstp) = Some st__dstp ->
+      (forall r, ~ In (src, r) (delayed_queries st__dstp)) ->
+
+      no_requests (channel gst' src (addr_of dstp)) ->
+      sigma gst' src = Some st' ->
+      cur_request st' = Some (dstp, q, m) ->
+      channel gst' (addr_of dstp) src = xs' ++ res :: ys' ->
+      no_responses (xs' ++ ys') ->
+      sigma gst' (addr_of dstp) = Some st__dstp' ->
+      (forall r, ~ In (src, r) (delayed_queries st__dstp')) ->
+
+      channel_order src gst' gst
 | COReqDelayed :
-    forall dst gst gst' req st,
+    forall dstp q m gst gst' req st st' xs ys st__dst st__dst',
+      sigma gst src = Some st ->
+      cur_request st = Some (dstp, q, m) ->
       request_payload req ->
-      In req (channel gst src dst) ->
-      no_requests (channel gst' src dst) ->
-      sigma gst' dst = Some st ->
-      In (src, req) (delayed_queries st) ->
-      channel_order src gst gst'
+
+      channel gst src (addr_of dstp) = xs ++ req :: ys ->
+      no_requests (xs ++ ys) ->
+      no_responses (channel gst (addr_of dstp) src) ->
+      sigma gst (addr_of dstp) = Some st__dst ->
+      (forall r, ~ In (src, r) (delayed_queries st__dst)) ->
+
+      sigma gst' src = Some st' ->
+      cur_request st' = Some (dstp, q, m) ->
+      no_requests (channel gst' src (addr_of dstp)) ->
+      no_responses (channel gst' (addr_of dstp) src) ->
+      sigma gst' (addr_of dstp) = Some st__dst' ->
+      In (src, req) (delayed_queries st__dst') ->
+
+      channel_order src gst' gst
 | CODelayedRes :
-    forall dst gst gst' req res st st',
+    forall dstp q m gst gst' req res st st__dstp st' st__dstp' xs' ys',
+      sigma gst src = Some st ->
+      cur_request st = Some (dstp, q, m) ->
       request_response_pair req res ->
-      sigma gst dst = Some st ->
-      In (src, req) (delayed_queries st) ->
-      sigma gst' dst = Some st' ->
-      no_requests (channel gst src dst) ->
-      no_requests (channel gst' src dst) ->
-      (forall r, ~ In (src, r) (delayed_queries st')) ->
-      In res (channel gst' dst src) ->
-      channel_order src gst gst'.
+
+      sigma gst (addr_of dstp) = Some st__dstp ->
+      In (src, req) (delayed_queries st__dstp) ->
+      no_requests (channel gst src (addr_of dstp)) ->
+      no_responses (channel gst (addr_of dstp) src) ->
+
+      sigma gst' src = Some st' ->
+      cur_request st' = Some (dstp, q, m) ->
+      no_requests (channel gst' src (addr_of dstp)) ->
+      channel gst' (addr_of dstp) src = xs' ++ res :: ys' ->
+      no_responses (xs' ++ ys') ->
+      sigma gst' (addr_of dstp) = Some st__dstp' ->
+      (forall r, ~ In (src, r) (delayed_queries st__dstp')) ->
+
+      channel_order src gst' gst.
 
 Lemma res_exists_for_req :
   forall req,
@@ -549,24 +586,241 @@ Qed.
 Hint Resolve res_exists_for_req.
 
 Lemma res_best_channel_config :
-  forall src gst,
+  forall src gst st dstp q m,
+    reachable_st gst ->
     stuck (channel_order src) gst ->
-    forall dst,
-      no_requests (channel gst src dst) /\
-      (forall st req,
-          sigma gst dst = Some st ->
-          request_payload req ->
-        ~ In (src, req) (delayed_queries st)).
+    sigma gst src = Some st ->
+    cur_request st = Some (dstp, q, m) ->
+    no_requests (channel gst src (addr_of dstp)) /\
+    (forall st__dstp req,
+        sigma gst (addr_of dstp) = Some st__dstp ->
+        ~ In (src, req) (delayed_queries st__dstp)).
 Proof.
-Abort.
+  unfold stuck; intros.
+  find_copy_eapply_lem_hyp cur_request_valid; eauto.
+  inv_prop valid_ptr.
+  find_apply_lem_hyp nodes_have_state; eauto.
+  break_exists_name st__dstp.
+  find_copy_eapply_lem_hyp (query_message_ok_invariant gst ltac:(auto) src (addr_of dstp));
+    eauto.
+  inv_prop query_message_ok.
+  - congruence.
+  - congruence.
+  - simpl in *.
+    assert (request_payload req) by eauto.
+    find_copy_apply_lem_hyp (res_exists_for_req req).
+    break_exists_name r.
+    set (gst' := {| nodes := nodes gst;
+                    failed_nodes := failed_nodes gst;
+                    timeouts := timeouts gst;
+                    sigma := sigma gst;
+                    msgs := [((addr_of dstp), (src, r))];
+                    trace := trace gst |}).
+    assert (no_requests (channel gst' src (addr_of dstp))).
+    {
+      unfold no_requests.
+      intros.
+      find_apply_lem_hyp in_channel_in_msgs.
+      simpl in *; intuition; find_injection; eauto.
+    }
+    assert (channel gst' (addr_of dstp) src = [r]).
+    {
+      unfold channel, ssrbool.is_left; simpl.
+      destruct (addr_eq_dec (addr_of dstp) (addr_of dstp)); try congruence.
+      destruct (addr_eq_dec src src); try congruence.
+      reflexivity.
+    }
+    replace dstp0 with dstp in * by congruence; clear dstp0.
+    find_apply_lem_hyp in_split; break_exists.
+    exfalso; find_eapply_prop False.
+    instantiate (1:=gst').
+    econstructor 1; eauto.
+    repeat find_rewrite.
+    change [r] with ([] ++ r :: []); eauto.
+    simpl; unfold no_responses; tauto.
+  - split; auto.
+    intros.
+    replace st__dstp0 with st__dstp by congruence.
+    eauto.
+  - assert (request_payload req) by eauto.
+    find_copy_apply_lem_hyp (res_exists_for_req req).
+    break_exists_name r.
+    set (st' := clear_delayed_queries st).
+    set (gst' := {| nodes := nodes gst;
+                    failed_nodes := failed_nodes gst;
+                    timeouts := timeouts gst;
+                    sigma := update addr_eq_dec (sigma gst) (addr_of dstp) (Some st');
+                    msgs := [((addr_of dstp), (src, r))];
+                    trace := trace gst |}).
+    assert (no_requests (channel gst' src (addr_of dstp))).
+    {
+      unfold no_requests.
+      intros.
+      find_apply_lem_hyp in_channel_in_msgs.
+      simpl in *; intuition; find_injection; eauto.
+    }
+    assert (channel gst' (addr_of dstp) src = [] ++ [r]).
+    {
+      unfold channel, ssrbool.is_left; simpl.
+      destruct (addr_eq_dec (addr_of dstp) (addr_of dstp)); try congruence.
+      destruct (addr_eq_dec src src); try congruence.
+      reflexivity.
+    }
+    replace dstp0 with dstp in * by congruence; clear dstp0.
+    find_apply_lem_hyp in_split; break_exists.
+    exfalso; find_eapply_prop False.
+    instantiate (1:=gst').
+    destruct (addr_eq_dec (addr_of dstp) src).
+    + econstructor 3; simpl; rewrite_update; eauto.
+      * repeat find_rewrite || find_injection.
+        auto with datatypes.
+      * unfold no_responses; tauto.
+    + econstructor 3; simpl; rewrite_update; eauto.
+      * repeat find_rewrite || find_injection.
+        auto with datatypes.
+      * unfold no_responses; tauto.
+Qed.
+
+Lemma co_res_acc :
+  forall src gst dstp xs ys res st q m,
+    sigma gst src = Some st ->
+    cur_request st = Some (dstp, q, m) ->
+    response_payload res ->
+    channel gst (addr_of dstp) src = xs ++ res :: ys ->
+    no_responses (xs ++ ys) ->
+    Acc (channel_order src) gst.
+Proof.
+  intros.
+  assert (In res0 (channel gst (addr_of dstp) src))
+    by (find_rewrite; auto with datatypes).
+  constructor; intros; inv_prop channel_order;
+    assert (dstp0 = dstp) by congruence; subst;
+      exfalso;
+      find_eapply_prop (no_responses (channel gst (addr_of dstp) src));
+      eauto.
+Qed.
+Hint Resolve co_res_acc.
+
+Lemma co_delayed_acc :
+  forall src gst dstp req st q m st__dstp,
+    sigma gst src = Some st ->
+    cur_request st = Some (dstp, q, m) ->
+    sigma gst (addr_of dstp) = Some st__dstp ->
+    In (src, req) (delayed_queries st__dstp) ->
+    request_payload req ->
+    Acc (channel_order src) gst.
+Proof.
+  intros.
+  constructor; intros; inv_prop channel_order;
+    assert (dstp0 = dstp) by congruence; subst.
+  - exfalso.
+    replace st__dstp0 with st__dstp in * by congruence.
+    find_eapply_prop (delayed_queries st__dstp); eauto.
+  - exfalso.
+    replace st__dst with st__dstp in * by congruence.
+    find_eapply_prop (delayed_queries st__dstp); eauto.
+  - eauto.
+Qed.
+Hint Resolve co_delayed_acc.
+
+Lemma co_req_acc :
+  forall gst src st dstp q m req xs ys st__dstp,
+    sigma gst src = Some st ->
+    cur_request st = Some (dstp, q, m) ->
+    sigma gst (addr_of dstp) = Some st__dstp ->
+    query_request q req ->
+    channel gst src (addr_of dstp) = xs ++ req :: ys ->
+    no_requests (xs ++ ys) ->
+    no_responses (channel gst (addr_of dstp) src) ->
+    (forall r, ~ In (src, r) (delayed_queries st__dstp)) ->
+    Acc (channel_order src) gst.
+Proof.
+  intros.
+  constructor; intros; inv_prop channel_order; eauto.
+Qed.
+Hint Resolve co_req_acc.
+
+Lemma channel_order_wf :
+  forall src,
+    well_founded (channel_order src).
+Proof.
+  unfold well_founded; intros.
+  constructor; intros; inv_prop channel_order; eauto.
+Qed.
+Hint Resolve channel_order_wf.
 
 Definition occ_order (R : rel global_state) : rel occurrence :=
   fun o o' => R (occ_gst o) (occ_gst o').
 
+Lemma occ_order_wf :
+  forall R,
+    well_founded R ->
+    well_founded (occ_order R).
+Proof.
+  unfold well_founded, occ_order.
+  intros.
+  remember (occ_gst a) as o.
+  assert (Hacc: Acc R o) by auto.
+  generalizeEverythingElse Hacc.
+  induction Hacc; intros.
+  constructor; intros; subst.
+  eauto.
+Qed.
+Hint Resolve occ_order_wf.
+
+Lemma occ_order_stuck :
+  forall R o,
+    stuck (occ_order R) o ->
+    stuck R (occ_gst o).
+Proof.
+  unfold stuck, occ_order; intros.
+  (* bogus *)
+  set (o':={| occ_gst := t';
+              occ_label := Timeout (String.EmptyString) Tick Ineffective|}).
+  change (R t' (occ_gst o)) with (R (occ_gst o') (occ_gst o)) in *.
+  eauto.
+Qed.
+Hint Resolve occ_order_stuck.
+
 Definition query_order (h : addr) :=
   occ_order (lex_diag (cr_order h) (channel_order h)).
 
-Theorem eventually_done_or_always_blocked :
+Theorem query_order_wf :
+  forall h,
+    well_founded (query_order h).
+Proof.
+  unfold query_order; eauto.
+Qed.
+Hint Resolve query_order_wf.
+
+Lemma stuck_query_order_cr_order :
+  forall h o,
+    stuck (query_order h) o ->
+    stuck (cr_order h) (occ_gst o).
+Proof.
+  eauto.
+Qed.
+Hint Resolve stuck_query_order_cr_order.
+
+Theorem stuck_query_order_done :
+  forall h o st,
+    stuck (query_order h) o ->
+    sigma (occ_gst o) h = Some st ->
+    cur_request st = None.
+Proof.
+  eauto.
+Qed.
+Hint Resolve stuck_query_order_done.
+Print Assumptions stuck_query_order_done.
+
+Definition query_order_stuck_dec :
+  forall h o,
+    {stuck (query_order h) o} + {~ stuck (query_order h) o}.
+Proof.
+Admitted.
+Hint Resolve query_order_stuck_dec.
+
+Theorem eventually_done_or_always_blocked_via_relation :
   forall ex h,
     lb_execution ex ->
     reachable_st (occ_gst (hd ex)) ->
@@ -575,8 +829,12 @@ Theorem eventually_done_or_always_blocked :
     forall st dstp q m,
       sigma (occ_gst (hd ex)) h = Some st ->
       cur_request st = Some (dstp, q, m) ->
-      eventually ((now (fun o => forall st, sigma (occ_gst o) h = Some st -> cur_request st = None))) ex \/
+      always (fun s =>
+                ~ stuck (query_order h) (hd s) ->
+                eventually (now (fun t => query_order h t (hd s))) s) ex \/
       continuously (now (fun o => exists dstp', blocked_by (occ_gst o) (addr_of dstp') h)) ex.
+Proof.
+Admitted.
 
 Theorem eventually_done_or_always_blocked :
   forall ex h,
@@ -590,7 +848,15 @@ Theorem eventually_done_or_always_blocked :
       eventually ((now (fun o => forall st, sigma (occ_gst o) h = Some st -> cur_request st = None))) ex \/
       continuously (now (fun o => exists dstp', blocked_by (occ_gst o) (addr_of dstp') h)) ex.
 Proof.
-Admitted.
+  intros.
+  find_eapply_lem_hyp eventually_done_or_always_blocked_via_relation; eauto.
+  break_or_hyp; try tauto.
+  left.
+  find_eapply_lem_hyp eventual_drop_means_eventually_stuck; eauto.
+  eapply eventually_monotonic_simple; try eassumption.
+  intros.
+  destruct s; simpl in *; eauto.
+Qed.
 
 Ltac fold_continuously :=
   match goal with

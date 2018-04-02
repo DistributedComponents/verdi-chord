@@ -64,12 +64,12 @@ Qed.
 Hint Resolve diag_wf.
 
 Lemma lex_diag_wf :
-  forall U (R S : rel (U * U)),
+  forall U (R S : rel U),
     well_founded R ->
     well_founded S ->
-    well_founded (diag (lex R S)).
+    well_founded (lex_diag R S).
 Proof.
-  eauto.
+  unfold lex_diag; eauto.
 Qed.
 Hint Resolve lex_diag_wf.
 
@@ -98,13 +98,14 @@ Section wf_liveness.
 
   Lemma eventual_drop_means_eventually_stuck :
     forall ex,
-      ~ stuck (hd ex) ->
       always (fun s =>
                 ~ stuck (hd s) ->
                 eventually (now (fun t => t < (hd s))) s) ex ->
       eventually (now stuck) ex.
   Proof.
     intros until 0.
+    destruct (stuck_dec (hd ex));
+      [destruct ex; constructor; eauto|].
     pose proof (wf (hd ex)) as w.
     remember (hd ex) as e.
     generalize dependent ex.
@@ -130,3 +131,30 @@ Section wf_liveness.
 End wf_liveness.
 
 Hint Resolve stuck_acc.
+
+Lemma lex_stuck :
+  forall (U V : Type) R S (u : U) (v : V),
+    stuck (lex R S) (u, v) ->
+    stuck R u /\
+    stuck S v.
+Proof.
+  unfold stuck.
+  intros.
+  split.
+  - intros.
+    eapply (H (t', v)).
+    constructor; eauto.
+  - intros.
+    eapply (H (u, t')).
+    constructor 2; eauto.
+Qed.
+
+Lemma lex_diag_stuck_l :
+  forall (U : Type) R S (u : U),
+    stuck (lex_diag R S) u -> 
+    stuck R u.
+Proof.
+  unfold lex_diag, diag, stuck; intros.
+  eapply H; constructor; eauto.
+Qed.
+Hint Resolve lex_diag_stuck_l.
