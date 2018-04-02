@@ -1,3 +1,4 @@
+Require Import Classical.
 Require Import List.
 Import ListNotations.
 Require Import Relations.
@@ -252,7 +253,7 @@ Proof.
       intros.
       inv_prop lb_execution.
       repeat invcs_prop live_node; expand_def.
-      eapply cur_request_constant_when_res_on_wire; invar_eauto.
+      eapply cur_request_constant_when_res_on_wire; eauto.
 Qed.
 
 Theorem have_cur_request_msg_on_wire_preserves :
@@ -811,7 +812,6 @@ Proof.
   eauto.
 Qed.
 Hint Resolve stuck_query_order_done.
-Print Assumptions stuck_query_order_done.
 
 Definition query_order_stuck_dec :
   forall h o,
@@ -826,15 +826,63 @@ Theorem eventually_done_or_always_blocked_via_relation :
     reachable_st (occ_gst (hd ex)) ->
     weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
-    forall st dstp q m,
-      sigma (occ_gst (hd ex)) h = Some st ->
-      cur_request st = Some (dstp, q, m) ->
-      always (fun s =>
-                ~ stuck (query_order h) (hd s) ->
-                eventually (now (fun t => query_order h t (hd s))) s) ex \/
-      continuously (now (fun o => exists dstp', blocked_by (occ_gst o) (addr_of dstp') h)) ex.
+    always
+      (fun s =>
+         ~ stuck (query_order h) (hd s) ->
+         eventually
+           (or_tl (now (fun t => query_order h t (hd s)))
+                  (fun s' => exists dstp,
+                       always (now (fun o => blocked_by (occ_gst o)
+                                                     (addr_of dstp)
+                                                     h)) s'))
+           s)
+      ex.
 Proof.
+  cofix c.
+  destruct ex; intros; constructor; intros;
+    [|apply c; invar_eauto].
+  (* magic happens here? *)
 Admitted.
+
+Lemma exists_eventually_comm :
+  forall T U (P : U -> infseq T -> Prop) ex,
+    eventually (fun s => exists x, P x s) ex ->
+    exists x, eventually (fun s => P x s) ex.
+Proof.
+  induction 1.
+  - break_exists_exists.
+    now constructor.
+  - break_exists_exists.
+    now constructor.
+Qed.
+
+Lemma gross_always_lemma :
+  forall (T U : Type) P Q R (ex : infseq T),
+    always (fun s => P s ->
+                  eventually ((Q s) \/_ (fun s => exists x: U, always (R x) s)) s) ex ->
+    always (fun s => P s -> eventually (Q s) s) ex \/
+    exists x, eventually (always (R x)) ex.
+Proof.
+  intros.
+  destruct (classic (exists x, eventually (always (R x)) ex)).
+  - tauto. 
+  - left.
+    generalize dependent ex.
+    cofix c.
+    destruct ex; intros; constructor.
+    + intros.
+      find_apply_lem_hyp always_now'.
+      concludes.
+      find_apply_lem_hyp eventually_or_tl_or.
+      break_or_hyp; try tauto.
+      find_eapply_lem_hyp exists_eventually_comm.
+      tauto.
+    + simpl; eapply c; invar_eauto.
+      intro.
+      eapply_prop not.
+      break_exists_exists.
+      constructor; now auto.
+Qed.
 
 Theorem eventually_done_or_always_blocked :
   forall ex h,
@@ -846,16 +894,19 @@ Theorem eventually_done_or_always_blocked :
       sigma (occ_gst (hd ex)) h = Some st ->
       cur_request st = Some (dstp, q, m) ->
       eventually ((now (fun o => forall st, sigma (occ_gst o) h = Some st -> cur_request st = None))) ex \/
-      continuously (now (fun o => exists dstp', blocked_by (occ_gst o) (addr_of dstp') h)) ex.
+      exists dstp',
+        continuously (now (fun o => blocked_by (occ_gst o) (addr_of dstp') h)) ex.
 Proof.
   intros.
   find_eapply_lem_hyp eventually_done_or_always_blocked_via_relation; eauto.
-  break_or_hyp; try tauto.
-  left.
-  find_eapply_lem_hyp eventual_drop_means_eventually_stuck; eauto.
-  eapply eventually_monotonic_simple; try eassumption.
-  intros.
-  destruct s; simpl in *; eauto.
+  find_eapply_lem_hyp gross_always_lemma.
+  break_or_hyp.
+  - left.
+    find_eapply_lem_hyp eventual_drop_means_eventually_stuck; eauto.
+    eapply eventually_monotonic_simple; try eassumption.
+    intros.
+    destruct s; simpl in *; eauto.
+  - eauto.
 Qed.
 
 Ltac fold_continuously :=
@@ -882,14 +933,6 @@ Lemma eventually_now_const :
 Proof.
   induction 1; destruct s; simpl in *; tauto.
 Qed.
-
-Lemma continuously_exists :
-  forall T S (s : infseq T) (P: T -> S -> Prop),
-    continuously (now (fun o => exists x, P o x)) s ->
-    exists x,
-      continuously (now (fun o => P o x)) s.
-Proof.
-Admitted.
 
 Lemma blocking_node_continuously_also_blocked :
   forall ex,
@@ -929,7 +972,7 @@ Proof.
     unfold and_tl in *; destruct s; break_and; simpl in *.
     firstorder congruence.
   - simpl.
-    find_eapply_lem_hyp continuously_exists.
+    break_exists.
     firstorder.
 Qed.
 
@@ -980,7 +1023,6 @@ Proof.
            ++ destruct s; firstorder eauto.
            ++ eapply IHeventually; invar_eauto.
         -- find_apply_lem_hyp always_continuously.
-           find_apply_lem_hyp continuously_exists.
            break_exists_name dstp'.
            exists [addr_of dstp'; h].
            simpl; intuition eauto.

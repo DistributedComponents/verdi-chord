@@ -407,6 +407,7 @@ Proof.
     + constructor.
       assumption.
     + apply queries_eventually_stop; auto.
+      eauto using strong_local_fairness_weak.
   - destruct ex.
     simpl.
     eapply c.
