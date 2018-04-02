@@ -16,6 +16,7 @@ Set Bullet Behavior "Strict Subproofs".
 Require Import Chord.Chord.
 
 Require Import Chord.LabeledLemmas.
+Require Import Chord.ChannelLemmas.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.

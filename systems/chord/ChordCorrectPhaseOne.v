@@ -15,6 +15,7 @@ Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.LabeledLemmas.
+Require Import Chord.ChannelLemmas.
 Require Import Chord.LabeledMeasures.
 
 Require Import Chord.FirstSuccNeverSelf.

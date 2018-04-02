@@ -6,6 +6,7 @@ Require Import InfSeqExt.infseq.
 Require Import Chord.Chord.
 
 Require Import Chord.LabeledLemmas.
+Require Import Chord.ChannelLemmas.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 

@@ -15,6 +15,7 @@ Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemLemmas.
 Require Import Chord.LabeledLemmas.
+Require Import Chord.ChannelLemmas.
 Require Import Chord.LiveNodesNotClients.
 Require Import Chord.QueryInvariant.
 Require Import Chord.NodesHaveState.
