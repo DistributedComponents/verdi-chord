@@ -3,6 +3,8 @@ Require Import List.
 Import ListNotations.
 Require Import Relations.
 Require Import Omega.
+Require Import Coq.Classes.RelationClasses.
+Require Import Coq.Classes.Morphisms.
 
 Require Import StructTact.StructTactics.
 Require Import StructTact.Update.
@@ -411,7 +413,7 @@ Proof.
     + eapply E_next, IHuntil; invar_eauto.
 Qed.
 
-Inductive cr_order (h : addr) : rel global_state :=
+Inductive cr_order (h : addr) : relation global_state :=
 | CRNone :
     forall gst gst' st st' dstp q m,
       sigma gst h = Some st ->
@@ -750,7 +752,7 @@ Proof.
 Qed.
 Hint Resolve channel_order_wf.
 
-Definition occ_order (R : rel global_state) : rel occurrence :=
+Definition occ_order (R : relation global_state) : relation occurrence :=
   fun o o' => R (occ_gst o) (occ_gst o').
 
 Lemma occ_order_wf :
@@ -783,14 +785,62 @@ Proof.
 Qed.
 Hint Resolve occ_order_stuck.
 
+Inductive cr_equiv (h : addr) : relation global_state :=
+| cr_equiv_not_stabilize :
+    forall gst gst' st st' dstp q m,
+      q <> Stabilize ->
+      sigma gst h = Some st ->
+      sigma gst' h = Some st' ->
+      cur_request st = Some (dstp, q, m) ->
+      cur_request st' = Some (dstp, q, m) ->
+      q <> Stabilize ->
+      cr_equiv h gst gst'
+| cr_equiv_succs :
+    forall gst gst' st st',
+      sigma gst h = Some st ->
+      sigma gst' h = Some st' ->
+      cur_request st = cur_request st' ->
+      succ_list st = succ_list st' ->
+      cr_equiv h gst gst'
+| cr_equiv_none :
+    forall gst gst' st st',
+      sigma gst h = Some st ->
+      sigma gst' h = Some st' ->
+      cur_request st = None ->
+      cur_request st' = None ->
+      cr_equiv h gst gst'
+| cr_equiv_invalid :
+    forall gst gst',
+      sigma gst h = None ->
+      sigma gst' h = None ->
+      cr_equiv h gst gst'.
+
+Instance cr_equiv_Equivalence (h : addr) : Equivalence (cr_equiv h).
+Proof.
+  split; repeat intro.
+  - destruct (sigma x h) eqn:?.
+    + econstructor 2; eauto.
+    + econstructor 4; eauto.
+  - inv_prop cr_equiv; 
+      solve [econstructor; eauto].
+  - repeat invcs_prop cr_equiv;
+      repeat find_rewrite || find_injection;
+      solve [congruence | econstructor; eauto].
+Defined.
+
+Instance cr_order_cr_equiv_proper (h : addr) :
+  Proper (cr_equiv h ==> cr_equiv h ==> iff) (cr_order h).
+Proof.
+Admitted.
+
 Definition query_order (h : addr) :=
-  occ_order (lex_diag (cr_order h) (channel_order h)).
+  occ_order (lex_diag (cr_equiv h) (cr_order h) (channel_order h)).
 
 Theorem query_order_wf :
   forall h,
     well_founded (query_order h).
 Proof.
-  unfold query_order; eauto.
+  unfold query_order; eauto with typeclass_instances.
 Qed.
 Hint Resolve query_order_wf.
 
@@ -839,11 +889,11 @@ Theorem eventually_done_or_always_blocked_via_relation :
       ex.
 Proof.
   cofix c.
-  destruct ex; intros; constructor; intros;
-    [|apply c; invar_eauto].
-  assert (exists st, sigma (occ_gst o) h = Some st /\
-                exists dstp q m,
-                  cur_request st = Some (dstp, q, m)).
+  intros; constructor; intros;
+    [clear c|destruct ex; apply c; invar_eauto].
+  assert (H_cr: exists st, sigma (occ_gst (hd ex)) h = Some st /\
+                      exists dstp q m,
+                        cur_request st = Some (dstp, q, m)).
   {
     inv_prop live_node; break_and.
     break_exists_exists; expand_def.
@@ -857,33 +907,37 @@ Proof.
     break_exists_name dstp;
     break_exists_name q;
     break_exists_name m.
-  assert (live_node (occ_gst o) (addr_of dstp))
+  assert (H_dl: live_node (occ_gst (hd ex)) (addr_of dstp))
     by admit.
-  assert (exists st, sigma (occ_gst o) (addr_of dstp) = Some st)
+  assert (H_dst: exists st, sigma (occ_gst (hd ex)) (addr_of dstp) = Some st)
     by eauto.
   break_exists_name st__dstp.
   assert (query_message_ok h (addr_of dstp) (cur_request st)
                            (delayed_queries st__dstp)
-                           (channel (occ_gst o) h (addr_of dstp))
-                           (channel (occ_gst o) (addr_of dstp) h))
+                           (channel (occ_gst (hd ex)) h (addr_of dstp))
+                           (channel (occ_gst (hd ex)) (addr_of dstp) h))
          by eauto.
   repeat find_rewrite.
   inv_prop query_message_ok.
   - congruence.
-  - find_eapply_lem_hyp (req_on_wire_until_response (Cons o ex) h); eauto.
-    repeat find_rewrite || find_injection.
-    remember (Cons o ex) as ex' in *.
-    replace o with (hd ex') in *
-      by (rewrite Heqex'; reflexivity).
-    replace ex with (tl ex') in *
-      by (rewrite Heqex'; reflexivity).
-    clear o ex.
-    induction H20.
-    + destruct s.
-      admit.
-    + simpl.
-      apply E_next.
-      admit.
+  - clear H7.
+    find_eapply_lem_hyp (req_on_wire_until_response ex h); eauto.
+    generalizeEverythingElse H18.
+    induction H18; intros.
+    + destruct s as [o [o' s]]; simpl in *.
+      break_or_hyp.
+      * admit.
+      * expand_def.
+        apply E_next, E0.
+        left; simpl.
+        unfold query_order, lex_diag, occ_order.
+        unfold diag.
+        eapply LexR.
+        -- repeat find_apply_lem_hyp in_split; break_exists.
+           eapply COReqRes;
+             admit.
+        -- admit.
+    + admit.
   - admit.
   - admit.
 Admitted.
