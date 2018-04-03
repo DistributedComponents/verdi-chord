@@ -1269,7 +1269,7 @@ Lemma nonzero_phase_one_error_eventually_drops :
     eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
 Proof.
   intros.
-  find_copy_eapply_lem_hyp dead_nodes_go_quiet; eauto.
+  find_copy_eapply_lem_hyp dead_nodes_go_quiet; eauto using strong_local_fairness_weak.
   induction 0 as [ex | o [o' ex]].
   - eauto using nonzero_phase_one_error_eventually_drops_dead_quiet.
   - destruct (leading_failed_succs h (occ_gst o')) eqn:?H.
