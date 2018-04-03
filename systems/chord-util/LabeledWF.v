@@ -1,87 +1,25 @@
+Require Import Coq.Classes.Equivalence.
+Require Import Coq.Classes.RelationClasses.
+Require Import Coq.Relations.Relations.
+Require Import Coq.Classes.Morphisms.
+Require Import Coq.Classes.RelationPairs.
+
 Require Import InfSeqExt.infseq.
 Require Import StructTact.StructTactics.
 
-Definition rel (T : Type) : Type :=
-  T -> T -> Prop.
-
 Set Implicit Arguments.
 
-Section lex.
-  (* This development of the lexicographic product follows one given
-    by Arthur Azevedo De Amorim on StackOverflow:
-    https://stackoverflow.com/questions/42520130/lexicographical-comparison-of-tuples-of-nats#42520191
-    ...which itself is an adaptation of the standard library's version
-    to remove awkward sigma types. *)
-
-  Variables (U V : Type) (R R' : rel U) (S : rel V).
-
-  Inductive lex : rel (U * V) :=
-  | LexL : forall x y x' y',
-      R x x' ->
-      lex (x, y) (x', y')
-  | LexR : forall x y y',
-      S y y' ->
-      lex (x, y) (x, y').
-
-  Lemma lex_wf :
-    well_founded R ->
-    well_founded S ->
-    well_founded lex.
-  Proof.
-    unfold well_founded; intros.
-    destruct a as [a b].
-    generalize dependent b.
-    assert (Haacc: Acc _ a) by auto.
-    induction Haacc; intros b.
-    assert (Hbacc: Acc _ b) by auto.
-    induction Hbacc; subst.
-    constructor; intros.
-    inv_prop lex; eauto.
-  Qed.
-
-End lex.
-(* hints don't survive sections *)
-Hint Resolve lex_wf.
-
-Definition diag {U : Type} (R : rel (U * U)) (x y : U) :=
-  R (x, x) (y, y).
-
-Definition lex_diag {U : Type} (R R' : rel U) : rel U :=
-  diag (lex R R').
-
-Lemma diag_wf :
-  forall U (R : rel (U * U)),
-    well_founded R ->
-    well_founded (diag R).
-Proof.
-  unfold well_founded; intros.
-  assert (Hacc: Acc R (a, a)) by auto.
-  remember (a, a) as da.
-  generalize dependent a.
-  induction Hacc; intros; subst.
-  constructor; eauto.
-Qed.
-Hint Resolve diag_wf.
-
-Lemma lex_diag_wf :
-  forall U (R S : rel U),
-    well_founded R ->
-    well_founded S ->
-    well_founded (lex_diag R S).
-Proof.
-  unfold lex_diag; eauto.
-Qed.
-Hint Resolve lex_diag_wf.
-
 Section wf_liveness.
-  Variable T : Type.
-  Variable R : T -> T -> Prop.
+  Variables (T : Type) (R : relation T).
   Notation "t > t'" := (R t' t).
   Notation "t < t'" := (R t t').
   Variable wf : well_founded R.
 
   Definition stuck (t : T) : Prop :=
     forall t', t > t' -> False.
+
+  Variable stuck_dec :
+    forall t, {stuck t} + {~ stuck t}.
 
   Lemma stuck_acc :
     forall t,
@@ -92,9 +30,6 @@ Section wf_liveness.
     constructor; intros.
     exfalso; eauto.
   Qed.
-
-  Variable stuck_dec :
-    forall t, {stuck t} + {~ stuck t}.
 
   Lemma eventual_drop_means_eventually_stuck :
     forall ex,
@@ -129,32 +64,193 @@ Section wf_liveness.
   Qed.
 
 End wf_liveness.
-
 Hint Resolve stuck_acc.
 
-Lemma lex_stuck :
-  forall (U V : Type) R S (u : U) (v : V),
-    stuck (lex R S) (u, v) ->
-    stuck R u /\
-    stuck S v.
-Proof.
-  unfold stuck.
-  intros.
-  split.
-  - intros.
-    eapply (H (t', v)).
-    constructor; eauto.
-  - intros.
-    eapply (H (u, t')).
-    constructor 2; eauto.
-Qed.
+Definition diag {U : Type} (R : relation (U * U)) : relation U :=
+  fun x y => R (x, x) (y, y).
 
-Lemma lex_diag_stuck_l :
-  forall (U : Type) R S (u : U),
-    stuck (lex_diag R S) u -> 
-    stuck R u.
+Lemma diag_wf :
+  forall U (R : relation (U * U)),
+    well_founded R ->
+    well_founded (diag R).
 Proof.
-  unfold lex_diag, diag, stuck; intros.
-  eapply H; constructor; eauto.
+  unfold well_founded; intros.
+  assert (Hacc: Acc R (a, a)) by auto.
+  remember (a, a) as da.
+  generalize dependent a.
+  induction Hacc; intros; subst.
+  constructor; eauto.
 Qed.
+Hint Resolve diag_wf.
+
+Section lex.
+  (* This development of the lexicographic product follows one given
+    by Arthur Azevedo De Amorim on StackOverflow:
+    https://stackoverflow.com/questions/42520130/lexicographical-comparison-of-tuples-of-nats#42520191
+    ...which itself is an adaptation of the standard library's version
+    to remove awkward sigma types. *)
+
+  Variables (U V : Type) (equiv R : relation U) (S : relation V).
+  Context `{Eq: Equivalence U equiv}.
+  Context `{R_compat : Proper _ (equiv ==> equiv ==> iff) R}.
+
+  Notation "a ~= b" := (equiv a b) (at level 50).
+
+  Inductive lex : relation (U * V) :=
+  | LexL : forall x y x' y',
+      R x x' ->
+      lex (x, y) (x', y')
+  | LexR : forall x x' y y',
+      S y y' ->
+      x ~= x' ->
+      lex (x, y) (x', y').
+
+  Lemma acc_R_equiv :
+    forall x x',
+      Acc R x ->
+      x ~= x' ->
+      Acc R x'.
+  Proof using Eq R_compat.
+    constructor; intros.
+    inv_prop Acc; eauto.
+    eapply H2.
+    eapply R_compat; eauto using Equivalence_Reflexive.
+  Qed.
+  Hint Resolve acc_R_equiv.
+
+  Ltac rewriter_goal :=
+    match goal with
+    | H: _ |- _ =>
+      rewrite -> H
+    end.
+
+  Ltac rewritel_goal :=
+    match goal with
+    | H: _ |- _ =>
+      rewrite <- H
+    end.
+
+  Lemma lex_properL :
+    forall x y x' b,
+      lex (x, y) b ->
+      x ~= x' ->
+      lex (x', y) b.
+  Proof using Eq R_compat.
+    intros.
+    inv_prop lex.
+    - constructor.
+      eapply R_compat;
+        eauto; eauto with relations.
+    - constructor 2; eauto.
+      repeat rewritel_goal;
+        reflexivity.
+  Qed.
+  Hint Resolve lex_properL.
+
+  Lemma lex_properR :
+    forall x y x' b,
+      lex b (x, y) ->
+      x ~= x' ->
+      lex b (x', y).
+  Proof using Eq R_compat.
+    intros.
+    inv_prop lex.
+    - constructor.
+      now repeat rewritel_goal.
+    - constructor 2; eauto using Equivalence_Transitive. 
+  Qed.
+  Hint Resolve lex_properR.
+
+  Instance lex_proper :
+    Proper (equiv * eq ==> equiv * eq ==> iff) lex.
+  Proof.
+    unfold Proper.
+    repeat intro.
+    destruct x, y, x0, y0; cbv in *.
+    break_and; subst.
+    split; eauto with relations.
+  Qed.
+
+  Lemma lex_acc_proper :
+    forall x x' y,
+      Acc lex (x, y) ->
+      x ~= x' ->
+      Acc lex (x', y).
+  Proof using Eq R_compat.
+    intros.
+    constructor; intros.
+    inv_prop Acc.
+    inv_prop lex;
+      eauto with relations.
+  Qed.
+  Hint Resolve lex_acc_proper.
+
+  Lemma lex_wf :
+    well_founded R ->
+    well_founded S ->
+    well_founded lex.
+  Proof using Eq R_compat.
+    unfold well_founded; intros.
+    destruct a as [a b]; revert b.
+    assert (Haacc: Acc _ a) by auto.
+    induction Haacc; intros b.
+    assert (Hbacc: Acc _ b) by auto.
+    induction Hbacc; subst.
+    constructor; intros.
+    inv_prop lex; eauto with relations.
+  Qed.
+
+  Lemma lex_stuck :
+    forall u v,
+      stuck lex (u, v) ->
+      stuck R u /\
+      stuck S v.
+  Proof.
+    unfold stuck.
+    intros.
+    split.
+    - intros.
+      eapply (H (t', v)).
+      constructor; eauto.
+    - intros.
+      eapply (H (u, t')).
+      constructor 2;
+        eauto with relations.
+  Qed.
+
+End lex.
+Hint Resolve lex_acc_proper.
+Hint Resolve lex_wf.
+Hint Resolve lex_stuck.
+
+Section lex_diag.
+  Variables (U : Type) (equiv R S : relation U).
+  Context `{Eq: Equivalence U equiv}.
+  Context `{R_compat : Proper _ (equiv ==> equiv ==> iff) R}.
+
+  Definition lex_diag : relation U :=
+    diag (lex equiv R S).
+
+  Lemma lex_diag_wf :
+    well_founded R ->
+    well_founded S ->
+    well_founded lex_diag.
+  Proof using Eq R_compat.
+    unfold lex_diag;
+      eauto with relations.
+  Qed.
+  Hint Resolve lex_diag_wf.
+
+  Lemma lex_diag_stuck_l :
+    forall u,
+      stuck lex_diag u -> 
+      stuck R u.
+  Proof.
+    unfold lex_diag, diag, stuck; intros.
+    eapply H; constructor; eauto.
+  Qed.
+  Hint Resolve lex_diag_stuck_l.
+
+End lex_diag.
+Hint Resolve lex_diag_wf.
 Hint Resolve lex_diag_stuck_l.
