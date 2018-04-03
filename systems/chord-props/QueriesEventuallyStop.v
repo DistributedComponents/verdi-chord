@@ -169,11 +169,14 @@ Theorem req_on_wire_until_response :
       live_node (occ_gst (hd ex)) (addr_of dstp) ->
       until (now (fun o =>
                     In m (channel (occ_gst o) h (addr_of dstp))))
-            (next (now (fun o =>
+            (and_tl
+               (now (fun o =>
+                       In m (channel (occ_gst o) h (addr_of dstp))))
+               (next (now (fun o =>
                           blocked_by (occ_gst o) (addr_of dstp) h \/
                           exists res,
                             request_response_pair m res /\
-                            In res (channel (occ_gst o) (addr_of dstp) h))))
+                            In res (channel (occ_gst o) (addr_of dstp) h)))))
             ex.
 Proof.
   intros.
@@ -205,7 +208,8 @@ Proof.
     destruct m0 as [? [? ?]]; repeat find_rewrite || find_injection.
     simpl (fst _) in *; simpl (snd _) in *.
     find_copy_apply_lem_hyp requests_get_response_or_queued; eauto.
-    break_or_hyp; break_and.
+    break_or_hyp; break_and; split.
+    + admit.
     + left.
       unfold blocked_by.
       repeat (split; invar_eauto).
@@ -223,7 +227,6 @@ Proof.
       forwards; eauto. concludes.
       forwards; eauto. concludes.
 
-      rewrite update_same.
       assert (cur_request x1 = Some (dstp, q, p)) by eauto.
       assert (cur_request st0 = cur_request d).
       {
@@ -235,15 +238,12 @@ Proof.
           eapply recv_msg_not_right_response_preserves_cur_request; eauto.
         - congruence.
       }
-      destruct_update.
-      * repeat (find_rewrite; find_injection).
-        repeat eexists; eauto.
-        instantiate (1:=q).
-        congruence.
-      * repeat eexists; eauto.
+      admit.
+    + admit.
     + right.
       break_exists_exists; intuition eauto.
       apply in_msgs_in_channel; simpl.
+      repeat find_rewrite; simpl.
       apply in_or_app; left.
       apply in_map_iff; eauto.
   - destruct s as [o [o' s]]; simpl in *.
@@ -256,7 +256,7 @@ Proof.
       inv_prop lb_execution.
       repeat invcs_prop live_node; expand_def.
       eapply cur_request_constant_when_res_on_wire; eauto.
-Qed.
+Admitted.
 
 Theorem have_cur_request_msg_on_wire_preserves :
   forall h dst ex q m r,
@@ -870,6 +870,30 @@ Proof.
 Admitted.
 Hint Resolve query_order_stuck_dec.
 
+Lemma co_msg_then_delayed :
+  forall gst l gst' src dst m,
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    In m (channel gst src dst) ->
+    forall st r,
+      sigma gst' dst = Some st ->
+      In (src, r) (delayed_queries st) ->
+      channel_order src gst' gst.
+Proof.
+Admitted.
+
+Lemma co_msg_then_response :
+  forall gst l gst' src dst m,
+    reachable_st gst ->
+    labeled_step_dynamic gst l gst' ->
+    In m (channel gst src dst) ->
+    forall r,
+      request_response_pair m r ->
+      In r (channel gst' dst src) ->
+      channel_order src gst' gst.
+Proof.
+Admitted.
+
 Theorem eventually_done_or_always_blocked_via_relation :
   forall ex h,
     lb_execution ex ->
@@ -877,10 +901,12 @@ Theorem eventually_done_or_always_blocked_via_relation :
     weak_local_fairness ex ->
     live_node (occ_gst (hd ex)) h ->
     always
-      (fun s =>
-         ~ stuck (query_order h) (hd s) ->
+      (fun s => forall t0,
+         (* this needs to use some kind of equivalence *)
+         t0 = hd s ->
+         ~ stuck (query_order h) t0 ->
          eventually
-           (or_tl (now (fun t => query_order h t (hd s)))
+           (or_tl (now (fun t => query_order h t t0))
                   (fun s' => exists dstp,
                        always (now (fun o => blocked_by (occ_gst o)
                                                      (addr_of dstp)
@@ -917,16 +943,32 @@ Proof.
                            (channel (occ_gst (hd ex)) h (addr_of dstp))
                            (channel (occ_gst (hd ex)) (addr_of dstp) h))
          by eauto.
-  repeat find_rewrite.
-  inv_prop query_message_ok.
+  generalize dependent t0.
+  invcs_prop query_message_ok; intros.
   - congruence.
-  - clear H7.
-    find_eapply_lem_hyp (req_on_wire_until_response ex h); eauto.
-    generalizeEverythingElse H18.
-    induction H18; intros.
+  - congruence.
+  - find_copy_eapply_lem_hyp (req_on_wire_until_response ex h);
+      congruence || eauto.
+    repeat match goal with
+           | H: sigma _ _ = Some _ |- _ => clear H
+           | H: cur_request _ = _ |- _ => clear H
+           | H: _ = cur_request _ |- _ => clear H
+           | H: no_responses _ |- _ => clear H
+           | H: In req (channel _ _ _) |- _ => clear H
+           | H: context[no_requests] |- _ => clear H
+           end.
+    match goal with
+    | H: until _ _ ex |- _ =>
+      generalizeEverythingElse H; induction H; intros
+    end.
     + destruct s as [o [o' s]]; simpl in *.
+      destruct H; simpl in *.
       break_or_hyp.
-      * admit.
+      * apply E_next, E0; left; simpl.
+        eapply LexR.
+        -- inv_prop blocked_by; expand_def.
+           eapply co_msg_then_delayed; invar_eauto.
+        -- admit. (* here's a cr_equiv goal *)
       * expand_def.
         apply E_next, E0.
         left; simpl.
@@ -934,10 +976,17 @@ Proof.
         unfold diag.
         eapply LexR.
         -- repeat find_apply_lem_hyp in_split; break_exists.
-           eapply COReqRes;
-             admit.
-        -- admit.
-    + admit.
+           eapply (co_msg_then_response _ _ _ h (addr_of dstp));
+             solve [invar_eauto
+                   |repeat find_rewrite; auto with datatypes].
+        -- admit. (* here's a cr_equiv goal *)
+    + apply E_next.
+      (* this is not true *)
+      replace (fun t => query_order h t t0) with (fun t => query_order h t (hd s))
+        by admit.
+      (* neither is this *)
+      replace (t0) with (hd s) in * by admit.
+      eapply IHuntil; invar_eauto.
   - admit.
   - admit.
 Admitted.
