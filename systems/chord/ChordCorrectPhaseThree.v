@@ -493,15 +493,15 @@ Proof.
   assert (pred_correct gst s (pred x)) by eauto.
   destruct (pred x) eqn:?;
     try solve [inv_prop pred_correct; break_and; congruence].
+  assert (valid_opt_ptr gst (pred x)) by admit.
+  repeat find_rewrite.
+  inv_prop valid_opt_ptr.
   f_equal; symmetry; eapply correct_pred_unique; eauto.
-  {
-    assert (valid_opt_ptr gst (pred x)) by admit.
-    repeat find_rewrite.
-    inv_prop valid_opt_ptr.
-    eauto.
-  }
   inv_prop pred_correct; break_and.
-  find_injection.
+  inv_prop valid_ptr.
+  (* must prove invariant that all predecessors are live_node(s). *)
+  inv_prop pred_correct.
+  expand_def.
   admit.
 Admitted.
 
