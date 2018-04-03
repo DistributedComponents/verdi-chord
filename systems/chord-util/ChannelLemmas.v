@@ -216,7 +216,8 @@ Lemma channel_measure_zero_or_eventually_decreasing :
     lb_execution ex ->
     weak_local_fairness ex ->
     In dead (failed_nodes (occ_gst (hd ex))) ->
-    live_node (occ_gst (hd ex)) h ->
+    In h (nodes (occ_gst (hd ex))) ->
+    ~ In h (failed_nodes (occ_gst (hd ex))) ->
     always (zero_or_eventually_decreasing (channel_measure dead h)) ex.
 Proof.
   cofix c.
@@ -229,7 +230,7 @@ Proof.
     + left. destruct ex. simpl in *. unfold measure_zero, channel_measure.
       repeat find_rewrite. auto.
     + right.
-      find_copy_apply_lem_hyp live_node_means_state_exists. break_exists.
+      find_copy_apply_lem_hyp nodes_have_state; auto. break_exists.
       eapply eventually_monotonic with (J := lb_execution); auto.
       eauto using lb_execution_invar.
       2:eapply RecvMsg_eventually_occurred with (src := dead) (m := p); eauto.
@@ -250,7 +251,7 @@ Proof.
            rewrite filterMap_map.
            simpl.
            destruct (addr_eq_dec (fst (snd m)) (fst m));
-             repeat find_rewrite; [exfalso; eapply live_node_not_in_failed_nodes; eauto|].
+             repeat find_rewrite; intuition.
            simpl.
            rewrite filterMap_all_None; intuition.
            simpl.
@@ -263,16 +264,32 @@ Proof.
            simpl. repeat rewrite app_length. simpl. intuition.
         -- unfold label_input in *. congruence.
         -- unfold label_output in *. congruence.
-      * unfold live_node in *. intuition.
+      * intuition.
         find_apply_lem_hyp clients_not_in_failed; intuition.
       * apply in_channel_in_msgs; repeat find_rewrite; in_crush.
   - destruct ex. simpl.
     inv_prop lb_execution.
     apply c;
-      eauto using weak_local_fairness_invar, reachable_st_lb_execution_cons, live_node_invariant.
-    erewrite <- labeled_step_dynamic_preserves_failed_nodes; eauto.
+      eauto using weak_local_fairness_invar, reachable_st_lb_execution_cons;
+      try solve [erewrite <- labeled_step_dynamic_preserves_failed_nodes; eauto];
+      try solve [erewrite <- labeled_step_dynamic_preserves_nodes; eauto].
 Qed.
 
+Lemma dead_node_channel_empties_out' :
+  forall ex dead h,
+    lb_execution ex ->
+    reachable_st (occ_gst (hd ex)) ->
+    In h (nodes (occ_gst (hd ex))) ->
+    ~ In h (failed_nodes (occ_gst (hd ex))) ->
+    In dead (failed_nodes (occ_gst (hd ex))) ->
+    weak_local_fairness ex ->
+    continuously (now (fun occ => channel (occ_gst occ) dead h = [])) ex.
+Proof.
+  intros.
+  eapply continuously_monotonic; [intros; eapply channel_measure_zero_empty; eauto|].
+  eapply measure_decreasing_to_zero;
+    eauto using channel_measure_nonincreasing, channel_measure_zero_or_eventually_decreasing.
+Qed.
 
 Lemma dead_node_channel_empties_out :
   forall ex dead h,
@@ -283,10 +300,7 @@ Lemma dead_node_channel_empties_out :
     weak_local_fairness ex ->
     continuously (now (fun occ => channel (occ_gst occ) dead h = [])) ex.
 Proof.
-  intros.
-  eapply continuously_monotonic; [intros; eapply channel_measure_zero_empty; eauto|].
-  eapply measure_decreasing_to_zero;
-    eauto using channel_measure_nonincreasing, channel_measure_zero_or_eventually_decreasing.
+  unfold live_node in *. eauto using dead_node_channel_empties_out'.
 Qed.
 
 Lemma live_node_in_active :
