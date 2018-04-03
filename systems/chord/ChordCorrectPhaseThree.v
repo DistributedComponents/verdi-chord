@@ -18,6 +18,7 @@ Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.LabeledMeasures.
+Require Import Chord.HashInjective.
 
 Require Import Chord.FirstSuccNeverSelf.
 Require Import Chord.LiveNodesStayLive.
@@ -468,20 +469,37 @@ Proof.
     break_and; find_injection.
     exists h; split; auto.
     intuition eauto using better_succ_better_pred.
-    eapply better_succ_better_pred; eauto.
-    { admit. }
+    assert (id_of h <> id_of p').
+    {
+      intro Hideq.
+      pose proof Hideq.
+      find_false.
+      rewrite (wf_ptr_eq h) in Hideq by auto.
+      rewrite (wf_ptr_eq p') in Hideq by auto.
+      simpl in *.
+      find_apply_lem_hyp hash_injective_invariant.
+      assert (addr_of h = addr_of p') by auto.
+      destruct h, p'; simpl in *; congruence.
+    }
     destruct (pointer_eq_dec x p').
-    - admit.
-    - eauto.
+    - subst.
+      constructor; intuition eauto.
+      eapply between_xyx; eauto.
+    - eapply better_succ_better_pred; eauto.
   }
   unfold has_pred.
   inv_prop live_node; expand_def.
   eexists; split; eauto.
   assert (pred_correct gst s (pred x)) by eauto.
-  destruct (pred x);
+  destruct (pred x) eqn:?;
     try solve [inv_prop pred_correct; break_and; congruence].
   f_equal; symmetry; eapply correct_pred_unique; eauto.
-  { admit. }
+  {
+    assert (valid_opt_ptr gst (pred x)) by admit.
+    repeat find_rewrite.
+    inv_prop valid_opt_ptr.
+    eauto.
+  }
   inv_prop pred_correct; break_and.
   find_injection.
   admit.
