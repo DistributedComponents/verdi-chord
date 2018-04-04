@@ -90,11 +90,14 @@ Section lex.
     ...which itself is an adaptation of the standard library's version
     to remove awkward sigma types. *)
 
-  Variables (U V : Type) (equiv R : relation U) (S : relation V).
+  Variables (U V : Type) (equiv R : relation U) (equiv' S : relation V).
   Context `{Eq: Equivalence U equiv}.
+  Context `{Eq': Equivalence V equiv'}.
   Context `{R_compat : Proper _ (equiv ==> equiv ==> iff) R}.
+  Context `{S_compat : Proper _ (equiv' ==> equiv' ==> iff) S}.
 
   Notation "a ~= b" := (equiv a b) (at level 50).
+  Notation "a ~=' b" := (equiv' a b) (at level 50).
 
   Inductive lex : relation (U * V) :=
   | LexL : forall x y x' y',
@@ -114,7 +117,7 @@ Section lex.
     constructor; intros.
     inv_prop Acc; eauto.
     eapply H2.
-    eapply R_compat; eauto using Equivalence_Reflexive.
+    eapply R_compat; eauto; eauto with relations.
   Qed.
   Hint Resolve acc_R_equiv.
 
@@ -157,12 +160,41 @@ Section lex.
     inv_prop lex.
     - constructor.
       now repeat rewritel_goal.
-    - constructor 2; eauto using Equivalence_Transitive. 
+    - constructor 2; eauto.
+      eapply Equivalence_Transitive; eauto.
   Qed.
   Hint Resolve lex_properR.
 
+  Lemma lex_properL' :
+    forall x y y' b,
+      lex (x, y) b ->
+      y ~=' y' ->
+      lex (x, y') b.
+  Proof using Eq' S_compat.
+    intros.
+    inv_prop lex; try solve [constructor; eauto].
+    constructor 2; eauto.
+    eapply S_compat; eauto;
+      eauto with relations.
+  Qed.
+  Hint Resolve lex_properL'.
+
+  Lemma lex_properR' :
+    forall x y y' b,
+      lex b (x, y) ->
+      y ~=' y' ->
+      lex b (x, y').
+  Proof using Eq' S_compat.
+    intros.
+    inv_prop lex; try solve [constructor; eauto].
+    constructor 2; eauto.
+    eapply S_compat; eauto;
+      eauto with relations.
+  Qed.
+  Hint Resolve lex_properR'.
+
   Instance lex_proper :
-    Proper (equiv * eq ==> equiv * eq ==> iff) lex.
+    Proper (equiv * equiv' ==> equiv * equiv' ==> iff) lex.
   Proof.
     unfold Proper.
     repeat intro.
@@ -176,7 +208,7 @@ Section lex.
       Acc lex (x, y) ->
       x ~= x' ->
       Acc lex (x', y).
-  Proof using Eq R_compat.
+  Proof using Eq Eq' R_compat S_compat.
     intros.
     constructor; intros.
     inv_prop Acc.
@@ -185,11 +217,25 @@ Section lex.
   Qed.
   Hint Resolve lex_acc_proper.
 
+  Lemma lex_acc_proper' :
+    forall x y y',
+      Acc lex (x, y) ->
+      y ~=' y' ->
+      Acc lex (x, y').
+  Proof using Eq Eq' R_compat S_compat.
+    intros.
+    constructor; intros.
+    inv_prop Acc.
+    inv_prop lex;
+      eauto with relations.
+  Qed.
+  Hint Resolve lex_acc_proper'.
+
   Lemma lex_wf :
     well_founded R ->
     well_founded S ->
     well_founded lex.
-  Proof using Eq R_compat.
+  Proof using Eq Eq' R_compat S_compat.
     unfold well_founded; intros.
     destruct a as [a b]; revert b.
     assert (Haacc: Acc _ a) by auto.
@@ -205,7 +251,7 @@ Section lex.
       stuck lex (u, v) ->
       stuck R u /\
       stuck S v.
-  Proof.
+  Proof using Eq.
     unfold stuck.
     intros.
     split.
@@ -220,22 +266,49 @@ Section lex.
 
 End lex.
 Hint Resolve lex_acc_proper.
+Hint Resolve lex_acc_proper'.
 Hint Resolve lex_wf.
 Hint Resolve lex_stuck.
+Hint Resolve lex_proper.
 
 Section lex_diag.
-  Variables (U : Type) (equiv R S : relation U).
+  Variables (U : Type) (equiv equiv' R S : relation U).
   Context `{Eq: Equivalence U equiv}.
+  Context `{Eq': Equivalence U equiv'}.
   Context `{R_compat : Proper _ (equiv ==> equiv ==> iff) R}.
+  Context `{S_compat : Proper _ (equiv' ==> equiv' ==> iff) S}.
 
   Definition lex_diag : relation U :=
     diag (lex equiv R S).
+
+  Definition equiv_both : relation U :=
+    relation_conjunction equiv equiv'.
+
+  Instance Eq_both :
+    Equivalence equiv_both.
+  Proof.
+    split; repeat intro;
+      repeat invcs_prop equiv_both;
+      split; solve [eauto with relations
+                   |eapply Equivalence_Transitive; eauto].
+  Defined.
+
+  Instance lex_diag_proper :
+    Proper (equiv_both ==> equiv_both ==> iff) lex_diag.
+  Proof.
+    unfold lex_diag, diag.
+    repeat intro || split; repeat invcs_prop equiv_both.
+    - eapply lex_proper; eauto with relations;
+        eauto with relations.
+    - eapply lex_proper; eauto with relations;
+        eauto with relations.
+  Qed.
 
   Lemma lex_diag_wf :
     well_founded R ->
     well_founded S ->
     well_founded lex_diag.
-  Proof using Eq R_compat.
+  Proof using Eq Eq' R_compat S_compat.
     unfold lex_diag;
       eauto with relations.
   Qed.
@@ -254,3 +327,4 @@ Section lex_diag.
 End lex_diag.
 Hint Resolve lex_diag_wf.
 Hint Resolve lex_diag_stuck_l.
+Hint Resolve lex_diag_proper.
