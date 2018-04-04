@@ -106,17 +106,6 @@ Proof.
 Qed.
 Hint Resolve always_const.
 
-Theorem joined_nodes_never_run_join :
-  forall gst h st,
-    reachable_st gst ->
-    sigma gst h = Some st ->
-    joined st = true ->
-    forall dst q m k,
-      cur_request st = Some (dst, q, m) ->
-      q <> Join k.
-Proof.
-Admitted.
-
 Lemma continuously_false_false :
   forall T (s : infseq T),
     continuously (fun _ => False) s ->
@@ -273,161 +262,6 @@ Proof.
       repeat invcs_prop live_node; expand_def.
       eapply cur_request_constant_when_res_on_wire; eauto.
 Admitted.
-
-Theorem have_cur_request_msg_on_wire_preserves :
-  forall h dst ex q m r,
-    reachable_st (occ_gst (hd ex)) ->
-    live_node (occ_gst (hd ex)) h ->
-    (exists st, sigma (occ_gst (hd ex)) (addr_of dst) = Some st) ->
-    lb_execution ex ->
-    In r (channel (occ_gst (hd ex)) (addr_of dst) h) ->
-    (forall st, 
-        sigma (occ_gst (hd ex)) h = Some st ->
-        cur_request st = Some (dst, q, m)) ->
-    request_response_pair m r ->
-    weak_until (now (fun o => In r (channel (occ_gst o) (addr_of dst) h) ->
-                           exists st,
-                             sigma (occ_gst o) h = Some st /\
-                             cur_request st = Some (dst, q, m)))
-               (now (fun o => ~ In r (channel (occ_gst o) (addr_of dst) h)))
-               ex.
-Proof.
-  cofix c.
-  intros.
-  eapply W_tl; simpl.
-  - intros.
-    destruct ex; simpl.
-    repeat invcs_prop live_node; expand_def.
-    eexists; split; eauto.
-  - destruct ex as [o [o' ex]].
-    set (gst := occ_gst o).
-    pose proof (query_message_ok_invariant gst ltac:(eauto) h (addr_of dst)).
-    destruct (label_eq_dec (RecvMsg (addr_of dst) h r) (occ_label o)).
-    + eapply W0.
-      simpl.
-      inv_prop lb_execution.
-      repeat find_reverse_rewrite.
-      inv_labeled_step; clean_up_labeled_step_cases.
-      repeat find_rewrite; intuition.
-      repeat invcs_prop live_node; expand_def.
-      copy_eapply_prop_hyp query_message_ok sigma; eauto.
-      inv_prop query_message_ok; try congruence.
-      * exfalso; eapply_prop no_responses;
-          repeat find_rewrite; eauto.
-      * admit.
-      * admit.
-      * assert (res0 = r) by admit; subst.
-        admit.
-      * exfalso; eapply_prop no_responses;
-          repeat find_rewrite; eauto.
-    + assert (live_node (occ_gst o') h) by invar_eauto.
-      apply c; invar_eauto.
-      * admit.
-      * apply in_msgs_in_channel.
-        simpl.
-        inv_lb_execution.
-        inv_labeled_step; repeat find_rewrite; simpl.
-        -- eauto with datatypes.
-        -- handler_def.
-           assert (m0 <> (addr_of dst, (h, r)))
-             by (destruct m0 as [? [? ?]]; simpl in *; congruence).
-           find_apply_lem_hyp in_channel_in_msgs; simpl in *.
-           repeat find_rewrite.
-           apply in_or_app; right.
-           find_apply_lem_hyp in_app_or; simpl in *.
-           intuition eauto with datatypes.
-        -- eauto.
-        -- assert (m0 <> (addr_of dst, (h, r))).
-           {
-             intro; subst.
-             exfalso; eapply live_nodes_not_clients; invar_eauto.
-           }
-           find_apply_lem_hyp in_channel_in_msgs; simpl in *.
-           repeat find_rewrite.
-           find_apply_lem_hyp in_app_or; simpl in *.
-           intuition eauto with datatypes.
-      * admit.
-Admitted.
-
-Theorem never_stuck_on_non_stabilize_with_res_on_wire :
-  forall ex h,
-    lb_execution ex ->
-    reachable_st (occ_gst (hd ex)) ->
-    strong_local_fairness ex ->
-    live_node (occ_gst (hd ex)) h ->
-    forall dstp q m res st,
-      q <> Stabilize ->
-      query_response q res ->
-      In res (channel (occ_gst (hd ex)) (addr_of dstp) h) ->
-      sigma (occ_gst (hd ex)) h = Some st ->
-      cur_request st = Some (dstp, q, m) ->
-      always (now
-                (fun o =>
-                   forall st,
-                     sigma (occ_gst o) h = Some st ->
-                     cur_request st <> None))
-             ex ->
-      False.
-Proof.
-  intros.
-  cut (continuously (fun _ => False) ex);
-    [eauto using continuously_false_false|].
-  find_copy_eapply_lem_hyp have_cur_request_msg_on_wire_preserves; eauto;
-    [
-    |eapply nodes_have_state; try eapply sent_non_client_message_means_in_nodes; invar_eauto;
-     inv_prop query_response; intro; inv_prop client_payload
-    |intros; repeat find_rewrite; find_injection; eauto
-    ].
-  find_apply_lem_hyp in_channel_in_msgs.
-  find_eapply_lem_hyp RecvMsg_strong_until_occurred;
-    eauto using strong_local_fairness_weak, l_enabled_RecvMsg_In_msgs.
-  match goal with
-  | H: In _ (msgs _) |- _ => clear H
-  end.
-  match goal with
-  | H: until _ _ _ |- _ => induction H
-  end.
-  - destruct s as [o [o' [o'' s]]]; simpl in *.
-    break_and; do 2 invcs_prop lb_execution.
-    assert (In res0 (channel (occ_gst o) (addr_of dstp) h)).
-    { simpl in *.
-      unfold occurred in *.
-      repeat find_reverse_rewrite.
-      inv_prop RecvMsg; clean_up_labeled_step_cases.
-      handler_def; find_injection.
-      apply in_msgs_in_channel; repeat find_rewrite.
-      replace (fst m0, (fst (snd m0), snd (snd m0))) with m0
-        by (destruct m0 as [? [? ?]]; reflexivity).
-      eauto with datatypes.
-    }
-    inv_prop channel;
-      [simpl in *; tauto|].
-    simpl in *; concludes.
-    expand_def; repeat find_rewrite || find_injection.
-    assert (exists st, sigma (occ_gst o') h = Some st /\ cur_request st = None).
-    {
-      unfold occurred in *; repeat find_reverse_rewrite.
-      inv_prop (labeled_step_dynamic (occ_gst o)); clean_up_labeled_step_cases.
-      recover_msg_from_recv_step_equality.
-      subst; simpl in *.
-      find_apply_lem_hyp always_now'; simpl in * |-.
-      repeat find_rewrite; simpl in *.
-      eexists; rewrite_update; split; eauto.
-      repeat find_rewrite || find_injection.
-      eapply recv_handler_response_clears_cur_request_q_single;
-        try eapply recv_handler_labeling; eauto.
-      intros.
-      eapply joined_nodes_never_run_join; invar_eauto.
-      inv_prop live_node; expand_def; congruence.
-    }
-    break_exists; expand_def.
-    find_apply_lem_hyp always_invar; find_apply_lem_hyp always_now'.
-    assert (cur_request _ <> None) by eauto.
-    tauto.
-  - inv_prop weak_until.
-    + simpl in *; intuition; find_false; eauto.
-    + eapply E_next, IHuntil; invar_eauto.
-Qed.
 
 Inductive cr_order (h : addr) : relation global_state :=
 | CRNone :
@@ -884,31 +718,6 @@ Definition query_order_stuck_dec :
     {stuck (query_order h) o} + {~ stuck (query_order h) o}.
 Proof.
 Admitted.
-Hint Resolve query_order_stuck_dec.
-
-Lemma co_msg_then_delayed :
-  forall gst l gst' src dst m,
-    reachable_st gst ->
-    labeled_step_dynamic gst l gst' ->
-    In m (channel gst src dst) ->
-    forall st r,
-      sigma gst' dst = Some st ->
-      In (src, r) (delayed_queries st) ->
-      channel_order src gst' gst.
-Proof.
-Admitted.
-
-Lemma co_msg_then_response :
-  forall gst l gst' src dst m,
-    reachable_st gst ->
-    labeled_step_dynamic gst l gst' ->
-    In m (channel gst src dst) ->
-    forall r,
-      request_response_pair m r ->
-      In r (channel gst' dst src) ->
-      channel_order src gst' gst.
-Proof.
-Admitted.
 
 Theorem cur_request_is_query_request :
   forall gst h dstp q m st,
@@ -1162,9 +971,9 @@ Proof.
   find_eapply_lem_hyp gross_always_lemma.
   break_or_hyp.
   - left.
-    find_eapply_lem_hyp eventual_drop_means_eventually_stuck; eauto.
+    find_eapply_lem_hyp eventual_drop_means_eventually_stuck;
+      eauto using query_order_stuck_dec.
     eapply eventually_monotonic_simple; try eassumption.
-    intros.
     destruct s; simpl in *; eauto.
   - eauto.
 Qed.
