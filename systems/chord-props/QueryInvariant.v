@@ -860,9 +860,6 @@ Inductive query_message_ok
     Prop :=
 | CInone :
     forall dst outbound inbound dqs,
-      no_responses inbound ->
-      no_requests outbound ->
-      (forall m, ~ In (src, m) dqs) ->
       query_message_ok src dst None dqs outbound inbound
 | CIother :
     forall dst dstp q req dqs outbound inbound,
@@ -916,7 +913,6 @@ Proof.
         destruct (addr_eq_dec dst (addr_of (make_pointer k))).
         -- subst. apply CIreq; simpl; auto.
            ++
-    
 Admitted.
 Hint Resolve query_message_ok_invariant.
 
@@ -952,3 +948,4 @@ Theorem requests_get_correct_response :
 Proof.
 Admitted.
 Hint Resolve requests_get_correct_response.
+

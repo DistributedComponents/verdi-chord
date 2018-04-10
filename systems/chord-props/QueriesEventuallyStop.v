@@ -988,27 +988,28 @@ Proof.
              | H: query_message_ok _ _ _ _ _ _ |- _ =>
                invcs H
              end;
-      right; eauto using cr_equiv_succs;
-      find_apply_lem_hyp (in_split req1);
-      try find_apply_lem_hyp (in_split res0); expand_def;
-        [eapply COReqDelayed | eapply COReqRes];
+    right; eauto using cr_equiv_succs; try congruence;
+        try find_apply_lem_hyp (in_split req1);
+        try find_apply_lem_hyp (in_split res0);
+        expand_def;
+        [admit|eapply COReqDelayed|admit|eapply COReqRes];
         autounfold; repeat split;
-        repeat match goal with
-               | |- sigma _ _ = _ => solve [eauto]
-               | |- request_payload _ =>
-                 solve [eapply query_request_request; eauto]
-               | H: Some _ = cur_request _ |- _ =>
-                 symmetry in H
-               | H: cur_request ?x = Some (?dst, _, _),
-                 H': cur_request ?x' = Some (?dst', _, _),
-                 Heq: ?dst = ?dst' |- _ =>
-                 idtac
-               | H: addr_of ?a = addr_of ?b |- _ =>
-                 rewrite -> H in *
-               | H: cur_request ?x = Some (?dst, _, _),
-                 H': cur_request ?x' = Some (?dst', _, _) |- _ =>
-                 assert (dst = dst') by congruence; subst
-               end; eauto; congruence.
+          repeat match goal with
+                 | |- sigma _ _ = _ => solve [eauto]
+                 | |- request_payload _ =>
+                   solve [eapply query_request_request; eauto]
+                 | H: Some _ = cur_request _ |- _ =>
+                   symmetry in H
+                 | H: cur_request ?x = Some (?dst, _, _),
+                      H': cur_request ?x' = Some (?dst', _, _),
+                          Heq: ?dst = ?dst' |- _ =>
+                   idtac
+                 | H: addr_of ?a = addr_of ?b |- _ =>
+                   rewrite -> H in *
+                 | H: cur_request ?x = Some (?dst, _, _),
+                      H': cur_request ?x' = Some (?dst', _, _) |- _ =>
+                   assert (dst = dst') by congruence; subst
+                 end; eauto; congruence.
   - destruct s.
     repeat match goal with
            | H: (_ /\_ _) _ |- _ => destruct H
