@@ -53,6 +53,19 @@ Qed.
 
 Set Bullet Behavior "Strict Subproofs".
 
+Lemma forall_continuously_commute2 :
+  forall T X (ex : infseq T) L (P : X -> X -> Prop) (Q : X -> X -> infseq T -> Prop),
+    (forall x y, P x y -> In x L /\ In y L) ->
+    (forall x y : X, P x y -> continuously (Q x y) ex) ->
+    continuously (fun t => forall x y, P x y -> Q x y t) ex.
+Proof.
+  induction L.
+  - intros. simpl in *.
+    unfold continuously. apply E0.
+    apply always_inv; intros; exfalso; cut (False /\ False); eauto; intuition.
+  - intros.
+Admitted.    
+
 Lemma dead_nodes_go_quiet :
   forall ex,
     reachable_st (occ_gst (hd ex)) ->
@@ -63,10 +76,10 @@ Proof.
   intros. unfold continuously.
   unfold no_msgs_to_live_from_dead_nodes, no_msgs_to_live_from.
   remember (occ_gst (hd ex)) as gst.
-  remember (fun occ => forall h, In h (failed_nodes gst) ->
-                         forall dst, In dst (nodes gst) ->
-                                ~ In dst (failed_nodes gst) ->
-                                channel (occ_gst occ) h dst = []) as PP.
+  remember (fun occ => forall h dst, (In h (failed_nodes gst) /\
+                             In dst (nodes gst) /\
+                             ~ In dst (failed_nodes gst)) ->
+                             channel (occ_gst occ) h dst = []) as PP.
   remember (fun ex => lb_execution ex /\
                    nodes (occ_gst (hd ex)) = nodes gst /\
                    failed_nodes (occ_gst (hd ex)) = failed_nodes gst) as JJ.
