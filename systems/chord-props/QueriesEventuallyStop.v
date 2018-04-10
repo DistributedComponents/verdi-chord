@@ -362,68 +362,139 @@ Proof.
 Qed.
 Hint Resolve cr_order_wf.
 
+Definition channel_delayed_query gst src dstp st st__dst q m :=
+  sigma gst src = Some st /\
+  cur_request st = Some (dstp, q, m) /\
+  query_request q m /\
+  sigma gst (addr_of dstp) = Some st__dst /\
+  In (src, m) (delayed_queries st__dst) /\
+  no_requests (channel gst src (addr_of dstp)) /\
+  no_responses (channel gst (addr_of dstp) src).
+
+Definition channel_request gst src dstp st st__dst q m req xs ys :=
+  sigma gst src = Some st /\
+  cur_request st = Some (dstp, q, m) /\
+  query_request q req /\
+  channel gst src (addr_of dstp) = xs ++ req :: ys /\
+  no_requests (xs ++ ys) /\
+  no_responses (channel gst (addr_of dstp) src) /\
+  sigma gst (addr_of dstp) = Some st__dst /\
+  (forall r, ~ In (src, r) (delayed_queries st__dst)).
+
+Definition channel_response gst src dstp st st__dst q m res xs ys :=
+  sigma gst src = Some st /\
+  cur_request st = Some (dstp, q, m) /\
+  no_requests (channel gst src (addr_of dstp)) /\
+  sigma gst src = Some st /\
+  cur_request st = Some (dstp, q, m) /\
+  channel gst (addr_of dstp) src = xs ++ res :: ys /\
+  no_responses (xs ++ ys) /\
+  sigma gst (addr_of dstp) = Some st__dst /\
+  (forall r, ~ In (src, r) (delayed_queries st__dst)).
+Hint Unfold channel_request channel_delayed_query channel_response.
+
 Inductive channel_order (src : addr) : global_state -> global_state -> Prop :=
   COReqRes :
-    forall dstp q m st st' st__dstp st__dstp' gst gst' req res xs ys xs' ys',
-      sigma gst src = Some st ->
-      cur_request st = Some (dstp, q, m) ->
+    forall dstp q m st st' st__dst st__dst' gst gst' req res xs ys xs' ys',
+      channel_request gst src dstp st st__dst q m req xs ys ->
+      channel_response gst' src dstp st' st__dst' q m res xs' ys' ->
       request_response_pair req res ->
-
-      channel gst src (addr_of dstp) = xs ++ req :: ys ->
-      no_requests (xs ++ ys) ->
-      no_responses (channel gst (addr_of dstp) src) ->
-      sigma gst (addr_of dstp) = Some st__dstp ->
-      (forall r, ~ In (src, r) (delayed_queries st__dstp)) ->
-
-      no_requests (channel gst' src (addr_of dstp)) ->
-      sigma gst' src = Some st' ->
-      cur_request st' = Some (dstp, q, m) ->
-      channel gst' (addr_of dstp) src = xs' ++ res :: ys' ->
-      no_responses (xs' ++ ys') ->
-      sigma gst' (addr_of dstp) = Some st__dstp' ->
-      (forall r, ~ In (src, r) (delayed_queries st__dstp')) ->
-
       channel_order src gst' gst
 | COReqDelayed :
     forall dstp q m gst gst' req st st' xs ys st__dst st__dst',
-      sigma gst src = Some st ->
-      cur_request st = Some (dstp, q, m) ->
-      request_payload req ->
-
-      channel gst src (addr_of dstp) = xs ++ req :: ys ->
-      no_requests (xs ++ ys) ->
-      no_responses (channel gst (addr_of dstp) src) ->
-      sigma gst (addr_of dstp) = Some st__dst ->
-      (forall r, ~ In (src, r) (delayed_queries st__dst)) ->
-
-      sigma gst' src = Some st' ->
-      cur_request st' = Some (dstp, q, m) ->
-      no_requests (channel gst' src (addr_of dstp)) ->
-      no_responses (channel gst' (addr_of dstp) src) ->
-      sigma gst' (addr_of dstp) = Some st__dst' ->
-      In (src, req) (delayed_queries st__dst') ->
-
+      channel_request gst src dstp st st__dst q m req xs ys ->
+      channel_delayed_query gst' src dstp st' st__dst' q m ->
       channel_order src gst' gst
 | CODelayedRes :
-    forall dstp q m gst gst' req res st st__dstp st' st__dstp' xs' ys',
-      sigma gst src = Some st ->
-      cur_request st = Some (dstp, q, m) ->
+    forall dstp q m gst gst' req res st st__dst st' st__dst' xs' ys',
+      channel_delayed_query gst src dstp st st__dst q m ->
+      channel_response gst' src dstp st' st__dst' q m res xs' ys' ->
       request_response_pair req res ->
-
-      sigma gst (addr_of dstp) = Some st__dstp ->
-      In (src, req) (delayed_queries st__dstp) ->
-      no_requests (channel gst src (addr_of dstp)) ->
-      no_responses (channel gst (addr_of dstp) src) ->
-
-      sigma gst' src = Some st' ->
-      cur_request st' = Some (dstp, q, m) ->
-      no_requests (channel gst' src (addr_of dstp)) ->
-      channel gst' (addr_of dstp) src = xs' ++ res :: ys' ->
-      no_responses (xs' ++ ys') ->
-      sigma gst' (addr_of dstp) = Some st__dstp' ->
-      (forall r, ~ In (src, r) (delayed_queries st__dstp')) ->
-
       channel_order src gst' gst.
+
+Inductive channel_preequiv (src : addr) : relation global_state :=
+| CERes :
+    forall gst gst' dstp st st' st__dst st__dst' q m res xs ys xs' ys',
+      channel_response gst src dstp st st__dst q m res xs ys ->
+      channel_response gst' src dstp st' st__dst' q m res xs' ys' ->
+      channel_preequiv src gst gst'
+| CEReq :
+    forall gst gst' dstp st st' st__dst st__dst' q m req xs ys xs' ys',
+      channel_request gst src dstp st st__dst q m req xs ys ->
+      channel_request gst' src dstp st' st__dst' q m req xs' ys' ->
+      channel_preequiv src gst gst'
+| CEDelayed :
+    forall dstp q m gst gst' st st__dst st' st__dst',
+      channel_delayed_query gst src dstp st st__dst q m ->
+      channel_delayed_query gst' src dstp st' st__dst' q m ->
+      channel_preequiv src gst gst'
+| CEInactive :
+    forall gst gst' st st',
+      sigma gst src = Some st ->
+      sigma gst' src = Some st' ->
+      cur_request st = None ->
+      cur_request st' = None ->
+      channel_preequiv src gst gst'
+| CENothing :
+    forall gst gst',
+      sigma gst src = None ->
+      sigma gst' src = None ->
+      channel_preequiv src gst gst'.
+
+Lemma channel_preequiv_refl :
+  forall src gst,
+    reachable_st gst ->
+    channel_preequiv src gst gst.
+Proof.
+  intros.
+  destruct (sigma gst src) eqn:?;
+    try now constructor.
+  destruct (cur_request d) as [[[dstp q] m]|] eqn:?;
+    try now econstructor; eauto.
+  assert (live_node gst (addr_of dstp)).
+  admit.
+  inv_prop live_node; expand_def.
+  assert (query_message_ok src (addr_of dstp) (cur_request d) (delayed_queries x) (channel gst src (addr_of dstp)) (channel gst (addr_of dstp) src))
+    by eauto.
+  inv_prop query_message_ok;
+    try congruence.
+  - repeat find_eapply_lem_hyp in_split; expand_def.
+    repeat find_rewrite || find_injection.
+    eapply CEReq; autounfold; intuition eauto.
+  - repeat find_eapply_lem_hyp in_split; expand_def.
+    repeat find_rewrite || find_injection.
+    eapply CERes; autounfold; intuition eauto.
+  - repeat find_eapply_lem_hyp in_split; expand_def.
+    repeat find_rewrite || find_injection.
+    eapply CEDelayed; autounfold; intuition eauto.
+    repeat find_rewrite; eauto with datatypes.
+    repeat find_rewrite; eauto with datatypes.
+Admitted.
+
+(* Make channel_preequiv reflexive on the nose *)
+Definition channel_equiv (src : addr) : relation global_state :=
+  fun gst gst' =>
+    channel_preequiv src gst gst' \/
+    ~ reachable_st gst /\
+    ~ reachable_st gst'.
+
+Instance channel_equiv_equivalence (src : addr) :
+  Equivalence (channel_equiv src).
+Proof.
+  split; intros.
+  - 
+
+Instance channel_order_proper (src : addr) :
+  Proper (channel_equiv src ==> channel_equiv src ==> iff) (channel_order src).
+Proof.
+  repeat intro || split.
+  - invcs_prop channel_equiv;
+      invcs_prop channel_order; admit.
+  - 
+      try solve [econstructor; eauto].
+    + admit.
+    + admit.
+  
 
 Lemma res_exists_for_req :
   forall req,
