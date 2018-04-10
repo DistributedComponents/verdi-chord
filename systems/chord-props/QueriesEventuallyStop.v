@@ -786,6 +786,9 @@ Defined.
 Instance cr_order_cr_equiv_proper (h : addr) :
   Proper (cr_equiv h ==> cr_equiv h ==> iff) (cr_order h).
 Proof.
+  repeat intro || split.
+  - admit.
+  - admit.
 Admitted.
 
 Definition query_order (h : addr) :=
@@ -824,6 +827,40 @@ Definition query_order_stuck_dec :
 Proof.
 Admitted.
 
+Definition query_equiv (h : addr) : relation occurrence :=
+  occ_order (equiv_both (cr_equiv h) (channel_equiv h)).
+
+Instance query_equiv_Equiv (h : addr) :
+  Equivalence (query_equiv h).
+Proof.
+Admitted.
+
+Lemma occ_order_proper :
+  forall R S ord,
+    Equivalence R ->
+    Equivalence S ->
+    Proper (R ==> S ==> iff) ord ->
+    Proper (occ_order R ==> occ_order S ==> iff) (occ_order ord).
+Proof.
+  unfold occ_order.
+  repeat intro || split;
+    repeat match goal with
+           | o : occurrence |- _ => destruct o
+           | |- _ => simpl in *
+           end;
+    find_eapply_prop @Proper;
+    eauto; auto with relations.
+Qed.
+
+Instance query_order_proper (h : addr) :
+  Proper (query_equiv h ==> query_equiv h ==> iff) (query_order h).
+Proof.
+  eapply occ_order_proper.
+  - eapply Eq_both; typeclasses eauto.
+  - eapply Eq_both; typeclasses eauto.
+  - eapply lex_diag_proper; eauto with relations typeclass_instances.
+Qed.
+
 Theorem cur_request_is_query_request :
   forall gst h dstp q m st,
     reachable_st gst ->
@@ -839,6 +876,14 @@ Proof.
   now invcs_prop cur_request_timeouts_ok'.
 Qed.
 Hint Resolve cur_request_is_query_request.
+
+Lemma request_still_on_wire_means_query_equiv :
+  forall o o' req src dst,
+    In req (channel (occ_gst o) src dst) ->
+    In req (channel (occ_gst o') src dst) ->
+    query_equiv src o o'.
+Proof.
+Admitted.
 
 Theorem req_on_wire_eventually_improved_or_stuck :
   forall ex h,
@@ -884,7 +929,21 @@ Proof.
     find_copy_eapply_lem_hyp (query_message_ok_invariant
                                 (occ_gst o') ltac:(eauto with invar)
                                                     h adst); eauto.
-    assert (sigma (occ_gst o) h = sigma (occ_gst o') h) by admit.
+    assert (sigma (occ_gst o) h = sigma (occ_gst o') h).
+    {
+      simpl in *.
+      repeat match goal with
+             | H: (?P /\_ ?Q) ?s |- _ =>
+               let HP := fresh "P" in
+               let HQ := fresh "Q" in
+               destruct H as [HP HQ];
+                 simpl in HP, HQ
+             end;
+        expand_def.
+      - admit.
+      - admit.
+    }
+    
     repeat match goal with
            | H: (?P /\_ ?Q) ?s |- _ =>
              let HP := fresh "P" in
@@ -950,16 +1009,19 @@ Proof.
                  H': cur_request ?x' = Some (?dst', _, _) |- _ =>
                  assert (dst = dst') by congruence; subst
                end; eauto; congruence.
-  - eapply E_next.
-    destruct s.
+  - destruct s.
     repeat match goal with
            | H: (_ /\_ _) _ |- _ => destruct H
            | _ => simpl in *
            end.
-    assert (eventually (now (fun t : occurrence => query_order h t o)) (Cons o s)).
-    eapply IHuntil; invar_eauto.
-    (* need to use req in both channels to show x and o are equivalent states *)
-    admit.
+    assert (eventually (now (fun t : occurrence => query_order h t o)) (Cons x (Cons o s)))
+      by (constructor; eapply IHuntil; invar_eauto).
+    assert (query_equiv h x o)
+      by eauto using request_still_on_wire_means_query_equiv.
+    eapply eventually_monotonic_simple; try eassumption.
+    intros [o'' s''] ?; simpl in *.
+    eapply query_order_proper;
+      eauto; eauto with relations.
 Admitted.
 
 Theorem eventually_done_or_always_blocked_via_relation :
