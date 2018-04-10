@@ -200,6 +200,30 @@ Theorem join2_target_joined :
 Proof.
 Admitted.
 
+Theorem query_target_joined :
+  forall gst h st dst q m,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    cur_request st = Some (dst, q, m) ->
+    exists st__d,
+      sigma gst (addr_of dst) = Some st__d /\
+      joined st__d = true.
+Proof.
+Admitted.
+
+Theorem query_target_state_joined :
+  forall gst h st dst q m,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    cur_request st = Some (dst, q, m) ->
+    forall st__d,
+      sigma gst (addr_of dst) = Some st__d ->
+      joined st__d = true.
+Proof.
+  intros.
+  eapply_lem_prop_hyp query_target_joined cur_request; eauto.
+  break_exists; break_and; congruence.
+Qed.
 
 Lemma first_elem_in :
   forall A (P Q : A -> Prop) l,

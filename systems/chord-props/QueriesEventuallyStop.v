@@ -22,6 +22,7 @@ Require Import Chord.SystemPointers.
 Require Import Chord.LabeledLemmas.
 Require Import Chord.LiveNodesNotClients.
 Require Import Chord.QueryInvariant.
+Require Import Chord.QueryTargetsJoined.
 Require Import Chord.NodesHaveState.
 Require Import Chord.ValidPointersInvariant.
 
@@ -451,9 +452,8 @@ Proof.
     try now constructor.
   destruct (cur_request d) as [[[dstp q] m]|] eqn:?;
     try now econstructor; eauto.
-  assert (live_node gst (addr_of dstp)).
-  admit.
-  inv_prop live_node; expand_def.
+  find_copy_eapply_lem_hyp query_target_joined; eauto.
+  break_exists; break_and.
   assert (query_message_ok src (addr_of dstp) (cur_request d) (delayed_queries x) (channel gst src (addr_of dstp)) (channel gst (addr_of dstp) src))
     by eauto.
   inv_prop query_message_ok;
@@ -469,7 +469,7 @@ Proof.
     eapply CEDelayed; autounfold; intuition eauto.
     repeat find_rewrite; eauto with datatypes.
     repeat find_rewrite; eauto with datatypes.
-Admitted.
+Qed.
 
 (* Make channel_preequiv reflexive on the nose *)
 Definition channel_equiv (src : addr) : relation global_state :=
@@ -478,23 +478,52 @@ Definition channel_equiv (src : addr) : relation global_state :=
     ~ reachable_st gst /\
     ~ reachable_st gst'.
 
+Lemma reachable_classic :
+  forall gst,
+    reachable_st gst \/ ~ reachable_st gst.
+Proof.
+  auto using classic.
+Qed.
+
 Instance channel_equiv_equivalence (src : addr) :
   Equivalence (channel_equiv src).
 Proof.
   split; intros.
-  - 
+  - repeat intro.
+    unfold channel_equiv.
+    destruct (reachable_classic x);
+      eauto using channel_preequiv_refl.
+  - repeat intro.
+    unfold channel_equiv.
+    inv_prop channel_equiv.
+    + inv_prop channel_preequiv; solve [left; econstructor; eauto].
+    + tauto.
+  - repeat intro.
+    unfold channel_equiv.
+    repeat invcs_prop channel_equiv.
+    + admit.
+    + admit.
+    + admit.
+    + tauto.
+Admitted.
 
 Instance channel_order_proper (src : addr) :
   Proper (channel_equiv src ==> channel_equiv src ==> iff) (channel_order src).
 Proof.
   repeat intro || split.
-  - invcs_prop channel_equiv;
-      invcs_prop channel_order; admit.
-  - 
-      try solve [econstructor; eauto].
+  - invcs_prop channel_order.
+    + invcs_prop channel_equiv;
+      try invcs_prop channel_preequiv.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
     + admit.
     + admit.
-  
+  - admit.
+Admitted.
 
 Lemma res_exists_for_req :
   forall req,
@@ -558,10 +587,11 @@ Proof.
     find_apply_lem_hyp in_split; break_exists.
     exfalso; find_eapply_prop False.
     instantiate (1:=gst').
-    econstructor 1; eauto.
-    repeat find_rewrite.
-    change [r] with ([] ++ r :: []); eauto.
-    simpl; unfold no_responses; tauto.
+    econstructor 1; autounfold; repeat split; eauto.
+    + congruence.
+    + repeat find_rewrite.
+      change [r] with ([] ++ r :: []); eauto.
+    + simpl; unfold no_responses; tauto.
   - split; auto.
     intros.
     replace st__dstp0 with st__dstp by congruence.
@@ -595,13 +625,15 @@ Proof.
     exfalso; find_eapply_prop False.
     instantiate (1:=gst').
     destruct (addr_eq_dec (addr_of dstp) src).
-    + econstructor 3; simpl; rewrite_update; eauto.
-      * repeat find_rewrite || find_injection.
-        auto with datatypes.
+    + econstructor 3; autounfold; repeat split;
+        simpl; rewrite_update; eauto.
+      * congruence.
+      * repeat find_rewrite || find_injection; auto with datatypes.
       * unfold no_responses; tauto.
-    + econstructor 3; simpl; rewrite_update; eauto.
-      * repeat find_rewrite || find_injection.
-        auto with datatypes.
+    + econstructor 3; autounfold; repeat split;
+        simpl; rewrite_update; eauto.
+      * congruence.
+      * repeat find_rewrite || find_injection; auto with datatypes.
       * unfold no_responses; tauto.
 Qed.
 
@@ -618,6 +650,7 @@ Proof.
   assert (In res0 (channel gst (addr_of dstp) src))
     by (find_rewrite; auto with datatypes).
   constructor; intros; inv_prop channel_order;
+    autounfold in *; break_and;
     assert (dstp0 = dstp) by congruence; subst;
       exfalso;
       find_eapply_prop (no_responses (channel gst (addr_of dstp) src));
@@ -636,13 +669,12 @@ Lemma co_delayed_acc :
 Proof.
   intros.
   constructor; intros; inv_prop channel_order;
+    autounfold in *; break_and;
     assert (dstp0 = dstp) by congruence; subst.
-  - exfalso.
-    replace st__dstp0 with st__dstp in * by congruence.
-    find_eapply_prop (delayed_queries st__dstp); eauto.
-  - exfalso.
-    replace st__dst with st__dstp in * by congruence.
-    find_eapply_prop (delayed_queries st__dstp); eauto.
+  - replace st__dst with st__dstp in * by congruence.
+    exfalso; eauto.
+  - replace st__dst with st__dstp in * by congruence.
+    exfalso; eauto.
   - eauto.
 Qed.
 Hint Resolve co_delayed_acc.
@@ -660,7 +692,8 @@ Lemma co_req_acc :
     Acc (channel_order src) gst.
 Proof.
   intros.
-  constructor; intros; inv_prop channel_order; eauto.
+  constructor; intros; inv_prop channel_order;
+    autounfold in *; intuition eauto.
 Qed.
 Hint Resolve co_req_acc.
 
@@ -669,7 +702,8 @@ Lemma channel_order_wf :
     well_founded (channel_order src).
 Proof.
   unfold well_founded; intros.
-  constructor; intros; inv_prop channel_order; eauto.
+  constructor; intros; inv_prop channel_order;
+    autounfold in *; intuition eauto.
 Qed.
 Hint Resolve channel_order_wf.
 
@@ -899,6 +933,7 @@ Proof.
       find_apply_lem_hyp (in_split req1);
       try find_apply_lem_hyp (in_split res0); expand_def;
         [eapply COReqDelayed | eapply COReqRes];
+        autounfold; repeat split;
         repeat match goal with
                | |- sigma _ _ = _ => solve [eauto]
                | |- request_payload _ =>
