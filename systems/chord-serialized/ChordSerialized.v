@@ -42,7 +42,7 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
                                  end.
 
   Definition serialized_client_payload (p : payload) : Prop :=
-    exists p', deserialize_top deserialize p = Some p' /\ S.client_payload p'.
+    exists p' : S.payload, @deserialize_top S.payload (@deserialize S.payload _) p = Some p' /\ S.client_payload p'.
 
   Definition client_payload := serialized_client_payload.
 
