@@ -132,8 +132,9 @@ Proof.
 Qed.
 Hint Resolve l_enabled_RecvMsg_means_in_msgs.
 
-Theorem cur_request_constant_when_res_on_wire :
+Theorem cur_request_constant_when_req_on_wire :
   forall gst l gst' h st st' dstp q m,
+    reachable_st gst ->
     labeled_step_dynamic gst l gst' ->
     sigma gst h = Some st ->
     sigma gst' h = Some st' ->
@@ -143,7 +144,62 @@ Theorem cur_request_constant_when_res_on_wire :
     ~ In (addr_of dstp) (failed_nodes gst) -> 
     cur_request st' = Some (dstp, q, m).
 Proof.
-Admitted.
+  intros; invcs_prop labeled_step_dynamic.
+  - repeat (handler_def || handler_simpl);
+      repeat find_rewrite || find_injection;
+      try solve [inv_prop timeout_constraint; tauto].
+  - destruct m0 as [src [dst p]]; simpl in *.
+    destruct (addr_eq_dec dst h); subst;
+      [|rewrite_update; congruence].
+    destruct (addr_eq_dec src (addr_of dstp));
+      [|repeat (handler_def || handler_simpl; try congruence)].
+    assert (no_responses (channel gst src h)).
+    {
+      find_copy_eapply_lem_hyp (sent_message_means_in_nodes_or_client gst src h);
+        repeat find_rewrite; auto with datatypes.
+      repeat match goal with
+             | H: _ \/ _ |- _ => destruct H
+             | H: _ /\ _ |- _ => destruct H
+             end.
+      - assert (exists st, sigma gst src = Some st) by (subst; eauto).
+        break_exists_name st__src.
+        assert (query_message_ok h src
+                                 (cur_request d) (delayed_queries st__src)
+                                 (channel gst h src) (channel gst src h))
+          by (subst; eauto).
+        subst; inv_prop query_message_ok; eauto.
+        repeat find_rewrite || find_injection.
+        exfalso; eapply_prop no_requests.
+        + eapply in_msgs_in_channel.
+          repeat find_rewrite; eauto.
+        + eauto.
+      - intro; intros.
+        find_apply_lem_hyp in_channel_in_msgs.
+        find_apply_lem_hyp sent_message_means_in_nodes_or_client; auto.
+        break_or_hyp.
+        + exfalso; eapply nodes_not_clients; eauto.
+        + break_and; invcs_prop client_payload;
+            intro; inv_prop response_payload.
+    }
+    assert (~ response_payload p).
+    {
+      intro.
+      eapply_prop no_responses; eauto.
+      eapply in_msgs_in_channel.
+      repeat find_rewrite.
+      eauto with datatypes.
+    }
+    repeat (handler_def; handler_simpl);
+      try solve [exfalso; find_eapply_prop response_payload; constructor];
+      try congruence.
+    repeat (handler_def || handler_simpl).
+  - inv_prop client_payload.
+    repeat (handler_def; handler_simpl);
+      try solve [exfalso; find_eapply_prop response_payload; constructor];
+      try congruence.
+    repeat (handler_def || handler_simpl).
+  - congruence.
+Qed.
 
 Lemma occurred_execution_enabled :
   forall l o o' ex,
@@ -263,7 +319,7 @@ Proof.
       intros.
       inv_prop lb_execution.
       repeat invcs_prop live_node; expand_def.
-      eapply cur_request_constant_when_res_on_wire; eauto.
+      eapply cur_request_constant_when_req_on_wire; eauto.
 Admitted.
 
 Inductive cr_order (h : addr) : relation global_state :=
