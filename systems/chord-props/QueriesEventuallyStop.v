@@ -230,8 +230,10 @@ Proof.
       do 2 insterU Qi'.
       forwards; eauto. concludes.
       forwards; eauto. concludes.
+      forwards; eauto. concludes.
       pose proof (query_message_ok_invariant (occ_gst o) ltac:(invar_eauto) a (addr_of dstp)) as Qi.
       do 2 insterU Qi.
+      forwards; eauto. concludes.
       forwards; eauto. concludes.
       forwards; eauto. concludes.
 
@@ -455,7 +457,7 @@ Proof.
   find_copy_eapply_lem_hyp query_target_joined; eauto.
   break_exists; break_and.
   assert (query_message_ok src (addr_of dstp) (cur_request d) (delayed_queries x) (channel gst src (addr_of dstp)) (channel gst (addr_of dstp) src))
-    by eauto.
+    by admit.
   inv_prop query_message_ok;
     try congruence.
   - repeat find_eapply_lem_hyp in_split; expand_def.
@@ -469,7 +471,7 @@ Proof.
     eapply CEDelayed; autounfold; intuition eauto.
     repeat find_rewrite; eauto with datatypes.
     repeat find_rewrite; eauto with datatypes.
-Qed.
+Admitted.
 
 (* Make channel_preequiv reflexive on the nose *)
 Definition channel_equiv (src : addr) : relation global_state :=
@@ -556,6 +558,7 @@ Proof.
   break_exists_name st__dstp.
   find_copy_eapply_lem_hyp (query_message_ok_invariant gst ltac:(auto) src (addr_of dstp));
     eauto.
+  2:admit.
   inv_prop query_message_ok.
   - congruence.
   - congruence.
@@ -635,7 +638,7 @@ Proof.
       * congruence.
       * repeat find_rewrite || find_injection; auto with datatypes.
       * unfold no_responses; tauto.
-Qed.
+Admitted.
 
 Lemma co_res_acc :
   forall src gst dstp xs ys res st q m,
@@ -992,7 +995,7 @@ Proof.
         try find_apply_lem_hyp (in_split req1);
         try find_apply_lem_hyp (in_split res0);
         expand_def;
-        [admit|eapply COReqDelayed|admit|eapply COReqRes];
+        [eapply COReqDelayed|eapply COReqRes];
         autounfold; repeat split;
           repeat match goal with
                  | |- sigma _ _ = _ => solve [eauto]

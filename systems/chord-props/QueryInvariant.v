@@ -860,6 +860,9 @@ Inductive query_message_ok
     Prop :=
 | CInone :
     forall dst outbound inbound dqs,
+      no_responses inbound ->
+      no_requests outbound ->
+      (forall m, ~ In (src, m) dqs) ->
       query_message_ok src dst None dqs outbound inbound
 | CIother :
     forall dst dstp q req dqs outbound inbound,
@@ -899,6 +902,7 @@ Theorem query_message_ok_invariant :
   forall gst,
     reachable_st gst ->
     forall src dst st__src st__dst,
+      ~ In dst (failed_nodes gst) ->
       sigma gst src = Some st__src ->
       sigma gst dst = Some st__dst ->
       query_message_ok src dst (cur_request st__src) (delayed_queries st__dst)
@@ -913,8 +917,59 @@ Proof.
         destruct (addr_eq_dec dst (addr_of (make_pointer k))).
         -- subst. apply CIreq; simpl; auto.
            ++
+    
 Admitted.
 Hint Resolve query_message_ok_invariant.
+
+(* handles failed nodes accurately *)
+Inductive query_message_ok'
+  (src : addr)
+  : addr ->
+    option (pointer * query * payload) ->
+    list (addr * payload) ->
+    list addr ->
+    list payload ->
+    list payload ->
+    Prop :=
+| QMLive :
+    forall dst outbound inbound failed dqs cr,
+      ~ In dst failed ->
+      query_message_ok src dst cr dqs outbound inbound ->
+      query_message_ok' src dst cr dqs failed outbound inbound
+| QMFailedNothing :
+    forall dst outbound inbound failed cr dqs,
+      In dst failed ->
+      no_responses inbound ->
+      no_requests outbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_message_ok' src dst cr dqs failed outbound inbound.
+
+Theorem query_message_ok'_invariant :
+  forall gst,
+    reachable_st gst ->
+    forall src dst st__src st__dst,
+      sigma gst src = Some st__src ->
+      sigma gst dst = Some st__dst ->
+      query_message_ok' src dst (cur_request st__src) (delayed_queries st__dst) (failed_nodes gst)
+                       (channel gst src dst) (channel gst dst src).
+Proof.
+  induction 1; intros; simpl in *.
+  - erewrite sigma_initial_st_start_handler at 1; eauto.
+    unfold start_handler. repeat break_match; simpl; admit.
+  - inv_prop step_dynamic; simpl in *; eauto.
+    + update_destruct; subst; rewrite_update; try find_inversion.
+      * simpl.
+        destruct (addr_eq_dec dst (addr_of (make_pointer k))).
+        -- subst. admit.
+        -- admit.
+      * admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+Admitted.
+Hint Resolve query_message_ok'_invariant.
 
 Theorem at_most_one_request_timeout_invariant :
   forall gst h,
@@ -948,4 +1003,3 @@ Theorem requests_get_correct_response :
 Proof.
 Admitted.
 Hint Resolve requests_get_correct_response.
-
