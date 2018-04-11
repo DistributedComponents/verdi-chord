@@ -151,6 +151,8 @@ Definition deserialize_msg_hard (m : msg) :=
                                 
 Definition valid_msg := fun m => exists m', deserialize_msg_hard m = Some m'.
 
+Definition valid_msg' := fun m => exists m', serialize_msg m' = m.
+
 Lemma Forall_app : forall {A} (l1 l2 : list A) P,
     Forall P l2 -> Forall P l1 -> Forall P (l1 ++ l2).
 Proof.
@@ -216,10 +218,10 @@ Proof.
   intros.
   induction msgs0.
   - constructor.
-  - constructor.
+  - rewrite List.map_cons.
+    constructor.
     + unfold valid_msg.
-      destruct a.
-      destruct p.
+      destruct a. destruct p.
       unfold deserialize_msg_hard, serialize_msg.
       rewrite serialize_deserialize_top_id.
       eauto.
@@ -272,15 +274,15 @@ Proof.
         assumption.
       * apply Forall_map_serialize.
     + unfold update_msgs_and_trace. simpl.
+      unfold client_payload, serialized_client_payload in *.
       constructor.
       * unfold valid_msg, send.
-        unfold client_payload, serialized_client_payload in *.
         break_exists. break_and.
         exists (h, (to, x)). simpl.
         match goal with
         | H : context[ChordSerializable.payload_serializer] |- _ =>
           unfold ChordSerializable.payload_serializer in H;
-            rewrite H
+          rewrite H
         end.
         reflexivity.
       * assumption.
@@ -292,9 +294,14 @@ Proof.
       assumption.
 Qed.
 
-Lemma reachable_revert_serialize : forall o,
-    reachable_st_serialized (occ_gst o) -> serialize_occurrence (revert_occurrence o) = o.
+Lemma reachable_revert_serialize : forall gst,
+    reachable_st_serialized gst -> serialize_global_state (revert_global_state gst) = gst.
 Proof.
+  intros.
+  apply reachable_st_valid in H.
+  unfold serialize_global_state, revert_global_state. simpl.
+  unfold valid_msg in *.
+  admit.
 Admitted.
 
 Lemma reachable_serialized_exteq : forall ex,
@@ -306,6 +313,8 @@ Proof.
   intros.
   do 2 (destruct ex;
         rewrite map_Cons).
+  unfold serialize_occurrence, revert_occurrence.
+  destruct o. simpl.
   rewrite reachable_revert_serialize.
   - constructor.
     match goal with
@@ -314,11 +323,13 @@ Proof.
     apply reachable_serialized_exteq. 
     + simpl.
       apply (reachableStepS (occ_gst o)).
-      * assumption.
+      * simpl in *. subst_max.  simpl.
+        assumption.
       * match goal with
         | H : labeled_step_dynamic _ ?l _ |- _ =>
           apply labeled_step_is_unlabeled_step in H
         end.
+        simpl in *. subst_max.
         assumption.
     + assumption.
   - assumption.
@@ -566,4 +577,4 @@ Proof.
       assumption.
     + apply revert_strong_local_fairness. assumption.
     + apply revert_circular_wait. assumption.
-Admitted.
+Qed.
