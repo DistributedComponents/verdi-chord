@@ -422,6 +422,7 @@ Qed.
 Hint Resolve cr_order_wf.
 
 Definition channel_delayed_query gst src dstp st st__dst q m :=
+  ~ In (addr_of dstp) (failed_nodes gst) /\
   sigma gst src = Some st /\
   cur_request st = Some (dstp, q, m) /\
   query_request q m /\
@@ -431,6 +432,7 @@ Definition channel_delayed_query gst src dstp st st__dst q m :=
   no_responses (channel gst (addr_of dstp) src).
 
 Definition channel_request gst src dstp st st__dst q m req xs ys :=
+  ~ In (addr_of dstp) (failed_nodes gst) /\
   sigma gst src = Some st /\
   cur_request st = Some (dstp, q, m) /\
   query_request q req /\
@@ -444,13 +446,18 @@ Definition channel_response gst src dstp st st__dst q m res xs ys :=
   sigma gst src = Some st /\
   cur_request st = Some (dstp, q, m) /\
   no_requests (channel gst src (addr_of dstp)) /\
-  sigma gst src = Some st /\
-  cur_request st = Some (dstp, q, m) /\
+  query_response q res /\
   channel gst (addr_of dstp) src = xs ++ res :: ys /\
   no_responses (xs ++ ys) /\
   sigma gst (addr_of dstp) = Some st__dst /\
   (forall r, ~ In (src, r) (delayed_queries st__dst)).
-Hint Unfold channel_request channel_delayed_query channel_response.
+
+Definition channel_dead gst src dstp st q m :=
+  In (addr_of dstp) (failed_nodes gst) /\
+  sigma gst src = Some st /\
+  cur_request st = Some (dstp, q, m) /\
+  no_responses (channel gst (addr_of dstp) src).
+Hint Unfold channel_request channel_delayed_query channel_response channel_dead.
 
 Inductive channel_order (src : addr) : global_state -> global_state -> Prop :=
   COReqRes :
@@ -468,6 +475,18 @@ Inductive channel_order (src : addr) : global_state -> global_state -> Prop :=
     forall dstp q m gst gst' req res st st__dst st' st__dst' xs' ys',
       channel_delayed_query gst src dstp st st__dst q m ->
       channel_response gst' src dstp st' st__dst' q m res xs' ys' ->
+      request_response_pair req res ->
+      channel_order src gst' gst
+| CODelayedDead :
+    forall dstp q m gst gst' req res st st__dst st',
+      channel_delayed_query gst src dstp st st__dst q m ->
+      channel_dead gst' src dstp st' q m ->
+      request_response_pair req res ->
+      channel_order src gst' gst
+| COReqDead :
+    forall dstp q m gst gst' req res st st__dst st' xs ys,
+      channel_request gst src dstp st st__dst q m req xs ys ->
+      channel_dead gst' src dstp st' q m ->
       request_response_pair req res ->
       channel_order src gst' gst.
 
@@ -487,6 +506,11 @@ Inductive channel_preequiv (src : addr) : relation global_state :=
       channel_delayed_query gst src dstp st st__dst q m ->
       channel_delayed_query gst' src dstp st' st__dst' q m ->
       channel_preequiv src gst gst'
+| CEDead :
+    forall gst gst' dstp st st' q m,
+      channel_dead gst src dstp st q m ->
+      channel_dead gst' src dstp st' q m ->
+      channel_preequiv src gst gst'
 | CEInactive :
     forall gst gst' st st',
       sigma gst src = Some st ->
@@ -500,6 +524,19 @@ Inductive channel_preequiv (src : addr) : relation global_state :=
       sigma gst' src = None ->
       channel_preequiv src gst gst'.
 
+Lemma response_to_query_request_query_response :
+  forall q req res,
+    request_response_pair req res ->
+    query_request q req ->
+    query_response q res.
+Proof.
+  intros.
+  inv_prop request_response_pair;
+    inv_prop query_request;
+    constructor.
+Qed.
+Hint Resolve response_to_query_request_query_response.
+
 Lemma channel_preequiv_refl :
   forall src gst,
     reachable_st gst ->
@@ -512,22 +549,28 @@ Proof.
     try now econstructor; eauto.
   find_copy_eapply_lem_hyp query_target_joined; eauto.
   break_exists; break_and.
-  assert (query_message_ok src (addr_of dstp) (cur_request d) (delayed_queries x) (channel gst src (addr_of dstp)) (channel gst (addr_of dstp) src))
-    by admit.
-  inv_prop query_message_ok;
-    try congruence.
-  - repeat find_eapply_lem_hyp in_split; expand_def.
-    repeat find_rewrite || find_injection.
-    eapply CEReq; autounfold; intuition eauto.
+  assert (query_message_ok' src (addr_of dstp) (cur_request d) (delayed_queries x) (failed_nodes gst)
+                             (channel gst src (addr_of dstp)) (channel gst (addr_of dstp) src))
+    by eauto.
+  inv_prop query_message_ok'.
+  - inv_prop query_message_ok;
+      try congruence.
+    + repeat find_eapply_lem_hyp in_split; expand_def.
+      repeat find_rewrite || find_injection.
+      eapply CEReq; autounfold; intuition eauto.
+    + repeat find_eapply_lem_hyp in_split; expand_def.
+      repeat find_rewrite || find_injection.
+      eapply CERes; autounfold; intuition eauto.
+    + repeat find_eapply_lem_hyp in_split; expand_def.
+      repeat find_rewrite || find_injection.
+      eapply CEDelayed; autounfold; intuition eauto.
+      repeat find_rewrite; eauto with datatypes.
+      repeat find_rewrite; eauto with datatypes.
   - repeat find_eapply_lem_hyp in_split; expand_def.
     repeat find_rewrite || find_injection.
     eapply CERes; autounfold; intuition eauto.
-  - repeat find_eapply_lem_hyp in_split; expand_def.
-    repeat find_rewrite || find_injection.
-    eapply CEDelayed; autounfold; intuition eauto.
-    repeat find_rewrite; eauto with datatypes.
-    repeat find_rewrite; eauto with datatypes.
-Admitted.
+  - eapply CEDead; eauto.
+Qed.
 
 (* Make channel_preequiv reflexive on the nose *)
 Definition channel_equiv (src : addr) : relation global_state :=
@@ -554,7 +597,7 @@ Proof.
   - repeat intro.
     unfold channel_equiv.
     inv_prop channel_equiv.
-    + inv_prop channel_preequiv; solve [left; econstructor; eauto].
+    + invcs_prop channel_preequiv; solve [left; econstructor; eauto].
     + tauto.
   - repeat intro.
     unfold channel_equiv.
@@ -570,14 +613,44 @@ Instance channel_order_proper (src : addr) :
 Proof.
   repeat intro || split.
   - invcs_prop channel_order.
-    + invcs_prop channel_equiv;
-      try invcs_prop channel_preequiv.
-      * admit.
-      * admit.
-      * admit.
-      * admit.
-      * admit.
-      * admit.
+    + repeat invcs_prop channel_equiv;
+      repeat invcs_prop channel_preequiv;
+      repeat match goal with
+             | H: In ?a (failed_nodes ?gst),
+               H': ~ In ?a (failed_nodes ?gst) |- _ =>
+               tauto
+             | Hnores: no_responses ?l |- _ =>
+               exfalso; eapply Hnores; now eauto with datatypes
+             | Hnoreq: no_requests ?l |- _ =>
+               exfalso; eapply Hnoreq; now eauto with datatypes
+             | H: context[channel_response ?gst],
+               H': context[channel_request ?gst] |- _ =>
+               invcs H; invcs H'; break_and; repeat find_rewrite || find_injection
+             | H: context[channel_response ?gst],
+               H': context[channel_delayed_query ?gst] |- _ =>
+               invcs H; invcs H'; break_and; repeat find_rewrite || find_injection
+             | H: context[channel_response ?gst],
+               H': context[channel_dead ?gst] |- _ =>
+               invcs H; invcs H'; break_and; repeat find_rewrite || find_injection
+             | H: context[channel_request ?gst],
+               H': context[channel_delayed_query ?gst] |- _ =>
+               invcs H; invcs H'; break_and; repeat find_rewrite || find_injection
+             | H: context[channel_request ?gst],
+               H': context[channel_dead ?gst] |- _ =>
+               invcs H; invcs H'; break_and; repeat find_rewrite || find_injection
+             | H: _ = None |- _ =>
+               repeat (invcs_prop channel_response ||
+                       invcs_prop channel_request ||
+                       invcs_prop channel_delayed_query);
+                 break_and;
+                 congruence
+             end.
+      admit.
+      admit.
+      admit.
+      admit.
+    + admit.
+    + admit.
     + admit.
     + admit.
   - admit.
@@ -605,20 +678,22 @@ Lemma res_best_channel_config :
     no_requests (channel gst src (addr_of dstp)) /\
     (forall st__dstp req,
         sigma gst (addr_of dstp) = Some st__dstp ->
-        ~ In (src, req) (delayed_queries st__dstp)).
+        ~ In (src, req) (delayed_queries st__dstp)) \/
+    no_responses (channel gst (addr_of dstp) src) /\
+    In (addr_of dstp) (failed_nodes gst).
 Proof.
   unfold stuck; intros.
   find_copy_eapply_lem_hyp cur_request_valid; eauto.
   inv_prop valid_ptr.
   find_apply_lem_hyp nodes_have_state; eauto.
   break_exists_name st__dstp.
-  find_copy_eapply_lem_hyp (query_message_ok_invariant gst ltac:(auto) src (addr_of dstp));
+  find_copy_eapply_lem_hyp (query_message_ok'_invariant gst ltac:(auto) src (addr_of dstp));
     eauto.
-  2:admit.
-  inv_prop query_message_ok.
+  inv_prop query_message_ok'; try inv_prop query_message_ok.
   - congruence.
   - congruence.
-  - simpl in *.
+  - left.
+    simpl in *.
     assert (request_payload req) by eauto.
     find_copy_apply_lem_hyp (res_exists_for_req req).
     break_exists_name r.
@@ -646,16 +721,18 @@ Proof.
     find_apply_lem_hyp in_split; break_exists.
     exfalso; find_eapply_prop False.
     instantiate (1:=gst').
+    repeat find_rewrite || find_injection.
     econstructor 1; autounfold; repeat split; eauto.
-    + congruence.
     + repeat find_rewrite.
       change [r] with ([] ++ r :: []); eauto.
-    + simpl; unfold no_responses; tauto.
-  - split; auto.
+    + unfold no_responses; tauto.
+  - left.
+    split; auto.
     intros.
     replace st__dstp0 with st__dstp by congruence.
     eauto.
-  - assert (request_payload req) by eauto.
+  - left.
+    assert (request_payload req) by eauto.
     find_copy_apply_lem_hyp (res_exists_for_req req).
     break_exists_name r.
     set (st' := clear_delayed_queries st).
@@ -688,13 +765,20 @@ Proof.
         simpl; rewrite_update; eauto.
       * congruence.
       * repeat find_rewrite || find_injection; auto with datatypes.
+      * repeat find_rewrite || find_injection; eauto.
       * unfold no_responses; tauto.
     + econstructor 3; autounfold; repeat split;
         simpl; rewrite_update; eauto.
       * congruence.
       * repeat find_rewrite || find_injection; auto with datatypes.
+      * repeat find_rewrite || find_injection; eauto.
       * unfold no_responses; tauto.
-Admitted.
+  - left.
+    intuition.
+    repeat find_rewrite || find_injection.
+    eauto.
+  - tauto.
+Qed.
 
 Lemma co_res_acc :
   forall src gst dstp xs ys res st q m,
@@ -717,6 +801,22 @@ Proof.
 Qed.
 Hint Resolve co_res_acc.
 
+Lemma co_dead_acc :
+  forall src gst dstp st q m,
+    sigma gst src = Some st ->
+    cur_request st = Some (dstp, q, m) ->
+    In (addr_of dstp) (failed_nodes gst) ->
+    no_responses (channel gst (addr_of dstp) src) ->
+    Acc (channel_order src) gst.
+Proof.
+  intros.
+  constructor; intros; inv_prop channel_order;
+    autounfold in *; break_and;
+      assert (dstp0 = dstp) by congruence; subst;
+        tauto.
+Qed.
+Hint Resolve co_dead_acc.
+
 Lemma co_delayed_acc :
   forall src gst dstp req st q m st__dstp,
     sigma gst src = Some st ->
@@ -734,6 +834,8 @@ Proof.
     exfalso; eauto.
   - replace st__dst with st__dstp in * by congruence.
     exfalso; eauto.
+  - eauto.
+  - eauto.
   - eauto.
 Qed.
 Hint Resolve co_delayed_acc.
@@ -1054,6 +1156,12 @@ Proof.
         [eapply COReqDelayed|eapply COReqRes];
         autounfold; repeat split;
           repeat match goal with
+                 | H: live_node ?gst ?h |- In ?h (failed_nodes ?gst) -> False =>
+                   eapply live_node_not_in_failed_nodes; eauto
+                 | H: query_request ?q ?req,
+                   H': request_response_pair ?req ?res |-
+                   query_response ?q' ?res =>
+                   eapply response_to_query_request_query_response; [eauto | congruence]
                  | |- sigma _ _ = _ => solve [eauto]
                  | |- request_payload _ =>
                    solve [eapply query_request_request; eauto]
@@ -1068,7 +1176,8 @@ Proof.
                  | H: cur_request ?x = Some (?dst, _, _),
                       H': cur_request ?x' = Some (?dst', _, _) |- _ =>
                    assert (dst = dst') by congruence; subst
-                 end; eauto; congruence.
+                 end; eauto; try congruence.
+    eapply response_to_query_request_query_response; [eauto | congruence].
   - destruct s.
     repeat match goal with
            | H: (_ /\_ _) _ |- _ => destruct H

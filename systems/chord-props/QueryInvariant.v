@@ -936,12 +936,20 @@ Inductive query_message_ok'
       ~ In dst failed ->
       query_message_ok src dst cr dqs outbound inbound ->
       query_message_ok' src dst cr dqs failed outbound inbound
+| QMFailedRes :
+    forall outbound inbound res dqs dstp q failed req,
+      In (addr_of dstp) failed ->
+      request_response_pair req res ->
+      In res inbound ->
+      (forall xs ys, inbound = xs ++ res :: ys -> no_responses (xs ++ ys)) ->
+      no_requests outbound ->
+      (forall m, ~ In (src, m) dqs) ->
+      query_request q req ->
+      query_message_ok' src (addr_of dstp) (Some (dstp, q, req)) dqs failed outbound inbound
 | QMFailedNothing :
     forall dst outbound inbound failed cr dqs,
       In dst failed ->
       no_responses inbound ->
-      no_requests outbound ->
-      (forall m, ~ In (src, m) dqs) ->
       query_message_ok' src dst cr dqs failed outbound inbound.
 
 Theorem query_message_ok'_invariant :
