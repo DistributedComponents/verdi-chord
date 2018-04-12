@@ -395,11 +395,6 @@ Proof.
       reflexivity.
 Qed.
 
-Lemma step_dynamic_step_dynamic_serialized : forall gst gst',
-    ChordSemantics.step_dynamic gst gst' ->
-    step_dynamic (serialize_global_state gst) (serialize_global_state gst').
-Admitted.
-
 Lemma step_dynamic_serialized_step_dynamic : forall gst gst',
     step_dynamic gst gst' ->
     ChordSemantics.step_dynamic (revert_global_state gst) (revert_global_state gst').
