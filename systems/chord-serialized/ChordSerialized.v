@@ -41,43 +41,41 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
                                  | None => S.default_payload
                                  end.
 
-  Definition serialized_client_payload (p : payload) : Prop :=
-    exists p' : S.payload, @deserialize_top S.payload (@deserialize S.payload _) p = Some p' /\ S.client_payload p'.
-
-  Definition client_payload := serialized_client_payload.
+  Definition client_payload (p : payload) : Prop :=
+    exists p' : S.payload,
+      deserialize_top deserialize p = Some p' /\
+      serialize_top (serialize p') = p /\
+      S.client_payload p'.
 
   Lemma client_payload_dec : forall (p : payload), {client_payload p} + {~ client_payload p}.
   Proof.
     intros.
-    destruct (deserialize_top deserialize p) eqn:H.
-    - destruct (S.client_payload_dec p0) eqn:G.
-      + unfold client_payload.
-        left.
-        unfold serialized_client_payload.
-        exists p0.
-        auto.
+    unfold client_payload.
+    destruct (deserialize_top deserialize p) eqn:G.
+    - destruct (payload_eq_dec (serialize_top (serialize p0)) p) eqn:H;
+        destruct (S.client_payload_dec p0) eqn:J.
+      + left.
+        eexists. eauto.
       + right.
-        unfold not.
-        intros.
-        unfold client_payload in *.
-        unfold client_payload in *.
-        match goal with
-        | H : context[serialized_client_payload] |- _ => destruct H
-        end.
+        unfold not. intros.
         break_exists.
-        break_and.
-        find_rewrite.
-        find_inversion.
+        intuition.
+        congruence.
+      + right.
+        unfold not. intros.
+        break_exists.
+        intuition.
+        congruence.
+      + right.
+        unfold not. intros.
+        break_exists.
+        intuition.
         congruence.
     - right.
       unfold not.
       intros.
-      unfold client_payload in *.
-      match goal with
-      | H : context[serialized_client_payload] |- _ => destruct H
-      end.
       break_exists.
-      break_and.
+      intuition.
       congruence.
   Qed.
 

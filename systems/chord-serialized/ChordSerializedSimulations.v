@@ -12,6 +12,7 @@ Require Import Chord.QueriesEventuallyStop.
 Require Import Chord.ChordStabilization.
 Require Import Chord.SystemReachable.
 
+(* useful definitions and lemmas *)
 Definition serialize_msg (m : ChordSemantics.msg) : ChordSerializedSemantics.msg :=
   match m with
   | (src, (dst, m)) => (src, (dst, serialize_top (serialize m)))
@@ -46,7 +47,7 @@ Definition serialize_event (e : ChordSemantics.event) :=
   | ChordSemantics.e_fail h => e_fail h
   end.
 
-Definition serialize_revert_event : forall e,
+Lemma serialize_revert_event : forall e,
     revert_event (serialize_event e) = e.
 Proof.
   intros.
@@ -58,7 +59,7 @@ Proof.
     reflexivity.
 Qed.
 
-Definition serialize_revert_events : forall l,
+Lemma serialize_revert_events : forall l,
     map revert_event (map serialize_event l) = l.
 Proof.
   induction l.
@@ -76,7 +77,7 @@ Definition serialize_global_state (gst : ChordSemantics.global_state) :=
      msgs := map serialize_msg (ChordSemantics.msgs gst);
      trace := map serialize_event (ChordSemantics.trace gst) |}.
 
-Definition serialize_revert_global_state : forall gst,
+Lemma serialize_revert_global_state : forall gst,
     revert_global_state (serialize_global_state gst) = gst.
 Proof.
   intros.
@@ -163,7 +164,8 @@ Proof.
     reflexivity.
 Qed.
 
-Definition labeled_step_serialized_labeled_step: forall gst l gst',
+(* simulation theorems *)
+Lemma labeled_step_serialized_labeled_step: forall gst l gst',
     ChordSemantics.labeled_step_dynamic gst l gst' ->
     ChordSerializedSemantics.labeled_step_dynamic (serialize_global_state gst)
                                                   l
@@ -234,11 +236,12 @@ Proof.
   - apply (LInput (serialize_global_state gst) (serialize_global_state gst')
                   h (serialize_top (serialize i)) to (serialize_msg m) l);
       try assumption.
-    + unfold client_payload, serialized_client_payload.
+    + unfold client_payload.
+      unfold ChordSemantics.send in *.
       exists i.
-      split.
-      * apply serialize_deserialize_top_id.
-      * assumption.
+      intuition.
+      rewrite serialize_deserialize_top_id.
+      reflexivity.
     + match goal with
       | H : m = _ |- _ => rewrite H
       end.
@@ -290,7 +293,7 @@ Proof.
       reflexivity.
 Qed.
 
-Definition serialized_labeled_step_labeled_step: forall gst l gst',
+Lemma serialized_labeled_step_labeled_step: forall gst l gst',
     ChordSerializedSemantics.labeled_step_dynamic gst l gst' ->
     ChordSemantics.labeled_step_dynamic (revert_global_state gst)
                                         l
@@ -354,7 +357,7 @@ Proof.
              (revert_global_state gst) (revert_global_state gst')
              h (revert_payload i) to (revert_msg m) l);
       try assumption.
-    + unfold client_payload, serialized_client_payload in *.
+    + unfold client_payload in *.
       break_exists. break_and.
       unfold revert_payload.
       match goal with
@@ -479,7 +482,7 @@ Proof.
              (revert_global_state gst) (revert_global_state gst')
              h (revert_payload i) to (revert_msg m));
       try assumption.
-    + unfold client_payload, serialized_client_payload in *.
+    + unfold client_payload in *.
       break_exists. break_and.
       unfold revert_payload.
       match goal with

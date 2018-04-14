@@ -17,10 +17,8 @@ Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.QueriesEventuallyStop.
 
-Require Import FunctionalExtensionality.
+(* useful definitions and lemmas *)
 
-
-(* liveness *)
 Definition serialize_occurrence (occ : ChordSemantics.occurrence) :=
   {| occ_gst := serialize_global_state (ChordSemantics.occ_gst occ);
      occ_label := (ChordSemantics.occ_label occ) |}.
@@ -71,107 +69,7 @@ Proof.
     assumption.
 Qed.
 
-
-Definition deserialize_msg_hard (m : msg) :=
-  match m with
-  | (src, (dst, m)) => match @deserialize_top ChordSerializable.payload (@deserialize ChordSerializable.payload _) m with
-                      | None => None
-                      | Some m' => Some (src, (dst, m'))
-                      end
-  end.
-
-Definition valid_msg' := fun m => exists m', deserialize_msg_hard m = Some m'.
-
-Definition valid_msg := fun m => exists m', serialize_msg m' = m.
-
-Lemma Forall_app : forall {A} (l1 l2 : list A) P,
-    Forall P l2 -> Forall P l1 -> Forall P (l1 ++ l2).
-Proof.
-  induction l1.
-  - intros.
-    assumption.
-  - intros.
-    simpl.
-    constructor;
-      inversion H0.
-    + assumption.
-    + apply IHl1.
-      * assumption.
-      * assumption.
-Qed.
-
-Lemma Forall_app_inv_l : forall {A} (l1 l2 : list A) P,
-    Forall P (l1 ++ l2) -> Forall P l1.
-Proof.
-  induction l1.
-  - constructor.
-  - simpl. intros.
-    constructor;
-      inversion H.
-    + assumption.
-    + apply (IHl1 l2).
-      assumption.
-Qed.
-
-Lemma Forall_app_inv_r : forall {A} (l1 l2 : list A) P,
-    Forall P (l1 ++ l2) -> Forall P l2.
-Proof.
-  induction l1.
-  - intros.
-    assumption.
-  - simpl. intros.
-    apply IHl1.
-    inversion H.
-    assumption.
-Qed.
-
-Lemma Forall_remove_mid : forall {A : Type} (l1 : list A) a l2 P,
-    Forall P (l1 ++ a :: l2) -> Forall P (l1 ++ l2).
-Proof.
-  induction l1.
-  - simpl. intros.
-    inversion H.
-    assumption.
-  - simpl.
-    intros.
-    inversion H.
-    constructor.
-    + assumption.
-    + match goal with
-      | H : Forall P (l1 ++ ?x :: l2) |- _ => apply (IHl1 x)
-      end.
-      assumption.
-Qed.
-
-Lemma Forall_map_serialize : forall msgs,
-    Forall valid_msg (List.map serialize_msg msgs).
-Proof.
-  intros.
-  induction msgs0.
-  - constructor.
-  - rewrite List.map_cons.
-    constructor.
-    + unfold valid_msg.
-      eauto.
-    + assumption.
-Qed.
-
-
-Lemma revert_serialize_compose_exteq : forall ex,
-    exteq (map serialize_occurrence (map revert_occurrence ex))
-          (map revert_serialize_occurrence ex).
-Proof.
-  cofix.
-  intros.
-  destruct ex.
-  do 3 rewrite map_Cons.
-  constructor.
-  intuition.
-Qed.
-
-(* Sanity check: redefine ideal for our system *)
-
-(* helper functions *)
+(* rewrite definitions for stabilization property *)
 Definition live_node gst h :=
   In h (nodes gst) /\
   ~ In h (failed_nodes gst) /\
@@ -212,52 +110,12 @@ Definition ideal (gst : global_state) : Prop :=
     length (succ_list st) = Chord.SUCC_LIST_LEN /\
     pred_correct gst h (pred st).
 
+
+(* more helper lemmas *)
 Lemma revert_live_node : forall gst h, live_node (serialize_global_state gst) (addr_of h) ->
                                   ConstrainedChord.live_node gst (addr_of h).
 Proof.
   intuition.
-Qed.
-
-Lemma revert_serialize_live_node : forall o h,
-    live_node (occ_gst o) (addr_of h) ->
-    live_node (occ_gst (revert_serialize_occurrence o)) (addr_of h).
-Proof.
-  intuition.
-Qed.
-
-Lemma serialize_correct_succs : forall gst h st,
-    ChordCorrectPhaseThree.correct_succs gst h st ->
-    correct_succs (serialize_global_state gst) h st.
-Proof.
-  unfold correct_succs, ChordCorrectPhaseThree.correct_succs.
-  intros.
-  apply (H s xs ys);
-    assumption.
-Qed.
-
-Lemma serialize_pred_correct : forall gst h st,
-    ChordCorrectPhaseTwo.pred_correct gst h (pred st) ->
-    pred_correct (serialize_global_state gst) h (pred st).
-Proof.
-  unfold ChordCorrectPhaseTwo.pred_correct, pred_correct.
-  unfold ChordCorrectPhaseTwo.better_pred, better_pred.
-  intros.
-  break_exists. intuition.
-  exists x.
-  split.
-  - assumption.
-  - intros.
-    specialize H1 with p'. apply H1 in H.
-    intuition; try assumption.
-    apply revert_live_node. assumption.
-    assumption.
-Qed.
-
-Lemma revert_serialize_pred_correct : forall o h st,
-    sigma (occ_gst (revert_serialize_occurrence o)) (addr_of h) = Some st ->
-    sigma (occ_gst o) (addr_of h) = Some st.
-Proof.
-  -intuition.
 Qed.
 
 Lemma preserves_ideal_gst : forall gst,
@@ -283,40 +141,17 @@ Proof.
   apply preserves_ideal_gst.
 Qed.
 
-Lemma serialize_ideal_seq : forall ex,
-    (now (fun o => ChordStabilization.ideal (ChordSemantics.occ_gst o))) ex ->
-    (now (fun o => ideal (occ_gst o))) (map serialize_occurrence ex).
-Proof.
-  unfold now. intros.
-  destruct ex. rewrite map_Cons.
-  apply serialize_ideal. assumption.
-Qed.
-
-Lemma serialize_continuously_now : forall (ex : infseq ChordSemantics.occurrence)
-                                     (P : ChordSemantics.occurrence -> Prop)
-                                     (P' : occurrence -> Prop),
-    (forall occ, P occ -> P' (serialize_occurrence occ)) ->
-    (forall s, now P s -> now P' (map serialize_occurrence s)) ->
-    continuously (now P) ex ->
-    continuously (now P') (map serialize_occurrence ex).
-Proof.
-  intros.
-  apply continuously_map with (P := (now P));
-    assumption.
-Qed.
-
 Theorem serialize_continuously_ideal : forall ex : infseq ChordSemantics.occurrence,
     continuously (now (fun o => ChordStabilization.ideal (ChordSemantics.occ_gst o))) ex ->
     continuously (now (fun o => ideal (occ_gst o)))
                  (map serialize_occurrence ex).
 Proof.
   intros.
-  match goal with
-  | H : continuously (now ?P) _ |- _ => apply (serialize_continuously_now _ P)
-  end.
-  - apply serialize_ideal.
-  - apply serialize_ideal_seq.
-  - assumption.
+  eapply continuously_map; eauto.
+  intros.
+  destruct s. simpl in *.
+  apply serialize_ideal.
+  assumption.
 Qed.
 
 Lemma ideal_extensional : extensional (continuously (now (fun o => ideal (occ_gst o)))).
@@ -358,60 +193,6 @@ Proof.
     eauto.
   - assumption.
 Qed.
-
-Definition now_ideal := now (fun o => ideal (occ_gst o)).
-
-Lemma a : forall ex,
-    continuously now_ideal
-                 (map revert_serialize_occurrence ex) ->
-    continuously now_ideal ex.
-Proof.
-  intros.
-  assert (extensional now_ideal).
-  { unfold extensional, now_ideal, now.
-    destruct s1, s2. simpl.
-    intros.
-    match goal with
-    | H : exteq _ _ |- _ => inversion H
-    end.
-    subst_max. assumption.
-  }
-  apply (@continuously_map_conv _ _ (revert_serialize_occurrence) _ now_ideal).
-  - assumption.
-  - assumption.
-  - destruct s.
-    unfold now_ideal, now.
-    rewrite map_Cons.
-    unfold ideal. intros.
-    assert (correct_succs (occ_gst (revert_serialize_occurrence o)) h st /\
-            length (succ_list st) = SUCC_LIST_LEN /\
-            pred_correct (occ_gst (revert_serialize_occurrence o)) h (pred st)).
-    {
-      apply H1;
-        intuition.
-    }
-    intuition.
-  - assumption.
-Qed.
-
-Lemma revert_serialize_update_for_start : forall gst h k,
-serialize_global_state (revert_global_state gst) = gst  ->
-    List.map serialize_msg
-            (List.map revert_msg
-                      (ChordSerializedSystem.msgs (update_for_start gst h (start_handler h (k :: nil)))))
-    = ChordSerializedSystem.msgs (update_for_start gst h (start_handler h (k :: nil))).
-  intros.
-  destruct gst.
-  unfold serialize_global_state, revert_global_state in *. simpl in *.
-  unfold revert_payload.
-  rewrite serialize_deserialize_top_id.
-  find_inversion.
-  unfold send.
-  do 2 rewrite H1.
-  reflexivity.
-Qed.
-
-
 
 Lemma revert_serialize_msgs : forall gst,
     serialize_global_state (revert_global_state gst) = gst ->
@@ -457,7 +238,6 @@ Proof.
     reflexivity.
 Qed.
 
-
 Lemma revert_serialize_start_handler_msgs : forall h k d l0 l,
     start_handler h (k :: nil) = (d, l0, l) ->
     List.map serialize_msg (List.map revert_msg (List.map (send h) l0))
@@ -498,6 +278,109 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma revert_serialize_recv_handler : forall a0 a1 d p st ms newts clearedts,
+      recv_handler a0 a1 d p = (st, ms, newts, clearedts) ->
+      List.map serialize_msg (List.map revert_msg (List.map (send a1) ms)) = List.map (send a1) ms.
+Proof.
+  unfold recv_handler, serialize_res.
+  intros.
+  repeat break_let.
+  find_inversion.
+  rewrite map_send_serialize.
+  rewrite serialize_revert_msgs.
+  reflexivity.
+Qed.
+
+Lemma revert_serialize_msgs_l_aux : forall xs m ys,
+    List.map serialize_msg (List.map revert_msg (xs ++ m :: ys)) = xs ++ m :: ys ->
+    List.map serialize_msg (List.map revert_msg xs) = xs.
+Proof.
+  induction xs.
+  - reflexivity.
+  - intros. simpl.
+    rewrite (IHxs m ys); inversion H.
+    + repeat rewrite H1.
+      reflexivity.
+    + simpl in H.
+      simpl in *.
+      repeat rewrite H2.
+      reflexivity.
+Qed.
+
+Lemma revert_serialize_msgs_mid_aux : forall xs m ys,
+    List.map serialize_msg (List.map revert_msg (xs ++ m :: ys)) = xs ++ m :: ys ->
+    serialize_msg (revert_msg m) = m.
+Proof.
+  induction xs.
+  - simpl. intros.
+    inversion H.
+    repeat rewrite H1.
+    reflexivity.
+  - intros. simpl.
+    rewrite (IHxs m ys); inversion H.
+    + repeat rewrite H1.
+      reflexivity.
+    + simpl in H.
+      simpl in *.
+      repeat rewrite H2.
+      reflexivity.
+Qed.
+
+Lemma revert_serialize_msgs_r_aux : forall xs m ys,
+    List.map serialize_msg (List.map revert_msg (xs ++ m :: ys)) = xs ++ m :: ys ->
+    List.map serialize_msg (List.map revert_msg ys) = ys.
+Proof.
+  induction xs.
+  - simpl. intros.
+    inversion H.
+    repeat rewrite H2.
+    reflexivity.
+  - intros. simpl.
+    rewrite (IHxs m ys); inversion H.
+    + repeat rewrite H1.
+      reflexivity.
+    + simpl in H.
+      simpl in *.
+      repeat rewrite H2.
+      reflexivity.
+Qed.
+
+Lemma revert_serialize_msgs_l : forall gst xs m ys,
+  serialize_global_state (revert_global_state gst) = gst ->
+      msgs gst = xs ++ m :: ys ->
+      List.map serialize_msg (List.map revert_msg xs) = xs.
+Proof.
+  unfold serialize_global_state, revert_global_state. simpl in *.
+  intros.
+  destruct gst. simpl in *.
+  find_inversion.
+  erewrite revert_serialize_msgs_l_aux; eauto.
+Qed.
+
+Lemma revert_serialize_msgs_mid : forall gst xs m ys,
+  serialize_global_state (revert_global_state gst) = gst ->
+      msgs gst = xs ++ m :: ys ->
+      serialize_msg (revert_msg m) = m.
+Proof.
+  unfold serialize_global_state, revert_global_state. simpl in *.
+  intros.
+  destruct gst. simpl in *.
+  find_inversion.
+  erewrite revert_serialize_msgs_mid_aux; eauto.
+Qed.
+
+Lemma revert_serialize_msgs_r : forall gst xs m ys,
+  serialize_global_state (revert_global_state gst) = gst ->
+      msgs gst = xs ++ m :: ys ->
+      List.map serialize_msg (List.map revert_msg ys) = ys.
+Proof.
+  unfold serialize_global_state, revert_global_state. simpl in *.
+  intros.
+  destruct gst. simpl in *.
+  find_inversion.
+  erewrite revert_serialize_msgs_r_aux; eauto.
+Qed.
+
 Lemma reachable_revert_serialize_global_state : forall gst,
     reachable_st_serialized gst ->
     serialize_global_state (revert_global_state gst) = gst.
@@ -517,10 +400,6 @@ Proof.
     | H : step_dynamic _ _ |- _ => inversion H
     end;
       subst_max.
-(*
-      destruct gst';
-      simpl.
-     *)
     + unfold update_for_start. repeat break_let.
       unfold serialize_global_state, revert_global_state. simpl.
       repeat rewrite map_app.
@@ -536,25 +415,79 @@ Proof.
       rewrite revert_serialize_msgs; try assumption.
       rewrite revert_serialize_trace; try assumption.
       reflexivity.
-    + unfold apply_handler_result.
+    + unfold apply_handler_result, serialize_global_state, revert_global_state.
       simpl.
-    + admit.
-    + admit.
-    + admit.
-Admitted.
+      repeat rewrite map_app.
+      erewrite revert_serialize_timeout_handler;
+        eauto.
+      rewrite revert_serialize_msgs; try assumption.
+      rewrite revert_serialize_trace; try assumption.
+      reflexivity.
+    + unfold apply_handler_result, serialize_global_state, revert_global_state.
+      simpl.
+      repeat rewrite map_app.
+      rewrite  (revert_serialize_msgs_l gst xs m ys) at 1; try assumption.
+      rewrite (revert_serialize_msgs_r gst xs m ys) at 1; try assumption.
+      erewrite revert_serialize_trace; eauto.
+      simpl.
+      erewrite revert_serialize_msgs_mid; eauto.
+      destruct m. destruct p. simpl in *.
+      erewrite revert_serialize_recv_handler; eauto.
+    + unfold update_msgs_and_trace, serialize_global_state, revert_global_state.
+      simpl.
+      repeat rewrite map_app.
+      erewrite revert_serialize_msgs; eauto.
+      erewrite revert_serialize_trace; eauto.
+      simpl.
+      unfold client_payload in *. break_exists. intuition.
+      unfold revert_payload.
+      match goal with
+      | H : deserialize_top deserialize _ = _ |- _ => rewrite H
+      end.
+      match goal with
+      | H : serialize_top _ = _ |- _ => rewrite <- H
+      end.
+      reflexivity.
+    + unfold update_msgs_and_trace, serialize_global_state, revert_global_state.
+      simpl.
+      repeat rewrite map_app. simpl.
+      erewrite revert_serialize_msgs_l; eauto.
+      erewrite revert_serialize_msgs_mid; eauto.
+      erewrite revert_serialize_msgs_r; eauto.
+      erewrite revert_serialize_trace; eauto.
+Qed.
 
-Lemma reachable_enabled : forall o l x,
-    reachable_st_serialized (occ_gst o) ->
-    ChordSemantics.labeled_step_dynamic (ChordSemantics.occ_gst (revert_occurrence o)) l x ->
-    exists gst' : global_state, labeled_step_dynamic (occ_gst o) l gst'.
+Lemma revert_serialize_exteq : forall ex,
+    reachable_st_serialized (occ_gst (infseq.hd ex)) ->
+    lb_execution ex ->
+    exteq (map serialize_occurrence (map revert_occurrence ex)) ex.
 Proof.
+  cofix.
   intros.
-  apply labeled_step_serialized_labeled_step in H0.
+  destruct ex. do 2 rewrite map_Cons.
+  unfold serialize_occurrence, revert_occurrence. simpl.
+  erewrite reachable_revert_serialize_global_state; eauto.
   destruct o.
-  unfold revert_occurrence in H0. simpl in *.
-  rewrite reachable_revert_serialize_global_state in H0.
-  - eexists. eauto.
-  - assumption.
+  constructor.
+  apply revert_serialize_exteq.
+  - destruct ex. simpl in *.
+    match goal with
+    | H : lb_execution _ |- _ => inversion H
+    end.
+    eapply reachableStepS; eauto.
+    eapply labeled_step_is_unlabeled_step; eauto.
+  - eapply lb_execution_invar; eauto.
+Qed.
+
+Lemma reachable_enabled' : forall l o,
+    ChordSemantics.l_enabled l o -> l_enabled l (serialize_occurrence o).
+Proof.
+  unfold ChordSemantics.l_enabled, ChordSemantics.enabled, l_enabled, enabled.
+  intros.
+  break_exists.
+  exists (serialize_global_state x).
+  apply labeled_step_serialized_labeled_step.
+  assumption.
 Qed.
 
 Lemma lb_execution_enabled : forall ex l,
@@ -564,23 +497,24 @@ Lemma lb_execution_enabled : forall ex l,
     eventually (now (l_enabled l)) ex.
 Proof.
   intros.
-  remember (map revert_occurrence ex) as ex'.
-  revert Heqex'.
-  match goal with
-  | H : eventually _ _ |- _ => induction H
-  end.
-  - intros.
-    constructor.
-    destruct ex.
-    subst_max. simpl in *.
-    unfold ChordSemantics.l_enabled, ChordSemantics.enabled, l_enabled, enabled in *.
-    break_exists.
-    eapply reachable_enabled;
-      eauto.
-  - intros.
-    apply IHeventually.
-    admit.
-Admitted.
+  assert (extensional (eventually (now (l_enabled l)))).
+  { apply extensional_eventually.
+    unfold extensional.
+    intros.
+    destruct s1, s2.
+    inversion H2.
+    subst_max.
+    unfold now in *. repeat break_match.
+    assumption. }
+  unfold extensional in *.
+  apply (H2 (map serialize_occurrence (map revert_occurrence ex))).
+  - eapply revert_serialize_exteq; eauto.
+  - eapply eventually_map; eauto.
+    intros.
+    destruct s. simpl in *.
+    apply reachable_enabled'.
+    assumption.
+Qed.
 
 Lemma revert_always_eventually_enabled : forall ex l,
     reachable_st_serialized (occ_gst (infseq.hd ex)) ->
@@ -640,27 +574,24 @@ Proof.
     + assumption.
 Qed.
 
-
-
+(* top-level correctness property *)
 Theorem chord_serialized_stabilization :
   forall ex : infseq.infseq occurrence,
     reachable_st_serialized (occ_gst (infseq.hd ex)) ->
     lb_execution ex ->
     strong_local_fairness ex ->
     always (~_ (now circular_wait)) ex ->
-    continuously now_ideal (map revert_serialize_occurrence ex).
+    continuously (now (fun o => ideal (occ_gst o))) ex.
 Proof.
   intros.
-  assert (extensional (continuously (now (fun o => ideal (occ_gst o))))) by
-      (exact ideal_extensional).
   match goal with
-  | H : extensional _ |- _ => unfold extensional in H
+  | _ : _ |- continuously ?P _ =>
+    assert (G : extensional (continuously P)) by (exact ideal_extensional)
   end.
-
-  apply H3 with (s1 := map serialize_occurrence (map revert_occurrence ex)).
-  - apply revert_serialize_compose_exteq.
-  - unfold now_ideal.
-    apply serialize_continuously_ideal.
+  unfold extensional in G.
+  apply (G (map serialize_occurrence (map revert_occurrence ex))).
+  - eapply revert_serialize_exteq; eauto.
+  - apply serialize_continuously_ideal.
     apply ChordStabilization.chord_stabilization.
     + apply revert_reachable.
       assumption.
