@@ -4,6 +4,7 @@ Require Import List.
 Require Import StructTact.StructTactics.
 Require Import StructTact.FilterMap.
 Require Import InfSeqExt.infseq.
+Require Import InfSeqExt.classical.
 Require Import Chord.InfSeqTactics.
 Require Import Chord.Chord.
 Require Import Chord.LabeledLemmas.
@@ -325,6 +326,120 @@ Section Measure.
     intros.
     now rewrite and_tl_comm.
   Qed.
+
+  Definition measure_x x occ := |occ_gst occ| = x.
+
+  Set Bullet Behavior "Strict Subproofs".
+
+  Require Import Classical.
+  Lemma always_or_eventually :
+    forall T P (s : infseq T),
+      always P s \/ eventually (not_tl P) s.
+  Proof.
+    intros.
+    destruct (classic (always P s)); eauto using not_always_eventually_not.
+  Qed.
+
+  Lemma eventually_exists :
+    forall T A (P : A -> T -> Prop) (s : infseq T),
+      eventually (now (fun o => exists x, P x o)) s ->
+      exists x,
+        eventually (now (fun o => P x o)) s.
+  Proof.
+    intros.
+    induction H.
+    - destruct s. simpl in *.
+      break_exists_exists.
+      apply E0. simpl. auto.
+    - break_exists_exists.
+      apply E_next. auto.
+  Qed.
+
+  Lemma eventually_exists' :
+    forall T A (P : A -> infseq T -> Prop) (s : infseq T),
+      eventually (fun s => exists x, P x s) s ->
+      exists x,
+        eventually (P x) s.
+  Proof.
+    intros.
+    induction H.
+    - break_exists_exists.
+      eauto using E0.
+    - break_exists_exists. eauto using E_next.
+  Qed.
+
+  Lemma eventually_pure_and :
+    forall T (Q : Prop) (P : T -> Prop) (s : infseq T),
+      eventually (now (fun o => Q /\ P o)) s ->
+      Q /\ eventually (now P) s.
+  Proof.
+    induction 1.
+    - destruct s; simpl in *; intuition.
+      eauto using E0.
+    - intuition. eauto using E_next.
+  Qed.
+  
+  Lemma measure_nonincreasing_eventually_stable' :
+    forall n ex,
+      (now (measure_x n) ex) ->
+      always (consecutive measure_nonincreasing) ex ->
+      exists x,
+        continuously (now (measure_x x)) ex.
+  Proof.
+    induction n using nat_strong_ind.
+    intros.
+    destruct (always_or_eventually _ (now (measure_x n)) ex).
+    - eauto using always_continuously.
+    - find_copy_eapply_lem_hyp nonincreasing_preserves_bound; eauto.
+      assert (|occ_gst (hd ex)| = n).
+      {
+        unfold now in *. break_match; repeat find_rewrite; simpl; auto.
+      }
+      repeat find_rewrite.
+      assert (exists m, m < n /\ eventually (now (measure_x m)) ex).
+      {
+        unfold measure_bounded in *.
+        find_eapply_lem_hyp cumul_eventually_always; eauto.
+        assert (eventually (now (fun o => exists m, m < n /\ measure_x m o)) ex).
+        {
+          eapply eventually_monotonic_simple; [|eauto].
+          intros.
+          unfold now; break_match. subst.
+          exists (|occ_gst o|). unfold measure_x. intuition.
+          unfold and_tl,not_tl in *. intuition. simpl in *.
+          unfold measure_x in *.
+          omega.
+        }
+        find_apply_lem_hyp eventually_exists.
+        break_exists_exists.
+        eauto using eventually_pure_and.
+      }
+      break_exists. intuition.
+      match goal with
+      | H : eventually (now _) _ |- _ =>
+        eapply eventually_monotonic with
+            (J := (always (consecutive measure_nonincreasing)))
+            (Q := (fun ex => exists x, continuously (now (measure_x x)) ex))
+          in H
+      end; eauto using always_invar.
+      find_apply_lem_hyp eventually_exists'.
+      break_exists_exists. 
+      unfold continuously in *.
+      eauto using eventually_idempotent.
+  Qed.
+      
+  Lemma measure_nonincreasing_eventually_stable :
+    forall ex,
+      always (consecutive measure_nonincreasing) ex ->
+      exists x,
+        continuously (now (measure_x x)) ex.
+  Proof.
+    intros.
+    assert (now (measure_x (|occ_gst (hd ex)|)) ex).
+    { unfold measure_x. destruct ex; simpl; auto. }
+    eauto using measure_nonincreasing_eventually_stable'.
+  Qed.
+      
 End Measure.
 
 Section LocalMeasure.

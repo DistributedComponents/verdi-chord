@@ -5,6 +5,7 @@ Require Import Chord.InfSeqTactics.
 Require Import Chord.Chord.
 
 Require Import Chord.LabeledLemmas.
+Require Import Chord.ChannelLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.LabeledMeasures.
