@@ -400,6 +400,8 @@ Module ChordSerializable <: SerializableSystem.
   Definition default_payload := Busy.
 End ChordSerializable.
 
+Export ChordSerializable.
+
 Module ChordSerializedSystem <: DynamicSystem := SerializedSystem(ChordSerializable).
 Export ChordSerializedSystem.
 

@@ -126,10 +126,8 @@ Proof.
   unfold ideal.
   intros.
   specialize H with h st.
-  match goal with
-  | H : live_node _ _ |- _ => apply revert_live_node in H
-  end.
-  apply (H H0 H1 H2).
+  find_apply_lem_hyp revert_live_node.
+  apply H; assumption.
 Qed.
 
 Lemma serialize_ideal : forall occ,
@@ -160,7 +158,7 @@ Proof.
   unfold extensional, now.
   intros.
   do 2 break_match.
-  apply exteq_inversion in H.
+  find_apply_lem_hyp exteq_inversion.
   break_and. subst_max.
   assumption.
 Qed.
@@ -221,7 +219,6 @@ Proof.
 Qed.
 
 Lemma serialize_send_revert_serialize : forall l h,
-
   List.map serialize_event
     (List.map revert_event
        (List.map e_send (List.map serialize_msg (List.map (ChordSemantics.send h) l)))) =
@@ -233,7 +230,6 @@ Proof.
     simpl. repeat break_let.
     unfold revert_msg, revert_payload.
     rewrite serialize_deserialize_top_id.
-    unfold serialize_msg at 1.
     rewrite IHl.
     reflexivity.
 Qed.
@@ -299,11 +295,10 @@ Proof.
   - reflexivity.
   - intros. simpl.
     rewrite (IHxs m ys); inversion H.
-    + repeat rewrite H1.
+    + repeat find_rewrite.
       reflexivity.
-    + simpl in H.
-      simpl in *.
-      repeat rewrite H2.
+    + simpl in *.
+      repeat find_rewrite.
       reflexivity.
 Qed.
 
@@ -314,15 +309,14 @@ Proof.
   induction xs.
   - simpl. intros.
     inversion H.
-    repeat rewrite H1.
+    repeat find_rewrite.
     reflexivity.
   - intros. simpl.
     rewrite (IHxs m ys); inversion H.
-    + repeat rewrite H1.
+    + repeat find_rewrite.
       reflexivity.
-    + simpl in H.
-      simpl in *.
-      repeat rewrite H2.
+    + simpl in *.
+      repeat find_rewrite.
       reflexivity.
 Qed.
 
@@ -333,15 +327,14 @@ Proof.
   induction xs.
   - simpl. intros.
     inversion H.
-    repeat rewrite H2.
+    repeat find_rewrite.
     reflexivity.
   - intros. simpl.
     rewrite (IHxs m ys); inversion H.
-    + repeat rewrite H1.
+    + repeat find_rewrite.
       reflexivity.
-    + simpl in H.
-      simpl in *.
-      repeat rewrite H2.
+    + simpl in *.
+      repeat find_rewrite.
       reflexivity.
 Qed.
 
@@ -391,14 +384,10 @@ Proof.
     intuition.
     unfold serialize_global_state, revert_global_state.
     destruct gst. simpl in *.
-    do 2 match goal with
-         | H : List.map _ _ = nil |- _ => apply map_eq_nil in H;
-                                          rewrite H
-         end.
+    do 2 find_apply_lem_hyp map_eq_nil.
+    subst_max.
     reflexivity.
-  - match goal with
-    | H : step_dynamic _ _ |- _ => inversion H
-    end;
+  - inv_prop step_dynamic;
       subst_max.
     + unfold update_for_start. repeat break_let.
       unfold serialize_global_state, revert_global_state. simpl.
@@ -426,7 +415,7 @@ Proof.
     + unfold apply_handler_result, serialize_global_state, revert_global_state.
       simpl.
       repeat rewrite map_app.
-      rewrite  (revert_serialize_msgs_l gst xs m ys) at 1; try assumption.
+      rewrite (revert_serialize_msgs_l gst xs m ys) at 1; try assumption.
       rewrite (revert_serialize_msgs_r gst xs m ys) at 1; try assumption.
       erewrite revert_serialize_trace; eauto.
       simpl.
@@ -471,9 +460,7 @@ Proof.
   constructor.
   apply revert_serialize_exteq.
   - destruct ex. simpl in *.
-    match goal with
-    | H : lb_execution _ |- _ => inversion H
-    end.
+    inv_prop lb_execution.
     eapply reachableStepS; eauto.
     eapply labeled_step_is_unlabeled_step; eauto.
   - eapply lb_execution_invar; eauto.
@@ -524,25 +511,18 @@ Lemma revert_always_eventually_enabled : forall ex l,
 Proof.
   cofix.
   constructor.
-  - match goal with
-    | H : always _ _ |- _ => inversion H
-    end.
+  - inv_prop always.
     apply lb_execution_enabled; assumption.
   - destruct ex. rewrite map_Cons in *.
     apply revert_always_eventually_enabled.
     + simpl.
       destruct ex.
       simpl in *.
-      match goal with
-      | H : lb_execution _ |- _ => inversion H
-      end. simpl in *.
-      apply (reachableStepS (occ_gst o)).
-      * assumption.
-      * apply (labeled_step_is_unlabeled_step _ (occ_label o)); try assumption.
+      inv_prop lb_execution. simpl in *.
+      eapply reachableStepS; eauto.
+      * eapply labeled_step_is_unlabeled_step. eauto.
       * eapply lb_execution_invar. eauto.
-    + match goal with
-    | H : always _ _ |- _ => inversion H
-      end.
+    + inv_prop always.
       assumption.
 Qed.
 
@@ -564,14 +544,12 @@ Proof.
       assumption.
   - unfold ChordSemantics.inf_occurred, inf_often.
     unfold inf_occurred, inf_often in *.
-    match goal with
-    | H : always ?P _ |- _ => apply (@always_map _ _ _ P)
-    end.
-    + apply eventually_map.
-      unfold occurred, ChordSemantics.occurred.
-      destruct s. rewrite map_Cons.
-      tauto.
-    + assumption.
+    eapply always_map; eauto.
+    intros.
+    eapply eventually_map; eauto.
+    unfold occurred, ChordSemantics.occurred.
+    destruct s0. rewrite map_Cons.
+    tauto.
 Qed.
 
 (* top-level correctness property *)
