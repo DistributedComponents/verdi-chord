@@ -48,10 +48,9 @@ Proof.
   induction H.
   - constructor.
     assumption.
-  - apply (reachableStep (revert_global_state gst)).
-    + assumption.
-    + apply step_dynamic_serialized_step_dynamic.
-      assumption.
+  - eapply reachableStep; eauto.
+    apply step_dynamic_serialized_step_dynamic.
+    assumption.
 Qed.
 
 Lemma revert_lb_execution : forall ex,
@@ -121,12 +120,8 @@ Qed.
 Lemma preserves_ideal_gst : forall gst,
     ChordStabilization.ideal gst -> ideal (serialize_global_state gst).
 Proof.
-  unfold ChordStabilization.ideal.
+  unfold ChordStabilization.ideal, ideal.
   intros.
-  unfold ideal.
-  intros.
-  specialize H with h st.
-  find_apply_lem_hyp revert_live_node.
   apply H; assumption.
 Qed.
 
@@ -139,7 +134,7 @@ Proof.
   apply preserves_ideal_gst.
 Qed.
 
-Theorem serialize_continuously_ideal : forall ex : infseq ChordSemantics.occurrence,
+Lemma serialize_continuously_ideal : forall ex : infseq ChordSemantics.occurrence,
     continuously (now (fun o => ChordStabilization.ideal (ChordSemantics.occ_gst o))) ex ->
     continuously (now (fun o => ideal (occ_gst o)))
                  (map serialize_occurrence ex).
@@ -180,16 +175,15 @@ Lemma revert_circular_wait : forall ex,
     always (~_ now circular_wait) ex ->
     always (~_ now QueriesEventuallyStop.circular_wait) (map revert_occurrence ex).
 Proof.
-  apply (@always_map _ _ _ (~_ now circular_wait)).
+  apply always_map.
   intros.
-  apply (@not_tl_map _ _ _ (now circular_wait)).
-  - unfold now. destruct s0.
-    rewrite map_Cons.
-    unfold QueriesEventuallyStop.circular_wait, circular_wait.
-    unfold QueriesEventuallyStop.blocked_by, blocked_by, has_cycle.
-    intros. break_exists.
-    eauto.
-  - assumption.
+  eapply not_tl_map; eauto.
+  unfold now. destruct s0.
+  rewrite map_Cons.
+  unfold QueriesEventuallyStop.circular_wait, circular_wait,
+  QueriesEventuallyStop.blocked_by, blocked_by, has_cycle.
+  intros. break_exists.
+  eauto.
 Qed.
 
 Lemma revert_serialize_msgs : forall gst,
@@ -198,9 +192,8 @@ Lemma revert_serialize_msgs : forall gst,
 Proof.
   unfold serialize_global_state, revert_global_state. simpl.
   intros.
-  destruct gst. simpl in *.
-  symmetry in H.
-  find_inversion.
+  find_reverse_rewrite.
+  simpl.
   rewrite serialize_revert_msgs.
   reflexivity.
 Qed.
@@ -431,11 +424,9 @@ Proof.
       unfold client_payload in *. break_exists. intuition.
       unfold revert_payload.
       match goal with
-      | H : deserialize_top deserialize _ = _ |- _ => rewrite H
-      end.
-      match goal with
       | H : serialize_top _ = _ |- _ => rewrite <- H
       end.
+      rewrite serialize_deserialize_top_id.
       reflexivity.
     + unfold update_msgs_and_trace, serialize_global_state, revert_global_state.
       simpl.
@@ -484,17 +475,17 @@ Lemma lb_execution_enabled : forall ex l,
     eventually (now (l_enabled l)) ex.
 Proof.
   intros.
-  assert (extensional (eventually (now (l_enabled l)))).
+  assert (G : extensional (eventually (now (l_enabled l)))).
   { apply extensional_eventually.
     unfold extensional.
     intros.
     destruct s1, s2.
-    inversion H2.
-    subst_max.
+    inv_prop exteq.
+     subst_max.
     unfold now in *. repeat break_match.
     assumption. }
   unfold extensional in *.
-  apply (H2 (map serialize_occurrence (map revert_occurrence ex))).
+  apply (G (map serialize_occurrence (map revert_occurrence ex))).
   - eapply revert_serialize_exteq; eauto.
   - eapply eventually_map; eauto.
     intros.

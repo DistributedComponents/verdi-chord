@@ -226,11 +226,9 @@ Proof.
       | H : ChordSemantics.client_payload ?p |- _ => exists p
       end.
       intuition.
-      rewrite serialize_deserialize_top_id.
-      reflexivity.
-    + subst_max.
       unfold label_input.
       rewrite serialize_revert_payload.
+      subst_max.
       reflexivity.
     + subst_max.
       unfold serialize_global_state, update_msgs_and_trace.
@@ -369,8 +367,7 @@ Proof.
     simpl.
     rewrite map_app.
     simpl.
-    unfold ChordSemantics.send, revert_payload.
-    find_rewrite.
+    rewrite serialize_revert_payload.
     reflexivity.
   - eapply ChordSemantics.Deliver_client; eauto.
     + simpl.
