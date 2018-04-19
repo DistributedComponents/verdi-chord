@@ -18,11 +18,9 @@ depends: [
   "coq-mathcomp-ssreflect" {>= "1.6" & < "1.7~"}
   "verdi" {= "dev"}
   "StructTact" {= "dev"}
-  "StructTact" {= "dev"}
   "InfSeqExt" {= "dev"}
   "verdi-runtime" {= "dev"}
   "ocamlbuild" {build}
-#  "coq-dpdgraph" {>= "0.6.2"}
 ]
 
 authors: [
