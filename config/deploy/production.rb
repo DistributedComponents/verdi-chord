@@ -45,7 +45,9 @@ server 'discoberry10.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.2
 # http://capistranorb.com/documentation/getting-started/configuration/
 # Feel free to add new variables to customise your setup.
 
-set :node_port, 7000
+set :chord_node_port, 7000
+set :chord_serialized_node_port, 8000
+
 set :make_jobs, 2
 
 # Custom SSH Options
