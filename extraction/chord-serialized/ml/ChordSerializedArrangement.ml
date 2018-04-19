@@ -2,7 +2,7 @@ open ExtractedChordSerialized
 open Printf
 open Str
 
-let chord_default_port = 7000
+let chord_serialized_default_port = 8000
 
 let show_id i =
   Digest.to_hex (Util.string_of_char_list (id_to_ascii i))
@@ -102,10 +102,8 @@ module ChordSerializedArrangement (C : ChordSerializedConfig) = struct
   type msg = ChordSerializedSystem.payload
   type timeout = ExtractedChordSerialized.ChordSystem._timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
-  let port = chord_default_port
-  let addr_of_name n =
-    let (a :: p :: _) = split (regexp ":") (Util.string_of_char_list n) in
-    a
+  let port = chord_serialized_default_port
+  let addr_of_name = Util.string_of_char_list
   let name_of_addr s =
     Util.char_list_of_string s
   let start_handler n ks =
