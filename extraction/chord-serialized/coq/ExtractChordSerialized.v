@@ -28,6 +28,8 @@ Extract Inlined Constant Chord.N => "16".
 
 Extract Constant VectorEq.eqb => "(fun _ _ _ -> (=))".
 
+Extract Constant ChordSerializable.client_addr_dec => "Obj.magic".
+
 Definition handleNet : addr -> addr -> data -> payload -> res :=
   ChordSerializedSystem.recv_handler.
 
