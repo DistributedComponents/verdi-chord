@@ -104,7 +104,9 @@ module ChordArrangement (C : ChordConfig) = struct
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let port = chord_default_port
   let addr_of_name n =
-    let (a :: p :: _) = split (regexp ":") (Util.string_of_char_list n) in
+    let s = Util.string_of_char_list n in
+    Printf.printf "addr_of_name: %s" s;
+    let (a :: p :: _) = split (regexp ":") s in
     a
   let name_of_addr s =
     Util.char_list_of_string s
