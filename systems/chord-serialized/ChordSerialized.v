@@ -43,7 +43,6 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
 
   Definition client_payload (p : payload) : Prop :=
     exists p' : S.payload,
-      deserialize_top deserialize p = Some p' /\
       serialize_top (serialize p') = p /\
       S.client_payload p'.
 
@@ -51,31 +50,49 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   Proof.
     intros.
     unfold client_payload.
+
     destruct (deserialize_top deserialize p) eqn:G.
     - destruct (payload_eq_dec (serialize_top (serialize p0)) p) eqn:H;
         destruct (S.client_payload_dec p0) eqn:J.
       + left.
         eexists. eauto.
       + right.
-        unfold not. intros.
+        unfold not.
+        intros.
         break_exists.
         intuition.
-        congruence.
+        apply n.
+        rewrite <- H1 in G.
+        rewrite serialize_deserialize_top_id in G.
+        find_inversion.
+        assumption.
       + right.
-        unfold not. intros.
+        unfold not.
+        intros.
         break_exists.
         intuition.
-        congruence.
+        apply n.
+        rewrite <- H1 in G.
+        rewrite serialize_deserialize_top_id in G.
+        find_inversion.
+        reflexivity.
       + right.
-        unfold not. intros.
+        unfold not.
+        intros.
         break_exists.
         intuition.
-        congruence.
+        apply n.
+        rewrite <- H1 in G.
+        rewrite serialize_deserialize_top_id in G.
+        find_inversion.
+        reflexivity.
     - right.
       unfold not.
       intros.
       break_exists.
       intuition.
+      subst_max.
+      find_rewrite_lem serialize_deserialize_top_id.
       congruence.
   Qed.
 
