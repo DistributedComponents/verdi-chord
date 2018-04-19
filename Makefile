@@ -1,7 +1,7 @@
 include Makefile.detect-coq-version
 
 ifeq (,$(filter $(COQVERSION),8.6 8.7 trunk))
-$(error "Verdi Chord is only compatible with Coq version 8.6.1")
+$(error "Verdi Chord is only compatible with Coq version 8.7")
 endif
 
 COQPROJECT_EXISTS=$(wildcard _CoqProject)
@@ -51,6 +51,7 @@ clean:
 	  $(MAKE) -f Makefile.coq cleanall; fi
 	rm -f Makefile.coq
 	$(MAKE) -C extraction/chord clean
+	$(MAKE) -C extraction/chord-serialized clean
 	$(MAKE) -C proofalytics clean
 
 chord:
@@ -70,3 +71,6 @@ distclean: clean
 	rm -f _CoqProject
 
 .PHONY: default quick clean lint distclean chord $(MLFILES) $(SERIALIZEDMLFILES) proofalytics proofalytics-aux
+
+.NOTPARALLEL: $(MLFILES)
+.NOTPARALLEL: $(SERIALIZEDMLFILES)
