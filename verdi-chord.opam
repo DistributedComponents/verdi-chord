@@ -18,7 +18,6 @@ depends: [
   "verdi" {= "dev"}
   "StructTact" {= "dev"}
   "InfSeqExt" {= "dev"}
-#  "coq-dpdgraph" {>= "0.6.2"}
 ]
 
 authors: [
