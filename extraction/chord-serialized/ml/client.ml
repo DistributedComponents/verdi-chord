@@ -11,7 +11,7 @@ end
 module Client : ClientSig = struct
 
   let connect_and_send me addr msg =
-    let remote = Util.mk_addr_inet (addr, ChordSerializedArrangement.chord_default_port) in
+    let remote = Util.mk_addr_inet (addr, ChordSerializedArrangement.chord_serialized_default_port) in
     let self = Util.mk_addr_inet (me, 0) in
     let conn = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
     Unix.setsockopt conn Unix.SO_REUSEADDR true;
