@@ -5,7 +5,7 @@ open Str
 let chord_default_port = 7000
 
 let show_id i =
-  Digest.to_hex (Util.bytes_of_char_list (id_to_ascii i))
+  Digest.to_hex (Util.string_of_char_list (id_to_ascii i))
 
 let show_pointer p =
   show_id p.ChordIDSpace.ptrId
@@ -15,7 +15,7 @@ let show_pointer_list ps =
   "[" ^ String.concat ", " strs ^ "]"
 
 let show_addr a =
-  Util.bytes_of_char_list a
+  Util.string_of_char_list a
 
 let caps_bool b =
   if b then "True" else "False"
@@ -104,7 +104,7 @@ module ChordSerializedArrangement (C : ChordSerializedConfig) = struct
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let port = chord_default_port
   let addr_of_name n =
-    let (a :: p :: _) = split (regexp ":") (Util.bytes_of_char_list n) in
+    let (a :: p :: _) = split (regexp ":") (Util.string_of_char_list n) in
     a
   let name_of_addr s =
     Util.char_list_of_string s
