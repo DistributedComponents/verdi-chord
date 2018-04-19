@@ -17,6 +17,7 @@ $(warning checkpath reported an error)
 endif
 
 MLFILES = extraction/chord/coq/ExtractedChord.ml extraction/chord/coq/ExtractedChord.mli
+SERIALIZEDMLFILES = extraction/chord-serialized/coq/ExtractedChordSerialized.ml extraction/chord-serialized/coq/ExtractedChordSerialized.mli
 
 default: Makefile.coq
 	$(MAKE) -f Makefile.coq
@@ -39,7 +40,11 @@ Makefile.coq: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq -install none \
 	  -extra '$(MLFILES)' \
 	    'extraction/chord/coq/ExtractChord.v systems/chord/Chord.vo' \
-	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v'
+	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord/coq/ExtractChord.v' \
+	  -extra '$(SERIALIZEDMLFILES)' \
+	    'extraction/chord-serialized/coq/ExtractChordSerialized.v systems/chord-serialized/ChordSerialized.vo' \
+	    '$$(COQC) $$(COQDEBUG) $$(COQFLAGS) extraction/chord-serialized/coq/ExtractChordSerialized.v'
+
 
 clean:
 	if [ -f Makefile.coq ]; then \
@@ -51,7 +56,10 @@ clean:
 chord:
 	+$(MAKE) -C extraction/chord chord.native client.native
 
-$(MLFILES): Makefile.coq
+chord-serialized:
+	+$(MAKE) -C extraction/chord-serialized chordserialized.native client.native
+
+$(MLFILES) $(SERIALIZEDMLFILES): Makefile.coq
 	$(MAKE) -f Makefile.coq $@
 
 lint:
@@ -61,4 +69,4 @@ lint:
 distclean: clean
 	rm -f _CoqProject
 
-.PHONY: default quick clean lint distclean chord $(MLFILES) proofalytics proofalytics-aux
+.PHONY: default quick clean lint distclean chord $(MLFILES) $(SERIALIZEDMLFILES) proofalytics proofalytics-aux

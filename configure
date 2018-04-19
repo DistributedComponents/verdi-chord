@@ -3,15 +3,20 @@
 ## Configures and calls coqproject.sh (https://github.com/dwoos/coqproject)
 
 ## Configuration options for coqproject.sh
-DEPS=(StructTact InfSeqExt Verdi)
-DIRS=(core systems/chord systems/chord-util systems/chord-props lib extraction/chord/coq)
+DEPS=(StructTact InfSeqExt Verdi Cheerios)
+DIRS=(core deps systems/chord systems/chord-serialized systems/chord-util systems/chord-props lib extraction/chord/coq extraction/chord-serialized/coq)
 NAMESPACE_core="Verdi"
 NAMESPACE_systems="Chord"
+NAMESPACE_deps="Chord"
 NAMESPACE_lib="Chord"
 NAMESPACE_systems_chord_util="Chord"
 NAMESPACE_systems_chord_props="Chord"
 NAMESPACE_systems_chord="Chord"
 NAMESPACE_extraction_chord_coq="Chord"
-CANARIES=("mathcomp.ssreflect.ssreflect" "Verdi requires mathcomp to be installed" "StructTact.StructTactics" "Build StructTact before building Verdi" "InfSeqExt.infseq" "Build InfSeqExt before building Verdi")
+NAMESPACE_systems_chord_serialized="Chord"
+NAMESPACE_extraction_chord_serialized_coq="Chord"
+
+CANARIES=("mathcomp.ssreflect.ssreflect" "Verdi requires mathcomp to be installed" "StructTact.StructTactics" "Build StructTact before building Verdi" "InfSeqExt.infseq" "Build InfSeqExt before building Verdi" "Cheerios.Cheerios" "Build Cheerios before building Verdi Chord")
 Verdi_DIRS=(core lib systems extraction)
+Cheerios_DIRS=(core extraction)
 source script/coqproject.sh
