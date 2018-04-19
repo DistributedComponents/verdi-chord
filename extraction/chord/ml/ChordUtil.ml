@@ -20,7 +20,7 @@ let send_all sock buf =
     if sent < l
     then send_chunk sock buf (i + sent) (l - sent)
     else () in
-  send_chunk sock buf 0 (String.length buf)
+  send_chunk sock buf 0 (Bytes.length buf)
 
 let octets_to_ip o1 o2 o3 o4 =
   let so1 = Int32.shift_left o1 24 in
