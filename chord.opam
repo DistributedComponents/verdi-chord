@@ -1,5 +1,4 @@
 opam-version: "1.2"
-name: "chord"
 version: "dev"
 maintainer: "palmskog@gmail.com"
 
@@ -20,6 +19,7 @@ depends: [
   "StructTact" {= "dev"}
   "InfSeqExt" {= "dev"}
   "verdi-runtime" {= "dev"}
+  "cheerios" {= "dev"}
   "ocamlbuild" {build}
 ]
 
@@ -29,4 +29,5 @@ authors: [
   "Karl Palmskog <>"
   "Zachary Tatlock <>"
   "James Wilcox <>"
+  "Justin Adsuara <>"
 ]

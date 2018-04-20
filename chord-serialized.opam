@@ -9,21 +9,25 @@ license: "BSD"
 
 build: [
   [ "./configure" ]
-  [ make "-j%{jobs}%" ]
+  [ make "-j%{jobs}%" "chord-serialized" ]
 ]
+available: [ ocaml-version >= "4.02.3" ]
 depends: [
   "coq" {((>= "8.6.1" & < "8.7~") | (>= "8.7" & < "8.8~"))}
   "coq-mathcomp-ssreflect" {>= "1.6" & < "1.7~"}
   "verdi" {= "dev"}
   "StructTact" {= "dev"}
-  "cheerios" {= "dev"}
   "InfSeqExt" {= "dev"}
+  "verdi-runtime" {= "dev"}
+  "cheerios" {= "dev"}
+  "cheerios-runtime" {= "dev"}
+  "ocamlbuild" {build}
 ]
 
 authors: [
   "Ryan Doenges <>"
-  "Karl Palmskog <>"
   "Doug Woos <>"
+  "Karl Palmskog <>"
   "Zachary Tatlock <>"
   "James Wilcox <>"
   "Justin Adsuara <>"

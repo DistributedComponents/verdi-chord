@@ -23,6 +23,9 @@ case ${MODE} in
   chord)
     opam pin add chord . --yes --verbose
     ;;
+  chord-serialized)
+    opam pin add chord-serialized . --yes --verbose
+    ;;
   *)
     opam pin add verdi-chord . --yes --verbose
     ;;

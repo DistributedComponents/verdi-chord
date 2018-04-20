@@ -1,0 +1,2 @@
+bin: [ "extraction/chord-serialized/_build/ml/chordserialized.native" {"chord-serialized-server"}
+       "extraction/chord-serialized/_build/ml/client.native" {"chord-serialized-client"} ]

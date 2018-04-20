@@ -10,6 +10,7 @@ env:
   matrix:
     - MODE=build COQ_VERSION=coq8.7-32bit
     - MODE=chord COQ_VERSION=coq8.7
+    - MODE=chord-serialized COQ_VERSION=coq8.7
     - MODE=proofalytics COQ_VERSION=coq8.7
 
 # The "docker run" command will pull if needed.

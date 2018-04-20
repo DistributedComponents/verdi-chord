@@ -7,6 +7,7 @@ _CoqProject.tmp
 Makefile.coq
 Makefile.coq.bak
 Makefile.coq.conf
+log
 *~
 .coq-native/
 *.aux
