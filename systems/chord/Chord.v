@@ -439,7 +439,7 @@ Module ChordSystem <: DynamicSystem.
       if ptr_between_bool rw0 rw (ptr st)
       then (set_rectify_with st rw, [], [], [])
       else (st, [], [], [])
-    | None => (st, [], [RectifyTick], [])
+    | None => (set_rectify_with st rw, [], [RectifyTick], [])
     end.
 
   Definition send_eq_dec :
