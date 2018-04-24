@@ -185,16 +185,16 @@ Lemma do_rectify_definition :
      joined st = true /\
      (exists new,
          rectify_with st = Some new /\
-         (exists x,
+         ((exists x,
              pred st = Some x /\
              eff = StartRectify /\
              start_query h (clear_rectify_with st) (Rectify new) = (st', ms', nts', cts')) \/
-         (pred st = None /\
+          (pred st = None /\
           eff = SetPred /\
           st' = clear_rectify_with (update_pred st new) /\
           ms' = [] /\
           nts' = [] /\
-          cts' = []))) \/
+          cts' = [])))) \/
     ((joined st = false \/ rectify_with st = None \/ exists r, cur_request st = Some r) /\
      st' = st /\ ms' = [] /\ nts' = [] /\ cts' = [] /\ eff = Ineffective).
 Proof using.
