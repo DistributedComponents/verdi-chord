@@ -226,7 +226,7 @@ Proof.
         assert (Exists (live_node gst) (map addr_of (chop_succs ((make_pointer (addr_of x)) :: x13)))).
         {
           find_eapply_prop live_node_in_msg_succ_lists; eauto.
-          repeat find_rewrite; constructor; in_crush.
+          repeat find_rewrite; constructor 2; in_crush.
           find_eapply_lem_hyp stabilize_target_joined; eauto.
         }
         find_apply_lem_hyp Exists_exists; break_exists.

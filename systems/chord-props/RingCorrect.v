@@ -1337,8 +1337,14 @@ Proof.
     + repeat (handler_def; simpl in *; try congruence);
         repeat (find_rewrite || find_injection); simpl.
       * eapply not_skipped_means_incoming_succs_not_skipped; eauto.
-        -- apply in_msgs_in_channel.
-           find_rewrite; simpl; in_crush.
+        find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
+        repeat break_or_hyp.
+        ++ eauto.
+        ++ intuition eauto.
+        ++ break_exists; break_and.
+           replace (succ_list st) with (@nil pointer) by congruence.
+           eauto.
+      * eapply not_skipped_means_incoming_succs_not_skipped; eauto.
         -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
            repeat break_or_hyp.
            ++ eauto.
@@ -1347,18 +1353,6 @@ Proof.
               replace (succ_list st) with (@nil pointer) by congruence.
               eauto.
       * eapply not_skipped_means_incoming_succs_not_skipped; eauto.
-        -- apply in_msgs_in_channel.
-           find_rewrite; simpl; in_crush.
-        -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
-           repeat break_or_hyp.
-           ++ eauto.
-           ++ intuition eauto.
-           ++ break_exists; break_and.
-              replace (succ_list st) with (@nil pointer) by congruence.
-              eauto.
-      * eapply not_skipped_means_incoming_succs_not_skipped; eauto.
-        -- apply in_msgs_in_channel.
-           find_rewrite; simpl; in_crush.
         -- find_eapply_lem_hyp live_node_was_live_or_no_succs; eauto.
            repeat break_or_hyp.
            ++ eauto.
