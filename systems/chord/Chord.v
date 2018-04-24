@@ -629,7 +629,7 @@ Module ChordSystem <: DynamicSystem.
       eauto using unrolling_reflexive, unrolling_transitive, unrolling_total.
   Qed.
 
-  Fixpoint find_pred (h : addr) (sorted_ring : list pointer) : option pointer :=
+  Definition find_pred (h : addr) (sorted_ring : list pointer) : option pointer :=
     hd_error (rev sorted_ring).
 
   Definition start_handler (h : addr) (knowns : list addr) : data * list (addr * payload) * list timeout :=
