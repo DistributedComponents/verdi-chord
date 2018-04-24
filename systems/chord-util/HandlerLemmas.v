@@ -889,7 +889,7 @@ Lemma schedule_rectify_with_definition :
          st' = st)) \/
 
      rectify_with st = None /\
-     st' = st /\
+     st' = set_rectify_with st rw /\
      nts = [RectifyTick]).
 Proof.
   unfold schedule_rectify_with.
