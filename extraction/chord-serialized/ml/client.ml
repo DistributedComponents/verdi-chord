@@ -63,8 +63,8 @@ let validate bind node query_type lookup_id =
      invalid_arg "please specify a query type with -query"
   | b, Some n, "lookup" ->
      handle_lookup b n (Some lookup_id)
-  | b, Some n, "get_pred_and_succs" ->
-     b, n, "get_pred_and_succs", lookup_id
+  | b, Some n, "get_ptrs" ->
+     b, n, "get_ptrs", lookup_id
   | _, _, _ ->
      invalid_arg "please specify both -bind and -node"
 
@@ -105,7 +105,7 @@ let _ =
   | "lookup", Some id ->
      let p = Client.lookup bind node id in
      print_endline (ChordSerializedArrangement.show_pointer p)
-  | "get_pred_and_succs", _->
+  | "get_ptrs", _->
      let p, succs = Client.get_pred_and_succs bind node in
      print_endline (ChordSerializedArrangement.show_opt_pointer p);
      print_endline (ChordSerializedArrangement.show_pointer_list succs)

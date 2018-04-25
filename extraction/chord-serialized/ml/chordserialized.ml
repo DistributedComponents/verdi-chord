@@ -49,7 +49,7 @@ let parse argv opts =
   let spec =
     [ addr_spec "-bind" opts.bind "{ip:port} address to listen for connections on"
     ; addrs_spec "-ring" opts.ring "{ip:port} node in initial ring"
-    ; addr_spec "-join" opts.known "{ip:port} node to join ring with"
+    ; addr_spec "-known" opts.known "{ip:port} node to join ring with"
     ; ( "-request-timeout"
       , Arg.Set_float opts.request_timeout
       , "minimum length of time to use for request timeouts"
