@@ -36,23 +36,24 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
   Definition payload := IOStreamWriter.wire.
   Definition payload_eq_dec := IOStreamWriter.wire_eq_dec.
 
-  Definition revert_payload p := match deserialize_top deserialize p with
-                                 | Some p => p
-                                 | None => S.default_payload
-                                 end.
+  Definition revert_payload p :=
+    match deserialize_top (@deserialize _ S.payload_serializer) p with
+    | Some p => p
+    | None => S.default_payload
+    end.
 
   Definition client_payload (p : payload) : Prop :=
     exists p' : S.payload,
-      serialize_top (serialize p') = p /\
+      serialize_top ((@serialize _ S.payload_serializer) p') = p /\
       S.client_payload p'.
 
   Lemma client_payload_dec : forall (p : payload), {client_payload p} + {~ client_payload p}.
   Proof.
     intros.
     unfold client_payload.
-
-    destruct (deserialize_top deserialize p) eqn:G.
-    - destruct (payload_eq_dec (serialize_top (serialize p0)) p) eqn:H;
+    destruct (deserialize_top (@deserialize _ S.payload_serializer) p) eqn:G.
+    - destruct (payload_eq_dec (serialize_top ((@serialize _ S.payload_serializer) p0))
+                               p) eqn:H.
         destruct (S.client_payload_dec p0) eqn:J.
       + left.
         eexists. eauto.
@@ -76,23 +77,13 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
         rewrite serialize_deserialize_top_id in G.
         find_inversion.
         reflexivity.
-      + right.
-        unfold not.
-        intros.
-        break_exists.
-        intuition.
-        apply n.
-        rewrite <- H1 in G.
-        rewrite serialize_deserialize_top_id in G.
-        find_inversion.
-        reflexivity.
     - right.
       unfold not.
       intros.
       break_exists.
       intuition.
       subst_max.
-      find_rewrite_lem serialize_deserialize_top_id.
+      rewrite serialize_deserialize_top_id in G.
       congruence.
   Qed.
 
@@ -105,7 +96,7 @@ Module SerializedSystem (S : SerializableSystem) <: ConstrainedDynamicSystem.
 
   Definition serialize_dst_msg (a : addr * S.payload) :=
     match a with
-    | (a, p) => (a, serialize_top (serialize p))
+    | (a, p) => (a, serialize_top ((@serialize S.payload S.payload_serializer) p))
     end.
 
   Definition start_handler a l :=
