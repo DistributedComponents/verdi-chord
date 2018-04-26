@@ -104,8 +104,7 @@ module ChordArrangement (C : ChordConfig) = struct
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let port = chord_default_port
   let addr_of_name = Util.string_of_char_list
-  let name_of_addr s =
-    Util.char_list_of_string s
+  let name_of_addr = Util.char_list_of_string
   let start_handler n ks =
     Random.self_init ();
     rebracket3 (init n ks)
