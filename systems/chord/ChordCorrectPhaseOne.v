@@ -10,12 +10,12 @@ Require Import Chord.InfSeqTactics.
 
 Require Import Chord.Chord.
 
+Require Import Chord.ChannelLemmas.
 Require Import Chord.HandlerLemmas.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.LabeledLemmas.
-Require Import Chord.ChannelLemmas.
 Require Import Chord.LabeledMeasures.
 
 Require Import Chord.FirstSuccNeverSelf.
@@ -31,7 +31,6 @@ Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.StabilizeOnlyWithFirstSucc.
 Require Import Chord.NodesNotJoinedHaveNoSuccessors.
 Require Import Chord.QueriesEventuallyStop.
-Require Import Chord.RingCorrect.
 Require Import Chord.LiveNodeHasTickInTimeouts.
 
 Set Bullet Behavior "Strict Subproofs".
@@ -976,7 +975,6 @@ Lemma open_request_to_dead_node_stays_or_timeout :
       open_request_to gst' h dst req /\
       In req (channel gst' h dst) /\
       l <> Timeout h (Request dst req) DetectFailure \/
-      ~ open_request_to gst' h dst req /\
       l = Timeout h (Request dst req) DetectFailure.
 Proof.
   intros.
@@ -1009,39 +1007,10 @@ Proof.
       handler_def; try congruence.
       handler_def; try congruence.
       * find_injection.
-        right; split.
-        -- intro.
-           inv_prop open_request_to; expand_def.
-           simpl in *.
-           handler_def; handler_simpl;
-             rewrite_update; find_injection; simpl in *; try congruence.
-           repeat find_rewrite; find_injection.
-           repeat find_rewrite; find_injection.
-           repeat find_injection.
-           assert (hd_error (succ_list st0) = Some x2).
-           {
-             inv_prop (query_request Stabilize).
-             find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
-             expand_def; congruence.
-           }
-           repeat find_rewrite; simpl in *; find_injection.
-           handler_def; simpl in *; try congruence.
-           simpl in *.
-           find_apply_lem_hyp option_map_Some; break_exists; break_and.
-           match goal with
-           | H: succ_list ?st = _ :: ?rest |- _ =>
-             destruct rest; simpl in *; try congruence
-           end.
-           repeat find_injection.
-           eapply first_succ_and_second_distinct;
-             eauto with datatypes.
-           destruct (joined st0) eqn:?.
-           ++ eapply live_node_characterization; eauto.
-           ++ find_eapply_lem_hyp nodes_not_joined_have_no_successors; eauto.
-              congruence.
-        -- f_equal.
-           eapply at_most_one_request_timeout'_uniqueness; try eassumption.
-           now inv_prop cur_request_timeouts_ok'.
+        right.
+        f_equal.
+        eapply at_most_one_request_timeout'_uniqueness; try eassumption.
+        now inv_prop cur_request_timeouts_ok'.
       * repeat (find_rewrite; repeat find_injection).
         inv_prop cur_request_timeouts_ok'.
         match goal with
@@ -1104,13 +1073,11 @@ Proof.
            assert (exists st, sigma gst (addr_of dstp) = Some st) by auto.
            break_exists_name st__dst.
            intro Hin. apply in_msgs_in_channel in Hin.
-           find_eapply_lem_hyp (query_message_ok_invariant gst ltac:(auto) (fst (snd m)) (addr_of dstp)); eauto.
-           invcs_prop query_message_ok.
-           ++ congruence.
-           ++ inv_prop request_response_pair; eapply_prop no_responses; eauto.
-           ++ repeat find_rewrite; inv_prop request_response_pair; eapply_prop no_responses; eauto.
-           ++ repeat find_rewrite; inv_prop query_request; eapply_prop no_requests; eauto.
-           ++ repeat find_rewrite; inv_prop query_request; eapply_prop no_requests; eauto.
+           find_eapply_lem_hyp (query_message_ok'_invariant gst ltac:(auto) (fst (snd m)) (addr_of dstp)); eauto.
+           invcs_prop query_message_ok'.
+           ++ tauto.
+           ++ repeat find_rewrite; eapply_prop no_requests; eauto.
+           ++ eapply_prop no_responses; eauto.
         -- destruct m as [? [? ?]]; simpl in *.
            repeat find_rewrite; in_crush.
       * split.
@@ -1143,7 +1110,6 @@ Lemma open_stabilize_request_stays_or_timeout :
 
       open_stabilize_request_to gst' h dst /\
       l <> Timeout h (Request dst GetPredAndSuccs) DetectFailure \/
-      ~ open_stabilize_request_to gst' h dst /\
       l = Timeout h (Request dst GetPredAndSuccs) DetectFailure.
 Proof.
   intros.
@@ -1163,7 +1129,7 @@ Lemma open_stabilize_request_until_timeout :
     weak_until (now (fun occ => open_stabilize_request_to (occ_gst occ) h dst) /\_
                 ~_ now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
                (now (fun occ => open_stabilize_request_to (occ_gst occ) h dst) /\_
-                now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
+                 now (occurred (Timeout h (Request dst GetPredAndSuccs) DetectFailure)))
                ex.
 Proof.
   cofix c.
@@ -1217,7 +1183,7 @@ Proof.
     + invar_eauto.
     + invc_prop always.
       unfold and_tl in *; break_and.
-      invcs_prop weak_until; break_and;
+      invcs_prop weak_until;
         destruct s;
         eapply stabilize_Request_timeout_decreases_error; eauto.
   - eapply weak_until_latch_eventually; eauto.
@@ -1269,7 +1235,8 @@ Lemma nonzero_phase_one_error_eventually_drops :
     eventually (consecutive (measure_decreasing (leading_failed_succs h))) ex.
 Proof.
   intros.
-  find_copy_eapply_lem_hyp dead_nodes_go_quiet; eauto using strong_local_fairness_weak.
+  find_copy_eapply_lem_hyp dead_nodes_go_quiet;
+    eauto using strong_local_fairness_weak.
   induction 0 as [ex | o [o' ex]].
   - eauto using nonzero_phase_one_error_eventually_drops_dead_quiet.
   - destruct (leading_failed_succs h (occ_gst o')) eqn:?H.

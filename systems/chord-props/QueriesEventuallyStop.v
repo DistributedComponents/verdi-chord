@@ -227,12 +227,10 @@ Proof.
       do 4 invcs_prop live_node; expand_def.
       pose proof (query_message_ok_invariant (occ_gst o') ltac:(invar_eauto) a (addr_of dstp)) as Qi'.
       do 2 insterU Qi'.
-      forwards; eauto. concludes.
-      forwards; eauto. concludes.
+      repeat conclude Qi' eauto.
       pose proof (query_message_ok_invariant (occ_gst o) ltac:(invar_eauto) a (addr_of dstp)) as Qi.
       do 2 insterU Qi.
-      forwards; eauto. concludes.
-      forwards; eauto. concludes.
+      repeat conclude Qi eauto.
 
       rewrite update_same.
       assert (cur_request x1 = Some (dstp, q, p)) by eauto.
@@ -241,7 +239,7 @@ Proof.
         destruct (cur_request x2) as [[[? ?] ?]|] eqn:?.
         - repeat find_rewrite || find_injection.
           simpl in *.
-          do 4 find_inversion.
+          repeat find_inversion.
           repeat find_reverse_rewrite.
           eapply recv_msg_not_right_response_preserves_cur_request; eauto.
         - congruence.
@@ -296,7 +294,7 @@ Proof.
     eexists; split; eauto.
   - destruct ex as [o [o' ex]].
     set (gst := occ_gst o).
-    pose proof (query_message_ok_invariant gst ltac:(eauto) h (addr_of dst)).
+    pose proof (query_message_ok'_invariant gst ltac:(eauto) h (addr_of dst)).
     destruct (label_eq_dec (RecvMsg (addr_of dst) h r) (occ_label o)).
     + eapply W0.
       simpl.
@@ -305,16 +303,16 @@ Proof.
       inv_labeled_step; clean_up_labeled_step_cases.
       repeat find_rewrite; intuition.
       repeat invcs_prop live_node; expand_def.
-      copy_eapply_prop_hyp query_message_ok sigma; eauto.
-      inv_prop query_message_ok; try congruence.
-      * exfalso; eapply_prop no_responses;
-          repeat find_rewrite; eauto.
-      * admit.
-      * admit.
+      copy_eapply_prop_hyp query_message_ok' sigma; eauto.
+      inv_prop query_message_ok';
+        try inv_prop query_message_ok;
+        try solve [congruence
+                  |eapply_prop no_responses;
+                   repeat find_rewrite; eauto].
       * assert (res0 = r) by admit; subst.
         admit.
-      * exfalso; eapply_prop no_responses;
-          repeat find_rewrite; eauto.
+      * assert (res0 = r) by admit; subst.
+        admit.
     + assert (live_node (occ_gst o') h) by invar_eauto.
       apply c; invar_eauto.
       * admit.
@@ -464,7 +462,7 @@ Proof.
   intros.
   destruct ex as [o ex].
 
-  pose proof (query_message_ok_invariant
+  pose proof (query_message_ok'_invariant
                 (occ_gst o) ltac:(eauto) h (addr_of dstp))
     as Qok.
   set (gst := occ_gst o).
@@ -477,13 +475,16 @@ Proof.
 
   find_copy_apply_lem_hyp always_now; simpl in *.
 
-  inv_prop query_message_ok.
+  inv_prop query_message_ok';
+    try inv_prop query_message_ok.
   - find_apply_hyp_hyp; congruence.
   - find_apply_hyp_hyp; congruence.
   - admit.
   - admit.
   - eapply always_continuously, always_stuck_blocked_always_blocked;
       invar_eauto.
+  - admit.
+  - admit.
 Admitted.
 
 Lemma blocking_node_continuously_also_blocked :

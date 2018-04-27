@@ -1169,11 +1169,16 @@ Proof.
         break_exists_name st__src.
         inv_prop open_request_to; expand_def.
         simpl in *.
-        find_copy_eapply_lem_hyp (query_message_ok_invariant gst ltac:(eauto) dst' src'); eauto.
-        inv_prop query_message_ok; try congruence; eauto.
-        repeat (find_rewrite || find_injection).
-        inv_prop request_response_pair.
-        exfalso; intuition eauto.
+        find_copy_eapply_lem_hyp (query_message_ok'_invariant gst ltac:(eauto) dst' src'); eauto.
+        inv_prop query_message_ok';
+          try inv_prop query_message_ok;
+          try congruence; eauto.
+        * repeat (find_rewrite || find_injection).
+          inv_prop request_response_pair.
+          exfalso; intuition eauto.
+        * repeat (find_rewrite || find_injection).
+          inv_prop request_response_pair.
+          exfalso; intuition eauto.
       + intuition.
         repeat (find_rewrite || find_injection).
         inv_prop client_payload; inv_prop response_payload.

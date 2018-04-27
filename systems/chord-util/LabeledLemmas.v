@@ -873,38 +873,6 @@ Proof using.
     right; intro H; inv H.
 Defined.
 
-(* TODO(ryan) move this somewhere else *)
-Lemma sent_non_client_message_means_in_nodes :
-  forall gst src dst p,
-    reachable_st gst ->
-    ~ client_payload p ->
-    In (src, (dst, p)) (msgs gst) ->
-    In src (nodes gst).
-Proof.
-  intros.
-  generalize dependent p.
-  generalize dependent dst.
-  generalize dependent src.
-  pattern gst.
-  apply chord_net_invariant; do 2 autounfold; simpl; intros;
-    repeat find_rewrite; intuition eauto;
-      try solve [
-            find_apply_lem_hyp in_app_or; break_or_hyp;
-            [find_apply_lem_hyp in_map_iff; expand_def; unfold send in *; find_injection; in_crush
-            |in_crush; eauto with datatypes]
-          ].
-  - inv_prop initial_st; break_and.
-    repeat find_rewrite.
-    in_crush.
-  - in_crush; eauto.
-    unfold send in *.
-    find_injection; tauto.
-  - simpl in *.
-    find_apply_lem_hyp in_app_or.
-    break_or_hyp; eauto with datatypes.
-Qed.
-Hint Resolve sent_non_client_message_means_in_nodes.
-
 Lemma constrained_Request_not_cleared_by_recv_handler :
   forall gst h dst req p src st st' ms nts cts,
     reachable_st gst ->
@@ -928,9 +896,10 @@ Proof using.
     }
     assert (exists st__src, sigma gst src = Some st__src) by eauto.
     break_exists_name st__src.
-    assert (query_message_ok h src (cur_request st) (delayed_queries st__src)
+    assert (query_message_ok' h src (cur_request st) (delayed_queries st__src)
+                              (failed_nodes gst)
                              (channel gst h src) (channel gst src h))
-      by eauto using query_message_ok_invariant.
+      by eauto using query_message_ok'_invariant.
     assert (Request (addr_of dstp) req0 = Request dst req)
       by eauto using at_most_one_request_timeout_uniqueness.
     find_injection.
@@ -941,17 +910,21 @@ Proof using.
       assert (src = (addr_of dstp)).
       {
         repeat find_rewrite.
-        inv_prop query_message_ok;
-          solve [exfalso; eapply_prop no_responses; eauto|reflexivity].
+        inv_prop query_message_ok';
+          try inv_prop query_message_ok;
+          try solve [exfalso; eapply_prop no_responses; eauto|reflexivity].
       }
       intro; invcs_prop query_response; invcs_prop query_request;
         intuition eauto using request_response_pair.
     + repeat find_rewrite.
       assert (no_responses (channel gst src h)).
       {
-        inv_prop query_message_ok; auto.
-        find_apply_hyp_hyp.
-        exfalso; intuition.
+        inv_prop query_message_ok';
+          try inv_prop query_message_ok;
+          try solve [exfalso; eapply_prop no_responses; eauto
+                    |reflexivity
+                    |find_apply_hyp_hyp; exfalso; intuition
+                    |eauto].
       }
       assert (~response_payload p) by eauto.
       find_copy_apply_lem_hyp timeouts_in_Some.
