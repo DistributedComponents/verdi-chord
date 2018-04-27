@@ -8,12 +8,10 @@ namespace :chord_serialized do
     "#{shared_path}/extraction/chord-serialized/tmp/chord-serialized.pid"
   end
 
-  desc 'start serialized chord'
+  desc 'start serialized chord ring'
   task :start do
-    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+    ring = roles(:node).collect { |node| "-ring #{node.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
     on roles(:node) do |node|
-      preds = node.properties.preds.collect { |n| "-ring #{nodes[n].properties.ip}:#{fetch(:chord_serialized_node_port)}" }.join(' ')
-      succs = node.properties.succs.collect { |n| "-ring #{nodes[n].properties.ip}:#{fetch(:chord_serialized_node_port)}" }.join(' ')
       execute '/sbin/start-stop-daemon',
         '--start',
         '--quiet',
@@ -23,7 +21,25 @@ namespace :chord_serialized do
         '--background',
         "--chdir #{current_path}/extraction/chord-serialized",
         '--startas /bin/bash',
-        "-- -c 'exec ./chordserialized.native -bind #{node.properties.ip}:#{fetch(:chord_serialized_node_port)} #{preds} #{succs} > log/chord-serialized.log 2>&1'"
+        "-- -c 'exec ./chordserialized.native -bind #{node.properties.ip}:#{fetch(:chord_serialized_node_port)} #{ring} > log/chord-serialized.log 2>&1'"
+    end
+  end
+
+  desc 'start serialized chord with known'
+  task :start_known do
+    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+    on roles(:node) do |node|
+      known = nodes[node.properties.known]
+      execute '/sbin/start-stop-daemon',
+        '--start',
+        '--quiet',
+        '--oknodo',
+        '--make-pidfile',
+        "--pidfile #{chord_pidfile_path}",
+        '--background',
+        "--chdir #{current_path}/extraction/chord-serialized",
+        '--startas /bin/bash',
+        "-- -c 'exec ./chordserialized.native -bind #{node.properties.ip}:#{fetch(:chord_node_port)} -known #{known.properties.ip}:#{fetch(:chord_node_port)} > log/chord-serialized.log 2>&1'"
     end
   end
 

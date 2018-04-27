@@ -10,7 +10,7 @@ namespace :chord do
 
   desc 'start chord ring'
   task :start do
-    ring = roles(:node).select { |r| node != r }.collect { |r| "-ring #{r.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
+    ring = roles(:node).collect { |node| "-ring #{node.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
     on roles(:node) do |node|
       execute '/sbin/start-stop-daemon',
         '--start',
