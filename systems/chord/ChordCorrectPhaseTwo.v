@@ -1309,8 +1309,17 @@ Proof.
       repeat handler_def;
         unfold make_request, send_keepalives in *;
         try find_apply_lem_hyp option_map_Some; expand_def;
+        try find_apply_lem_hyp in_concat; expand_def;
         try find_apply_lem_hyp in_map_iff; expand_def;
-          simpl in *; intuition congruence.
+        try find_apply_lem_hyp option_map_None; expand_def;
+          simpl in *; try intuition congruence.
+      admit.
+      admit.
+      admit.
+      admit.
+      admit.
+      admit.
+      admit.
   - remember (apply_handler_result (fst (snd m)) (st, ms, newts, clearedts) [ChordSemantics.e_recv m] (update_msgs gst (xs ++ ys))) as gst'.
     assert (open_request_to gst' h (addr_of j) GetPredAndSuccs /\
             has_first_succ gst' h j)
@@ -1422,7 +1431,7 @@ Proof.
     repeat find_rewrite.
     find_apply_lem_hyp in_app_or.
     intuition eauto with datatypes.
-Qed.
+Admitted.
 
 Lemma open_stabilize_request_until_response_weak :
   forall ex h j,

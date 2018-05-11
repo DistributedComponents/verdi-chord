@@ -129,27 +129,21 @@ Proof.
       * unfold do_rectify in *.
         unfold start_query in *.
         repeat (break_match; simpler);
-          try solve [apply remove_preserve; simpler; congruence].
+          try solve [apply remove_preserve; simpler; congruence
+                    |right; apply remove_preserve; simpler; congruence].
         right.
         rewrite timeouts_in_None; auto.
         apply remove_preserve; simpler; congruence.
       * unfold keepalive_handler in *. simpl in *.
         find_inversion. simpl in *.
         right. apply remove_preserve; simpler; congruence.
-      * unfold request_timeout_handler in *.
-        repeat (break_match; simpler);
-          try solve [apply remove_preserve; simpler; congruence].
-        unfold handle_query_timeout in *.
-        in_crush. right.
-        unfold start_query in *.
-        repeat (break_match; simpler);
-          try solve [apply remove_preserve; simpler; congruence];
-          apply in_remove_all_preserve;
-          try solve [match goal with
-          | |- ~ In _ _ =>
-            unfold timeouts_in; repeat break_match; in_crush; congruence
-                     end];
-          try solve [apply remove_preserve; simpler; congruence].
+      * destruct (request_timeout_handler h st a p) as [[[? ?] ?] ?] eqn:?.
+        repeat handler_simpl.
+        repeat (handler_def || handler_simpl);
+          try solve [repeat apply remove_preserve; simpler; congruence].
+        in_crush.
+        right.
+        repeat apply remove_preserve; simpler; congruence.
     + subst. simpl in *.
       update_destruct; subst;
         unfold live_node in *; simpl in *; repeat rewrite_update; auto.

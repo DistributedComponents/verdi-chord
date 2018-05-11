@@ -195,6 +195,13 @@ Lemma do_rectify_definition :
           ms' = [] /\
           nts' = [] /\
           cts' = [])))) \/
+    (exists cr, cur_request st = Some cr) /\
+    (exists new, rectify_with st = Some new) /\
+    st' = st /\
+    ms' = [] /\
+    nts' = [RectifyTick] /\
+    cts' = [] /\
+    eff = Ineffective \/
     ((joined st = false \/ rectify_with st = None \/ exists r, cur_request st = Some r) /\
      st' = st /\ ms' = [] /\ nts' = [] /\ cts' = [] /\ eff = Ineffective).
 Proof using.
@@ -206,6 +213,7 @@ Proof using.
     repeat (eexists; firstorder eauto).
   - left.
     repeat (eexists; firstorder).
+  - firstorder eauto.
 Qed.
 
 Lemma start_query_definition :
@@ -438,7 +446,11 @@ Lemma request_timeout_handler_definition :
         cur_request st = Some (dst_ptr, query, m) /\
         ((addr_of dst_ptr = dst /\
           eff = DetectFailure /\
-          handle_query_timeout h st dst_ptr query = (st', ms, nts, cts)) \/
+          exists st_h ms_h nts_h cts_h
+                 st_d ms_d nts_d cts_d,
+            handle_query_timeout h st dst_ptr query = (st_h, ms_h, nts_h, cts_h) /\
+            do_delayed_queries h st_h = (st_d, ms_d, nts_d, cts_d) /\
+            (st_d, ms_h ++ ms_d, nts_h ++ nts_d, cts_h ++ cts_d) = (st', ms, nts, cts)) \/
         (addr_of dst_ptr <> dst /\
          eff = Ineffective /\
          st' = st /\ ms = [] /\ nts = [] /\ cts = []))) \/
@@ -448,7 +460,10 @@ Lemma request_timeout_handler_definition :
 Proof.
   unfold request_timeout_handler.
   intros; repeat break_match; try tuple_inversion;
-    tauto || left; repeat eexists; eauto; tauto.
+    tauto || left; repeat eexists; eauto; try tauto.
+  left.
+  intuition eauto.
+  repeat eexists; eauto.
 Qed.
 
 Lemma timeout_handler_eff_definition :
@@ -963,6 +978,7 @@ Proof using.
   - apply keepalive_handler_definition in H; expand_def; auto.
   - find_apply_lem_hyp request_timeout_handler_definition; expand_def; try reflexivity.
     find_apply_lem_hyp handle_query_timeout_definition;
+      find_apply_lem_hyp do_delayed_queries_definition;
       expand_def;
       try find_apply_lem_hyp end_query_definition;
       try find_apply_lem_hyp start_query_definition;

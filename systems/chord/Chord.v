@@ -701,7 +701,9 @@ Module ChordSystem <: DynamicSystem.
     match cur_request st with
     | Some (ptr, q, _) =>
       if addr_eq_dec (addr_of ptr) dst
-      then (handle_query_timeout h st ptr q, DetectFailure)
+      then let '(st', ms, nts, cts) := handle_query_timeout h st ptr q in
+           let '(st'', ms', nts', cts') := do_delayed_queries h st' in
+           (st'', ms ++ ms', nts ++ nts', cts ++ cts', DetectFailure)
       else ((st, [], [], []), Ineffective) (* shouldn't happen *)
     | None => ((st, [], [], []), Ineffective) (* shouldn't happen *)
     end.
@@ -714,7 +716,10 @@ Module ChordSystem <: DynamicSystem.
       | Some _ => (start_query h st (Rectify new), StartRectify)
       | None => ((update_pred st new, [], [], []), SetPred)
       end
-    | _, _, _ => ((st, [], [], []), Ineffective)
+    | _, Some cr, Some new =>
+      ((st, [], [RectifyTick], []), Ineffective)
+    | _, _, _ =>
+      ((st, [], [], []), Ineffective) (* shouldn't happen *)
     end.
 
   Definition timeout_handler_eff (h : addr) (st : data) (t : timeout) : res * timeout_effect :=

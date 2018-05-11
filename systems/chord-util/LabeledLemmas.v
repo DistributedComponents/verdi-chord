@@ -832,12 +832,9 @@ Proof.
   - eapply do_rectify_never_clears_Tick; eauto.
   - find_apply_lem_hyp request_timeout_handler_definition; expand_def;
       try auto with datatypes.
-    find_apply_lem_hyp handle_query_timeout_definition; expand_def;
-      try find_apply_lem_hyp end_query_definition;
-      try find_apply_lem_hyp start_query_definition;
-      expand_def;
-      autorewrite with list;
-      auto using timeouts_in_never_has_Tick.
+    find_apply_lem_hyp handle_query_timeout_definition;
+      repeat handler_def || handler_simpl;
+      intuition congruence.
 Qed.
 
 Lemma timeouts_in_Request :
@@ -1212,10 +1209,11 @@ Proof.
         unfold do_rectify in *.
         repeat find_rewrite.
         find_rewrite_lem if_branches_same.
-        find_inversion.
-        simpl in *. rewrite_update.
-        intuition; [|repeat eexists; intuition; now eauto].
-        eapply remove_preserve; eauto; congruence.
+        rewrite_update.
+        simpl.
+        break_match; find_inversion;
+          rewrite in_app_iff;
+          intuition (repeat eexists; eauto using remove_preserve).
       * rewrite_update. intuition.
         repeat eexists; intuition; now eauto.
     + left. simpl in *.
@@ -1237,10 +1235,12 @@ Proof.
       destruct (addr_eq_dec h h0).
       * subst. repeat find_rewrite. find_inversion.
         unfold request_timeout_handler in *.
-        repeat find_rewrite. break_if.
-        -- find_inversion. right. f_equal.
-           eauto using at_most_one_request_timeout_uniqueness,
-           at_most_one_request_timeout_invariant.
+        repeat find_rewrite.
+        break_if; repeat break_match.
+        -- find_inversion.
+           repeat handler_def || handler_simpl;
+           right; f_equal; eauto using at_most_one_request_timeout_uniqueness,
+                  at_most_one_request_timeout_invariant.
         -- left. find_inversion.
            simpl in *. rewrite_update.
            intuition; [|repeat eexists; intuition; now eauto].

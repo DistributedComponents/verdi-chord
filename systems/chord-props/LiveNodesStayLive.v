@@ -3,6 +3,9 @@ Require Import StructTact.Util.
 Require Import Verdi.DynamicNet.
 
 Require Import Chord.Chord.
+Require Import Chord.HandlerLemmas.
+
+Set Bullet Behavior "Strict Subproofs".
 
 Ltac live_node_invariant_finish_goal :=
   unfold live_node in *; simpl in *; intuition;
@@ -20,12 +23,14 @@ Proof.
   | H : labeled_step_dynamic _ _ _ |- _ =>
     inv H
   end.
-  - unfold timeout_handler_l, timeout_handler_eff,
+  - repeat unfold timeout_handler_l, timeout_handler_eff,
+    do_delayed_queries, clear_delayed_queries,
     tick_handler, keepalive_handler, do_rectify, request_timeout_handler,
     add_tick, handle_query_timeout, clear_query, end_query, start_query,
     update_query, update_succ_list in *.
     repeat break_match; live_node_invariant_finish_goal.
-  - repeat unfold recv_handler_l, recv_handler,
+  - repeat handler_def || handler_simpl;
+    repeat unfold recv_handler_l, recv_handler,
     handle_msg, do_delayed_queries,
     clear_delayed_queries, tick_handler, keepalive_handler, do_rectify, request_timeout_handler,
     handle_rectify, handle_query_req,
@@ -35,7 +40,7 @@ Proof.
     add_tick,
     update_query, update_succ_list,
     end_query, clear_query
-      in *. repeat break_match; live_node_invariant_finish_goal.
+      in *; repeat break_match; live_node_invariant_finish_goal.
   - live_node_invariant_finish_goal.
   - live_node_invariant_finish_goal.
 Qed.

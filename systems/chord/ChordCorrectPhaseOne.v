@@ -748,9 +748,11 @@ Proof.
   unfold start_query, update_query in *.
   simpl in *.
   repeat break_match;
+    try find_apply_lem_hyp succ_list_preserved_by_do_delayed_queries;
     simpl in *;
     tuple_inversion;
-    reflexivity.
+    simpl in *;
+    congruence.
 Qed.
 
 Lemma removing_head_decreases_failed_node_count :

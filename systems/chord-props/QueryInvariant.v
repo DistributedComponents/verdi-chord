@@ -728,64 +728,22 @@ Proof.
         exfalso; unfold not in *; eauto with datatypes.
       }
       apply cur_request_timeouts_ok'_sound.
-      repeat (handler_def || handler_simpl || rewrite_update).
-      * constructor.
-        intros.
-        rewrite remove_comm.
-        assert (In (Request (addr_of x) x1) (timeouts gst h))
-          by (inv_prop cur_request_timeouts_ok; congruence).
-        intro. find_apply_lem_hyp in_remove.
-        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+      repeat (handler_def || handler_simpl || rewrite_update);
+        try solve [constructor;
+                   intros;
+                   rewrite remove_comm;
+                   assert (In (Request (addr_of x) req) (timeouts gst h))
+                     by (inv_prop cur_request_timeouts_ok; congruence);
+                   intro;
+                   rewrite remove_comm in *;
+                   do 2 find_apply_lem_hyp in_remove;
+                   eapply at_most_one_request_timeout'_remove_drops_all; eauto].
       * unfold hd_error in *; break_match; simpl in *; try congruence.
         find_injection.
         constructor; eauto with datatypes.
         eapply at_most_one_request_timeout'_cons.
         intros; intro.
         find_apply_lem_hyp in_remove.
-        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-      * repeat find_rewrite.
-        inv_prop cur_request_timeouts_ok; try congruence.
-        find_injection.
-        inv_prop query_request.
-        constructor.
-        rewrite remove_comm.
-        intros; intro.
-        find_apply_lem_hyp in_remove.
-        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-      * constructor.
-        intros.
-        rewrite remove_comm.
-        assert (In (Request (addr_of x) x1) (timeouts gst h))
-          by (inv_prop cur_request_timeouts_ok; congruence).
-        intro. find_apply_lem_hyp in_remove.
-        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-      * constructor.
-        intros.
-        rewrite remove_comm.
-        assert (In (Request (addr_of x) x1) (timeouts gst h))
-          by (inv_prop cur_request_timeouts_ok; congruence).
-        intro. find_apply_lem_hyp in_remove.
-        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-      * constructor.
-        intros.
-        rewrite remove_comm.
-        assert (In (Request (addr_of x) x1) (timeouts gst h))
-          by (inv_prop cur_request_timeouts_ok; congruence).
-        intro. find_apply_lem_hyp in_remove.
-        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-      * constructor.
-        intros.
-        rewrite remove_comm.
-        assert (In (Request (addr_of x) x1) (timeouts gst h))
-          by (inv_prop cur_request_timeouts_ok; congruence).
-        intro. find_apply_lem_hyp in_remove.
-        eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-      * constructor.
-        intros.
-        rewrite remove_comm.
-        assert (In (Request (addr_of x) x1) (timeouts gst h))
-          by (inv_prop cur_request_timeouts_ok; congruence).
-        intro. find_apply_lem_hyp in_remove.
         eapply at_most_one_request_timeout'_remove_drops_all; eauto.
       * invcs_prop cur_request_timeouts_ok; try congruence.
         assert (Request (addr_of dstp) req0 = Request dst req)
@@ -1111,6 +1069,98 @@ Proof.
   handler_def.
 Admitted.
 
+Theorem query_message_ok'_keepalive_invariant :
+ chord_keepalive_invariant
+   (fun g : global_state =>
+    forall (src dst : addr) (st__src st__dst : data),
+    sigma g src = Some st__src ->
+    sigma g dst = Some st__dst ->
+    query_message_ok' src dst (cur_request st__src) 
+      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
+      (channel g dst src)).
+Proof.
+  repeat autounfold; intros.
+  handler_def.
+Admitted.
+
+Theorem query_message_ok'_rectify_invariant :
+ chord_rectify_invariant
+   (fun g : global_state =>
+    forall (src dst : addr) (st__src st__dst : data),
+    sigma g src = Some st__src ->
+    sigma g dst = Some st__dst ->
+    query_message_ok' src dst (cur_request st__src) 
+      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
+      (channel g dst src)).
+Proof.
+  repeat autounfold; intros.
+  handler_def.
+Admitted.
+
+Theorem query_message_ok'_request_invariant :
+ chord_request_invariant
+   (fun g : global_state =>
+    forall (src dst : addr) (st__src st__dst : data),
+    sigma g src = Some st__src ->
+    sigma g dst = Some st__dst ->
+    query_message_ok' src dst (cur_request st__src) 
+      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
+      (channel g dst src)).
+Proof.
+  repeat autounfold; intros.
+  assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h))
+    by eauto.
+  destruct (addr_eq_dec h src); subst.
+  - destruct (sigma gst dst0) eqn:?;
+      [|repeat find_rewrite; update_destruct; rewrite_update; congruence].
+    match goal with
+    | H: forall (_ _ : addr), _ |- _ =>
+      specialize (H src dst0);
+        do 2 insterU H;
+        repeat (forwards; eauto; concludes)
+    end.
+    inv_prop cur_request_timeouts_ok.
+    + exfalso; intuition eauto.
+    + assert (Request dst req = Request (addr_of dstp) req0)
+        by eauto using at_most_one_request_timeout'_uniqueness.
+      handler_def; try congruence.
+      handler_def.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+  - repeat find_rewrite.
+    destruct (addr_eq_dec h dst0); subst.
+    + repeat rewrite_update.
+      erewrite (channel_msgs_unchanged ms gst'); eauto.
+      find_injection.
+      invcs_prop cur_request_timeouts_ok;
+        [exfalso; intuition eauto|].
+      match goal with
+      | H: forall (_ _ : addr), _ |- _ =>
+        specialize (H src dst0);
+          do 2 insterU H;
+          repeat (forwards; eauto; concludes)
+      end.
+      assert (no_responses (channel gst dst0 src) ->
+              no_responses (channel gst' dst0 src))
+        by admit.
+      inv_prop query_message_ok'; try tauto.
+      apply QMLive; auto.
+      inv_prop query_message_ok.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+    + erewrite (channel_msgs_unchanged ms gst'); eauto.
+      erewrite (channel_msgs_unchanged ms gst'); eauto.
+      repeat rewrite_update; eauto.
+Admitted.
+
 Theorem query_message_ok'_start_invariant :
  chord_start_invariant
    (fun g : global_state =>
@@ -1231,8 +1281,7 @@ Proof.
            simpl in *.
            repeat erewrite (msgs_eq_channels_eq gst' gst); eauto.
            eapply CInone; eauto.
-        -- 
-repeat find_rewrite || find_injection.
+        -- repeat find_rewrite || find_injection.
            repeat erewrite (msgs_eq_channels_eq gst' gst); eauto.
         -- repeat find_rewrite || find_injection.
            repeat erewrite (msgs_eq_channels_eq gst' gst); eauto.
@@ -1318,9 +1367,9 @@ repeat find_rewrite || find_injection.
                        simpl;
                        try congruence
                    end.
-  - admit. (* keepalive case, easy *)
-  - admit. (* rectify case *)
-  - admit. (* request case *)
+  - eapply query_message_ok'_keepalive_invariant.
+  - eapply query_message_ok'_rectify_invariant.
+  - eapply query_message_ok'_request_invariant.
   - eapply query_message_ok'_recv_invariant.
   - repeat autounfold; intros.
     assert (In src (nodes gst')).
@@ -1369,7 +1418,7 @@ repeat find_rewrite || find_injection.
     erewrite (channel_msgs_remove_unchanged gst' gst);
       try solve [repeat find_rewrite; simpl; eauto];
       eauto.
-Admitted.
+Qed.
 Hint Resolve query_message_ok'_invariant.
 
 Theorem at_most_one_request_timeout_invariant :

@@ -600,14 +600,14 @@ Proof.
           repeat (find_rewrite || find_injection).
         - find_copy_eapply_lem_hyp cur_request_timeouts_related_invariant; auto.
           repeat find_reverse_rewrite.
-          repeat handler_def; simpl; try congruence.
+          repeat handler_def; simpl in *; try congruence.
           + repeat find_rewrite.
             inv_prop cur_request_timeouts_ok; try congruence; find_injection.
             inv_prop query_request.
             find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
             break_exists; break_and.
             repeat find_rewrite; simpl in *; repeat find_injection.
-            assert (In best (addr_of x2 :: map addr_of x6)) by congruence.
+            assert (In best (addr_of x2 :: map addr_of x13)) by congruence.
             in_crush.
           + simpl in *.
             find_apply_lem_hyp option_map_None.
@@ -644,15 +644,18 @@ Proof.
         repeat match goal with
                | H: option_map _ _ = Some _ |- _ =>
                  apply option_map_Some in H; destruct H as [? [? ?]]
+               | H: In _ (concat _) |- _ =>
+                 apply in_concat in H; expand_def
                | H: In _ (map _ _) |- _ =>
                  erewrite in_map_iff in H; expand_def
                | H: context[send_keepalives] |- _ =>
                  unfold send_keepalives in H
                | H: send _ _ = _ |- _ =>
                  unfold send in H
-               | H: (_, (_, _)) = (_, (_, _)) |- _ =>
-                 congruence
+               | H: (_, _) = (_, _) |- _ =>
+                 injc H
                end.
+      all:admit.
     + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
       {
         eapply_prop live_node_in_msg_succ_lists; eauto.
@@ -666,7 +669,7 @@ Proof.
       apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
       break_and; split; eauto.
       eapply live_node_preserved_by_request; subst; eauto.
-Qed.
+Admitted.
 Hint Resolve live_node_invariant_request.
 
 Theorem live_node_invariant_output :

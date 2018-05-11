@@ -72,18 +72,20 @@ Proof.
         repeat break_match; simpl in *;
           find_inversion; simpl; auto.
       * unfold do_rectify in *. simpl in *.
+        break_match; simpl in *; try solve_by_inversion;
+        break_match; simpl in *; try solve_by_inversion;
         break_match; simpl in *; try solve_by_inversion.
-        break_match; simpl in *; try solve_by_inversion.
-        break_match; simpl in *; try solve_by_inversion.
-        unfold start_query in *;
+        unfold start_query, update_pred in *;
           repeat break_match; simpl in *; find_inversion; simpl; auto.
       * simpl in *. find_inversion. auto.
       * unfold request_timeout_handler in *.
         repeat break_match; simpl in *; try solve_by_inversion.
-        subst. unfold handle_query_timeout in *.
-        repeat break_match; simpl in *; try find_inversion; simpl in *; auto.
-        unfold start_query in *.
-        repeat break_match; try find_inversion; simpl in *; auto.
+        subst. unfold update_pred, handle_query_timeout, do_delayed_queries in *.
+        repeat break_match; simpl in *; try find_inversion; simpl in *; auto;
+          repeat find_rewrite || find_injection;
+          simpl; eauto;
+            unfold start_query in *;
+          repeat break_match; try find_inversion; simpl in *; auto.
     + update_destruct; subst; rewrite_update; auto.
       find_inversion.
       unfold recv_handler in *. repeat break_let. find_inversion.

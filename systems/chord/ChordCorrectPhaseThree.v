@@ -750,7 +750,16 @@ Proof.
     assert (wf_ptr s) by eauto using wf_ptr_succ_list_invariant.
     eapply (stabilize_res_after_phase_two_to_err_drop (Cons o ex) h s err);
       eauto.
-    admit.
+    unfold open_stabilize_request_to_first_succ in *.
+    assert (open_stabilize_request_to (occ_gst o) h (addr_of s)) by eauto.
+    inv_prop open_stabilize_request_to.
+    simpl.
+    assert (query_message_ok h (addr_of s) (cur_request st_h) (delayed_queries st_s)
+                             (channel (occ_gst o) h (addr_of s)) (channel (occ_gst o) (addr_of s) h))
+      by eauto.
+    inv_prop query_message_ok;
+      try solve [exfalso; eapply_prop no_requests; repeat find_rewrite; eauto
+                |unfold no_responses in *; intuition eauto].
   - apply E_next, IHeventually; invar_eauto.
     find_apply_lem_hyp local_always_nonincreasing_causes_max_always_nonincreasing; invar_eauto.
     find_apply_lem_hyp always_now.
@@ -758,7 +767,7 @@ Proof.
     cbn in *.
     unfold phase_three_error in *.
     omega.
-Admitted.
+Qed.
 
 Lemma not_joined_zero_succs_error :
   forall gst h st,

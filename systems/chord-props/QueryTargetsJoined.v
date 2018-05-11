@@ -545,6 +545,7 @@ Proof.
           try solve [find_apply_lem_hyp option_map_Some; break_exists;
                      intuition; repeat find_inversion; eauto; subst; simpl in *; intuition];
           try solve [in_crush; eauto; unfold send_keepalives in *; in_crush].
+        all:admit. (* sorry *)
     + find_apply_lem_hyp pointers_in_state_elim.
       intuition; break_exists; intuition; simpl in *; eauto.
       * repeat (handler_def || (try find_apply_lem_hyp in_make_succs; intuition) || handler_simpl);
