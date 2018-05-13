@@ -1061,7 +1061,7 @@ Theorem query_message_ok'_recv_invariant :
     forall (src dst : addr) (st__src st__dst : data),
     sigma g src = Some st__src ->
     sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src) 
+    query_message_ok' src dst (cur_request st__src)
       (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
       (channel g dst src)).
 Proof.
@@ -1075,7 +1075,7 @@ Theorem query_message_ok'_keepalive_invariant :
     forall (src dst : addr) (st__src st__dst : data),
     sigma g src = Some st__src ->
     sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src) 
+    query_message_ok' src dst (cur_request st__src)
       (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
       (channel g dst src)).
 Proof.
@@ -1089,7 +1089,7 @@ Theorem query_message_ok'_rectify_invariant :
     forall (src dst : addr) (st__src st__dst : data),
     sigma g src = Some st__src ->
     sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src) 
+    query_message_ok' src dst (cur_request st__src)
       (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
       (channel g dst src)).
 Proof.
@@ -1172,7 +1172,7 @@ Ltac channel_crush :=
            apply in_map_iff in H; destruct H
          | H: In _ (filterMap _ _) |- _ =>
            apply In_filterMap in H; destruct H
-         | H: context[addr_eq_dec ?x ?y] |- _ => 
+         | H: context[addr_eq_dec ?x ?y] |- _ =>
            destruct (addr_eq_dec x y); simpl in H; try congruence
          | H: _ = _ |- _ => progress injc H
          | |- _ => progress subst_max
@@ -1189,7 +1189,7 @@ Ltac chan2msg :=
 
 Theorem dq_res_qmo :
   forall gst gst' src dst req res st__src st__src' st__dst st__dst' l ms,
-    query_message_ok' src dst (cur_request st__src) 
+    query_message_ok' src dst (cur_request st__src)
       (delayed_queries st__dst) (failed_nodes gst) (channel gst src dst)
       (channel gst dst src) ->
     msgs gst' = map (send dst) l ++ ms ->
@@ -1206,7 +1206,7 @@ Theorem dq_res_qmo :
                    response_payload (snd z) ->
                    ~ In z (xs ++ ys)) ->
     request_response_pair req res ->
-    query_message_ok src dst (cur_request st__src') 
+    query_message_ok src dst (cur_request st__src')
       (delayed_queries st__dst') (channel gst' src dst)
       (channel gst' dst src).
 Proof.
@@ -1243,7 +1243,7 @@ Proof.
     rewrite ?map_app, ?map_cons, ?filterMap_app in *.
     rewrite filterMap_defn in *; break_match; simpl in *;
       repeat match goal with
-             | H: context[addr_eq_dec ?x ?x] |- _ => 
+             | H: context[addr_eq_dec ?x ?x] |- _ =>
                destruct (addr_eq_dec x x); simpl in H; try congruence
              end.
     find_injection.
@@ -1295,7 +1295,7 @@ Theorem query_message_ok'_request_invariant :
     forall (src dst : addr) (st__src st__dst : data),
     sigma g src = Some st__src ->
     sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src) 
+    query_message_ok' src dst (cur_request st__src)
       (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
       (channel g dst src)).
 Proof.
@@ -1402,7 +1402,7 @@ Theorem query_message_ok'_start_invariant :
     forall (src dst : addr) (st__src st__dst : data),
     sigma g src = Some st__src ->
     sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src) 
+    query_message_ok' src dst (cur_request st__src)
       (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
       (channel g dst src)).
 Proof.
@@ -1445,7 +1445,7 @@ Proof.
     + inv_prop query_message_ok'; try tauto.
       inv_prop query_message_ok;
         solve [eapply QMFailedNothing; simpl; eauto
-              |eapply QMFailedRes; simpl; 
+              |eapply QMFailedRes; simpl;
                try erewrite msgs_eq_channels_eq; eauto].
     + repeat erewrite (msgs_eq_channels_eq gst' gst) by eauto.
       inv_prop query_message_ok';
