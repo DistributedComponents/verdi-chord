@@ -1097,6 +1097,198 @@ Proof.
   handler_def.
 Admitted.
 
+Lemma uniq_list_eq :
+  forall A (A_eq_dec : forall (x y : A), {x = y} + {x <> y}) P l (a b : A),
+    In a l ->
+    In b l ->
+    P a ->
+    P b ->
+    (forall xs ys, l = xs ++ a :: ys -> forall z, P z -> ~ In z (xs ++ ys)) ->
+    a = b.
+Proof.
+  intros.
+  repeat find_apply_lem_hyp in_split; expand_def.
+  do 2 find_insterU.
+  forwards; eauto. concludes.
+  find_insterU.
+  destruct (A_eq_dec a b); auto.
+  exfalso.
+  find_eapply_prop In; try find_eapply_prop (P b).
+  eauto using in_middle_reduce, app_cons_in.
+Qed.
+
+Lemma request_response_pair_response :
+  forall req res,
+    request_response_pair req res ->
+    response_payload res.
+Proof.
+  intros.
+  inv_prop request_response_pair;
+    constructor.
+Qed.
+Hint Resolve request_response_pair_response.
+
+Lemma splits_uniq_eq :
+  forall A (P : A -> Prop) l xs ys xs' ys' a,
+    l = xs ++ a :: ys ->
+    l = xs' ++ a :: ys' ->
+    P a ->
+    (forall z, P z -> ~ In z (xs ++ ys)) ->
+    xs = xs' /\ ys = ys'.
+Proof.
+  intros.
+  copy_eapply_prop_hyp P P; eauto.
+  generalizeEverythingElse l.
+  induction l; intros.
+  - exfalso; eapply app_cons_not_nil; eauto.
+  - destruct xs eqn:?, xs' eqn:?.
+    + simpl in *; split; congruence.
+    + simpl in *.
+      repeat find_injection.
+      exfalso; eauto using app_cons_in.
+    + simpl in *.
+      exfalso.
+      repeat find_injection.
+      eauto using app_cons_in.
+    + simpl in *.
+      repeat find_injection.
+      cut (l0 = l1 /\ ys = ys'); [intuition congruence|].
+      eapply IHl; eauto.
+      intuition.
+      match goal with
+      | H: _ |- _ =>
+        specialize (H z); eapply H; eauto
+      end.
+Qed.
+
+Ltac channel_crush :=
+  repeat match goal with
+         | a: msg |- _ => destruct a; simpl in *; subst
+         | a: _ * _ |- _ => destruct a; simpl in *; subst
+         | H: _ /\ _ |- _ => destruct H
+         | H: _ \/ _ |- _ => destruct H
+         | H: In _ (_ ++ _) |- _ => apply in_app_or in H
+         | H: In _ (map _ _) |- _ =>
+           apply in_map_iff in H; destruct H
+         | H: In _ (filterMap _ _) |- _ =>
+           apply In_filterMap in H; destruct H
+         | H: context[addr_eq_dec ?x ?y] |- _ => 
+           destruct (addr_eq_dec x y); simpl in H; try congruence
+         | H: _ = _ |- _ => progress injc H
+         | |- _ => progress subst_max
+         | |- _ => tauto
+         end.
+
+Ltac chan2msg :=
+  repeat match goal with
+         | |- In _ (channel _ _ _) =>
+           apply in_msgs_in_channel
+         | H: In _ (channel _ _ _) |- _ =>
+           apply in_channel_in_msgs in H
+         end.
+
+Theorem dq_res_qmo :
+  forall gst gst' src dst req res st__src st__src' st__dst st__dst' l ms,
+    query_message_ok' src dst (cur_request st__src) 
+      (delayed_queries st__dst) (failed_nodes gst) (channel gst src dst)
+      (channel gst dst src) ->
+    msgs gst' = map (send dst) l ++ ms ->
+    In (src, req) (delayed_queries st__dst) ->
+    src <> dst ->
+    (forall m, In m ms -> In m (msgs gst)) ->
+    delayed_queries st__dst' = [] ->
+    ~ In dst (failed_nodes gst) ->
+    ~ In dst (failed_nodes gst') ->
+    cur_request st__src = cur_request st__src' ->
+    In (src, res) l ->
+    (forall xs ys, l = xs ++ (src, res) :: ys ->
+              forall z, fst z = src ->
+                   response_payload (snd z) ->
+                   ~ In z (xs ++ ys)) ->
+    request_response_pair req res ->
+    query_message_ok src dst (cur_request st__src') 
+      (delayed_queries st__dst') (channel gst' src dst)
+      (channel gst' dst src).
+Proof.
+  intros.
+  inv_prop query_message_ok';
+    [|tauto|tauto].
+  inv_prop query_message_ok;
+    match goal with
+    | H: forall m, ~ In (src, m) (delayed_queries _) |- _ =>
+      exfalso; eapply H; eauto
+    | _ => idtac
+    end.
+  repeat find_reverse_rewrite.
+  assert (req = req0).
+  {
+    cut ((src, req0) = (src, req)); [congruence|].
+    eapply uniq_list_eq with (P := fun p => fst p = src); eauto using send_eq_dec.
+    intros.
+    destruct z; simpl in *; subst.
+    eauto.
+  }
+  subst.
+  eapply CIres; eauto.
+  - apply in_msgs_in_channel.
+    repeat find_rewrite.
+    apply in_or_app; left.
+    apply in_map_iff.
+    exists (src, res0); auto.
+  - intros.
+    unfold no_responses; intros.
+    unfold channel in H18.
+    repeat find_rewrite.
+    find_copy_apply_lem_hyp (in_split (src, res0)); expand_def.
+    rewrite ?map_app, ?map_cons, ?filterMap_app in *.
+    rewrite filterMap_defn in *; break_match; simpl in *;
+      repeat match goal with
+             | H: context[addr_eq_dec ?x ?x] |- _ => 
+               destruct (addr_eq_dec x x); simpl in H; try congruence
+             end.
+    find_injection.
+    autorewrite with list in H18.
+    match goal with
+    | H: (?a ++ p :: ?b) ++ ?more = ?xs ++ p :: ?ys |- _ =>
+      rewrite <- app_assoc in H; simpl in H;
+        assert (a = xs /\ b ++ more = ys)
+    end.
+    {
+      eapply splits_uniq_eq; eauto.
+      intros; intro.
+      assert (~ In (src, z) (x ++ x0)) by eauto.
+      intuition.
+      find_false.
+      apply in_or_app.
+      channel_crush;
+        match goal with
+        | H: In ?pkt ms,
+          H': no_responses ?chan |- _ =>
+          exfalso; eapply H'; chan2msg
+        end; eauto.
+    }
+    find_apply_lem_hyp in_app_or.
+    intro; channel_crush;
+      solve [find_eapply_prop response_payload; eauto with datatypes; eauto
+            |find_eapply_prop no_responses; chan2msg; eauto].
+  - unfold no_requests; intros.
+    find_apply_lem_hyp in_channel_in_msgs.
+    repeat find_rewrite.
+    find_apply_lem_hyp in_app_or; break_or_hyp.
+    + find_apply_lem_hyp in_map_iff; expand_def.
+      unfold send in *; congruence.
+    + eapply_prop no_requests; eauto.
+  - repeat find_rewrite; auto.
+Qed.
+
+Lemma handle_query_timeout_dqs :
+  forall h st dst q st' ms nts cts,
+    handle_query_timeout h st dst q = (st', ms, nts, cts) ->
+    delayed_queries st' = delayed_queries st.
+Proof.
+  intros; repeat handler_def; reflexivity.
+Qed.
+
 Theorem query_message_ok'_request_invariant :
  chord_request_invariant
    (fun g : global_state =>
@@ -1145,17 +1337,60 @@ Proof.
           do 2 insterU H;
           repeat (forwards; eauto; concludes)
       end.
+      assert (Request dst req = Request (addr_of dstp) req0)
+        by eauto using at_most_one_request_timeout'_uniqueness.
       assert (no_responses (channel gst dst0 src) ->
+              (forall m, ~ In (src, m) (delayed_queries st)) ->
               no_responses (channel gst' dst0 src))
         by admit.
+      assert ((forall m, ~ In (src, m) (delayed_queries st)) ->
+              forall m, ~ In (src, m) (delayed_queries st__dst)).
+      {
+        repeat handler_def; simpl; eauto.
+      }
+      handler_def; try congruence.
+      eapply QMLive; eauto.
       inv_prop query_message_ok'; try tauto.
-      apply QMLive; auto.
-      inv_prop query_message_ok.
+      inv_prop query_message_ok;
+        match goal with
+        | |- query_message_ok _ _ None _ _ _ =>
+          eapply CInone; auto
+        | H: _ <> addr_of ?dst
+          |- query_message_ok _ _ (Some (?dst, _, _)) _ _ _ =>
+          solve [econstructor; eauto]
+        | H: In ?req (channel ?gst ?src (addr_of ?dst)),
+             H':query_request _ ?req
+          |- query_message_ok _ _ (Some (?dst, _, _)) _ _ _ =>
+          eapply CIreq; eauto
+        | H: In ?res (channel ?gst (addr_of ?dst) ?src),
+             H':request_response_pair _ ?res
+          |- query_message_ok _ _ (Some (?dst, _, _)) _ _ _ =>
+          eapply CIres; eauto; chan2msg; repeat find_rewrite; eauto with datatypes
+        | _ => idtac
+        end.
       * admit.
-      * admit.
-      * admit.
-      * admit.
-      * admit.
+      * find_apply_lem_hyp do_delayed_queries_definition; expand_def.
+        -- admit.
+        -- repeat find_rewrite.
+           replace (failed_nodes gst) with (failed_nodes gst').
+           replace (channel gst src (addr_of dstp0)) with (channel gst' src (addr_of dstp0))
+             by eauto using channel_msgs_unchanged.
+           find_copy_apply_lem_hyp handle_query_timeout_dqs.
+           destruct (handle_query_req x2 src req1) eqn:?;
+             find_copy_eapply_lem_hyp real_requests_get_response_handle_query_req; eauto.
+           ++ simpl in *; exfalso; expand_def; eauto.
+           ++ admit.
+           ++ expand_def.
+             eapply dq_res_qmo; try solve [eauto|congruence];
+               [apply in_or_app; right|].
+             rewrite <- flat_map_concat_map, in_flat_map.
+             eexists; split; eauto.
+             repeat find_rewrite; eauto.
+             simpl; congruence.
+             intros.
+             simpl in *.
+             admit.
+           ++ admit.
     + erewrite (channel_msgs_unchanged ms gst'); eauto.
       erewrite (channel_msgs_unchanged ms gst'); eauto.
       repeat rewrite_update; eauto.
@@ -1516,17 +1751,6 @@ Proof.
         simpl; congruence.
 Qed.
 Hint Resolve uniq_res_eq.
-
-Lemma request_response_pair_response :
-  forall req res,
-    request_response_pair req res ->
-    response_payload res.
-Proof.
-  intros.
-  inv_prop request_response_pair;
-    constructor.
-Qed.
-Hint Resolve request_response_pair_response.
 
 Theorem requests_get_correct_response :
   forall gst h st dstp q m r,
