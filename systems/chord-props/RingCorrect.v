@@ -129,18 +129,18 @@ Proof.
                                                            (map id_of (succ_list st)) (hash h)
                               | None => true
                               end) (live_addrs gst)) eqn:?.
-    + left. unfold principal. intuition.
+    + left. unfold principal; autounfold. intuition.
       find_eapply_lem_hyp forallb_forall; eauto using live_addr_In_live_addrs.
       repeat find_rewrite. eauto using not_skipped_bool_not_skipped.
+      admit.
     + right. intro. find_apply_lem_hyp forallb_exists.
       break_exists. intuition. find_apply_lem_hyp In_live_addrs_live.
       break_match; try congruence.
-      unfold principal in *.
+      unfold principal in *; autounfold in *.
       intuition.
-      eapply_prop_hyp live_node sigma; eauto.
-      eauto using not_skipped_not_skipped_bool.
-  - right. intuition. unfold principal in *. intuition.
-Defined.
+      admit.
+  - right. intuition. unfold principal in *; autounfold in *. intuition.
+Admitted.
 
 Definition compute_principals (gst : global_state) : list addr :=
   dedup
@@ -888,11 +888,16 @@ Proof.
   intros.
   unfold principal; split.
   - auto.
-  - unfold not_skipped; intros.
-    find_apply_lem_hyp initial_succ_list; eauto.
-    unfold initial_st in *. intuition.
-    repeat find_rewrite; repeat find_injection.
-    simpl in *; eapply initial_succ_lists_all_principal with (p := h) (h := h0); eauto.
+  - unfold not_skipped; autounfold; intros.
+    split; intros.
+    + find_apply_lem_hyp initial_succ_list; eauto.
+      unfold initial_st in *; autounfold in *. intuition.
+      repeat find_rewrite; repeat find_injection.
+      unfold not_skipped; intros.
+      simpl in *; eapply initial_succ_lists_all_principal with (p := h) (h := h0); eauto.
+    + find_apply_lem_hyp initial_succ_list; eauto.
+      unfold initial_st in *; autounfold in *. intuition.
+      repeat find_rewrite; repeat find_injection; simpl in *; tauto.
 Qed.
 Hint Resolve initial_nodes_principal.
 
@@ -921,12 +926,17 @@ Proof.
   eauto using principals_intro.
 Qed.
 
-Lemma principals_involves_joined_node_state_only :
+Lemma principals_involves_joined_node_state_and_msgs_only :
   forall gst gst' p,
     principal gst p ->
     (forall h st,
         live_node gst h /\ sigma gst h = Some st <->
         live_node gst' h /\ sigma gst' h = Some st) ->
+    (forall src h m s,
+        succs_msg m s ->
+        live_node gst h ->
+        In (src, (h, m)) (msgs gst') ->
+        In (src, (h, m)) (msgs gst)) ->
     principal gst' p.
 Proof.
   unfold principal.
@@ -945,8 +955,40 @@ Proof.
         split; eauto.
     }
     break_and.
-    eapply H1; eauto.
-    eapply H0; split; eauto.
+    split; autounfold; intros; eauto.
+    + find_eapply_prop no_live_node_skips; eauto.
+      find_eapply_prop iff; eauto.
+    + find_eapply_prop no_msg_to_live_node_skips; eauto.
+      find_eapply_prop iff; eauto.
+Qed.
+
+Lemma principals_involves_joined_node_state_only :
+  forall gst gst' p,
+    principal gst p ->
+    (forall h st,
+        live_node gst h /\ sigma gst h = Some st <->
+        live_node gst' h /\ sigma gst' h = Some st) ->
+    live_node gst' p /\ no_live_node_skips gst' p.
+Proof.
+  unfold principal.
+  intros.
+  expand_def.
+  split.
+  - firstorder.
+  - intros.
+    assert ((forall h, live_node gst h -> live_node gst' h) /\
+            (forall h, live_node gst' h -> live_node gst h)).
+    {
+      split; intros;
+        inv_prop live_node;
+        expand_def;
+        eapply H0;
+        split; eauto.
+    }
+    break_and.
+    autounfold; intros; eauto.
+    find_eapply_prop no_live_node_skips; eauto.
+    find_eapply_prop iff; eauto.
 Qed.
 
 Theorem zave_invariant_init :
@@ -1029,39 +1071,57 @@ Proof.
   break_and; split; eauto.
   inv_prop principals; break_and.
   apply principals_intro; auto; intros.
-  - inv_prop principals; expand_def.
-    eapply principals_involves_joined_node_state_only; eauto.
-    eapply Forall_forall; eauto.
-    intros.
-    intuition; inv_prop live_node; expand_def.
-    + eapply live_node_characterization; eauto;
-        repeat find_rewrite;
-        try rewrite_update;
-        in_crush || eauto.
-    + repeat find_rewrite; rewrite_update; auto.
-    + repeat find_rewrite; update_destruct;
-        subst; rewrite_update;
-          repeat find_injection.
-      cut (joined x0 = false); [congruence|].
-      eapply joining_start_handler_st_joined; eauto.
-      eapply live_node_characterization; eauto; in_crush.
-    + repeat find_rewrite; update_destruct;
-        subst; rewrite_update;
-          repeat find_injection.
-      cut (joined x0 = false); [congruence|].
-      eapply joining_start_handler_st_joined; eauto.
-      rewrite_update; auto.
+  - inv_prop principals; expand_def; autounfold in *.
+    unfold principal; rewrite <- and_assoc; split.
+    eapply principals_involves_joined_node_state_only;
+      [eapply Forall_forall; eassumption |]; intros.
+    + intuition; inv_prop live_node; expand_def.
+      * eapply live_node_characterization; eauto;
+          repeat find_rewrite;
+          try rewrite_update;
+          in_crush || eauto.
+      * repeat find_rewrite; rewrite_update; auto.
+      * repeat find_rewrite; update_destruct;
+          subst; rewrite_update;
+            repeat find_injection.
+        cut (joined x0 = false); [congruence|].
+        eapply joining_start_handler_st_joined; eauto.
+        eapply live_node_characterization; eauto; in_crush.
+      * repeat find_rewrite; update_destruct;
+          subst; rewrite_update;
+            repeat find_injection.
+        cut (joined x0 = false); [congruence|].
+        eapply joining_start_handler_st_joined; eauto.
+        rewrite_update; auto.
+    + autounfold; intros.
+      assert (live_node gst h0)
+        by eauto using live_after_start_was_live; eauto.
+      unfold start_handler in *; simpl in *.
+      repeat find_rewrite || find_injection.
+      simpl in *; break_or_hyp.
+      * unfold send in *; find_injection; inv_prop succs_msg.
+      * assert (principal gst p) by (eapply Forall_forall; eauto).
+        inv_prop principal; expand_def.
+        find_copy_eapply_lem_hyp (live_node_means_state_exists gst h0); expand_def.
+        now eauto.
   - find_eapply_prop In.
     inv_prop principal.
     split; eauto using live_after_start_was_live.
-    intros.
-    inv_prop principal.
-    assert (live_node gst p) by eauto using live_after_start_was_live.
-    assert (live_node gst' h0) by eauto using live_before_start_stays_live.
-    inv_prop (live_node gst' h0); expand_def.
-    find_eapply_prop not_skipped; eauto.
-    assert (h0 <> h) by eauto using live_node_not_just_started.
-    repeat find_rewrite; rewrite_update; congruence.
+    split; autounfold in *; intros.
+    + inv_prop principal;  expand_def.
+      assert (live_node gst p) by eauto using live_after_start_was_live.
+      assert (live_node gst' h0) by eauto using live_before_start_stays_live.
+      inv_prop (live_node gst' h0); expand_def.
+      find_eapply_prop not_skipped; eauto.
+      assert (h0 <> h) by eauto using live_node_not_just_started.
+      repeat find_rewrite; rewrite_update; congruence.
+    + inv_prop principal; expand_def.
+      assert (live_node gst p) by eauto using live_after_start_was_live.
+      assert (live_node gst' h0) by eauto using live_before_start_stays_live.
+      inv_prop (live_node gst' h0); expand_def.
+      find_eapply_prop not_skipped; eauto.
+      repeat find_rewrite || find_injection.
+      eapply in_or_app; eauto.
 Qed.
 Hint Resolve zave_invariant_start.
 
@@ -1221,14 +1281,6 @@ Proof.
     tauto.
 Qed.
 Hint Resolve zave_invariant_fail.
-
-Inductive succs_msg : payload -> list pointer -> Prop :=
-| SuccsMsgGotSuccList :
-    forall succs, succs_msg (GotSuccList succs) succs
-| SuccsMsgGotPredAndSuccs :
-    forall p succs,
-      succs_msg (GotPredAndSuccs p succs) succs.
-Hint Constructors succs_msg.
 
 Theorem not_skipped_means_incoming_succs_not_skipped :
   forall gst h s m st succs,
