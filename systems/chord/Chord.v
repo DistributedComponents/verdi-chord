@@ -976,12 +976,11 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
   Hint Unfold no_live_node_skips.
 
   Definition no_msg_to_live_node_skips (gst : global_state) (p : addr) : Prop :=
-    forall src h st m succs,
-      live_node gst h ->
+    forall src h m succs,
+      In h (nodes gst) ->
+      ~ In h (failed_nodes gst) ->
       In (src, (h, m)) (msgs gst) ->
       succs_msg m succs ->
-      live_node gst h ->
-      sigma gst h = Some st ->
       not_skipped (hash h) (map ChordIDSpace.id_of (make_succs (make_pointer src) succs)) (hash p).
   Hint Unfold no_msg_to_live_node_skips.
   
