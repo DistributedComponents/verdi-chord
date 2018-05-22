@@ -1785,6 +1785,16 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_holds.
 
+(* Eventually this should only list the following "assumptions":
+
+    succ_list_len_lower_bound : SUCC_LIST_LEN >= 2
+    ocaml_hash : Chord.addr -> {s : String.string | String.length s = N}
+    Chord.client_addr : String.string -> Prop
+    SUCC_LIST_LEN : nat
+    N : nat
+*)
+Print Assumptions zave_invariant_holds.
+
 Lemma sufficient_principals_invariant :
   forall gst,
     reachable_st gst ->
