@@ -1063,6 +1063,16 @@ Proof.
     solve [now rewrite_update | in_crush].
 Qed.
 
+Theorem all_msgs_to_real_node :
+  forall gst,
+    reachable_st gst ->
+    forall src dst p,
+      In (src, (dst, p)) (msgs gst) ->
+      In dst (nodes gst).
+Proof.
+Admitted.
+Hint Resolve all_msgs_to_real_node.
+
 Theorem zave_invariant_start :
   chord_start_invariant zave_invariant.
 Proof.
@@ -1104,8 +1114,6 @@ Proof.
       * assert (principal gst p) by (eapply Forall_forall; eauto).
         inv_prop principal;
           expand_def; eauto.
-        find_eapply_prop no_msg_to_live_node_skips; eauto.
-        admit. (* need invariant saying new nodes have empty channels *)
   - find_eapply_prop In.
     inv_prop principal.
     split; eauto using live_after_start_was_live.
@@ -1122,7 +1130,7 @@ Proof.
       find_eapply_prop not_skipped;
         repeat find_rewrite || find_injection;
         eauto with datatypes.
-Admitted.
+Qed.
 Hint Resolve zave_invariant_start.
 
 Lemma principal_preserved :
