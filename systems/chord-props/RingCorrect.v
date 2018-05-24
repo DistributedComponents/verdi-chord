@@ -1843,6 +1843,7 @@ Proof.
            admit.
       * find_eapply_prop no_msg_to_live_node_skips; eauto.
         congruence.
+        intuition congruence.
   - break_and.
     unfold sufficient_principals in *.
     eapply some_principals_ok.
