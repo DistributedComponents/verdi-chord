@@ -1631,12 +1631,107 @@ Proof.
 Qed.
 Hint Resolve remove_list_element_still_not_skipped.
 
+Lemma responses_request_timeout_handler_accurate :
+  forall h st dst msg st' ms nts cts eff,
+    request_timeout_handler h st dst msg = (st', ms, nts, cts, eff) ->
+    forall dst m succs,
+      In (dst, m) ms ->
+      succs_msg m succs ->
+      succs = succ_list st'.
+Proof.
+  intros.
+  handler_def; auto.
+  in_crush.
+  - repeat match goal with
+           | H: context[do_delayed_queries] |- _ => clear H
+           | |- _ =>
+             progress (repeat handler_def; try simpl in *; intuition)
+           | H: context[option_map] |- _ =>
+             eapply option_map_Some in H; eauto; expand_def
+           | H: _ = _ |- _ => injc H
+           end; invcs_prop succs_msg.
+  - inv_prop succs_msg.
+    + eapply handle_delayed_queries_GotSuccList_response_accurate; eauto.
+    + eapply handle_delayed_queries_GotPredAndSuccs_response_accurate; eauto.
+Qed.
+
+Lemma cons_make_succs :
+  forall p succs,
+    make_succs p succs = p :: firstn (SUCC_LIST_LEN - 1) succs.
+Proof.
+  pose proof succ_list_len_lower_bound.
+  unfold make_succs, chop_succs.
+  intros; simpl.
+  destruct SUCC_LIST_LEN; try omega.
+  simpl.
+  replace (n - 0) with n by omega.
+  auto.
+Qed.
+
+Lemma pair_in_complete :
+  forall A a b l,
+    @pair_in A a b l ->
+    exists xs ys,
+      l = xs ++ [a; b] ++ ys.
+Proof.
+  intros.
+Admitted.
+
+Lemma not_skipped_firstn :
+  forall h l n k,
+    not_skipped h l n ->
+    not_skipped h (firstn k l) n.
+Proof.
+  unfold not_skipped.
+  intros.
+  change (h :: firstn k l) with (firstn (S k) (h :: l)) in *.
+  copy_eapply pair_in_sound H0.
+  find_eapply_lem_hyp pair_in_firstn.
+  find_eapply_lem_hyp pair_in_complete.
+  expand_def; eauto.
+Qed.
+
+Lemma map_firstn :
+  forall A B (f : A -> B) k l,
+    map f (firstn k l) = firstn k (map f l).
+Proof.
+  induction k; auto.
+  intros.
+  destruct l; simpl; congruence.
+Qed.
+
 Theorem zave_invariant_request :
   chord_request_invariant zave_invariant.
 Proof.
   autounfold; intros.
   break_and; split; eauto.
   find_copy_eapply_lem_hyp cur_request_timeouts_related_invariant; auto.
+  assert (forall h, live_node gst h -> live_node gst' h).
+  {
+    intros.
+    unfold live_node in *; expand_def.
+    repeat find_rewrite.
+    update_destruct; rewrite_update; subst.
+    * intuition.
+      eexists.
+      split; [eauto|].
+      repeat find_rewrite || find_injection.
+      erewrite <- joined_preserved_by_request_timeout_handler; eauto.
+    * eauto.
+  }
+  assert (forall h, live_node gst' h -> live_node gst h).
+  {
+    intros.
+    unfold live_node in *; expand_def.
+    repeat find_rewrite.
+    update_destruct; rewrite_update; subst.
+    * intuition.
+      eexists.
+      split; [eauto|].
+      repeat find_rewrite || find_injection.
+      erewrite -> joined_preserved_by_request_timeout_handler; eauto.
+    * eauto.
+  }
   assert (succ_list st = succ_list st' \/
           req = GetPredAndSuccs /\
           exists s1 rest,
@@ -1660,7 +1755,91 @@ Proof.
     repeat split; eauto; try omega.
     rewrite -> Forall_forall in *.
     intros.
-    admit.
+    match goal with
+    | |- principal gst' ?p =>
+      assert (principal gst p) by auto;
+        invcs_prop principal; expand_def
+    end.
+    assert (live_node gst' h ->
+            not_skipped (ChordIDSpace.hash h) (map id_of (succ_list st')) (ChordIDSpace.hash x0)).
+    {
+      intro.
+      assert (sigma gst' h = Some st').
+      repeat find_rewrite; rewrite_update; auto.
+      autounfold in *.
+      repeat find_rewrite.
+      update_destruct; rewrite_update.
+      repeat handler_def; simpl; eauto;
+        repeat match goal with
+             | |- not_skipped _ (map id_of ?rest) _ =>
+               eapply remove_list_element_still_not_skipped
+             | H: succ_list ?st = ?head :: ?rest
+               |- not_skipped _ (?h :: map id_of ?rest) _ =>
+               erewrite <- map_cons;
+                 erewrite <- H;
+                 eauto
+             end;
+      repeat match goal with
+             | H: timeout_constraint _ _ _ |- _ =>
+               invcs H
+             | H: cur_request_timeouts_ok _ _ |- _ =>
+               apply cur_request_timeouts_ok'_complete in H
+             | H: cur_request_timeouts_ok' (cur_request ?st) ?timeouts,
+               Heq: cur_request ?st = Some _ |- _ =>
+               rewrite Heq in H
+             | H: cur_request_timeouts_ok' (Some _) _ |- _ =>
+               invcs H
+             | H: query_request Stabilize ?x |- _ =>
+               invcs H
+             | H: In (Request _ GetPredAndSuccs) (timeouts gst _) |- _ =>
+               eapply stabilize_only_with_first_succ in H; eauto; expand_def
+             | H: hd_error (succ_list ?st) = Some _,
+               Heq: succ_list ?st = _ :: _
+               |- _ =>
+               rewrite Heq in H; simpl in H; injc H
+             end;
+      repeat match goal with
+             | H: live_node _ _ |- _ =>
+               invcs H; expand_def
+             | Hfailed: In (addr_of ?dead) (failed_nodes _),
+               Hlive: ~ In ?principal (failed_nodes _)
+              |- id_of ?ptr <> ChordIDSpace.hash ?principal =>
+               intro; assert (principal = addr_of dead); [|congruence]
+             | |- _ = addr_of _ =>
+               eapply hash_injective_invariant; eauto using in_failed_in_nodes
+             | |- context[ChordIDSpace.hash] =>
+               change ChordIDSpace.hash with hash in *
+             | |- hash ?h = hash (addr_of ?p) =>
+               assert (Hwf: wf_ptr p)
+                 by (eapply cur_request_valid; [| | eauto]; eauto);
+                 rewrite <- Hwf; congruence
+             end.
+      eauto.
+    }
+    unfold principal; repeat break_and_goal.
+    + eauto.
+    + autounfold; intros; subst.
+      repeat find_rewrite.
+      update_destruct; rewrite_update; subst;
+        repeat find_rewrite || find_injection;
+        eauto.
+    + autounfold; intros; subst.
+      find_rewrite. in_crush.
+      * unfold send in *; find_injection.
+        find_eapply_lem_hyp responses_request_timeout_handler_accurate; eauto; subst.
+        unfold make_succs, chop_succs; simpl.
+        rewrite map_firstn.
+        eapply not_skipped_firstn.
+        simpl; apply not_skipped_initial'.
+        -- eapply H27.
+           admit.
+        -- apply between_swap_not.
+           (* need invariant saying that if h0 ---request----> src,
+              then h0 < src < h0.succs[0].
+              This implies (since x0 is principal) that h0 < src < x0. *)
+           admit.
+      * find_eapply_prop no_msg_to_live_node_skips; eauto.
+        congruence.
   - break_and.
     unfold sufficient_principals in *.
     eapply some_principals_ok.
@@ -1680,7 +1859,6 @@ Proof.
       congruence.
     }
     split; intuition eauto.
-    + eapply live_node_preserved_by_request; eauto.
     + break_and.
       autounfold; intros.
       assert (not_skipped (ChordIDSpace.hash h)
@@ -1717,12 +1895,28 @@ Proof.
       * cut (not_skipped (ChordIDSpace.hash h0)
                           (map id_of (succ_list st0))
                           (ChordIDSpace.hash x0)); eauto.
-        find_eapply_prop no_live_node_skips; eauto.
-        break_live_node; eapply live_node_characterization;
-          repeat find_rewrite; rewrite_update; eauto || congruence.
-    + autounfold; intros.
-      find_rewrite.
-      admit.
+    + autounfold; intros; subst.
+      find_rewrite. in_crush.
+      * unfold send in *; find_injection.
+        find_eapply_lem_hyp responses_request_timeout_handler_accurate; eauto; subst.
+        unfold make_succs, chop_succs; simpl.
+        rewrite map_firstn.
+        eapply not_skipped_firstn.
+        simpl; apply not_skipped_initial'.
+        -- eapply remove_list_element_still_not_skipped;
+             [|eapply H1; eauto;
+              repeat find_rewrite;
+              simpl; eauto].
+           intro.
+           invcs_prop timeout_constraint.
+           admit. (* same argument as in assert above *)
+        -- apply between_swap_not.
+           (* need invariant saying that if h0 ---request----> src,
+              then h0 < src < h0.succs[0].
+              This implies (since x0 is principal) that h0 < src < x0. *)
+           admit.
+      * find_eapply_prop no_msg_to_live_node_skips; eauto.
+        congruence.
 Admitted.
 Hint Resolve zave_invariant_request.
 
