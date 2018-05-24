@@ -1063,15 +1063,15 @@ Proof.
     solve [now rewrite_update | in_crush].
 Qed.
 
-Theorem all_msgs_to_real_node :
+Theorem msgs_out_of_net_go_to_clients :
   forall gst,
     reachable_st gst ->
     forall src dst p,
       In (src, (dst, p)) (msgs gst) ->
-      In dst (nodes gst).
+      ~ In dst (nodes gst) ->
+      client_addr dst.
 Proof.
 Admitted.
-Hint Resolve all_msgs_to_real_node.
 
 Theorem zave_invariant_start :
   chord_start_invariant zave_invariant.
@@ -1113,7 +1113,10 @@ Proof.
       * unfold send in *; find_injection; inv_prop succs_msg.
       * assert (principal gst p) by (eapply Forall_forall; eauto).
         inv_prop principal;
-          expand_def; eauto.
+          expand_def.
+        exfalso; find_eapply_prop client_addr;
+          eapply msgs_out_of_net_go_to_clients; eauto.
+        eauto.
   - find_eapply_prop In.
     inv_prop principal.
     split; eauto using live_after_start_was_live.
