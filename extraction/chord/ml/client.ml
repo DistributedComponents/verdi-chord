@@ -24,8 +24,9 @@ module Client : ClientSig = struct
     print_newline ();
     listen_fd
 
-  let setup_write_fd write_addr =
+  let setup_write_fd bind_addr write_addr =
     let write_fd = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+    Unix.bind write_fd (Unix.ADDR_INET (bind_addr, 0));
     Unix.connect write_fd (Unix.ADDR_INET (write_addr, ChordArrangement.chord_default_port));
     Printf.printf "[%s] opened connection" (Util.timestamp ());
     print_newline ();
@@ -69,7 +70,7 @@ module Client : ClientSig = struct
 
   let query listen_addr write_addr msg =
     let listen_fd = setup_listen_fd listen_addr in
-    let write_fd = setup_write_fd write_addr in
+    let write_fd = setup_write_fd listen_addr write_addr in
     let buf = serialize_msg msg in
     let read_bufs = Hashtbl.create 1 in
     Util.send_chunk write_fd buf;
