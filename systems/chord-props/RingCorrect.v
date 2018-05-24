@@ -1803,15 +1803,21 @@ Proof.
         repeat find_rewrite || find_injection;
         eauto.
     + autounfold; intros; subst.
-      find_rewrite. in_crush.
-      * unfold send in *; find_injection.
+      find_rewrite. find_apply_lem_hyp in_app_or; break_or_hyp.
+      * find_copy_apply_lem_hyp in_map_iff; expand_def.
+        unfold send in *; find_injection.
         find_eapply_lem_hyp responses_request_timeout_handler_accurate; eauto; subst.
         unfold make_succs, chop_succs; simpl.
         rewrite map_firstn.
         eapply not_skipped_firstn.
+        assert (sigma gst' src = Some st')
+          by (repeat find_rewrite; rewrite_update; auto).
         simpl; apply not_skipped_initial'.
-        -- eapply H27.
-           admit.
+        -- destruct (joined st') eqn:?.
+          ++ eapply H27; eauto using live_node_characterization.
+          ++ find_apply_lem_hyp nodes_not_joined_have_no_successors; eauto.
+            repeat find_rewrite; eauto using not_skipped_nil.
+            solve [econstructor; eauto].
         -- apply between_swap_not.
            (* need invariant saying that if h0 ---request----> src,
               then h0 < src < h0.succs[0].
@@ -1882,14 +1888,29 @@ Proof.
         unfold make_succs, chop_succs; simpl.
         rewrite map_firstn.
         eapply not_skipped_firstn.
+        assert (not_skipped (hash src) (map id_of (succ_list st)) (hash x0))
+          by (find_eapply_prop no_live_node_skips; eauto).
         simpl; apply not_skipped_initial'.
-        -- eapply remove_list_element_still_not_skipped;
-             [|eapply H1; eauto;
-              repeat find_rewrite;
-              simpl; eauto].
-           intro.
+        -- repeat find_rewrite; eauto.
+          eapply remove_list_element_still_not_skipped; eauto.
+          intro.
            invcs_prop timeout_constraint.
-           admit. (* same argument as in assert above *)
+           invcs_prop cur_request_timeouts_ok;
+             [exfalso; intuition eauto|].
+           find_eapply_lem_hyp stabilize_only_with_first_succ; eauto; expand_def.
+           repeat find_rewrite; simpl in *.
+           repeat find_injection.
+           repeat invcs_prop live_node; expand_def.
+           assert (addr_of x1 = x0).
+           {
+             eapply hash_injective_invariant; eauto using in_failed_in_nodes.
+             repeat find_reverse_rewrite.
+             eapply wf_ptr_hash_eq.
+             eapply wf_ptr_succ_list_invariant' with (h:=src); eauto.
+             repeat find_rewrite || find_injection.
+             in_crush.
+           }
+           repeat find_rewrite; eauto.
         -- apply between_swap_not.
            (* need invariant saying that if h0 ---request----> src,
               then h0 < src < h0.succs[0].
