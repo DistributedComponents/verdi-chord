@@ -571,6 +571,30 @@ Proof.
 Qed.
 Hint Resolve live_node_invariant_rectify.
 
+Lemma responses_request_timeout_handler_accurate :
+  forall h st dst msg st' ms nts cts eff,
+    request_timeout_handler h st dst msg = (st', ms, nts, cts, eff) ->
+    forall dst m succs,
+      In (dst, m) ms ->
+      succs_msg m succs ->
+      succs = succ_list st'.
+Proof.
+  intros.
+  handler_def; auto.
+  in_crush.
+  - repeat match goal with
+           | H: context[do_delayed_queries] |- _ => clear H
+           | |- _ =>
+             progress (repeat handler_def; try simpl in *; intuition)
+           | H: context[option_map] |- _ =>
+             eapply option_map_Some in H; eauto; expand_def
+           | H: _ = _ |- _ => injc H
+           end; invcs_prop succs_msg.
+  - inv_prop succs_msg.
+    + eapply handle_delayed_queries_GotSuccList_response_accurate; eauto.
+    + eapply handle_delayed_queries_GotPredAndSuccs_response_accurate; eauto.
+Qed.
+
 Theorem live_node_invariant_request :
   chord_request_invariant
     (fun gst => live_node_in_succ_lists gst /\
@@ -639,23 +663,40 @@ Proof.
         solve [eauto
               |econstructor; eauto].
   - repeat find_rewrite.
-    apply live_node_in_msg_succ_lists_app; autounfold; intros.
-    + repeat handler_def; simpl in *; intuition;
-        repeat match goal with
-               | H: option_map _ _ = Some _ |- _ =>
-                 apply option_map_Some in H; destruct H as [? [? ?]]
-               | H: In _ (concat _) |- _ =>
-                 apply in_concat in H; expand_def
-               | H: In _ (map _ _) |- _ =>
-                 erewrite in_map_iff in H; expand_def
-               | H: context[send_keepalives] |- _ =>
-                 unfold send_keepalives in H
-               | H: send _ _ = _ |- _ =>
-                 unfold send in H
-               | H: (_, _) = (_, _) |- _ =>
-                 injc H
-               end.
-      all:admit.
+    apply live_node_in_msg_succ_lists_app;
+    autounfold; intros.
+    + assert (src = h); subst.
+      {
+        repeat break_or_hyp; unfold send in *;
+        rewrite in_map_iff in *;
+        expand_def; auto.
+      }
+      assert (exists m, In (h, (dst0, m)) (map (send h) ms) /\ succs_msg m succs)
+        by (break_or_hyp; eexists; eauto).
+      break_exists_name m; break_and.
+      find_apply_lem_hyp in_map_iff; break_exists; break_and.
+      unfold send in *; find_injection.
+      find_eapply_lem_hyp responses_request_timeout_handler_accurate; eauto.
+      subst.
+      assert (sigma gst' h = Some st')
+        by (repeat find_rewrite; rewrite_update; auto).
+      break_or_hyp.
+      * destruct (joined st') eqn:?.
+        -- apply Exists_exists; exists h; split.
+           change h with (addr_of (make_pointer h)).
+           apply in_map.
+           apply hd_in_chop_succs.
+           eapply live_node_characterization; try congruence; eauto.
+        -- assert (succ_list st' = []).
+           eapply nodes_not_joined_have_no_successors; [|eauto|]; eauto.
+           econstructor 2; eauto.
+           find_rewrite; simpl in *; omega.
+      * break_exists; break_and.
+        apply Exists_exists; exists h; split.
+        change h with (addr_of (make_pointer h)).
+        apply in_map.
+        apply hd_in_chop_succs.
+        eapply live_node_characterization; try congruence; eauto.
     + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
       {
         eapply_prop live_node_in_msg_succ_lists; eauto.
@@ -669,7 +710,7 @@ Proof.
       apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
       break_and; split; eauto.
       eapply live_node_preserved_by_request; subst; eauto.
-Admitted.
+Qed.
 Hint Resolve live_node_invariant_request.
 
 Theorem live_node_invariant_output :
