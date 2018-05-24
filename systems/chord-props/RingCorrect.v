@@ -1565,14 +1565,45 @@ Proof.
 Qed.
 
 Lemma principal_not_before_stabilize2_tgt :
-  forall gst st h s ns p req,
+  forall gst,
     reachable_st gst ->
-    ~ In h (failed_nodes gst) ->
-    sigma gst h = Some st ->
-    cur_request st = Some (s, Stabilize2 ns, req) ->
-    no_live_node_skips gst p ->
-    ~ between (hash h) (hash p) (id_of s).
+    forall st h s ns p req,
+      In h (nodes gst) ->
+      ~ In h (failed_nodes gst) ->
+      sigma gst h = Some st ->
+      cur_request st = Some (s, Stabilize2 ns, req) ->
+      principal gst p ->
+      ~ between (hash h) (hash p) (id_of s).
 Proof.
+  intros until 1.
+  pattern gst.
+  eapply chord_net_invariant; do 2 autounfold; intros.
+  - match goal with
+    | H: context[cur_request] |- _ =>
+      erewrite initial_st_cur_request_None in H; eauto; congruence
+    end.
+  - repeat find_rewrite.
+    destruct (addr_eq_dec h0 h); subst.
+    + match goal with
+      | H: context[start_handler] |- _ =>
+        rewrite start_handler_with_single_known in H
+      end.
+      rewrite_update.
+      repeat find_injection || simpl in *.
+      congruence.
+    + rewrite_update.
+      simpl in *; break_or_hyp; try tauto.
+      find_eapply_prop hash; eauto.
+      (* need to know principal nodes were principal nodes before start step *)
+      admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
 Admitted.
 
 Lemma principal_not_before_join2_tgt :
@@ -1704,6 +1735,7 @@ Proof.
         * rewrite -> wf_ptr_hash_eq
             by eauto using cur_request_valid.
           eapply principal_not_before_stabilize2_tgt; eauto.
+          unfold principal; eauto.
       + find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
         rewrite cons_make_succs.
         simpl; subst.
