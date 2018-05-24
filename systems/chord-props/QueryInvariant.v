@@ -1289,15 +1289,16 @@ Proof.
   intros; repeat handler_def; reflexivity.
 Qed.
 
-Theorem query_message_ok'_request_invariant :
+Theorem query_message_ok'_request_invariant_dst_live :
  chord_request_invariant
    (fun g : global_state =>
     forall (src dst : addr) (st__src st__dst : data),
-    sigma g src = Some st__src ->
-    sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src)
-      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
-      (channel g dst src)).
+      ~ In dst (failed_nodes g) ->
+        sigma g src = Some st__src ->
+      sigma g dst = Some st__dst ->
+      query_message_ok' src dst (cur_request st__src)
+                        (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
+                        (channel g dst src)).
 Proof.
   repeat autounfold; intros.
   assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h))
@@ -1305,22 +1306,59 @@ Proof.
   destruct (addr_eq_dec h src); subst.
   - destruct (sigma gst dst0) eqn:?;
       [|repeat find_rewrite; update_destruct; rewrite_update; congruence].
+    replace (failed_nodes gst') with (failed_nodes gst) in H15.
     match goal with
     | H: forall (_ _ : addr), _ |- _ =>
       specialize (H src dst0);
         do 2 insterU H;
-        repeat (forwards; eauto; concludes)
+        repeat (forward H; eauto; concludes)
     end.
+    inv_prop query_message_ok'; try tauto.
+    apply QMLive; congruence || auto.
+    repeat find_rewrite || find_injection.
+    repeat rewrite_update; find_injection.
+    update_destruct; repeat rewrite_update.
+    simpl.
     inv_prop cur_request_timeouts_ok.
     + exfalso; intuition eauto.
     + assert (Request dst req = Request (addr_of dstp) req0)
         by eauto using at_most_one_request_timeout'_uniqueness.
       handler_def; try congruence.
       handler_def.
+      * repeat handler_def; simpl in *; try congruence.
+        eapply CInone.
+        -- admit.
+        -- admit.
+        -- admit.
       * admit.
       * admit.
       * admit.
       * admit.
+      * admit.
+      * admit.
+    + repeat find_rewrite || find_injection.
+      inv_prop query_message_ok.
+      * repeat find_rewrite || find_injection.
+        handler_def; try congruence.
+        simpl in *.
+        replace (channel gst' src dst0) with (channel gst src dst0)
+          by eauto using msgs_eq_channels_eq.
+        replace (channel gst' dst0 src) with (channel gst dst0 src)
+          by eauto using msgs_eq_channels_eq.
+        auto.
+      * repeat handler_def || handler_simpl.
+        -- eapply CInone; eauto.
+           simpl in *.
+           admit.
+           admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
+        -- admit.
       * admit.
       * admit.
       * admit.
@@ -1335,7 +1373,7 @@ Proof.
       | H: forall (_ _ : addr), _ |- _ =>
         specialize (H src dst0);
           do 2 insterU H;
-          repeat (forwards; eauto; concludes)
+          repeat (forward H; eauto; concludes)
       end.
       assert (Request dst req = Request (addr_of dstp) req0)
         by eauto using at_most_one_request_timeout'_uniqueness.
@@ -1394,6 +1432,25 @@ Proof.
     + erewrite (channel_msgs_unchanged ms gst'); eauto.
       erewrite (channel_msgs_unchanged ms gst'); eauto.
       repeat rewrite_update; eauto.
+Admitted.
+
+Theorem query_message_ok'_request_invariant :
+ chord_request_invariant
+   (fun g : global_state =>
+    forall (src dst : addr) (st__src st__dst : data),
+    sigma g src = Some st__src ->
+    sigma g dst = Some st__dst ->
+    query_message_ok' src dst (cur_request st__src)
+      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
+      (channel g dst src)).
+Proof.
+  repeat autounfold; intros.
+  destruct (In_dec addr_eq_dec dst0 (failed_nodes gst)).
+  - repeat find_rewrite.
+    update_destruct; subst; try tauto.
+    admit.
+  - eapply query_message_ok'_request_invariant_dst_live; eauto.
+    congruence.
 Admitted.
 
 Theorem query_message_ok'_start_invariant :
