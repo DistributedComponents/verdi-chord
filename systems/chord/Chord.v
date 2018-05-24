@@ -981,7 +981,7 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       ~ In h (failed_nodes gst) ->
       In (src, (h, m)) (msgs gst) ->
       succs_msg m succs ->
-      not_skipped (hash h) (map ChordIDSpace.id_of (make_succs (make_pointer src) succs)) (hash p).
+      not_skipped (hash src) (map ChordIDSpace.id_of succs) (hash p).
   Hint Unfold no_msg_to_live_node_skips.
   
   (* "A principal node is a member that is not skipped by any member's

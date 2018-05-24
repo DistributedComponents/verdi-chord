@@ -961,8 +961,8 @@ Proof.
     split; autounfold; intros; eauto.
     + find_eapply_prop no_live_node_skips; eauto.
       find_eapply_prop iff; eauto.
-    + find_eapply_prop no_msg_to_live_node_skips; eauto;
-        solve [find_eapply_prop In; eauto].
+    + find_eapply_prop no_msg_to_live_node_skips;
+        try find_eapply_prop In; eauto.
 Qed.
 
 Lemma principals_involves_joined_node_state_only :
@@ -1122,17 +1122,16 @@ Proof.
     split; eauto using live_after_start_was_live.
     split; autounfold in *; intros.
     + inv_prop principal;  expand_def.
-      assert (live_node gst p) by eauto using live_after_start_was_live.
-      assert (live_node gst' h0) by eauto using live_before_start_stays_live.
-      inv_prop (live_node gst' h0); expand_def.
-      find_eapply_prop not_skipped; eauto.
-      assert (h0 <> h) by eauto using live_node_not_just_started.
-      repeat find_rewrite; rewrite_update; congruence.
+      find_eapply_prop no_live_node_skips; eauto.
+      eapply live_before_start_stays_live; eauto.
+      repeat find_rewrite;
+        update_destruct; rewrite_update; eauto.
+      subst; exfalso; eauto.
     + inv_prop principal; expand_def.
       assert (live_node gst p) by eauto using live_after_start_was_live.
-      find_eapply_prop not_skipped;
-        repeat find_rewrite || find_injection;
-        eauto with datatypes.
+      find_eapply_prop no_msg_to_live_node_skips;
+        repeat find_rewrite; try solve [try apply in_cons; eauto].
+      in_crush; eauto.
 Qed.
 Hint Resolve zave_invariant_start.
 
@@ -1159,7 +1158,7 @@ Proof.
   - intros; subst.
     inv_prop live_node; expand_def.
     repeat find_rewrite || find_injection.
-    find_eapply_prop not_skipped; repeat find_rewrite; eauto.
+    find_eapply_prop succ_list; repeat find_rewrite; eauto.
     eapply live_node_characterization; repeat find_rewrite; eauto.
   - intros; subst.
     inv_prop live_node; expand_def.
@@ -1217,7 +1216,8 @@ Proof.
         rewrite_update; congruence.
       }
       eauto.
-  - find_eapply_prop no_msg_to_live_node_skips; eauto; congruence.
+  - find_eapply_prop no_msg_to_live_node_skips;
+      repeat find_rewrite; eauto.
 Qed.
 Hint Resolve succ_lists_same_principal_preserved.
 
@@ -1265,7 +1265,9 @@ Proof.
       }
       eauto.
   - find_copy_apply_lem_hyp live_node_means_state_exists; expand_def.
-    find_eapply_prop no_msg_to_live_node_skips; eauto;
+    find_eapply_prop no_msg_to_live_node_skips;
+      repeat find_reverse_rewrite;
+      eauto;
       unfold not; find_eapply_prop In; now eauto.
 Qed.
 Hint Resolve msgs_succs_principal_preserved.
@@ -1450,6 +1452,74 @@ Proof.
 Qed.
 Hint Resolve not_skipped_nil.
 
+Lemma cons_make_succs :
+  forall p succs,
+    make_succs p succs = p :: firstn (SUCC_LIST_LEN - 1) succs.
+Proof.
+  pose proof succ_list_len_lower_bound.
+  unfold make_succs, chop_succs.
+  intros; simpl.
+  destruct SUCC_LIST_LEN; try omega.
+  simpl.
+  replace (n - 0) with n by omega.
+  auto.
+Qed.
+
+Lemma pair_in_complete :
+  forall A a b l,
+    @pair_in A a b l ->
+    exists xs ys,
+      l = xs ++ [a; b] ++ ys.
+Proof.
+  intros.
+Admitted.
+
+Lemma not_skipped_firstn :
+  forall h l n k,
+    not_skipped h l n ->
+    not_skipped h (firstn k l) n.
+Proof.
+  unfold not_skipped.
+  intros.
+  change (h :: firstn k l) with (firstn (S k) (h :: l)) in *.
+  copy_eapply pair_in_sound H0.
+  find_eapply_lem_hyp pair_in_firstn.
+  find_eapply_lem_hyp pair_in_complete.
+  expand_def; eauto.
+Qed.
+
+Lemma map_firstn :
+  forall A B (f : A -> B) k l,
+    map f (firstn k l) = firstn k (map f l).
+Proof.
+  induction k; auto.
+  intros.
+  destruct l; simpl; congruence.
+Qed.
+
+Lemma recv_handler_succs_msg_accurate :
+  forall src dst st p st' ms nts cts h m succs,
+  recv_handler src dst st p = (st', ms, nts, cts) ->
+  In (h, m) ms ->
+  succs_msg m succs ->
+  succs = succ_list st'.
+Proof.
+  intros; inv_prop succs_msg.
+  - handler_def.
+    find_apply_lem_hyp in_app_or; break_or_hyp.
+    + find_eapply_lem_hyp handle_delayed_queries_GotSuccList_response_accurate; eauto.
+    + handler_def;
+      repeat match goal with
+             | H: False |- _ => elim H
+             | H: _ \/ _ |- _ => destruct H
+             | H: (_, _) = (_, _) |- _ => injc H; try congruence
+             | |- _ => progress simpl in *
+             | |- _ => handler_def
+             end;
+      eapply handle_query_req_GotSuccList_response_accurate; eauto.
+  - eapply recv_handler_GotPredAndSuccs_response_accurate; eauto.
+Qed.
+
 Theorem zave_invariant_recv_sufficient_principals :
   chord_recv_handler_pre_post
     zave_invariant
@@ -1471,7 +1541,8 @@ Proof.
       repeat find_rewrite.
       exfalso; eapply in_nil.
       rewrite -> e; eapply hd_in_chop_succs.
-  - eapply some_principals_ok.
+  - assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h)) by auto.
+    eapply some_principals_ok.
     unfold sufficient_principals, principals in *; break_exists_exists.
     break_and; repeat split; omega || eauto.
     rewrite -> Forall_forall in *; intros.
@@ -1480,29 +1551,86 @@ Proof.
     subst.
     repeat find_rewrite; update_destruct; rewrite_update; subst.
     + repeat (handler_def; simpl in *; try congruence);
-        repeat (find_rewrite || find_injection); simpl;
-          try solve [find_eapply_prop no_msg_to_live_node_skips; eauto].
-      * find_copy_eapply_lem_hyp stabilize2_param_matches; eauto; subst.
-        assert (wf_ptr x12).
-        {
-          admit.
-        }
-        rewrite -> (wf_ptr_eq x12) by auto.
-        eapply H23; eauto.
+        repeat (find_rewrite || find_injection); simpl.
+      * repeat find_rewrite.
+        inv_prop cur_request_timeouts_ok'.
+        invcs_prop query_request.
+        find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+        break_exists; break_and.
+        repeat find_rewrite || find_injection.
+        rewrite cons_make_succs.
+        simpl.
+        eapply not_skipped_initial'.
+        -- rewrite map_firstn.
+           eapply not_skipped_firstn.
+           find_eapply_prop no_msg_to_live_node_skips; eauto.
+        -- admit. (* need invariant. *)
+      * repeat find_rewrite.
+        inv_prop cur_request_timeouts_ok'.
+        invcs_prop query_request.
+        find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+        break_exists; break_and.
+        repeat find_rewrite || find_injection.
+        rewrite cons_make_succs.
+        simpl.
+        eapply not_skipped_initial'.
+        -- rewrite map_firstn.
+           eapply not_skipped_firstn.
+           find_eapply_prop no_msg_to_live_node_skips; eauto.
+        -- admit. (* need invariant. *)
+      * repeat find_rewrite.
+        inv_prop cur_request_timeouts_ok'.
+        invcs_prop query_request.
+        find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+        break_exists; break_and.
+        repeat find_rewrite || find_injection.
+        rewrite cons_make_succs.
+        simpl.
+        eapply not_skipped_initial'.
+        -- rewrite map_firstn.
+           eapply not_skipped_firstn.
+           find_eapply_prop no_msg_to_live_node_skips; eauto.
+        -- admit. (* need invariant. *)
+      * find_copy_eapply_lem_hyp stabilize2_param_matches; eauto.
+        rewrite cons_make_succs.
+        simpl; subst.
+        erewrite <- wf_ptr_hash_eq
+          by eauto using cur_request_valid.
+        eapply not_skipped_initial'.
+        -- rewrite map_firstn.
+           eapply not_skipped_firstn.
+           find_eapply_prop no_msg_to_live_node_skips; eauto.
+        -- admit. (* need invariant. *)
       * find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
-        assert (wf_ptr x12).
-        {
-          admit.
-        }
-        rewrite -> (wf_ptr_eq x12) by auto.
-        eapply H23; eauto.
+        rewrite cons_make_succs.
+        simpl; subst.
+        erewrite <- wf_ptr_hash_eq
+          by eauto using cur_request_valid.
+        eapply not_skipped_initial'.
+        -- rewrite map_firstn.
+           eapply not_skipped_firstn.
+           find_eapply_prop no_msg_to_live_node_skips; eauto.
+        -- admit. (* need invariant. *)
     + find_eapply_prop no_live_node_skips; eauto.
       eapply live_node_equivalence; eauto.
       repeat find_rewrite; rewrite_update; auto.
     + repeat find_rewrite.
       find_apply_lem_hyp in_app_or.
       break_or_hyp.
-      * admit.
+      * find_apply_lem_hyp in_map_iff; expand_def; unfold send in *; find_injection.
+        find_eapply_lem_hyp recv_handler_succs_msg_accurate; eauto.
+        subst.
+        assert (sigma gst' src0 = Some st')
+          by (repeat find_rewrite; rewrite_update; eauto).
+        destruct (joined st') eqn:?.
+        assert (no_live_node_skips gst' x0) by admit.
+        find_eapply_prop no_live_node_skips; eauto.
+        eapply live_node_characterization; eauto || congruence.
+        replace (succ_list st') with (@nil pointer); eauto.
+        symmetry.
+        eapply nodes_not_joined_have_no_successors;
+          solve [econstructor; eauto
+                |eauto].
       * find_eapply_prop no_msg_to_live_node_skips; eauto; try congruence.
         find_rewrite.
         in_crush.
@@ -1634,49 +1762,21 @@ Proof.
 Qed.
 Hint Resolve remove_list_element_still_not_skipped.
 
-Lemma cons_make_succs :
-  forall p succs,
-    make_succs p succs = p :: firstn (SUCC_LIST_LEN - 1) succs.
+Lemma weaken_no_live_node_skips :
+  forall gst p,
+    reachable_st gst ->
+    no_live_node_skips gst p ->
+    forall h st,
+      In h (nodes gst) ->
+      ~ In h (failed_nodes gst) ->
+      sigma gst h = Some st ->
+      not_skipped (ChordIDSpace.hash h) (map id_of (succ_list st)) (ChordIDSpace.hash p).
 Proof.
-  pose proof succ_list_len_lower_bound.
-  unfold make_succs, chop_succs.
-  intros; simpl.
-  destruct SUCC_LIST_LEN; try omega.
-  simpl.
-  replace (n - 0) with n by omega.
-  auto.
-Qed.
-
-Lemma pair_in_complete :
-  forall A a b l,
-    @pair_in A a b l ->
-    exists xs ys,
-      l = xs ++ [a; b] ++ ys.
-Proof.
-  intros.
-Admitted.
-
-Lemma not_skipped_firstn :
-  forall h l n k,
-    not_skipped h l n ->
-    not_skipped h (firstn k l) n.
-Proof.
-  unfold not_skipped.
-  intros.
-  change (h :: firstn k l) with (firstn (S k) (h :: l)) in *.
-  copy_eapply pair_in_sound H0.
-  find_eapply_lem_hyp pair_in_firstn.
-  find_eapply_lem_hyp pair_in_complete.
-  expand_def; eauto.
-Qed.
-
-Lemma map_firstn :
-  forall A B (f : A -> B) k l,
-    map f (firstn k l) = firstn k (map f l).
-Proof.
-  induction k; auto.
-  intros.
-  destruct l; simpl; congruence.
+  autounfold; intros; subst.
+  destruct (joined st) eqn:?.
+  - find_eapply_prop not_skipped; eauto using live_node_characterization.
+  - find_apply_lem_hyp nodes_not_joined_have_no_successors; eauto.
+    repeat find_rewrite; eauto.
 Qed.
 
 Theorem zave_invariant_request :
@@ -1795,37 +1895,28 @@ Proof.
              end.
       eauto.
     }
-    unfold principal; repeat break_and_goal.
-    + eauto.
-    + autounfold; intros; subst.
+    assert (no_live_node_skips gst' x0).
+    {
+      autounfold; intros; subst.
       repeat find_rewrite.
       update_destruct; rewrite_update; subst;
         repeat find_rewrite || find_injection;
         eauto.
-    + autounfold; intros; subst.
-      find_rewrite. find_apply_lem_hyp in_app_or; break_or_hyp.
-      * find_copy_apply_lem_hyp in_map_iff; expand_def.
-        unfold send in *; find_injection.
-        find_eapply_lem_hyp responses_request_timeout_handler_accurate; eauto; subst.
-        unfold make_succs, chop_succs; simpl.
-        rewrite map_firstn.
-        eapply not_skipped_firstn.
-        assert (sigma gst' src = Some st')
-          by (repeat find_rewrite; rewrite_update; auto).
-        simpl; apply not_skipped_initial'.
-        -- destruct (joined st') eqn:?.
-          ++ eapply H27; eauto using live_node_characterization.
-          ++ find_apply_lem_hyp nodes_not_joined_have_no_successors; eauto.
-            repeat find_rewrite; eauto using not_skipped_nil.
-            solve [econstructor; eauto].
-        -- apply between_swap_not.
-           (* need invariant saying that if h0 ---request----> src,
-              then h0 < src < h0.succs[0].
-              This implies (since x0 is principal) that h0 < src < x0. *)
-           admit.
-      * find_eapply_prop no_msg_to_live_node_skips; eauto.
-        congruence.
-        intuition congruence.
+    }
+    unfold principal; repeat break_and_goal; eauto.
+    autounfold; intros; subst.
+    find_rewrite. find_apply_lem_hyp in_app_or; break_or_hyp.
+    * find_copy_apply_lem_hyp in_map_iff; expand_def.
+      unfold send in *; find_injection.
+      find_eapply_lem_hyp responses_request_timeout_handler_accurate; eauto; subst.
+      assert (sigma gst' src = Some st')
+        by (repeat find_rewrite; rewrite_update; auto).
+      eapply weaken_no_live_node_skips;
+        try solve [econstructor 2; eauto
+                  |congruence
+                  |eauto].
+    * find_eapply_prop no_msg_to_live_node_skips;
+        repeat find_reverse_rewrite; eauto.
   - break_and.
     unfold sufficient_principals in *.
     eapply some_principals_ok.
@@ -1844,8 +1935,8 @@ Proof.
       find_apply_lem_hyp nodes_not_joined_have_no_successors; eauto.
       congruence.
     }
-    split; intuition eauto.
-    + break_and.
+    assert (no_live_node_skips gst' x0).
+    {
       autounfold; intros.
       assert (not_skipped (ChordIDSpace.hash h)
                           (map id_of (s1 :: succ_list st'))
@@ -1881,44 +1972,18 @@ Proof.
       * cut (not_skipped (ChordIDSpace.hash h0)
                           (map id_of (succ_list st0))
                           (ChordIDSpace.hash x0)); eauto.
-    + autounfold; intros; subst.
-      find_rewrite. in_crush.
-      * unfold send in *; find_injection.
-        find_eapply_lem_hyp responses_request_timeout_handler_accurate; eauto; subst.
-        unfold make_succs, chop_succs; simpl.
-        rewrite map_firstn.
-        eapply not_skipped_firstn.
-        assert (not_skipped (hash src) (map id_of (succ_list st)) (hash x0))
-          by (find_eapply_prop no_live_node_skips; eauto).
-        simpl; apply not_skipped_initial'.
-        -- repeat find_rewrite; eauto.
-          eapply remove_list_element_still_not_skipped; eauto.
-          intro.
-           invcs_prop timeout_constraint.
-           invcs_prop cur_request_timeouts_ok;
-             [exfalso; intuition eauto|].
-           find_eapply_lem_hyp stabilize_only_with_first_succ; eauto; expand_def.
-           repeat find_rewrite; simpl in *.
-           repeat find_injection.
-           repeat invcs_prop live_node; expand_def.
-           assert (addr_of x1 = x0).
-           {
-             eapply hash_injective_invariant; eauto using in_failed_in_nodes.
-             repeat find_reverse_rewrite.
-             eapply wf_ptr_hash_eq.
-             eapply wf_ptr_succ_list_invariant' with (h:=src); eauto.
-             repeat find_rewrite || find_injection.
-             in_crush.
-           }
-           repeat find_rewrite; eauto.
-        -- apply between_swap_not.
-           (* need invariant saying that if h0 ---request----> src,
-              then h0 < src < h0.succs[0].
-              This implies (since x0 is principal) that h0 < src < x0. *)
-           admit.
-      * find_eapply_prop no_msg_to_live_node_skips; eauto.
-        congruence.
-Admitted.
+    }
+    split; eauto.
+    split; eauto.
+    autounfold; intros; subst.
+    find_rewrite. in_crush.
+    * unfold send in *; find_injection.
+      find_eapply_lem_hyp responses_request_timeout_handler_accurate; eauto; subst.
+      find_eapply_prop no_live_node_skips; eauto.
+      repeat find_rewrite; rewrite_update; auto.
+    * find_eapply_prop no_msg_to_live_node_skips;
+        repeat find_reverse_rewrite; eauto.
+Qed.
 Hint Resolve zave_invariant_request.
 
 Theorem zave_invariant_input :
