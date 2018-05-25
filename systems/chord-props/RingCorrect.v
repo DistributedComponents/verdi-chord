@@ -1572,7 +1572,7 @@ Lemma principal_not_before_stabilize2_tgt :
       ~ In h (failed_nodes gst) ->
       sigma gst h = Some st ->
       cur_request st = Some (s, Stabilize2 ns, req) ->
-      principal gst p ->
+      not_skipped (hash h) (map id_of (succ_list st)) (hash p) ->
       ~ between (hash h) (hash p) (id_of s).
 Proof.
   intros until 1.
@@ -1593,18 +1593,69 @@ Proof.
       congruence.
     + rewrite_update.
       simpl in *; break_or_hyp; try tauto.
-      find_eapply_prop hash; eauto.
-      (* need to know principal nodes were principal nodes before start step *)
-      admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+      eauto.
+  - repeat find_rewrite.
+    eauto with datatypes.
+  - repeat find_rewrite.
+    update_destruct; rewrite_update.
+    + subst. repeat find_injection || find_rewrite.
+      repeat (handler_def || handler_simpl).
+    + eauto.
+  - repeat find_rewrite.
+    update_destruct; rewrite_update.
+    + subst. repeat find_injection || find_rewrite.
+      repeat (handler_def || handler_simpl).
+    + eauto.
+  - repeat find_rewrite.
+    update_destruct; rewrite_update.
+    + subst. repeat find_injection || find_rewrite.
+      repeat (handler_def || handler_simpl).
+    + eauto.
+  - repeat find_rewrite.
+    update_destruct; rewrite_update.
+    + subst. repeat find_injection || find_rewrite.
+      repeat (handler_def || handler_simpl).
+    + eauto.
+  - repeat find_rewrite.
+    update_destruct; rewrite_update.
+    + subst. repeat find_injection || find_rewrite.
+      repeat (handler_def || handler_simpl).
+      Require Import Chord.PtrCorrectInvariant.
+      replace (ptr st) with (make_pointer h0) in *
+        by (symmetry; eapply ptr_correct; eauto).
+      unfold ptr_between in *; simpl in *.
+      assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst0 h0))
+        by eauto.
+      repeat find_rewrite.
+      inv_prop cur_request_timeouts_ok'; inv_prop query_request.
+      find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+      expand_def.
+      destruct (succ_list st) eqn:?;
+        simpl in *; try congruence.
+      find_injection.
+      assert (between (hash h0) (hash p0) (id_of x)).
+      {
+        eapply between_trans.
+        eauto.
+        rewrite <- (wf_ptr_hash_eq x)
+          by eauto using cur_request_valid.
+        repeat find_rewrite.
+        eauto.
+      }
+      find_eapply_prop not_skipped; eauto.
+      repeat find_reverse_rewrite.
+      simpl.
+      rewrite cons_make_succs.
+      simpl.
+      change ChordIDParams.hash with hash.
+      rewrite -> (wf_ptr_hash_eq x)
+        by eauto using cur_request_valid.
+      eauto using app_nil_l with datatypes.
+    + eauto.
+  - repeat (handler_def || handler_simpl).
+  - repeat find_rewrite; simpl in *; eauto.
+  - repeat find_rewrite; simpl in *; eauto.
+Qed.
 
 Lemma principal_not_before_join2_tgt :
   forall gst st h s ns p req,
@@ -1735,7 +1786,7 @@ Proof.
         * rewrite -> wf_ptr_hash_eq
             by eauto using cur_request_valid.
           eapply principal_not_before_stabilize2_tgt; eauto.
-          unfold principal; eauto.
+          eapply weaken_no_live_node_skips; eauto.
       + find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
         rewrite cons_make_succs.
         simpl; subst.
@@ -2167,16 +2218,6 @@ Proof.
 Qed.
 Hint Resolve zave_invariant_holds.
 
-(* Eventually this should only list the following "assumptions":
-
-    succ_list_len_lower_bound : SUCC_LIST_LEN >= 2
-    ocaml_hash : Chord.addr -> {s : String.string | String.length s = N}
-    Chord.client_addr : String.string -> Prop
-    SUCC_LIST_LEN : nat
-    N : nat
-*)
-Print Assumptions zave_invariant_holds.
-
 Lemma sufficient_principals_invariant :
   forall gst,
     reachable_st gst ->
@@ -2265,3 +2306,13 @@ Proof.
       eauto.
 Qed.
 Hint Resolve first_succ_and_second_distinct.
+
+(* Eventually this should only list the following "assumptions":
+
+    succ_list_len_lower_bound : SUCC_LIST_LEN >= 2
+    ocaml_hash : Chord.addr -> {s : String.string | String.length s = N}
+    Chord.client_addr : String.string -> Prop
+    SUCC_LIST_LEN : nat
+    N : nat
+*)
+Print Assumptions zave_invariant_holds.
