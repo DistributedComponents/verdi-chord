@@ -24,8 +24,10 @@ module Client : ClientSig = struct
     print_newline ();
     listen_fd
 
-  let setup_write_fd write_addr =
+  let setup_write_fd write_addr listen_addr =
     let write_fd = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+    Unix.setsockopt write_fd Unix.SO_REUSEADDR true;
+    Unix.bind write_fd (Unix.ADDR_INET (listen_addr, 0));
     Unix.connect write_fd (Unix.ADDR_INET (write_addr, ChordArrangement.chord_default_port));
     Printf.printf "[%s] opened connection" (Util.timestamp ());
     print_newline ();
@@ -56,12 +58,15 @@ module Client : ClientSig = struct
           if fd = listen_fd then
             let read_fd = accept_read_fd fd in
             (read_fd :: fds, res)
-          else
+          else begin
+            Printf.printf "[%s] receiving data" (Util.timestamp ());
+            print_newline ();
             match Util.recv_buf_chunk fd read_bufs with
             | None -> (fds, res)
             | Some buf ->
               let m = deserialize_msg buf in
-              (fds, Some m)) ([], None) ready_fds
+              (fds, Some m)
+          end) ([], None) ready_fds
     in
     match res with
     | None -> eloop timeout listen_fd (new_fds @ read_fds) read_bufs
@@ -69,7 +74,7 @@ module Client : ClientSig = struct
 
   let query listen_addr write_addr msg =
     let listen_fd = setup_listen_fd listen_addr in
-    let write_fd = setup_write_fd write_addr in
+    let write_fd = setup_write_fd write_addr listen_addr in
     let buf = serialize_msg msg in
     let read_bufs = Hashtbl.create 1 in
     Util.send_chunk write_fd buf;
