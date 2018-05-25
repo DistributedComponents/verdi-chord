@@ -20,6 +20,7 @@ Require Import Chord.QueryTargetsJoined.
 Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodeInSuccLists.
 Require Import Chord.LiveNodePreservation.
+Require Import Chord.PtrCorrectInvariant.
 Require Import Chord.StabilizeOnlyWithFirstSucc.
 Require Import Chord.WfPtrSuccListInvariant.
 
@@ -1620,7 +1621,6 @@ Proof.
     update_destruct; rewrite_update.
     + subst. repeat find_injection || find_rewrite.
       repeat (handler_def || handler_simpl).
-      Require Import Chord.PtrCorrectInvariant.
       replace (ptr st) with (make_pointer h0) in *
         by (symmetry; eapply ptr_correct; eauto).
       unfold ptr_between in *; simpl in *.
