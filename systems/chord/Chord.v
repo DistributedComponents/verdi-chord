@@ -959,15 +959,37 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       h :: succs = xs ++ [a; b] ++ ys ->
       ~ between a n b.
 
-  (* "A principal node is a member that is not skipped by any member's
-     extended successor list" *)
-  Definition principal (gst : global_state) (p : addr) : Prop :=
-    live_node gst p /\
+  Inductive succs_msg : payload -> list pointer -> Prop :=
+  | SuccsMsgGotSuccList :
+      forall succs, succs_msg (GotSuccList succs) succs
+  | SuccsMsgGotPredAndSuccs :
+      forall p succs,
+      succs_msg (GotPredAndSuccs p succs) succs.
+  Hint Constructors succs_msg.
+
+  Definition no_live_node_skips (gst : global_state) (p : addr) : Prop :=
     forall h st succs,
       live_node gst h ->
       sigma gst h = Some st ->
       succs = map ChordIDSpace.id_of (succ_list st) ->
       not_skipped (hash h) succs (hash p).
+  Hint Unfold no_live_node_skips.
+
+  Definition no_msg_to_live_node_skips (gst : global_state) (p : addr) : Prop :=
+    forall src h m succs,
+      In h (nodes gst) ->
+      ~ In h (failed_nodes gst) ->
+      In (src, (h, m)) (msgs gst) ->
+      succs_msg m succs ->
+      not_skipped (hash src) (map ChordIDSpace.id_of succs) (hash p).
+  Hint Unfold no_msg_to_live_node_skips.
+  
+  (* "A principal node is a member that is not skipped by any member's
+     extended successor list" *)
+  Definition principal (gst : global_state) (p : addr) : Prop :=
+    live_node gst p /\
+    no_live_node_skips gst p /\
+    no_msg_to_live_node_skips gst p.
 
   Definition principals (gst : global_state) (ps : list addr) : Prop :=
     NoDup ps /\

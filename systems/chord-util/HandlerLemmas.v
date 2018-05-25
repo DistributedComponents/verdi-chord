@@ -1708,6 +1708,31 @@ Proof.
 Qed.
 Hint Resolve recv_handler_GotPredAndSuccs_response_accurate.
 
+Lemma responses_request_timeout_handler_accurate :
+  forall h st dst msg st' ms nts cts eff,
+    request_timeout_handler h st dst msg = (st', ms, nts, cts, eff) ->
+    forall dst m succs,
+      In (dst, m) ms ->
+      succs_msg m succs ->
+      succs = succ_list st'.
+Proof.
+  intros.
+  handler_def; auto.
+  in_crush.
+  - repeat match goal with
+           | H: context[do_delayed_queries] |- _ => clear H
+           | |- _ =>
+             progress (repeat handler_def; try simpl in *; intuition)
+           | H: context[option_map] |- _ =>
+             eapply option_map_Some in H; eauto; expand_def
+           | H: _ = _ |- _ => injc H
+           end; invcs_prop succs_msg.
+  - inv_prop succs_msg.
+    + eapply handle_delayed_queries_GotSuccList_response_accurate; eauto.
+    + eapply handle_delayed_queries_GotPredAndSuccs_response_accurate; eauto.
+Qed.
+
+
 Lemma joining_start_handler_st_joined:
   forall h k st ms nts,
     start_handler h [k] = (st, ms, nts) ->
