@@ -21,6 +21,7 @@ Require Import Chord.QueryInvariant.
 Require Import Chord.LiveNodeInSuccLists.
 Require Import Chord.LiveNodePreservation.
 Require Import Chord.PtrCorrectInvariant.
+Require Import Chord.Sorting.
 Require Import Chord.StabilizeOnlyWithFirstSucc.
 Require Import Chord.WfPtrSuccListInvariant.
 
@@ -320,8 +321,6 @@ Proof.
   - find_apply_lem_hyp not_between_xyy. auto.
   - find_apply_lem_hyp between_rot_l; auto.
 Qed.
-
-Require Import Chord.Sorting.
 
 Lemma sorted_map :
   forall A B (f : A -> B) (leA : A -> A -> bool) (leB : B -> B -> bool),
@@ -686,7 +685,7 @@ Proof.
     by eauto using sort_by_between_sorted.
   match goal with
   | H : sorted _ _ _ |- _ =>
-    eapply sorted_zero_prefix with (wf := (wf h)) in H  
+    eapply sorted_zero_prefix with (wf := (wf h)) in H
   end;
     eauto using pointer_eq_dec, unroll_between_zero, unroll_between_ptr_trans.
   - break_exists_name xs. break_exists_name ys.
@@ -1657,12 +1656,156 @@ Proof.
   - repeat find_rewrite; simpl in *; eauto.
 Qed.
 
+Lemma best_predecessor_between :
+  forall h x succs p,
+    best_predecessor h succs x = p ->
+    ptr_between h p x \/ h = p.
+Proof.
+  unfold best_predecessor, hd.
+  intros.
+  break_match; subst; eauto.
+  assert (In p (p :: l)) by in_crush.
+  find_reverse_rewrite.
+  find_eapply_lem_hyp filter_In.
+  intuition eauto.
+Qed.
+
+Lemma best_predecessor_self :
+  forall h x succs,
+    best_predecessor h succs x = h ->
+    id_of h = id_of x \/
+    id_of (hd h succs) = id_of x \/
+    ptr_between h x (hd h succs).
+Proof.
+  unfold best_predecessor, hd, ptr_between.
+  intros.
+  destruct (id_eq_dec (id_of h) (id_of x)); eauto.
+  destruct succs as [|s rest];
+    [simpl in *; right; right;
+     eapply between_xyx;
+     unfold id_of in *; congruence|].
+  destruct (id_eq_dec (id_of s) (id_of x)); eauto.
+  do 2 right.
+  repeat break_match; try eauto using between_xyx.
+  - assert (~ In s []) by in_crush.
+    repeat find_reverse_rewrite; subst.
+    erewrite filter_In in *.
+    eapply not_between_swap;
+      [unfold id_of in *; congruence|].
+    intro; eapply_prop not.
+    split; in_crush.
+  - subst.
+    assert (In h (h :: l)) by in_crush.
+    repeat find_reverse_rewrite; subst.
+    erewrite filter_In in *; expand_def.
+    find_apply_lem_hyp ptr_between_bool_true.
+    exfalso; eapply not_between_xxy; eauto.
+Qed.
+
+Lemma handle_query_req_GotBestPredecessor_between :
+  forall st src dst ms p,
+    handle_query_req st src (GetBestPredecessor p) = ms ->
+    In (dst, GotBestPredecessor (ptr st)) ms ->
+    id_of (ptr st) = id_of p \/
+    id_of (hd (ptr st) (succ_list st)) = id_of p \/
+    ptr_between (ptr st) p (hd (ptr st) (succ_list st)).
+Proof.
+  unfold handle_query_req.
+  intros; subst.
+  eapply best_predecessor_self.
+  in_crush; congruence.
+Qed.
+
+Lemma handle_delayed_query_GotBestPredecessor_accurate :
+  forall h st ms dst src p,
+    handle_delayed_query h st (src, GetBestPredecessor p) = ms ->
+    In (dst, GotBestPredecessor (ptr st)) ms ->
+    id_of (ptr st) = id_of p \/
+    id_of (hd (ptr st) (succ_list st)) = id_of p \/
+    ptr_between (ptr st) p (hd (ptr st) (succ_list st)).
+Proof.
+  unfold handle_delayed_query.
+  intros.
+  eapply handle_query_req_GotBestPredecessor_between; eauto.
+Qed.
+
+Lemma handle_delayed_query_GotBestPredecessor_not_between :
+  forall h st ms dst src p,
+    handle_delayed_query h st (src, GetBestPredecessor p) = ms ->
+    In (dst, GotBestPredecessor (ptr st)) ms ->
+    ~ ptr_between (ptr st) (hd (ptr st) (succ_list st)) p \/
+    id_of (ptr st) = id_of p /\
+    id_of (hd (ptr st) (succ_list st)) <> id_of (ptr st).
+Proof.
+  intros.
+  eapply handle_delayed_query_GotBestPredecessor_accurate in H; eauto.
+  unfold ptr_between, id_of in *.
+  repeat break_or_hyp.
+  - repeat find_rewrite.
+    destruct (succ_list st); simpl in *.
+    + repeat find_rewrite.
+      eauto using not_between_xxy.
+    + destruct (id_eq_dec (ptrId p0) (ptrId p)).
+      * repeat find_rewrite.
+        eauto using not_between_xxy.
+      * tauto.
+  - repeat find_rewrite.
+    eauto using not_between_xyy.
+  - left.
+    now apply between_swap_not.
+Qed.
+
+Lemma lookup_not_between :
+  forall gst p j h,
+    reachable_st gst ->
+    In (h, (j, GotBestPredecessor p)) (msgs gst) ->
+    ~ between (hash h) (id_of p) (hash j).
+Proof.
+  intros until 1.
+  pattern gst.
+  eapply chord_net_invariant; do 2 autounfold; intros.
+  - inv_prop initial_st; break_and;
+      repeat find_rewrite; in_crush.
+  - repeat find_rewrite; in_crush.
+    unfold send in *; find_injection.
+    repeat handler_simpl || handler_def.
+  - repeat find_rewrite; in_crush.
+  - repeat find_rewrite; in_crush.
+    unfold send in *; find_injection.
+    repeat handler_simpl || handler_def.
+    find_eapply_lem_hyp option_map_Some; expand_def.
+  - repeat find_rewrite; in_crush.
+    unfold send in *; find_injection.
+    repeat handler_simpl || handler_def.
+    unfold send_keepalives in *.
+    find_apply_lem_hyp in_map_iff.
+    expand_def.
+  - repeat find_rewrite; in_crush.
+    unfold send in *; find_injection.
+    repeat handler_simpl || handler_def.
+    unfold send_keepalives in *.
+    find_eapply_lem_hyp option_map_Some; expand_def.
+  - repeat find_rewrite; in_crush.
+    unfold send in *; find_injection.
+    handler_def.
+    in_crush.
+    + repeat handler_def || handler_simpl.
+      find_eapply_lem_hyp option_map_Some; expand_def.
+    + match goal with
+      | H: context[handle_query_timeout] |- _ => clear H
+      end.
+      repeat handler_def || handler_simpl.
+      find_apply_lem_hyp in_concat; expand_def.
+      find_apply_lem_hyp in_map_iff; expand_def.
+Admitted.
+
 Lemma principal_not_before_join2_tgt :
   forall gst st h s ns p req,
     reachable_st gst ->
     ~ In h (failed_nodes gst) ->
     sigma gst h = Some st ->
     cur_request st = Some (s, Join2 ns, req) ->
+
     no_live_node_skips gst p ->
     ~ between (hash h) (hash p) (id_of s).
 Proof.
@@ -1788,6 +1931,9 @@ Proof.
           eapply principal_not_before_stabilize2_tgt; eauto.
           eapply weaken_no_live_node_skips; eauto.
       + find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
+        assert (not_skipped (hash (addr_of x12)) (map id_of x13) (ChordIDSpace.hash x0)).
+        find_eapply_prop no_msg_to_live_node_skips; eauto.
+        eauto.
         rewrite cons_make_succs.
         simpl; subst.
         erewrite <- wf_ptr_hash_eq
@@ -1795,8 +1941,40 @@ Proof.
         eapply not_skipped_initial'.
         * rewrite map_firstn.
            eapply not_skipped_firstn.
-           find_eapply_prop no_msg_to_live_node_skips; eauto.
-        * rewrite -> wf_ptr_hash_eq
+           eauto.
+        * destruct x13 as [|s1 rest].
+          -- admit.
+          -- simpl in *.
+             assert (between (hash (addr_of x12)) (hash h0) (id_of s1)).
+             {
+               admit.
+             }
+             assert (id_of s1 <> hash (addr_of x12)).
+             {
+               admit.
+             }
+             assert (~ between (hash (addr_of x12)) (hash x0) (id_of s1)).
+             {
+               admit.
+             }
+             unfold not_skipped in *.
+             unfold ChordIDSpace.hash in *.
+             set (pred := (hash (addr_of x12))) in *.
+             set (principal := (hash x0)) in *.
+             set (first_succ := (id_of s1)) in *.
+             set (joining := hash h0) in *.
+             intro.
+             eapply_prop not.
+             eapply between_trans; [eauto|].
+             eauto.
+             apply between_rot_l in H33; [|admit].
+             assert (between (hash h0) (id_of s1)).
+             eapply not_between_swap in H32; [|admit].
+             eauto using between_trans, between_trans'.
+             eapply between_trans; eauto.
+             apply between_rot_l in H30.
+
+             intro.
             by eauto using cur_request_valid.
           eapply principal_not_before_join2_tgt; eauto.
       - find_eapply_prop no_live_node_skips; eauto.
@@ -1932,7 +2110,7 @@ Proof.
       | H1 : lt ?a ?b, H2 : lt ?b ?c, H3 : lt ?c ?a |- _ =>
         specialize (lt_trans _ _ _ H1 H2) as Hcontra;
           specialize (lt_asymm _ _ H3 Hcontra); eauto
-      end. 
+      end.
     + repeat find_apply_lem_hyp lt_asymm_neg.
       intuition; subst; auto;
         try solve [eapply lt_asymm; eauto].

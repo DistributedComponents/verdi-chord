@@ -97,7 +97,7 @@ Lemma handle_query_res_definition :
           end_query (st, [], [], []) = (st', ms, newts, clearedts)) \/
          (exists new_succ rest,
              p = GotSuccList (new_succ :: rest) /\
-             start_query (addr_of new_succ) st (Join2 new_succ) = (st', ms, newts, clearedts)))) \/
+             add_tick (end_query (update_for_join st (new_succ :: rest), [], [], [])) = (st', ms, newts, clearedts)))) \/
     (exists new_succ succs,
         q = Join2 new_succ /\
         p = GotSuccList succs /\
@@ -885,7 +885,6 @@ Proof.
     try (find_eapply_lem_hyp joined_preserved_by_end_query; simpl in *; congruence).
   - find_eapply_lem_hyp joined_preserved_by_end_query_handle_rectify; congruence.
   - find_eapply_lem_hyp joined_preserved_by_handle_stabilize; congruence.
-  - find_eapply_lem_hyp joined_preserved_by_start_query; simpl in *; congruence.
 Qed.
 
 Lemma schedule_rectify_with_definition :
@@ -1551,14 +1550,16 @@ Lemma recv_handler_sets_succ_list_when_setting_joined :
     recv_handler src dst st m = (st', ms, nts, cts) ->
     joined st = false ->
     joined st' = true ->
-    exists succs qdst s p,
+    exists succs s uccs,
       m = GotSuccList succs /\
-      cur_request st = Some (qdst, Join2 s, p) /\
-      succ_list st' = make_succs s succs.
+      succ_list st' = s :: uccs.
 Proof.
   intros.
   repeat (handler_def || handler_simpl).
-  repeat eexists; eauto.
+  unfold make_succs, chop_succs.
+  pose proof succ_list_len_lower_bound.
+  destruct SUCC_LIST_LEN; try omega.
+  simpl; eexists; eauto.
 Qed.
 
 Lemma hd_in_chop_succs :
@@ -1583,12 +1584,7 @@ Proof.
   intros.
   find_eapply_lem_hyp recv_handler_sets_succ_list_when_setting_joined; eauto.
   expand_def.
-  intro.
-  repeat find_rewrite.
-  unfold make_succs in *.
-  eapply (@in_nil pointer).
-  repeat find_reverse_rewrite.
-  eauto using hd_in_chop_succs.
+  eauto.
 Qed.
 
 Lemma option_map_Some :
