@@ -573,7 +573,9 @@ Module ChordSystem <: DynamicSystem.
     | Join known, GotSuccList l =>
       match l with
       | (new_succ :: _) =>
-        add_tick (end_query (update_for_join st l, [], [], []))
+        if between_bool (hash src) (hash h) (id_of new_succ)
+        then add_tick (end_query (update_for_join st l, [], [], []))
+        else end_query (st, [], [], []) (* this is bad *)
       | [] => end_query (st, [], [], []) (* this is bad *)
       end
     | Join2 new_succ, GotSuccList l =>

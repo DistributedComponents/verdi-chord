@@ -1037,6 +1037,7 @@ Proof.
          find_apply_lem_hyp in_map_iff; expand_def.
          easy.
   - autounfold; break_and; find_rewrite; in_crush.
+  - autounfold; break_and; find_rewrite; in_crush.
 Qed.
 Hint Resolve zave_invariant_init.
 
@@ -1077,7 +1078,7 @@ Theorem zave_invariant_start :
   chord_start_invariant zave_invariant.
 Proof.
   unfold chord_start_invariant, zave_invariant.
-  repeat apply chord_start_pre_post_conj; eauto.
+  repeat (apply chord_start_pre_post_conj; eauto).
   do 2 autounfold_one; intros; break_and.
   unfold sufficient_principals in *; break_and.
   break_exists_exists.
@@ -1335,7 +1336,7 @@ Theorem zave_invariant_fail :
 Proof.
   autounfold.
   intros.
-  eapply chord_fail_pre_post_conj; eauto.
+  repeat (apply chord_fail_pre_post_conj; eauto).
   autounfold; intros; break_and.
   inv_prop failure_constraint.
   unfold principal_failure_constraint in *.
@@ -1797,9 +1798,16 @@ Proof.
       repeat handler_def || handler_simpl.
       find_apply_lem_hyp in_concat; expand_def.
       find_apply_lem_hyp in_map_iff; expand_def.
+      admit.
+  - repeat find_rewrite; in_crush.
+    unfold send in *; find_injection.
+    handler_def.
+    in_crush.
+    + find_eapply_lem_hyp handle_msg_GotSuccList_response_accurate.
+      admit.
 Admitted.
 
-Lemma principal_not_before_join2_tgt :
+Lemma principal_not_before_join_tgt :
   forall gst st h s ns p req,
     reachable_st gst ->
     ~ In h (failed_nodes gst) ->
@@ -1808,6 +1816,15 @@ Lemma principal_not_before_join2_tgt :
 
     no_live_node_skips gst p ->
     ~ between (hash h) (hash p) (id_of s).
+Proof.
+Admitted.
+
+Theorem join2_unreachable :
+  forall gst h st dstp j req,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    cur_request st = Some (dstp, Join2 j, req) ->
+    False.
 Proof.
 Admitted.
 
@@ -1857,9 +1874,7 @@ Proof.
       find_apply_lem_hyp recv_handler_sets_succ_list_when_setting_joined; eauto.
       expand_def.
       find_apply_lem_hyp nodes_not_joined_have_no_successors; eauto.
-      repeat find_rewrite.
-      exfalso; eapply in_nil.
-      rewrite -> e; eapply hd_in_chop_succs.
+      congruence.
   - assert (cur_request_timeouts_ok' (cur_request st) (timeouts gst h)) by auto.
     eapply some_principals_ok.
     unfold sufficient_principals, principals in *; break_exists_exists.
@@ -1930,53 +1945,28 @@ Proof.
             by eauto using cur_request_valid.
           eapply principal_not_before_stabilize2_tgt; eauto.
           eapply weaken_no_live_node_skips; eauto.
-      + find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
-        assert (not_skipped (hash (addr_of x12)) (map id_of x13) (ChordIDSpace.hash x0)).
-        find_eapply_prop no_msg_to_live_node_skips; eauto.
-        eauto.
-        rewrite cons_make_succs.
-        simpl; subst.
-        erewrite <- wf_ptr_hash_eq
-          by eauto using cur_request_valid.
+      + match goal with
+        | H: context[GotSuccList ?l] |- _ =>
+          assert (succs_msg (GotSuccList l) l) by constructor
+        end.
+        copy_eapply_prop_hyp no_msg_to_live_node_skips succs_msg;
+          [| | |repeat find_rewrite; in_crush]; eauto.
         eapply not_skipped_initial'.
-        * rewrite map_firstn.
-           eapply not_skipped_firstn.
-           eauto.
-        * destruct x13 as [|s1 rest].
-          -- admit.
-          -- simpl in *.
-             assert (between (hash (addr_of x12)) (hash h0) (id_of s1)).
-             {
-               admit.
-             }
-             assert (id_of s1 <> hash (addr_of x12)).
-             {
-               admit.
-             }
-             assert (~ between (hash (addr_of x12)) (hash x0) (id_of s1)).
-             {
-               admit.
-             }
-             unfold not_skipped in *.
-             unfold ChordIDSpace.hash in *.
-             set (pred := (hash (addr_of x12))) in *.
-             set (principal := (hash x0)) in *.
-             set (first_succ := (id_of s1)) in *.
-             set (joining := hash h0) in *.
-             intro.
-             eapply_prop not.
-             eapply between_trans; [eauto|].
-             eauto.
-             apply between_rot_l in H33; [|admit].
-             assert (between (hash h0) (id_of s1)).
-             eapply not_between_swap in H32; [|admit].
-             eauto using between_trans, between_trans'.
-             eapply between_trans; eauto.
-             apply between_rot_l in H30.
-
-             intro.
-            by eauto using cur_request_valid.
-          eapply principal_not_before_join2_tgt; eauto.
+        * eapply not_skipped_initial; eauto.
+        * unfold ChordIDSpace.hash in *.
+          remember (hash (addr_of x9)) as joined in *.
+          remember (hash h0) as joining in *.
+          remember (id_of x10) as first_succ in *.
+          remember (hash x0) as principal in *.
+          assert (~ between joined principal first_succ).
+          {
+            find_eapply_prop not_skipped.
+            simpl.
+            rewrite <- app_nil_l at 1.
+            rewrite Heqfirst_succ; eauto.
+          }
+          eauto using between_trans'.
+      + exfalso; eapply join2_unreachable; eauto.
       - find_eapply_prop no_live_node_skips; eauto.
         eapply live_node_equivalence; eauto.
         repeat find_rewrite; rewrite_update; auto.
@@ -2008,8 +1998,8 @@ Theorem zave_invariant_tick :
   chord_tick_invariant zave_invariant.
 Proof.
   unfold zave_invariant.
-  repeat split; eauto.
-  break_and.
+  break_and; split; eauto; break_and;
+    eauto using reachableStep.
   eapply msgs_state_principals_preserved; eauto.
   - repeat handler_def; simpl; auto.
   - eauto using joined_preserved_by_tick_handler.

@@ -97,7 +97,10 @@ Lemma handle_query_res_definition :
           end_query (st, [], [], []) = (st', ms, newts, clearedts)) \/
          (exists new_succ rest,
              p = GotSuccList (new_succ :: rest) /\
-             add_tick (end_query (update_for_join st (new_succ :: rest), [], [], [])) = (st', ms, newts, clearedts)))) \/
+             (~ between (hash src) (hash dst) (id_of new_succ) /\
+              end_query (st, [], [], []) = (st', ms, newts, clearedts) \/
+             between (hash src) (hash dst) (id_of new_succ) /\
+             add_tick (end_query (update_for_join st (new_succ :: rest), [], [], [])) = (st', ms, newts, clearedts))))) \/
     (exists new_succ succs,
         q = Join2 new_succ /\
         p = GotSuccList succs /\
@@ -125,7 +128,14 @@ Proof using.
     eexists. intuition eauto.
   - repeat find_rewrite.
     do 5 right. left.
-    eexists. intuition eauto.
+    eexists.
+    find_apply_lem_hyp between_bool_between.
+    intuition (eexists; eauto).
+  - repeat find_rewrite.
+    do 5 right. left.
+    eexists.
+    find_apply_lem_hyp between_bool_false_not_between.
+    intuition (eexists; eauto).
   - do 6 right. left.
     eexists. intuition eauto.
 Qed.
