@@ -457,6 +457,17 @@ Proof.
               rewrite remove_comm in *.
               find_apply_lem_hyp in_remove.
               eapply at_most_one_request_timeout'_remove_drops_all; eauto.
+           ++ simpl;
+                eauto with datatypes;
+                econstructor; intros; eauto;
+                  rewrite remove_comm;
+                  eauto using remove_preserve.
+              intro.
+              simpl in *.
+              break_or_hyp; try congruence.
+              rewrite remove_comm in *.
+              find_apply_lem_hyp in_remove.
+              eapply at_most_one_request_timeout'_remove_drops_all; eauto.
         -- repeat (handler_def || handler_simpl).
       * find_copy_eapply_lem_hyp recv_msg_not_right_response_preserves_cur_request; eauto.
         find_copy_eapply_lem_hyp recv_msg_not_right_response_never_removes_request_timeout; eauto.

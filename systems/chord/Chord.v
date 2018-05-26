@@ -944,8 +944,16 @@ Module ConstrainedChord <: ConstrainedDynamicSystem.
       Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))).
   Hint Unfold live_node_in_msg_succ_lists'.
 
+  Definition live_node_in_msg_succ_lists_join (gst : global_state) (ms : list msg) : Prop :=
+    forall src dst succs,
+      In (src, (dst, GotSuccList succs)) ms ->
+      length succs > 0 ->
+      Exists (live_node gst) (map addr_of succs).
+  Hint Unfold live_node_in_msg_succ_lists_join.
+
   Definition live_node_in_msg_succ_lists (gst : global_state) : Prop :=
-    live_node_in_msg_succ_lists' gst (msgs gst).
+    live_node_in_msg_succ_lists' gst (msgs gst) /\
+    live_node_in_msg_succ_lists_join gst (msgs gst).
   Hint Unfold live_node_in_msg_succ_lists.
 
   Definition live_node_in_succ_lists (gst : global_state) : Prop :=

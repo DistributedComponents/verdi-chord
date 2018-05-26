@@ -1704,6 +1704,17 @@ Proof.
 Qed.
 Hint Resolve recv_handler_GotPredAndSuccs_response_accurate.
 
+Lemma handle_msg_GotSuccList_response_accurate :
+  forall src dst st p st' ms nts cts h succs,
+    handle_msg src dst st p = (st', ms, nts, cts) ->
+    In (h, GotSuccList succs) ms ->
+    succs = succ_list st'.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl.
+Qed.
+Hint Resolve handle_msg_GotSuccList_response_accurate.
+
 Lemma responses_request_timeout_handler_accurate :
   forall h st dst msg st' ms nts cts eff,
     request_timeout_handler h st dst msg = (st', ms, nts, cts, eff) ->

@@ -59,6 +59,7 @@ Proof.
          find_apply_lem_hyp in_map_iff; expand_def.
          easy.
   - autounfold; break_and; find_rewrite; in_crush.
+  - autounfold; break_and; find_rewrite; in_crush.
 Qed.
 Hint Resolve live_node_invariant_init.
 
@@ -69,14 +70,8 @@ Lemma live_node_in_msg_succ_lists_app :
     live_node_in_msg_succ_lists' gst (xs ++ ys).
 Proof.
   autounfold; intros.
-  match goal with
-  | H: In _ _ \/ In _ _ |- _ =>
-    destruct H;
-      find_apply_lem_hyp in_app_or;
-      intuition eauto
-  end.
-  Unshelve.
-  all:exact None.
+  in_crush; eauto.
+  Unshelve. all:exact None.
 Qed.
 Hint Resolve live_node_in_msg_succ_lists_app.
 
@@ -85,13 +80,11 @@ Lemma live_node_in_msg_succ_lists_app_l :
     live_node_in_msg_succ_lists' gst (xs ++ ys) ->
     live_node_in_msg_succ_lists' gst xs.
 Proof.
-  autounfold; intros.
-  match goal with
-  | H: In _ _ \/ In _ _ |- _ =>
-    destruct H; eauto using in_or_app
-  end.
-  Unshelve.
-  all:exact None.
+  autounfold_one; intros.
+  in_crush;
+    find_eapply_prop live_node_in_msg_succ_lists';
+    eauto using in_or_app.
+  Unshelve. all:exact None.
 Qed.
 Hint Resolve live_node_in_msg_succ_lists_app_l.
 
@@ -100,13 +93,11 @@ Lemma live_node_in_msg_succ_lists_app_r :
     live_node_in_msg_succ_lists' gst (xs ++ ys) ->
     live_node_in_msg_succ_lists' gst ys.
 Proof.
-  autounfold; intros.
-  match goal with
-  | H: In _ _ \/ In _ _ |- _ =>
-    destruct H; eauto using in_or_app
-  end.
-  Unshelve.
-  all:exact None.
+  autounfold_one; intros.
+  in_crush;
+    find_eapply_prop live_node_in_msg_succ_lists';
+    eauto using in_or_app.
+  Unshelve. all:exact None.
 Qed.
 Hint Resolve live_node_in_msg_succ_lists_app_r.
 
@@ -163,11 +154,29 @@ Proof.
     + simpl in *; break_and.
       assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
       {
-        eapply_prop live_node_in_msg_succ_lists; eauto.
+        inv_prop live_node_in_msg_succ_lists.
+        find_eapply_prop live_node_in_msg_succ_lists'; eauto.
         break_or_hyp; try tauto.
         break_exists; break_and.
         repeat find_rewrite; update_destruct; rewrite_update;
           [find_apply_lem_hyp joining_start_handler_st_joined; congruence|eauto].
+      }
+      find_apply_lem_hyp Exists_exists; apply Exists_exists; break_exists_exists.
+      break_and; eauto using live_before_start_stays_live.
+  - autounfold_one; intros.
+    repeat find_rewrite.
+    match goal with
+    | H: In _ (_ ++ _) |- _ =>
+      apply in_app_or in H; destruct H
+    end.
+    + unfold start_handler, send in *.
+      expand_def; in_crush;
+        repeat simpl in * || find_injection;
+        intuition congruence.
+    + assert (Exists (live_node gst) (map addr_of succs)).
+      {
+        unfold live_node_in_msg_succ_lists in *; break_and.
+        find_eapply_prop live_node_in_msg_succ_lists_join; eauto.
       }
       find_apply_lem_hyp Exists_exists; apply Exists_exists; break_exists_exists.
       break_and; eauto using live_before_start_stays_live.
@@ -178,7 +187,7 @@ Theorem live_node_invariant_fail :
   chord_fail_invariant (fun gst => live_node_in_succ_lists gst /\
                                 live_node_in_msg_succ_lists gst).
 Proof.
-  autounfold.
+  do 2 autounfold_one.
   intros.
   break_and.
   split; inv_prop failure_constraint; tauto.
@@ -225,7 +234,8 @@ Proof.
           try solve [handler_def].
         assert (Exists (live_node gst) (map addr_of (chop_succs ((make_pointer (addr_of x)) :: x13)))).
         {
-          find_eapply_prop live_node_in_msg_succ_lists; eauto.
+          unfold live_node_in_msg_succ_lists in *; break_and.
+          find_eapply_prop live_node_in_msg_succ_lists'; eauto.
           repeat find_rewrite; constructor 2; in_crush.
           find_eapply_lem_hyp stabilize_target_joined; eauto.
         }
@@ -250,27 +260,29 @@ Proof.
       * handler_def.
         simpl in *; repeat find_rewrite.
         break_if; try congruence.
-        assert (succ_list x7 = chop_succs ((make_pointer (addr_of x)) :: x2)).
+        assert (Exists (live_node gst) (map addr_of (succ_list x7))).
         {
+          find_copy_eapply_lem_hyp cur_request_valid; eauto.
+          unfold live_node_in_msg_succ_lists in *; break_and.
           repeat (handler_def || find_injection || congruence || auto || simpl);
             unfold make_succs; try solve [simpl in *; congruence].
           - find_copy_eapply_lem_hyp stabilize2_param_matches; eauto; subst.
-            find_eapply_lem_hyp cur_request_valid; eauto.
-            rewrite <- wf_ptr_eq; eauto.
-          - find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
-            find_eapply_lem_hyp cur_request_valid; eauto.
-            rewrite <- wf_ptr_eq; eauto.
-        }
-        assert (Exists (live_node gst)
-                       (map addr_of (chop_succs (make_pointer (addr_of x) :: x2)))).
-        {
-          eapply_prop live_node_in_msg_succ_lists;
-            try solve [repeat find_rewrite; right; in_crush].
-          repeat (handler_def || handler_simpl).
-          - find_copy_eapply_lem_hyp stabilize2_param_matches; eauto; subst.
-            find_eapply_lem_hyp stabilize2_target_joined; eauto.
+            find_copy_eapply_lem_hyp stabilize2_target_joined; eauto.
+            expand_def.
+            rewrite (wf_ptr_eq x11) by eauto.
+            find_eapply_prop live_node_in_msg_succ_lists'.
+            in_crush; eauto.
+            intuition eauto.
+          - rewrite <- map_cons.
+            find_eapply_prop live_node_in_msg_succ_lists_join; eauto.
+            simpl; omega.
           - find_copy_eapply_lem_hyp join2_param_matches; eauto; subst.
             find_eapply_lem_hyp join2_target_joined; eauto.
+            expand_def.
+            rewrite (wf_ptr_eq x11) by eauto.
+            find_eapply_prop live_node_in_msg_succ_lists'.
+            in_crush; eauto.
+            intuition eauto.
         }
         find_apply_lem_hyp Exists_exists; break_exists_name l.
         break_and.
@@ -284,10 +296,10 @@ Proof.
               congruence.
           - eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto.
         }
-        eapply live_node_in_succs_best_succ; eauto.
-        -- solve [econstructor; eauto].
-        -- repeat find_rewrite; rewrite_update; eauto.
-        -- repeat find_rewrite; eauto.
+        eapply live_node_in_succs_best_succ;
+          solve [eauto
+                |econstructor; eauto
+                |repeat find_rewrite; rewrite_update; eauto].
   - assert (live_node gst h0).
     break_live_node; repeat find_rewrite; rewrite_update; eauto using live_node_characterization.
     assert (exists s : addr, best_succ gst h0 s) by eauto.
@@ -306,6 +318,8 @@ Theorem zave_invariant_recv_live_node_in_msg_succ_lists :
     live_node_in_msg_succ_lists.
 Proof.
   autounfold_one; intros.
+  assert (live_node_in_succ_lists gst')
+    by (eapply zave_invariant_recv_live_node_in_succ_lists; eauto).
   cbn in *; break_and.
   assert (reachable_st gst') by (econstructor; eauto).
   pose proof (joined_preserved_by_recv_handler _ _ _ _ _ _ _ _ ltac:(eauto)).
@@ -313,6 +327,7 @@ Proof.
   unfold live_node_in_msg_succ_lists in *.
   repeat find_rewrite.
   rewrite map_app.
+  split.
   apply live_node_in_msg_succ_lists_app;
     [apply live_node_in_msg_succ_lists_app|].
   - autounfold; intros.
@@ -396,7 +411,7 @@ Proof.
                solve [replace (succ_list st) with (@nil pointer) in H21; [simpl in *; omega|congruence]
                      |repeat find_rewrite; now rewrite_update]
            end.
-  - assert (live_node_in_msg_succ_lists' gst (xs ++ ys)) by eauto.
+  - assert (live_node_in_msg_succ_lists' gst (xs ++ ys)) by intuition eauto.
     autounfold in *; intros.
     repeat find_rewrite.
     update_destruct; rewrite_update; eauto; subst; break_or_hyp;
@@ -418,8 +433,105 @@ Proof.
            repeat find_rewrite; rewrite_update; find_injection; eauto
           |eapply live_node_characterization; repeat find_rewrite; rewrite_update; eauto]
       end.
+  -
+    break_and.
+    autounfold; intros.
+    assert (sigma gst' h = Some x3)
+      by (repeat find_rewrite; rewrite_update; auto).
+    unfold send in *.
+    repeat match goal with
+           | H: In _ (_ ++ _) |- _ =>
+             apply in_app_or in H; destruct H
+           | H: In _ (map _ _) |- _ =>
+             apply in_map_iff in H; destruct H; break_and
+           | H: (_, _) = (_, _) |- _ =>
+             injc H
+           end.
+    + find_eapply_lem_hyp handle_delayed_queries_GotSuccList_response_accurate;
+        eauto; subst.
+      destruct (joined x3) eqn:?.
+      * assert (live_node gst' src0).
+        {
+          eapply live_node_characterization; eauto.
+          repeat find_rewrite; eauto.
+        }
+        eapply_prop_hyp live_node_in_succ_lists live_node; eauto.
+        apply Exists_exists.
+        break_exists_exists.
+        unfold best_succ in *; expand_def.
+        split; eauto.
+        repeat find_rewrite || find_injection.
+        in_crush.
+      * copy_eapply nodes_not_joined_have_no_successors Heqb;
+          eauto.
+        repeat find_rewrite.
+        simpl in *; expand_def;
+          congruence || omega.
+    + find_eapply_lem_hyp handle_msg_GotSuccList_response_accurate;
+        eauto; subst.
+      assert (succ_list x = succ_list x3)
+        by (clear H1; repeat handler_def || handler_simpl).
+      destruct (joined x3) eqn:?.
+      * replace (succ_list x) with (succ_list x3) by auto.
+        assert (live_node gst' src0).
+        {
+          eapply live_node_characterization; eauto.
+          repeat find_rewrite; eauto.
+        }
+        eapply_prop_hyp live_node_in_succ_lists live_node; eauto.
+        apply Exists_exists.
+        break_exists_exists.
+        unfold best_succ in *; expand_def.
+        split; eauto.
+        repeat find_rewrite || find_injection.
+        in_crush.
+      * copy_eapply nodes_not_joined_have_no_successors Heqb;
+          eauto.
+        repeat find_rewrite.
+        repeat find_rewrite.
+        simpl in *; expand_def;
+          congruence || omega.
+    + assert (Exists (live_node gst) (map addr_of succs)).
+      {
+        find_eapply_prop live_node_in_msg_succ_lists_join; eauto.
+        in_crush; eauto.
+      }
+      eapply Exists_exists.
+      find_eapply_lem_hyp Exists_exists.
+      break_exists_exists.
+      intuition eauto.
+      inv_prop live_node; expand_def.
+      destruct (sigma gst' x7) eqn:?;
+        repeat find_rewrite; update_destruct; rewrite_update;
+        try congruence.
+      repeat find_rewrite || find_injection.
+      eapply live_node_characterization;
+        repeat find_rewrite; rewrite_update; eauto.
+      eapply live_node_characterization;
+        repeat find_rewrite; rewrite_update; eauto.
+      congruence.
+    + assert (Exists (live_node gst) (map addr_of succs)).
+      {
+        find_eapply_prop live_node_in_msg_succ_lists_join; eauto.
+        in_crush; eauto.
+      }
+      eapply Exists_exists.
+      find_eapply_lem_hyp Exists_exists.
+      break_exists_exists.
+      intuition eauto.
+      inv_prop live_node; expand_def.
+      destruct (sigma gst' x7) eqn:?;
+        repeat find_rewrite; update_destruct; rewrite_update;
+        try congruence.
+      repeat find_rewrite || find_injection.
+      eapply live_node_characterization;
+        repeat find_rewrite; rewrite_update; eauto.
+      eapply live_node_characterization;
+        repeat find_rewrite; rewrite_update; eauto.
+      congruence.
 Qed.
 Hint Resolve zave_invariant_recv_live_node_in_msg_succ_lists.
+
 Theorem live_node_invariant_tick_live_node_in_succ_lists :
   chord_tick_pre_post
     (fun gst => live_node_in_succ_lists gst /\
@@ -452,25 +564,38 @@ Theorem live_node_invariant_tick_live_node_in_msg_succ_lists :
 Proof.
   autounfold_one; intros.
   simpl in *; break_and.
-  unfold live_node_in_msg_succ_lists; repeat find_rewrite.
-  apply live_node_in_msg_succ_lists_app; autounfold; intros.
-  - exfalso; repeat handler_def; unfold send in *; simpl in *;
-      find_apply_lem_hyp option_map_Some; expand_def; congruence.
-  - assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
-    {
-      eapply_prop live_node_in_msg_succ_lists; eauto.
-      repeat find_rewrite.
-      break_or_hyp; auto.
-      right.
-      break_exists; break_and.
-      update_destruct; rewrite_update; subst; try solve [eexists; eauto].
-      exists st.
-      split; auto; find_injection.
-      erewrite -> joined_preserved_by_tick_handler; eauto.
-    }
-    apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
-    break_and; split; auto.
-    eapply live_node_preserved_by_tick; eauto.
+  unfold live_node_in_msg_succ_lists in *; repeat find_rewrite.
+  break_and; split.
+  - apply live_node_in_msg_succ_lists_app; autounfold; intros.
+    + exfalso; repeat handler_def; unfold send in *; simpl in *;
+        find_apply_lem_hyp option_map_Some; expand_def; congruence.
+    + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
+      {
+        find_eapply_prop live_node_in_msg_succ_lists'; eauto.
+        repeat find_rewrite.
+        break_or_hyp; auto.
+        right.
+        break_exists; break_and.
+        update_destruct; rewrite_update; subst; try solve [eexists; eauto].
+        exists st.
+        split; auto; find_injection.
+        erewrite -> joined_preserved_by_tick_handler; eauto.
+      }
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+      break_and; split; auto.
+      eapply live_node_preserved_by_tick; eauto.
+  - autounfold_one; intros.
+    find_apply_lem_hyp in_app_or; break_or_hyp.
+    + repeat handler_def ||
+             handler_simpl ||
+             find_apply_lem_hyp option_map_Some ||
+             expand_def;
+        in_crush.
+    + assert (Exists (live_node gst) (map addr_of succs))
+        by (find_eapply_prop live_node_in_msg_succ_lists_join; eauto).
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+      break_and; split; auto.
+      eapply live_node_preserved_by_tick; eauto.
 Qed.
 Hint Resolve live_node_invariant_tick_live_node_in_msg_succ_lists.
 
@@ -479,13 +604,14 @@ Theorem live_node_invariant_keepalive :
     (fun gst => live_node_in_succ_lists gst /\
              live_node_in_msg_succ_lists gst).
 Proof.
-  do 2 autounfold_one; simpl; intuition;
-    unfold live_node_in_msg_succ_lists, live_node_in_succ_lists; intros.
+  do 2 autounfold_one; simpl.
+  unfold live_node_in_msg_succ_lists.
+  intros; unfold live_node_in_succ_lists; intuition.
   - handler_def.
     assert (exists s, best_succ gst h0 s).
     {
       repeat find_rewrite; update_destruct; rewrite_update; try find_injection;
-        eapply_prop live_node_in_succ_lists; eauto;
+        find_eapply_prop live_node_in_succ_lists; eauto;
           break_live_node; eapply live_node_characterization; eauto;
             repeat find_rewrite; rewrite_update; congruence.
     }
@@ -505,7 +631,7 @@ Proof.
                end.
     + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
       {
-        eapply_prop live_node_in_msg_succ_lists; eauto.
+        find_eapply_prop live_node_in_msg_succ_lists'; eauto.
         repeat find_rewrite.
         break_or_hyp; auto.
         right.
@@ -517,9 +643,27 @@ Proof.
       apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
       break_and; split; eauto.
       eapply live_node_preserved_by_keepalive; eauto.
+  - repeat find_rewrite.
+    autounfold_one; intros.
+    find_apply_lem_hyp in_app_or; break_or_hyp.
+    + repeat handler_def;
+        repeat match goal with
+               | H: In _ (map _ _) |- _ =>
+                 erewrite in_map_iff in H; expand_def
+               | H: context[send_keepalives] |- _ =>
+                 unfold send_keepalives in H
+               | H: send _ _ = _ |- _ =>
+                 unfold send in H
+               | H: (_, (_, _)) = (_, (_, _)) |- _ =>
+                 congruence
+               end.
+    + assert (Exists (live_node gst) (map addr_of succs))
+        by (find_eapply_prop live_node_in_msg_succ_lists_join; eauto).
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+      break_and; split; eauto.
+      eapply live_node_preserved_by_keepalive; eauto.
 Qed.
 Hint Resolve live_node_invariant_keepalive.
-
 
 Theorem live_node_invariant_rectify :
   chord_rectify_invariant
@@ -530,7 +674,8 @@ Proof.
   find_copy_apply_lem_hyp joined_preserved_by_do_rectify.
   assert (succ_list st = succ_list st')
     by now repeat handler_def.
-  split; unfold live_node_in_msg_succ_lists, live_node_in_succ_lists; intros.
+  unfold live_node_in_msg_succ_lists in *; unfold live_node_in_succ_lists;
+    intuition.
   - assert (exists s, best_succ gst h0 s).
     {
       repeat find_rewrite; update_destruct; rewrite_update; try find_injection;
@@ -556,7 +701,7 @@ Proof.
                end.
     + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
       {
-        eapply_prop live_node_in_msg_succ_lists; eauto.
+        find_eapply_prop live_node_in_msg_succ_lists'; eauto.
         repeat find_rewrite.
         break_or_hyp; auto.
         right.
@@ -568,76 +713,115 @@ Proof.
       apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
       break_and; split; eauto.
       eapply live_node_preserved_by_rectify; eauto.
+  - repeat find_rewrite.
+    autounfold_one; intros.
+    find_apply_lem_hyp in_app_or; break_or_hyp.
+    + repeat handler_def; simpl in *; intuition;
+        repeat match goal with
+               | H: option_map _ _ = Some _ |- _ =>
+                 apply option_map_Some in H; destruct H as [? [? ?]]
+               | H: In _ (map _ _) |- _ =>
+                 erewrite in_map_iff in H; expand_def
+               | H: context[send_keepalives] |- _ =>
+                 unfold send_keepalives in H
+               | H: send _ _ = _ |- _ =>
+                 unfold send in H
+               | H: (_, (_, _)) = (_, (_, _)) |- _ =>
+                 congruence
+               end.
+    + assert (Exists (live_node gst) (map addr_of succs))
+        by (find_eapply_prop live_node_in_msg_succ_lists_join; eauto).
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+      break_and; split; eauto.
+      eapply live_node_preserved_by_rectify; eauto.
 Qed.
 Hint Resolve live_node_invariant_rectify.
 
-Theorem live_node_invariant_request :
-  chord_request_invariant
+Theorem live_node_invariant_request_succ_lists :
+  chord_request_pre_post
     (fun gst => live_node_in_succ_lists gst /\
-             live_node_in_msg_succ_lists gst).
+             live_node_in_msg_succ_lists gst)
+    live_node_in_succ_lists.
 Proof.
   do 2 autounfold_one; simpl; intros; break_and.
   assert (joined st' = joined st) by (symmetry; eauto).
   find_copy_apply_lem_hyp joined_preserved_by_request_timeout_handler.
-  split; unfold live_node_in_msg_succ_lists, live_node_in_succ_lists; intros.
-  - assert (exists s, best_succ gst h0 s).
+  unfold live_node_in_msg_succ_lists in *; unfold live_node_in_succ_lists;
+    intuition.
+  assert (exists s, best_succ gst h0 s).
+  {
+    repeat find_rewrite; update_destruct; rewrite_update; try find_injection;
+      eapply_prop live_node_in_succ_lists; eauto;
+        break_live_node; eapply live_node_characterization; eauto;
+          repeat find_rewrite; rewrite_update; congruence.
+  }
+  subst; inv_prop timeout_constraint.
+  break_exists_name best.
+  inv_prop best_succ; break_exists; break_and.
+  destruct (addr_eq_dec best dst); subst.
+  + break_live_node; tauto.
+  + assert (In best (map addr_of (succ_list x)))
+      by (repeat find_rewrite; in_crush).
+    assert (In best (map addr_of (succ_list st0))).
     {
-      repeat find_rewrite; update_destruct; rewrite_update; try find_injection;
-        eapply_prop live_node_in_succ_lists; eauto;
-          break_live_node; eapply live_node_characterization; eauto;
-            repeat find_rewrite; rewrite_update; congruence.
+      repeat find_rewrite; update_destruct; rewrite_update;
+        repeat (find_rewrite || find_injection).
+      - find_copy_eapply_lem_hyp cur_request_timeouts_related_invariant; auto.
+        repeat find_reverse_rewrite.
+        repeat handler_def; simpl in *; try congruence.
+        + repeat find_rewrite.
+          inv_prop cur_request_timeouts_ok; try congruence; find_injection.
+          inv_prop query_request.
+          find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+          break_exists; break_and.
+          repeat find_rewrite; simpl in *; repeat find_injection.
+          assert (In best (addr_of x2 :: map addr_of x13)) by congruence.
+          in_crush.
+        + simpl in *.
+          find_apply_lem_hyp option_map_None.
+          find_apply_lem_hyp hd_error_None; subst.
+          inv_prop cur_request_timeouts_ok; try congruence.
+          repeat find_rewrite; repeat find_injection.
+          inv_prop query_request.
+          find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
+          break_exists; break_and.
+          repeat find_rewrite; simpl in *; repeat find_injection.
+          assert (exists s, best_succ gst h0 s).
+          eapply_prop live_node_in_succ_lists; eauto.
+          break_exists; inv_prop best_succ; expand_def.
+          repeat (find_rewrite || find_injection); simpl in *.
+          match goal with
+          | H: context[app] |- _ =>
+            symmetry in H;
+              apply app_cons_singleton_inv in H;
+              destruct H as [? [? ?]];
+              subst
+          end.
+          break_live_node.
+          tauto.
+      - auto.
     }
-    subst; inv_prop timeout_constraint.
-    break_exists_name best.
-    inv_prop best_succ; break_exists; break_and.
-    destruct (addr_eq_dec best dst); subst.
-    + break_live_node; tauto.
-    + assert (In best (map addr_of (succ_list x)))
-        by (repeat find_rewrite; in_crush).
-      assert (In best (map addr_of (succ_list st0))).
-      {
-        repeat find_rewrite; update_destruct; rewrite_update;
-          repeat (find_rewrite || find_injection).
-        - find_copy_eapply_lem_hyp cur_request_timeouts_related_invariant; auto.
-          repeat find_reverse_rewrite.
-          repeat handler_def; simpl in *; try congruence.
-          + repeat find_rewrite.
-            inv_prop cur_request_timeouts_ok; try congruence; find_injection.
-            inv_prop query_request.
-            find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
-            break_exists; break_and.
-            repeat find_rewrite; simpl in *; repeat find_injection.
-            assert (In best (addr_of x2 :: map addr_of x13)) by congruence.
-            in_crush.
-          + simpl in *.
-            find_apply_lem_hyp option_map_None.
-            find_apply_lem_hyp hd_error_None; subst.
-            inv_prop cur_request_timeouts_ok; try congruence.
-            repeat find_rewrite; repeat find_injection.
-            inv_prop query_request.
-            find_eapply_lem_hyp stabilize_only_with_first_succ; eauto.
-            break_exists; break_and.
-            repeat find_rewrite; simpl in *; repeat find_injection.
-            assert (exists s, best_succ gst h0 s).
-            eapply_prop live_node_in_succ_lists; eauto.
-            break_exists; inv_prop best_succ; expand_def.
-            repeat (find_rewrite || find_injection); simpl in *.
-            match goal with
-            | H: context[app] |- _ =>
-              symmetry in H;
-                apply app_cons_singleton_inv in H;
-                destruct H as [? [? ?]];
-                subst
-            end.
-            break_live_node.
-            tauto.
-        - auto.
-      }
-      assert (live_node gst' best)
-        by (eapply live_node_preserved_by_request; eauto).
-      eapply live_node_in_succs_best_succ;
-        solve [eauto
-              |econstructor; eauto].
+    assert (live_node gst' best)
+      by (eapply live_node_preserved_by_request; eauto).
+    eapply live_node_in_succs_best_succ;
+      solve [eauto
+            |econstructor; eauto].
+Qed.
+Hint Resolve live_node_invariant_request_succ_lists.
+
+Theorem live_node_invariant_request_msgs :
+  chord_request_pre_post
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst)
+    live_node_in_msg_succ_lists.
+Proof.
+  do 2 autounfold_one; simpl; intros.
+  find_copy_eapply_lem_hyp live_node_invariant_request_succ_lists; eauto.
+  break_and.
+  assert (joined st' = joined st) by (symmetry; eauto).
+  find_copy_apply_lem_hyp joined_preserved_by_request_timeout_handler.
+  unfold live_node_in_msg_succ_lists in *; unfold live_node_in_succ_lists;
+    intuition.
   - repeat find_rewrite.
     apply live_node_in_msg_succ_lists_app;
     autounfold; intros.
@@ -675,7 +859,7 @@ Proof.
         eapply live_node_characterization; try congruence; eauto.
     + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs)))).
       {
-        eapply_prop live_node_in_msg_succ_lists; eauto.
+        find_eapply_prop live_node_in_msg_succ_lists'; eauto.
         repeat find_rewrite.
         break_or_hyp; auto.
         right.
@@ -686,9 +870,56 @@ Proof.
       apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
       break_and; split; eauto.
       eapply live_node_preserved_by_request; subst; eauto.
+  - autounfold; intros.
+    repeat find_rewrite.
+    find_apply_lem_hyp in_app_or; break_or_hyp.
+    + handler_def.
+      assert (succ_list x2 = succ_list st')
+        by eauto using succ_list_preserved_by_do_delayed_queries.
+      unfold send in *.
+      in_crush; find_injection.
+      * match goal with H: context[do_delayed_queries] |- _ => clear H end.
+        repeat handler_def;
+          simpl in *; try find_apply_lem_hyp option_map_Some; expand_def;
+            repeat handler_simpl.
+      * find_eapply_lem_hyp handle_delayed_queries_GotSuccList_response_accurate; eauto.
+        subst.
+        assert (exists s, best_succ gst' src s).
+        {
+          destruct (joined st') eqn:Hjoined.
+          - eapply_prop live_node_in_succ_lists;
+              repeat find_rewrite; rewrite_update; eauto.
+            eapply live_node_characterization;
+              [repeat find_rewrite; rewrite_update; eauto| | |];
+              congruence.
+          - exfalso.
+            eapply_lem_prop_hyp (nodes_not_joined_have_no_successors gst') (joined st');
+              try solve [econstructor; eauto
+                        |repeat find_rewrite; rewrite_update; eauto].
+            repeat find_rewrite; simpl in *; omega.
+        }
+        eapply Exists_exists; break_exists_exists.
+        inv_prop best_succ; expand_def; intuition eauto with datatypes.
+        repeat find_rewrite || find_injection || rewrite_update.
+        in_crush.
+    + assert (Exists (live_node gst) (map addr_of succs))
+        by (find_eapply_prop live_node_in_msg_succ_lists_join; eauto).
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists.
+      break_and; split; eauto.
+      eapply live_node_preserved_by_request; subst; eauto.
+Qed.
+Hint Resolve live_node_invariant_request_msgs.
+
+Theorem live_node_invariant_request :
+  chord_request_invariant
+    (fun gst => live_node_in_succ_lists gst /\
+             live_node_in_msg_succ_lists gst).
+Proof.
+  autounfold_one; eauto.
 Qed.
 Hint Resolve live_node_invariant_request.
 
+  
 Theorem live_node_invariant_output :
   chord_output_invariant
     (fun gst => live_node_in_succ_lists gst /\
@@ -696,17 +927,26 @@ Theorem live_node_invariant_output :
 Proof.
   unfold chord_output_invariant, chord_output_pre_post; intros; break_and.
   unfold send in *; subst.
-  split.
+  unfold live_node_in_msg_succ_lists in *; break_and.
+  repeat break_and_goal.
   - unfold live_node_in_succ_lists; intros.
     simpl in *.
     assert (exists s, best_succ gst h s) by eauto.
     break_exists_exists; eauto using coarse_best_succ_characterization.
-  - autounfold_one; simpl.
+  - simpl.
     eapply live_node_in_msg_succ_lists_app; autounfold; intros;
       assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))))
-      by (eapply_prop live_node_in_msg_succ_lists; repeat find_rewrite;
+      by (find_eapply_prop live_node_in_msg_succ_lists'; repeat find_rewrite;
           intuition eauto with datatypes);
       apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists; tauto.
+  - autounfold_one; simpl; intros.
+    assert (Exists (live_node gst) (map addr_of succs)).
+    {
+      find_apply_lem_hyp in_app_or; break_or_hyp;
+        find_eapply_prop live_node_in_msg_succ_lists_join;
+        repeat find_rewrite; in_crush; eauto.
+    }
+    apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists; tauto.
 Qed.
 Hint Resolve live_node_invariant_output.
 
@@ -717,15 +957,19 @@ Theorem live_node_invariant_input :
 Proof.
   unfold chord_input_invariant, chord_input_pre_post; intros; break_and.
   unfold send in *; subst.
-  split.
-  - unfold live_node_in_succ_lists; intros.
-    simpl in *.
-    assert (exists s, best_succ gst h0 s) by eauto.
-    break_exists_exists; eauto using coarse_best_succ_characterization.
-  - autounfold_one; simpl.
+  unfold live_node_in_msg_succ_lists in *; intuition.
+  - simpl.
     eapply live_node_in_msg_succ_lists_app_cons_split; autounfold; intros.
     + inv_prop client_payload; simpl in *; intuition congruence.
     + assert (Exists (live_node gst) (map addr_of (chop_succs (make_pointer src :: succs))))
+        by eauto.
+      apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists; tauto.
+  - simpl.
+    autounfold_one; intros.
+    simpl in *; break_or_hyp.
+    + find_injection.
+      invcs_prop client_payload.
+    + assert (Exists (live_node gst) (map addr_of succs))
         by eauto.
       apply Exists_exists; find_apply_lem_hyp Exists_exists; break_exists_exists; tauto.
 Qed.

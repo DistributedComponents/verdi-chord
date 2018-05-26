@@ -709,14 +709,14 @@ Proof using.
       break_and; subst_max;
         autorewrite with list;
         auto using timeouts_in_never_has_Tick.
-  - find_apply_lem_hyp start_query_definition;
-      break_or_hyp; break_exists; break_and; subst_max;
+  - find_apply_lem_hyp end_query_definition;
+      break_and; subst_max;
+        autorewrite with list;
         auto using timeouts_in_never_has_Tick.
-  - unfold add_tick in *.
-    simpl in *.
-    tuple_inversion.
-    autorewrite with list.
-    auto using timeouts_in_never_has_Tick.
+  - find_apply_lem_hyp end_query_definition;
+      break_and; subst_max;
+        autorewrite with list;
+        auto using timeouts_in_never_has_Tick.
 Qed.
 
 Lemma schedule_rectify_with_never_clears :
