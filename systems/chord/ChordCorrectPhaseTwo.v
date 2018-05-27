@@ -1799,12 +1799,12 @@ Proof using.
       unfold has_first_succ in *.
       break_exists; simpl in *; rewrite_update; intuition; find_inversion.
       simpl in *. find_rewrite_lem hd_error_make_succs. congruence.
-    + exfalso.
-      find_eapply_lem_hyp cur_request_join2_not_joined; eauto.
+    + find_eapply_lem_hyp cur_request_join_not_joined; eauto.
       find_eapply_lem_hyp nodes_not_joined_have_no_successors; eauto.
       unfold has_first_succ in *. break_exists; intuition.
       repeat find_rewrite. find_inversion. find_rewrite.
       simpl in *. discriminate.
+    + exfalso; eapply join2_unreachable; eauto.
   - find_eapply_lem_hyp has_first_succ_sigma; simpl; eauto.
     find_eapply_lem_hyp has_first_succ_inj; eauto.
   - find_eapply_lem_hyp has_first_succ_sigma; simpl; eauto.

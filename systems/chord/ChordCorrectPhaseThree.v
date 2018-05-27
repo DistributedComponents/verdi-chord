@@ -125,7 +125,8 @@ Proof.
     + update_destruct; subst; rewrite_update; simpl in *; eauto.
       repeat (handler_def || handler_simpl;
               eauto using length_chop_succs, length_tl).
-Qed.
+      admit. (* need to add conjunct about GotSuccList messages *)
+Admitted.
 
 Lemma succs_error_helper_length:
   forall ys gst p xs x,
