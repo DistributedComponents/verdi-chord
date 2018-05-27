@@ -74,4 +74,52 @@ namespace :chord_serialized do
     end
   end
 
+  desc 'client get ptrs'
+  task :client_get_ptrs do
+    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+    node = nodes[ENV['NODE']]
+    on roles(:client) do |client|
+      execute "#{current_path}/extraction/chord-serialized/client.native",
+        "-bind #{client.properties.ip}",
+        "-node #{node.properties.ip}:#{fetch(:chord_node_port)}",
+        "-query get_ptrs"
+    end
+  end
+
+  desc 'client get ptrs locally'
+  task :client_local_get_ptrs do
+    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+    node = nodes[ENV['NODE']]
+    run_locally do
+      execute 'extraction/chord-serialized/client.native',
+              '-bind 0.0.0.0',
+        "-node #{node.properties.ip}:#{fetch(:chord_node_port)}",
+        '-query get_ptrs'
+    end
+  end
+
+  desc 'client lookup'
+  task :client_lookup do
+    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+    node = nodes[ENV['NODE']]
+    on roles(:client) do |client|
+      execute "#{current_path}/extraction/chord-serialized/client.native",
+        "-bind #{client.properties.ip}",
+        "-node #{node.properties.ip}:#{fetch(:chord_node_port)}",
+        "-query lookup #{ENV['HASH']}"
+    end
+  end
+
+  desc 'client lookup locally'
+  task :client_local_lookup do
+    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+    node = nodes[ENV['NODE']]
+    run_locally do
+      execute 'extraction/chord-serialized/client.native',
+        '-bind 0.0.0.0',
+        "-node #{node.properties.ip}:#{fetch(:chord_node_port)}",
+        "-query lookup #{ENV['HASH']}"
+    end
+  end
+
 end

@@ -5,7 +5,7 @@ open Str
 let chord_default_port = 7000
 
 let show_id i =
-  Digest.to_hex (Util.string_of_char_list (id_to_ascii i))
+  Util.string_of_char_list (id_to_ascii i)
 
 let show_pointer p =
   show_id p.ChordIDSpace.ptrId
@@ -100,7 +100,7 @@ module ChordArrangement (C : ChordConfig) = struct
   type name = ChordSystem.addr
   type state = ChordSystem._data
   type msg = ChordSystem.payload
-  type timeout = ExtractedChord.ChordSystem._timeout
+  type timeout = ChordSystem._timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let port = chord_default_port
   let addr_of_name = Util.string_of_char_list
