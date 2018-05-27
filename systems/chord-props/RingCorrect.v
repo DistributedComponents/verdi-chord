@@ -1819,15 +1819,6 @@ Lemma principal_not_before_join_tgt :
 Proof.
 Admitted.
 
-Theorem join2_unreachable :
-  forall gst h st dstp j req,
-    reachable_st gst ->
-    sigma gst h = Some st ->
-    cur_request st = Some (dstp, Join2 j, req) ->
-    False.
-Proof.
-Admitted.
-
 Theorem zave_invariant_recv_sufficient_principals :
   chord_recv_handler_pre_post
     zave_invariant

@@ -40,15 +40,16 @@ Proof.
               repeat find_inversion; simpl in *; eauto; try congruence).
 Qed.
 
-Theorem join2_param_matches :
+Theorem join2_unreachable :
   forall gst,
     reachable_st gst ->
-    forall dst h st ns p,
+    forall h st dstp j req,
       sigma gst h = Some st ->
-      cur_request st = Some (dst, Join2 ns, p) ->
-      dst = ns.
+      cur_request st = Some (dstp, Join2 j, req) ->
+      False.
 Proof.
-  intros until 1. pattern gst.
+  intros until 1.
+  pattern gst.
   eapply chord_net_invariant; try assumption; clear H gst;
     do 2 autounfold; intros.
   - inv_prop initial_st; expand_def.
@@ -98,11 +99,22 @@ Proof.
     + find_injection.
       repeat handler_def;
         simpl in *;
-        solve [congruence
-              |eauto].
+        try solve [congruence
+                  |eauto].
     + eauto.
   - repeat find_rewrite; eauto.
   - repeat find_rewrite; eauto.
+Qed.
+
+Theorem join2_param_matches :
+  forall gst,
+    reachable_st gst ->
+    forall dst h st ns p,
+      sigma gst h = Some st ->
+      cur_request st = Some (dst, Join2 ns, p) ->
+      dst = ns.
+Proof.
+  intros; exfalso; eauto using join2_unreachable.
 Qed.
 
 Lemma sigma_some_in_nodes :
@@ -777,8 +789,9 @@ Theorem join2_target_joined :
       sigma gst (addr_of dst) = Some st__d /\
       joined st__d = true.
 Proof.
-Admitted.
-
+  intros.
+  exfalso; eauto using join2_unreachable.
+Qed.
 
 Lemma first_elem_in :
   forall A (P Q : A -> Prop) l,
