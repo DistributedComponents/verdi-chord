@@ -10,44 +10,92 @@ end
 
 module Client : ClientSig = struct
 
-  let connect_and_send me addr msg =
-    let remote = Util.mk_addr_inet (addr, ChordSerializedArrangement.chord_serialized_default_port) in
-    let self = Util.mk_addr_inet (me, 0) in
-    let conn = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
-    Unix.setsockopt conn Unix.SO_REUSEADDR true;
-    Unix.bind conn self;
-    Unix.connect conn remote;
-    let recv_chan = Unix.in_channel_of_descr conn in
-    let send_chan = Unix.out_channel_of_descr conn in
-    print_endline "connected successfully";
-    output_value send_chan msg;
-    flush send_chan;
-    print_endline "sent message";
-    send_chan, recv_chan, conn
+  let setup_listen_fd listen_addr =
+    let listen_fd = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+    Unix.setsockopt listen_fd Unix.SO_REUSEADDR true;
+    Unix.bind listen_fd (Unix.ADDR_INET (listen_addr, ChordSerializedArrangement.chord_serialized_default_port));
+    Unix.listen listen_fd 8;
+    Unix.set_nonblock listen_fd;
+    Printf.printf "[%s] started listening for connections" (Util.timestamp ());
+    print_newline ();
+    listen_fd
 
-  let debug_unix_error prefix errno fn arg =
-    let err_msg = Unix.error_message errno in
-    let full_msg = Printf.sprintf "in %s - %s(%s): %s" prefix fn arg err_msg in
-    print_endline full_msg
+  let setup_write_fd write_addr listen_addr =
+    let write_fd = Unix.socket Unix.PF_INET Unix.SOCK_STREAM 0 in
+    Unix.setsockopt write_fd Unix.SO_REUSEADDR true;
+    Unix.bind write_fd (Unix.ADDR_INET (listen_addr, 0));
+    Unix.connect write_fd (Unix.ADDR_INET (write_addr, ChordSerializedArrangement.chord_serialized_default_port));
+    Printf.printf "[%s] opened connection" (Util.timestamp ());
+    print_newline ();
+    write_fd
 
-  let query bind node p =
-    let send_chan, recv_chan, conn = connect_and_send bind node p in
-    let res = input_value recv_chan in
-    Unix.shutdown conn Unix.SHUTDOWN_ALL;
-    res
+  let accept_read_fd listen_fd =
+    Printf.printf "[%s] incoming connection" (Util.timestamp ());
+    print_newline ();
+    let (read_fd, read_addr) = Unix.accept listen_fd in
+    Unix.set_nonblock read_fd;
+    begin
+      match read_addr with
+      | Unix.ADDR_INET (addr, port) ->
+        Printf.printf "[%s] done processing new connection from %s" (Util.timestamp ()) (Unix.string_of_inet_addr addr);
+        print_newline ()
+      | _ -> ()
+    end;
+    read_fd
+
+  let rec eloop timeout listen_fd read_fds read_bufs =
+    let select_fds = listen_fd :: read_fds in
+    let (ready_fds, _, _) =
+      Util.select_unintr select_fds [] [] timeout
+    in
+    let (new_fds, res) =
+      List.fold_left
+        (fun (fds, res) fd ->
+          if fd = listen_fd then
+            let read_fd = accept_read_fd fd in
+            (read_fd :: fds, res)
+          else begin
+            Printf.printf "[%s] receiving data" (Util.timestamp ());
+            print_newline ();
+            match Util.recv_buf_chunk fd read_bufs with
+            | None -> (fds, res)
+            | Some buf -> (fds, Some buf)
+          end) ([], None) ready_fds
+    in
+    match res with
+    | None -> eloop timeout listen_fd (new_fds @ read_fds) read_bufs
+    | Some m -> m
+
+  let query listen_addr write_addr msg =
+    let listen_fd = setup_listen_fd listen_addr in
+    let write_fd = setup_write_fd write_addr listen_addr in
+    let buf = serialize_top (payload_Serializer.serialize msg) in
+    let read_bufs = Hashtbl.create 1 in
+    Util.send_chunk write_fd buf;
+    Printf.printf "[%s] sent message" (Util.timestamp ());
+    print_newline ();
+    let buf = eloop 1.0 listen_fd [] read_bufs in
+    deserializePayload buf
 
   exception Wrong_response of string
 
   let lookup bind node id =
     let p = forge_pointer id in
-    match query bind node (ChordSystem.GetBestPredecessor p) with
-    | ChordSystem.GotBestPredecessor p -> p
-    | r -> raise (Wrong_response (ChordSerializedArrangement.show_msg r))
+    let listen_addr = Unix.inet_addr_of_string bind in
+    let write_addr = Unix.inet_addr_of_string node in
+    match query listen_addr write_addr (GetBestPredecessor p) with
+    | Some (GotBestPredecessor p) -> p
+    | Some r -> raise (Wrong_response (ChordSerializedArrangement.show_msg r))
+    | None -> raise (Wrong_response "undeserializable")
 
   let get_pred_and_succs bind node =
-    match query bind node ChordSystem.GetPredAndSuccs with
-    | ChordSystem.GotPredAndSuccs (p, ss) -> (p, ss)
-    | r -> raise (Wrong_response (ChordSerializedArrangement.show_msg r))
+    let listen_addr = Unix.inet_addr_of_string bind in
+    let write_addr = Unix.inet_addr_of_string node in
+    match query listen_addr write_addr GetPredAndSuccs with
+    | Some (GotPredAndSuccs (p, ss)) -> (p, ss)
+    | Some r -> raise (Wrong_response (ChordSerializedArrangement.show_msg r))
+    | None -> raise (Wrong_response "undeserializable")
+
 end
 
 let validate bind node query_type lookup_id =
