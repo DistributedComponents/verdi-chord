@@ -1756,69 +1756,6 @@ Proof.
     now apply between_swap_not.
 Qed.
 
-Lemma lookup_not_between :
-  forall gst p j h,
-    reachable_st gst ->
-    In (h, (j, GotBestPredecessor p)) (msgs gst) ->
-    ~ between (hash h) (id_of p) (hash j).
-Proof.
-  intros until 1.
-  pattern gst.
-  eapply chord_net_invariant; do 2 autounfold; intros.
-  - inv_prop initial_st; break_and;
-      repeat find_rewrite; in_crush.
-  - repeat find_rewrite; in_crush.
-    unfold send in *; find_injection.
-    repeat handler_simpl || handler_def.
-  - repeat find_rewrite; in_crush.
-  - repeat find_rewrite; in_crush.
-    unfold send in *; find_injection.
-    repeat handler_simpl || handler_def.
-    find_eapply_lem_hyp option_map_Some; expand_def.
-  - repeat find_rewrite; in_crush.
-    unfold send in *; find_injection.
-    repeat handler_simpl || handler_def.
-    unfold send_keepalives in *.
-    find_apply_lem_hyp in_map_iff.
-    expand_def.
-  - repeat find_rewrite; in_crush.
-    unfold send in *; find_injection.
-    repeat handler_simpl || handler_def.
-    unfold send_keepalives in *.
-    find_eapply_lem_hyp option_map_Some; expand_def.
-  - repeat find_rewrite; in_crush.
-    unfold send in *; find_injection.
-    handler_def.
-    in_crush.
-    + repeat handler_def || handler_simpl.
-      find_eapply_lem_hyp option_map_Some; expand_def.
-    + match goal with
-      | H: context[handle_query_timeout] |- _ => clear H
-      end.
-      repeat handler_def || handler_simpl.
-      find_apply_lem_hyp in_concat; expand_def.
-      find_apply_lem_hyp in_map_iff; expand_def.
-      admit.
-  - repeat find_rewrite; in_crush.
-    unfold send in *; find_injection.
-    handler_def.
-    in_crush.
-    + find_eapply_lem_hyp handle_msg_GotSuccList_response_accurate.
-      admit.
-Admitted.
-
-Lemma principal_not_before_join_tgt :
-  forall gst st h s ns p req,
-    reachable_st gst ->
-    ~ In h (failed_nodes gst) ->
-    sigma gst h = Some st ->
-    cur_request st = Some (s, Join2 ns, req) ->
-
-    no_live_node_skips gst p ->
-    ~ between (hash h) (hash p) (id_of s).
-Proof.
-Admitted.
-
 Theorem zave_invariant_recv_sufficient_principals :
   chord_recv_handler_pre_post
     zave_invariant
