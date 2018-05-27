@@ -199,8 +199,15 @@ Definition option_to_list {A} (x : option A) :=
   end.
 
 
+Definition pointers_in_request (r : option (pointer * query * payload)) : list pointer :=
+  match r with
+  | Some (p, Rectify q, _) => [p; q]
+  | _ => []
+  end.
+  
+
 Definition pointers_in_node_state st :=
-  (option_to_list (pred st)) ++ (option_to_list (rectify_with st)) ++ succ_list st.
+  (option_to_list (pred st)) ++ (option_to_list (rectify_with st)) ++ succ_list st ++ pointers_in_request (cur_request st).
 
 Definition pointers_in_state gst :=
   concat (filterMap (fun h => option_map pointers_in_node_state (sigma gst h)) (nodes gst))
@@ -364,6 +371,50 @@ Qed.
 
 Hint Resolve sender_got_best_pred_in_pointers_in_state.
 
+(* cur_request lemmas and hints *)
+
+Lemma cur_request_rectify_with1 :
+  forall gst st h p q r,
+    In h (nodes gst) ->
+    sigma gst h = Some st ->
+    cur_request st = Some (p, Rectify q, r) ->
+    In p (pointers_in_state gst).
+Proof.
+  intros. unfold pointers_in_state.
+  in_crush. left.
+  assert (In p (pointers_in_node_state st)).
+  {
+    unfold pointers_in_node_state.
+    repeat find_rewrite. simpl. in_crush.
+  }
+  eapply concat_in; eauto.
+  eapply filterMap_In; eauto.
+  repeat find_rewrite. simpl. auto.
+Qed.
+
+Hint Resolve cur_request_rectify_with1.
+
+Lemma cur_request_rectify_with2 :
+  forall gst st h p q r,
+    In h (nodes gst) ->
+    sigma gst h = Some st ->
+    cur_request st = Some (q, Rectify p, r) ->
+    In p (pointers_in_state gst).
+Proof.
+  intros. unfold pointers_in_state.
+  in_crush. left.
+  assert (In p (pointers_in_node_state st)).
+  {
+    unfold pointers_in_node_state.
+    repeat find_rewrite. simpl.
+    repeat (in_crush; right).
+  }
+  eapply concat_in; eauto.
+  eapply filterMap_In; eauto.
+  repeat find_rewrite. simpl. auto.
+Qed.
+
+Hint Resolve cur_request_rectify_with2.
 
 Lemma filterMap_in :
   forall A B (f : A -> option B) l x,
@@ -393,6 +444,10 @@ Lemma pointers_in_state_elim :
     (exists h st, In h (nodes gst) /\ sigma gst h = Some st /\ In p (succ_list st)) \/
     (exists h st, In h (nodes gst) /\ sigma gst h = Some st /\ pred st = Some p) \/
     (exists h st, In h (nodes gst) /\ sigma gst h = Some st /\ rectify_with st = Some p) \/
+    (exists h st q m, In h (nodes gst) /\ sigma gst h = Some st /\
+                 cur_request st = Some (p, Rectify q, m)) \/
+    (exists h st q m, In h (nodes gst) /\ sigma gst h = Some st /\
+                 cur_request st = Some (q, Rectify p, m)) \/
     (exists m, In m (msgs gst) /\ In p (pointers_in_payload (fst m) (snd (snd m)))).
 Proof.
   intros. unfold pointers_in_state in *.
@@ -409,6 +464,11 @@ Proof.
     + right. left. find_apply_lem_hyp in_option_to_list. eauto.
     + right. right. left. find_apply_lem_hyp in_option_to_list. eauto.
     + left. eauto.
+    + unfold pointers_in_request in *. repeat break_match; in_crush.
+      * right. right. right. left.
+        repeat eexists; eauto.
+      * right. right. right. right. left.
+        repeat eexists; eauto.
   - repeat right.
     unfold pointers_in_network in *.
     find_apply_lem_hyp in_flat_map.
@@ -487,6 +547,45 @@ Qed.
 
 Hint Resolve in_partition.
 
+Lemma best_predecessor_elim :
+  forall h l h',
+    best_predecessor h l h' = h \/
+    In (best_predecessor h l h') l.
+Proof.
+  intros. unfold best_predecessor, hd.
+  break_match; intuition.
+  right.
+  apply in_rev.
+  eapply filter_In. rewrite Heql0. in_crush.
+Qed.
+
+Lemma annoying:
+  forall (p : pointer) (h : ChordSemantics.addr) dqs
+    (st : ChordSemantics.data) m,
+      In m
+         (map (send h)
+              (concat
+                 (map (handle_delayed_query h st) dqs))) ->
+      In p (pointers_in_payload (fst m) (snd (snd m))) ->
+      In p (succ_list st) \/
+      pred st = Some p \/
+      ptr st = p \/
+      make_pointer h = p.
+Proof.
+  intros.
+  find_apply_lem_hyp in_map_iff.
+  break_exists. intuition. subst.
+  find_apply_lem_hyp in_concat.
+  break_exists. intuition.
+  in_crush. unfold handle_delayed_query, handle_query_req in *.
+  repeat break_match; simpl in *; in_crush.
+  - match goal with
+    | |- context [best_predecessor ?h ?l ?h'] =>
+      pose proof best_predecessor_elim h l h'
+    end. intuition.
+  - break_match; in_crush.
+Qed.
+
 Theorem big_joined_invariant :
   forall gst p,
     reachable_st gst ->
@@ -530,12 +629,22 @@ Proof.
     + find_copy_apply_lem_hyp sigma_initial_st_start_handler; eauto.
       subst. unfold start_handler in *.
       repeat break_match; simpl in *; intuition; congruence.
+    + find_copy_apply_lem_hyp sigma_initial_st_start_handler; eauto.
+      subst. unfold start_handler in *.
+      repeat break_match; simpl in *; intuition; congruence.
+    + find_copy_apply_lem_hyp sigma_initial_st_start_handler; eauto.
+      subst. unfold start_handler in *.
+      repeat break_match; simpl in *; intuition; congruence.
     + unfold initial_st in *. intuition. repeat find_rewrite. in_crush.
   - assert (In p (pointers_in_state gst) -> pointer_joined gst' p) by
         eauto using pointer_joined_stable.
     inv_prop step_dynamic.
     + find_apply_lem_hyp pointers_in_state_elim.
       intuition; break_exists; intuition; simpl in *; eauto.
+      * update_destruct; subst; rewrite_update; intuition; subst; eauto.
+        find_inversion. simpl in *. intuition; congruence.
+      * update_destruct; subst; rewrite_update; intuition; subst; eauto.
+        find_inversion. simpl in *. intuition; congruence.
       * update_destruct; subst; rewrite_update; intuition; subst; eauto.
         find_inversion. simpl in *. intuition; congruence.
       * update_destruct; subst; rewrite_update; intuition; subst; eauto.
@@ -551,13 +660,29 @@ Proof.
       * repeat (handler_def || handler_simpl);
           try solve [assert (In p (succ_list st)) by (repeat find_rewrite; in_crush); eauto].
       * repeat (handler_def || handler_simpl).
-        admit (* need to add timeouts *).
       * repeat (handler_def || handler_simpl).
+      * repeat (handler_def || handler_simpl);
+          try solve [find_apply_lem_hyp option_map_Some;
+                     break_exists; intuition; find_inversion; eauto].
+      * repeat (handler_def || handler_simpl);
+          try solve [find_apply_lem_hyp option_map_Some;
+                     break_exists; intuition; find_inversion; eauto].
       * repeat (handler_def || handler_simpl);
           try solve [find_apply_lem_hyp option_map_Some; break_exists;
                      intuition; repeat find_inversion; eauto; subst; simpl in *; intuition];
           try solve [in_crush; eauto; unfold send_keepalives in *; in_crush].
-        all:admit. (* sorry *)
+        all:admit.
+        (*-- find_apply_lem_hyp in_app_iff. intuition eauto.
+           eapply annoying in H11; eauto. simpl in *. intuition eauto.
+           find_inversion. eauto. Focus 2.
+           all:d
+        { in_crush.
+          - find_apply_lem_hyp in_concat; break_exists. intuition.
+            find_apply_lem_hyp in_map_iff; break_exists. intuition.
+            subst. unfold handle_delayed_query in *.
+            break_match. subst. simpl in *.
+            unfold handle_query_req in H12. simpl in *.
+                   all:admit. (* sorry *)*)
     + find_apply_lem_hyp pointers_in_state_elim.
       intuition; break_exists; intuition; simpl in *; eauto.
       * repeat (handler_def || (try find_apply_lem_hyp in_make_succs; intuition) || handler_simpl);
