@@ -1472,8 +1472,14 @@ Lemma pair_in_complete :
     exists xs ys,
       l = xs ++ [a; b] ++ ys.
 Proof.
-  intros.
-Admitted.
+ intros A a b l PI.
+ induction PI.
+ - exists [], l. reflexivity.
+ - destruct IHPI as [xs [ys ?]].
+   subst l.
+   exists (x :: xs), ys.
+   reflexivity.
+Qed.
 
 Lemma not_skipped_firstn :
   forall h l n k,
