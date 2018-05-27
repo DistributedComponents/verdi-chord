@@ -133,7 +133,7 @@ let parse argv =
   in
   let anonarg a =
     if !query_type = "lookup"
-    then lookup_id := Some (ascii_to_id (Util.char_list_of_string a))
+    then lookup_id := Some (ascii_to_id (Util.char_list_of_string (Digest.from_hex a)))
     else raise (Arg.Bad "not a lookup")
   in
   let usage = "USAGE:\n\

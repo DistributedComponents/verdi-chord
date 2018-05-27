@@ -5,7 +5,7 @@ open Str
 let chord_serialized_default_port = 8000
 
 let show_id i =
-  Util.string_of_char_list (id_to_ascii i)
+  Digest.to_hex (Util.string_of_char_list (id_to_ascii i))
 
 let show_pointer p =
   show_id p.ChordIDSpace.ptrId
