@@ -11,6 +11,7 @@ Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.QueryInvariant.
+Require Import Chord.SuccessorNodesAlwaysValid.
 Require Import Chord.PtrCorrectInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
