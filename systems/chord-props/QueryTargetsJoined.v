@@ -523,7 +523,47 @@ Proof.
     subst.
     unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
 Qed.
-    
+
+Lemma pointers_wf_start :
+  chord_start_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one.
+  intuition.
+  find_rewrite_lem start_handler_with_single_known.
+  repeat (handler_def || handler_simpl).
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+  - apply all_msgs_cons; auto.
+    intros. inv_prop succs_msg.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+  - apply all_msgs_cons; auto.
+    intros. congruence.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+    inv_prop query_ptr; eauto.
+  - apply all_msgs_cons; auto.
+    intros. congruence.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+Qed.
+
+
+             
+
+
 Theorem pointers_wf :
   forall gst,
     reachable_st gst -> 
@@ -532,7 +572,7 @@ Proof.
   intros until 1. pattern gst.
   eapply chord_net_invariant.
   (* TODO(doug) need more theorems for each case here *)
-  all:(try exact pointers_wf_recv; try exact pointers_wf_init).
+  all:(try exact pointers_wf_recv; try exact pointers_wf_init; try exact pointers_wf_start); auto.
 Admitted.
 
 (*
