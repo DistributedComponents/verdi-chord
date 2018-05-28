@@ -1453,19 +1453,6 @@ Proof.
 Qed.
 Hint Resolve not_skipped_nil.
 
-Lemma cons_make_succs :
-  forall p succs,
-    make_succs p succs = p :: firstn (SUCC_LIST_LEN - 1) succs.
-Proof.
-  pose proof succ_list_len_lower_bound.
-  unfold make_succs, chop_succs.
-  intros; simpl.
-  destruct SUCC_LIST_LEN; try omega.
-  simpl.
-  replace (n - 0) with n by omega.
-  auto.
-Qed.
-
 Lemma pair_in_complete :
   forall A a b l,
     @pair_in A a b l ->
@@ -1502,29 +1489,6 @@ Proof.
   induction k; auto.
   intros.
   destruct l; simpl; congruence.
-Qed.
-
-Lemma recv_handler_succs_msg_accurate :
-  forall src dst st p st' ms nts cts h m succs,
-  recv_handler src dst st p = (st', ms, nts, cts) ->
-  In (h, m) ms ->
-  succs_msg m succs ->
-  succs = succ_list st'.
-Proof.
-  intros; inv_prop succs_msg.
-  - handler_def.
-    find_apply_lem_hyp in_app_or; break_or_hyp.
-    + find_eapply_lem_hyp handle_delayed_queries_GotSuccList_response_accurate; eauto.
-    + handler_def;
-      repeat match goal with
-             | H: False |- _ => elim H
-             | H: _ \/ _ |- _ => destruct H
-             | H: (_, _) = (_, _) |- _ => injc H; try congruence
-             | |- _ => progress simpl in *
-             | |- _ => handler_def
-             end;
-      eapply handle_query_req_GotSuccList_response_accurate; eauto.
-  - eapply recv_handler_GotPredAndSuccs_response_accurate; eauto.
 Qed.
 
 Lemma weaken_no_live_node_skips :

@@ -11,6 +11,7 @@ Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
 Require Import Chord.QueryInvariant.
+Require Import Chord.PtrCorrectInvariant.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -132,6 +133,333 @@ Proof.
   - invcs H0; simpl in *; eauto;
       update_destruct; subst; rewrite_update; simpl in *; eauto.
 Qed.
+
+Definition all_states (P : data -> Prop) (sigma : addr -> option data) : Prop :=
+  forall h st,
+    sigma h = Some st ->
+    P st.
+Hint Unfold all_states.
+
+Definition all_msgs (P : addr -> addr -> payload -> Prop) (ms : list msg) :=
+  forall src dst p,
+    In (src, (dst, p)) ms ->
+    P src dst p.
+Hint Unfold all_msgs.
+
+Definition all_succs_state (P : pointer -> Prop) (sigma : addr -> option data): Prop :=
+  all_states (fun st => forall s, In s (succ_list st) -> P s) sigma.
+Hint Unfold all_succs_state.
+
+Definition all_succs_net (P : pointer -> Prop) (ms : list msg) : Prop :=
+  all_msgs (fun src dst p =>
+              forall succs s,
+                succs_msg p succs ->
+                In s succs ->
+                P s)
+           ms.
+Hint Unfold all_succs_net.
+
+Definition all_preds_state (P : pointer -> Prop) (sigma : addr -> option data): Prop :=
+  all_states (fun st => forall p, pred st = Some p -> P p) sigma.
+Hint Unfold all_preds_state.
+
+Definition all_preds_net (P : pointer -> Prop) (ms : list msg) : Prop :=
+  all_msgs (fun src dst p =>
+              forall pred succs,
+                p = GotPredAndSuccs (Some pred) succs ->
+                P pred)
+           ms.
+Hint Unfold all_preds_net.
+
+Definition all_self_ptr (P : pointer -> Prop) : (addr -> option data) -> Prop :=
+  all_states (fun st => P (ptr st)).
+
+Definition all_rectify_with (P : pointer -> Prop) (sigma : addr -> option data) : Prop :=
+  all_states (fun st => forall rw, rectify_with st = Some rw -> P rw) sigma.
+Hint Unfold all_rectify_with.
+
+Definition all_cur_request (P : pointer -> query -> Prop) (sigma : addr -> option data) : Prop :=
+  all_states (fun st => forall dstp q m,
+                  cur_request st = Some (dstp, q, m) ->
+                  P dstp q)
+             sigma.
+Hint Unfold all_cur_request.
+
+Inductive query_ptr : query -> pointer -> Prop :=
+| QPRectify : forall p, query_ptr (Rectify p) p
+| QPStabilize2 : forall p, query_ptr (Stabilize2 p) p
+| QPJoin : forall p, query_ptr (Join p) p
+| QPJoin2 : forall p, query_ptr (Join2 p) p.
+Hint Constructors query_ptr.
+
+Definition all_query_ptr (P : pointer -> Prop) (sigma : addr -> option data) : Prop :=
+  all_cur_request (fun _ q => forall p, query_ptr q p -> P p) sigma.
+Hint Unfold all_query_ptr.
+
+Definition all_lookup_results (P : pointer -> Prop) : list msg -> Prop :=
+  all_msgs (fun _ _ p => forall res, p = GotBestPredecessor res -> P res).
+Hint Unfold all_lookup_results.
+
+Inductive all_ptrs P (gst : global_state) :=
+| AllPtrs :
+    all_succs_state P (sigma gst) ->
+    all_succs_net P (msgs gst) ->
+    all_preds_state P (sigma gst) ->
+    all_preds_net P (msgs gst) ->
+    all_rectify_with P (sigma gst) ->
+    all_cur_request (fun p _ => P p) (sigma gst) ->
+    all_query_ptr P (sigma gst) ->
+    all_lookup_results P (msgs gst) ->
+    all_self_ptr P (sigma gst) ->
+    all_ptrs P gst.
+
+Theorem all_msgs_app :
+  forall P xs ys,
+    all_msgs P xs ->
+    all_msgs P ys ->
+    all_msgs P (xs ++ ys).
+Proof.
+  autounfold; in_crush.
+Qed.
+Hint Resolve all_msgs_app.
+
+Theorem all_msgs_split :
+  forall P l m xs ys,
+    l = xs ++ m :: ys ->
+    all_msgs P l ->
+    all_msgs P (xs ++ ys).
+Proof.
+  autounfold; in_crush.
+Qed.
+Hint Resolve all_msgs_split.
+
+Theorem all_msgs_cons :
+  forall (P : addr -> addr -> payload -> Prop) src dst p xs,
+    P src dst p ->
+    all_msgs P xs ->
+    all_msgs P ((src, (dst, p)) :: xs).
+Proof.
+  autounfold; in_crush; congruence.
+Qed.
+Hint Resolve all_msgs_cons.
+
+Theorem all_states_update :
+  forall P h st' sigma,
+    all_states P sigma ->
+    P st' ->
+    all_states P (update addr_eq_dec sigma h (Some st')).
+Proof.
+  autounfold.
+  intros.
+  destruct_update; rewrite_update.
+  - congruence.
+  - eauto.
+Qed.
+Hint Resolve all_states_update.
+
+Lemma cons_make_succs :
+  forall p succs,
+    make_succs p succs = p :: firstn (SUCC_LIST_LEN - 1) succs.
+Proof.
+  pose proof succ_list_len_lower_bound.
+  unfold make_succs, chop_succs.
+  intros; simpl.
+  destruct SUCC_LIST_LEN; try omega.
+  simpl.
+  replace (n - 0) with n by omega.
+  auto.
+Qed.
+
+Hint Resolve make_pointer_wf.
+
+Lemma recv_handler_succs_msg_accurate :
+  forall src dst st p st' ms nts cts h m succs,
+  recv_handler src dst st p = (st', ms, nts, cts) ->
+  In (h, m) ms ->
+  succs_msg m succs ->
+  succs = succ_list st'.
+Proof.
+  intros; inv_prop succs_msg.
+  - handler_def.
+    find_apply_lem_hyp in_app_or; break_or_hyp.
+    + find_eapply_lem_hyp handle_delayed_queries_GotSuccList_response_accurate; eauto.
+    + handler_def;
+      repeat match goal with
+             | H: False |- _ => elim H
+             | H: _ \/ _ |- _ => destruct H
+             | H: (_, _) = (_, _) |- _ => injc H; try congruence
+             | |- _ => progress simpl in *
+             | |- _ => handler_def
+             end;
+      eapply handle_query_req_GotSuccList_response_accurate; eauto.
+  - eapply recv_handler_GotPredAndSuccs_response_accurate; eauto.
+Qed.
+
+Lemma best_predecessor_in_succs_or_ptr :
+  forall self succs x p,
+    x = best_predecessor self succs p ->
+    In x (self :: succs).
+Proof.
+  intros; subst.
+  unfold best_predecessor, hd.
+  break_match.
+  in_crush.
+  simpl; right.
+  apply in_rev.
+  eapply In_filter_In; eauto.
+  in_crush.
+Qed.
+
+Lemma handle_query_req_GotBestPredecessor_in_succs_or_ptr :
+  forall src st r h p pt succs,
+    In (h, GotBestPredecessor r) (handle_query_req st src p) ->
+    pt = ptr st ->
+    succs = succ_list st ->
+    r = pt \/ In r succs.
+Proof.
+  unfold handle_query_req.
+  intros.
+  subst.
+  cut (In r (ptr st :: succ_list st)).
+  { simpl; intuition congruence. }
+  break_match; try solve [exfalso; subst; in_crush; congruence].
+  eapply best_predecessor_in_succs_or_ptr.
+  subst; in_crush.
+  find_injection.
+  eauto.
+Qed.
+
+Lemma recv_handler_lookup_response_in_succs :
+  forall src dst st p st' ms nts cts,
+    recv_handler src dst st p = (st', ms, nts, cts) ->
+    forall h p,
+      In (h, GotBestPredecessor p) ms ->
+      p = ptr st \/ In p (succ_list st').
+Proof.
+  intros.
+  repeat handler_def
+  || handler_simpl
+  || (unfold handle_delayed_query in *)
+  || in_crush
+  || (try find_eapply_lem_hyp in_concat; expand_def).
+  all:repeat break_match.
+  all:try solve [eapply handle_query_req_GotBestPredecessor_in_succs_or_ptr; eauto].
+  change (x8 = p0 \/ In p0 x11) with (In p0 (x8 :: x11)).
+  eapply handle_query_req_GotBestPredecessor_in_succs_or_ptr; eauto.
+Qed.
+
+Theorem pointers_wf_recv :
+  chord_recv_handler_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one.
+  intros.
+  inv_prop all_ptrs.
+  (* We'll prove the state cases separately so we can use them in the message cases. *)
+  assert (all_succs_state wf_ptr (update addr_eq_dec (sigma gst) h (Some st'))).
+  {
+    apply all_states_update; eauto; intros.
+    repeat handler_def;
+      try solve [repeat handler_simpl].
+    - simpl in *; repeat find_rewrite || find_injection.
+      rewrite cons_make_succs in *; in_crush.
+      find_apply_lem_hyp in_firstn.
+      find_eapply_prop all_succs_net; eauto; in_crush.
+    - simpl in *; repeat find_rewrite || find_injection.
+      rewrite cons_make_succs in *; in_crush.
+      find_apply_lem_hyp in_firstn.
+      find_eapply_prop all_succs_net; eauto; in_crush.
+    - simpl in *; repeat find_rewrite || find_injection.
+      rewrite cons_make_succs in *; in_crush.
+      find_apply_lem_hyp in_firstn.
+      find_eapply_prop all_succs_net; eauto; in_crush.
+    - simpl in *; repeat find_rewrite || find_injection.
+      rewrite cons_make_succs in *; in_crush.
+      + find_eapply_prop all_query_ptr; eauto.
+      + find_apply_lem_hyp in_firstn.
+        find_eapply_prop all_succs_net; [in_crush| |]; eauto.
+    - simpl in *; repeat find_rewrite || find_injection.
+      find_eapply_prop all_succs_net; [in_crush| |]; eauto.
+    - simpl in *; repeat find_rewrite || find_injection.
+      rewrite cons_make_succs in *; in_crush.
+      + find_eapply_prop all_query_ptr; eauto.
+      + find_apply_lem_hyp in_firstn.
+        find_eapply_prop all_succs_net; [in_crush| |]; eauto.
+  }
+  assert (all_preds_state wf_ptr (update addr_eq_dec (sigma gst) h (Some st'))).
+  {
+    apply all_states_update; eauto; intros.
+    repeat handler_def || handler_simpl.
+  }
+  constructor;
+    repeat match goal with
+           | H: _ |- _ => rewrite H
+           end.
+  - assumption.
+  - apply all_msgs_app; [|eauto using all_msgs_split].
+    unfold send.
+    autounfold_one; intros.
+    find_apply_lem_hyp in_map_iff; expand_def.
+    intros.
+    find_eapply_lem_hyp recv_handler_succs_msg_accurate; eauto.
+    subst.
+    find_eapply_prop all_succs_state; rewrite_update; eauto.
+  - assumption.
+  - apply all_msgs_app; [|eauto using all_msgs_split].
+    unfold send.
+    autounfold_one; intros.
+    find_apply_lem_hyp in_map_iff; expand_def.
+    intros; subst.
+    find_eapply_lem_hyp recv_handler_GotPredAndSuccs_response_accurate; eauto.
+    find_eapply_prop all_preds_state; rewrite_update; intuition.
+  - apply all_states_update; eauto; intros.
+    repeat handler_def || handler_simpl.
+  - apply all_states_update; eauto; intros.
+    repeat handler_def; try solve [repeat handler_simpl].
+    all:repeat find_rewrite || find_injection || simpl in *.
+    + find_eapply_prop all_preds_net; in_crush.
+    + find_eapply_prop all_lookup_results; in_crush.
+    + find_eapply_prop all_lookup_results; in_crush.
+  - apply all_states_update; eauto; intros.
+    repeat match goal with
+           | H: context[handle_query_res] |- _ => idtac
+           | _ => handler_def
+           end;
+      match goal with
+      | H: context[handle_query_res] |- _ => idtac
+      | _ => repeat handler_simpl
+      end.
+    find_apply_lem_hyp cur_request_preserved_by_do_delayed_queries.
+    repeat find_rewrite.
+    repeat handler_def;
+      try solve [repeat handler_simpl].
+    repeat find_rewrite || find_injection || simpl in *.
+    inv_prop query_ptr.
+    find_eapply_prop all_preds_net; in_crush.
+  - apply all_msgs_app; [|eauto using all_msgs_split].
+    autounfold; intros.
+    subst.
+    unfold send in *; find_apply_lem_hyp in_map_iff; expand_def.
+    find_eapply_lem_hyp recv_handler_lookup_response_in_succs; eauto.
+    break_or_hyp; auto.
+    + find_eapply_prop all_self_ptr; eauto.
+    + find_eapply_prop all_succs_state; rewrite_update; eauto.
+  - apply all_states_update; auto; intros.
+    replace (ptr st') with (make_pointer h); eauto.
+    symmetry; eapply ptr_correct;
+      [eapply reachableStep; eauto
+      |repeat find_rewrite; rewrite_update; auto].
+Qed.
+
+Theorem pointers_wf :
+  forall gst,
+    reachable_st gst -> 
+    all_ptrs wf_ptr gst.
+Proof.
+  intros until 1. pattern gst.
+  eapply chord_net_invariant.
+  (* TODO(doug) need more theorems for each case here *)
+  all:try exact pointers_wf_recv.
+Admitted.
 
 (*
 Theorem succs_joined :
