@@ -43,6 +43,8 @@ module Client : ClientSig = struct
     end;
     read_fd
 
+  exception Wrong_response of string
+
   let rec eloop timeout listen_fd read_fds read_bufs =
     let select_fds = listen_fd :: read_fds in
     let (ready_fds, _, _) =
@@ -63,8 +65,13 @@ module Client : ClientSig = struct
           end) ([], None) ready_fds
     in
     match res with
-    | None -> eloop timeout listen_fd (new_fds @ read_fds) read_bufs
-    | Some m -> m
+      None -> eloop timeout listen_fd (new_fds @ read_fds) read_bufs
+    | Some m -> (match deserializePayload m with
+                  None -> raise (Wrong_response "undeserializable")
+                 | Some Busy -> Printf.printf "repeating";
+                                print_newline ();
+                                eloop timeout listen_fd (new_fds @ read_fds) read_bufs
+                 | _ -> m)
 
   let query listen_addr write_addr msg =
     let listen_fd = setup_listen_fd listen_addr in
@@ -76,8 +83,6 @@ module Client : ClientSig = struct
     print_newline ();
     let buf = eloop 1.0 listen_fd [] read_bufs in
     deserializePayload buf
-
-  exception Wrong_response of string
 
   let lookup bind node id =
     let p = forge_pointer id in

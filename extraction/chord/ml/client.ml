@@ -69,7 +69,8 @@ module Client : ClientSig = struct
           end) ([], None) ready_fds
     in
     match res with
-    | None -> eloop timeout listen_fd (new_fds @ read_fds) read_bufs
+      None
+    | Some Busy -> eloop timeout listen_fd (new_fds @ read_fds) read_bufs
     | Some m -> m
 
   let query listen_addr write_addr msg =
