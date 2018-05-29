@@ -714,11 +714,11 @@ Proof.
   - apply all_states_update; eauto; intros.
     repeat (handler_def || handler_simpler).
   - apply all_msgs_app; eauto; intros; simpl in *.
-    Time repeat (handler_def || handler_simpler).
+    repeat (handler_def || handler_simpler).
   - apply all_states_update; eauto; intros.
-    Time repeat (handler_def || handler_simpler).
+    repeat (handler_def || handler_simpler).
   - apply all_msgs_app; eauto; intros; simpl in *.
-    Time repeat (handler_def || handler_simpler).
+    repeat (handler_def || handler_simpler).
   - apply all_states_update; eauto; intros.
     repeat (handler_def || handler_simpler).
   - apply all_states_update; eauto; intros.
