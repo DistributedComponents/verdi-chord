@@ -78,7 +78,7 @@ class Node(object):
         return template.format(self.addr, self.knowns, self.started)
 
 def initial_ring(start, n):
-    initial_addrs = [Addr("127.0.0.{}".format(start + i), 8000) for i in range(n)]
+    initial_addrs = [Addr("127.0.0.{}".format(start + i), 7000) for i in range(n)]
     nodes = []
     for addr in initial_addrs:
         nodes.append(Node(addr, initial_addrs))
