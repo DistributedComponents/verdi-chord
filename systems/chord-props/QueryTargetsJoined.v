@@ -174,6 +174,7 @@ Hint Unfold all_preds_net.
 
 Definition all_self_ptr (P : pointer -> Prop) : (addr -> option data) -> Prop :=
   all_states (fun st => P (ptr st)).
+Hint Unfold all_self_ptr.
 
 Definition all_rectify_with (P : pointer -> Prop) (sigma : addr -> option data) : Prop :=
   all_states (fun st => forall rw, rectify_with st = Some rw -> P rw) sigma.
@@ -451,6 +452,228 @@ Proof.
       |repeat find_rewrite; rewrite_update; auto].
 Qed.
 
+Lemma hd_error_in :
+  forall X (l : list X) x,
+    hd_error l = Some x ->
+    In x l.
+Proof.
+  intros. unfold hd_error in *.
+  break_match; try congruence.
+  find_inversion. in_crush.
+Qed.
+
+Lemma pointers_wf_init :
+  chord_init_invariant (all_ptrs wf_ptr).
+Proof.
+  autounfold_one. intuition.
+  constructor.
+  - do 2 autounfold_one; simpl.
+    intros.
+    find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; in_crush.
+    find_apply_lem_hyp in_firstn.
+    match goal with
+    | H : In ?s ?l, H' : ?l' = _ :: ?l |- _ => assert (In s l') by (repeat find_rewrite; in_crush)
+    end. find_apply_lem_hyp in_sort_by_between. in_crush.
+  - do 2 autounfold_one; simpl. intros.
+    unfold initial_st in *. intuition. repeat find_rewrite. in_crush.
+  - do 2 autounfold_one; simpl.
+    intros.
+    find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
+    find_apply_lem_hyp hd_error_in.
+    find_apply_lem_hyp in_rev.
+    find_reverse_rewrite. find_apply_lem_hyp in_sort_by_between.
+    in_crush.
+  - do 2 autounfold_one; simpl. intros.
+    unfold initial_st in *. intuition. repeat find_rewrite. in_crush.
+  - do 2 autounfold_one; simpl.
+    intros.
+    find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
+  - do 2 autounfold_one; simpl.
+    intros.
+    find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
+    find_inversion.
+    match goal with
+    | _ : ?l = [?x] |- _ => assert (In x l) by (repeat find_rewrite; in_crush)
+    end.
+    find_apply_lem_hyp in_sort_by_between. in_crush.
+  - do 3 autounfold_one; simpl.
+    intros.
+    find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
+    find_inversion.
+    inv_prop query_ptr.
+    match goal with
+    | _ : ?l = [?x] |- _ => assert (In x l) by (repeat find_rewrite; in_crush)
+    end.
+    find_apply_lem_hyp in_sort_by_between. in_crush.
+  - do 2 autounfold_one; simpl. intros.
+    unfold initial_st in *. intuition. repeat find_rewrite. in_crush.
+  - do 2 autounfold_one; simpl.
+    intros.
+    find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
+Qed.
+
+Lemma pointers_wf_start :
+  chord_start_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one.
+  intuition.
+  find_rewrite_lem start_handler_with_single_known.
+  repeat (handler_def || handler_simpl).
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+  - apply all_msgs_cons; auto.
+    intros. inv_prop succs_msg.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+  - apply all_msgs_cons; auto.
+    intros. congruence.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+    inv_prop query_ptr; eauto.
+  - apply all_msgs_cons; auto.
+    intros. congruence.
+  - apply all_states_update; eauto.
+    intros.
+    repeat handler_simpl; intuition.
+Qed.
+
+Lemma pointers_wf_tick:
+  chord_tick_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one. intros; simpl in *.
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite; simpl in *.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    find_apply_lem_hyp option_map_Some.
+    break_exists; intuition. find_inversion.
+    unfold send in *. find_inversion. inv_prop succs_msg.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    find_apply_lem_hyp option_map_Some.
+    break_exists; intuition. find_inversion.
+    unfold send in *. find_inversion.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+    find_apply_lem_hyp option_map_Some.
+    break_exists. intuition. find_inversion.
+    eauto using hd_error_in.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+    inv_prop query_ptr.
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    find_apply_lem_hyp option_map_Some.
+    break_exists; intuition. find_inversion.
+    unfold send in *. find_inversion.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+Qed.
+
+Lemma pointers_wf_keepalive :
+  chord_keepalive_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one. intros; simpl in *.
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite; simpl in *.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    in_crush. unfold send_keepalives in *.
+    in_crush. unfold send in *. find_inversion.
+    inv_prop succs_msg.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    subst.
+    in_crush. unfold send_keepalives in *.
+    in_crush. unfold send in *. find_inversion.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    subst.
+    in_crush. unfold send_keepalives in *.
+    in_crush. unfold send in *. find_inversion.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+Qed.
+
+Lemma pointers_wf_rectify :
+  chord_rectify_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one. intros; simpl in *.
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite; simpl in *.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    find_apply_lem_hyp option_map_Some. break_exists. intuition.
+    find_inversion.
+    unfold send in *. find_inversion.
+    inv_prop succs_msg.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    find_apply_lem_hyp option_map_Some. break_exists. intuition.
+    find_inversion.
+    unfold send in *. find_inversion.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+    find_apply_lem_hyp option_map_Some. break_exists. intuition.
+    find_inversion. eauto.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+    inv_prop query_ptr. eauto.
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpl); intuition.
+    subst.
+    find_apply_lem_hyp option_map_Some. break_exists. intuition.
+    find_inversion.
+    unfold send in *. find_inversion.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpl).
+Qed.
+
 Theorem pointers_wf :
   forall gst,
     reachable_st gst -> 
@@ -459,7 +682,12 @@ Proof.
   intros until 1. pattern gst.
   eapply chord_net_invariant.
   (* TODO(doug) need more theorems for each case here *)
-  all:try exact pointers_wf_recv.
+  all:(try exact pointers_wf_recv; try exact pointers_wf_init; try exact pointers_wf_start); auto.
+  - do 2 autounfold_one.
+    intuition. inv_prop all_ptrs. constructor; repeat find_rewrite; auto.
+  -
+    
+    + 
 Admitted.
 
 (*

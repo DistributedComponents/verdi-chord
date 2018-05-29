@@ -1,7 +1,13 @@
-namespace :chord_serialized do
+require 'digest'
+
+namespace :chord_serialized do  
 
   def chord_serialized_log_path
     "#{shared_path}/extraction/chord-serialized/log/chord-serialized.log"
+  end
+
+  def client_serialized_log_path
+    "#{shared_path}/extraction/chord-serialized/log/client.log"
   end
 
   def chord_serialized_pidfile_path
@@ -29,7 +35,7 @@ namespace :chord_serialized do
   task :start_known do
     nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
     on roles(:node) do |node|
-      known = nodes[node.properties.known]
+      known = nodes[ENV['KNOWN']]
       execute '/sbin/start-stop-daemon',
         '--start',
         '--quiet',
@@ -67,10 +73,24 @@ namespace :chord_serialized do
     end
   end
 
+  desc 'truncate client log'
+  task :truncate_client_log do
+    on roles(:client) do
+      execute 'truncate', '-s 0', client_serialized_log_path
+    end
+  end
+
   desc 'print entire serialized chord log'
   task :get_log do
     on roles(:node) do
       execute 'cat', chord_serialized_log_path
+    end
+  end
+
+  desc 'print entire client log'
+  task :get_client_log do
+    on roles(:client) do
+      execute 'cat', client_serialized_log_path
     end
   end
 
@@ -102,11 +122,13 @@ namespace :chord_serialized do
   task :client_lookup do
     nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
     node = nodes[ENV['NODE']]
+    hash = Digest::MD5.hexdigest(ENV['QUERY'])
     on roles(:client) do |client|
+      execute "echo \"query: #{ENV['QUERY']} (#{hash})\" >> #{client_serialized_log_path} 2>&1"
       execute "#{current_path}/extraction/chord-serialized/client.native",
         "-bind #{client.properties.ip}",
         "-node #{node.properties.ip}:#{fetch(:chord_serialized_node_port)}",
-        "-query lookup #{ENV['HASH']}"
+        "-query lookup #{hash} >> #{client_serialized_log_path} 2>&1"
     end
   end
 
@@ -114,57 +136,41 @@ namespace :chord_serialized do
   task :client_local_lookup do
     nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
     node = nodes[ENV['NODE']]
+    hash = Digest::MD5.hexdigest(ENV['QUERY'])
     run_locally do
       execute 'extraction/chord-serialized/client.native',
         '-bind 0.0.0.0',
         "-node #{node.properties.ip}:#{fetch(:chord_serialized_node_port)}",
-        "-query lookup #{ENV['HASH']}"
+        "-query lookup #{hash}"
     end
-  end
-
-  # bad
-  def join h
-    ENV['HOSTS'] = h
-    Rake::Task["chord_serialized:start_known"].execute
-    ENV['HOSTS'] = nil
-  end
-
-  # bad
-  def part h
-    ENV['HOSTS'] = 'discoberry02.cs.washington.edu'
-    Rake::Task["chord_serialized:stop"].execute
-    ENV['HOSTS'] = nil
-  end
-
-  def lookup (n, k)
-    ENV['NODE'] = n
-    ENV['HASH'] = k
-    Rake::Task["chord_serialized:client_lookup"].execute
-    ENV['NODE'] = nil
-    ENV['HASH'] = nil
   end
 
   desc 'experiment 1'
   task :experiment_1 do
+    names = roles(:node).collect { |node| node.properties.name }
+
     # 0. truncate logs
-    Rake::Task["chord_serialized:truncate_log"].execute
+    Rake::Task['chord_serialized:truncate_log'].execute
+    Rake::Task['chord_serialized:truncate_client_log'].execute
 
     # 1. start up whole ring
-    Rake::Task["chord_serialized:start"].execute
+    Rake::Task['chord_serialized:start'].execute
 
     # 2. pause 20 seconds
     sleep(20)
 
     # 3. send queries
-    n = '211'
-    k = '66e3ec3f16c5a8071d00b917ce3cc992'
-
-    lookup n, k
-    sleep(10)
-    lookup n, k
-    sleep(10)
+    f = File.open('words10.txt')
+    words = f.readlines
+    words.each do |word|
+      ENV['NODE'] = names.sample
+      ENV['QUERY'] = word.strip
+      Rake::Task['chord_serialized:client_lookup'].execute
+      sleep(5)
+    end
 
     # 4. stop ring
-    Rake::Task["chord_serialized:stop"].execute
+    Rake::Task['chord_serialized:stop'].execute
   end
+
 end

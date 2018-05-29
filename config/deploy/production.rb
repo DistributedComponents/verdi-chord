@@ -8,16 +8,16 @@
 # server "db.example.com", user: "deploy", roles: %w{db}
 
 # complete ring
-server 'discoberry01.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.23',  name: '23' , known: '211'
-server 'discoberry02.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.211', name: '211', known: '13'
-server 'discoberry03.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.13',  name: '13' , known: '216'
-server 'discoberry04.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.216', name: '216', known: '214'
-server 'discoberry05.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.214', name: '214', known: '212'
-server 'discoberry06.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.212', name: '212', known: '26'
-server 'discoberry07.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.26',  name: '26' , known: '30'
-server 'discoberry08.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.30',  name: '30' , known: '27'
-server 'discoberry09.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.27',  name: '27' , known: '15'
-server 'discoberry10.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.15',  name: '15' , known: '23'
+server 'discoberry01.cs.washington.edu', user: 'pi', roles: %w{client}, ip: '128.208.2.23',  name: 'db01'
+server 'discoberry02.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.211', name: 'db02'
+server 'discoberry03.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.13',  name: 'db03'
+server 'discoberry04.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.216', name: 'db04'
+server 'discoberry05.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.214', name: 'db05'
+server 'discoberry06.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.212', name: 'db06'
+server 'discoberry07.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.26',  name: 'db07'
+server 'discoberry08.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.30',  name: 'db08'
+server 'discoberry09.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.27',  name: 'db09'
+server 'discoberry10.cs.washington.edu', user: 'pi', roles: %w{node}, ip: '128.208.2.15',  name: 'db10'
 
 # subset ring
 #server 'discoberry01.cs.washington.edu', user: 'pi', roles: %w{node}, name: '23',  succs: %w(13 216),  preds: %w(211), ip: '128.208.2.23'
