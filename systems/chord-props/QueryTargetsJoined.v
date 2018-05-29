@@ -674,6 +674,94 @@ Proof.
     repeat (handler_def || handler_simpl).
 Qed.
 
+Ltac handler_simpler :=
+  discriminate ||
+  solve [eauto] ||
+  match goal with
+  | H : In _ [] |- _ =>
+    invcs H
+  | H : In _ (concat _) |- _ =>
+    apply in_concat in H; break_exists; intuition
+  | H : In _ (handle_delayed_query _ _ _) |- _ =>
+    unfold handle_delayed_query, handle_query_req in *
+  | H : option_map _ _ = Some _ |- _ =>
+    apply option_map_Some in H; break_exists
+  | H : succs_msg _ _ |- _ =>
+    invcs H
+  | H : In ?x ?l, _ : ?l' = _ :: ?l, _ : In ?x ?l' |- _ =>
+    idtac
+  | H : In ?x ?l, _ : ?l' = _ :: ?l |- _ =>
+    assert (In x l') by (repeat find_rewrite; in_crush)
+  | H : hd_error _ = Some _ |- _ =>
+    apply hd_error_in in H
+  | H : ptr _ = ?x |- context [?x] =>
+    symmetry in H; rewrite H
+  | |- context [best_predecessor ?x ?l ?p] =>
+    pose proof (best_predecessor_in_succs_or_ptr x l (best_predecessor x l p) p);
+    in_crush
+  end ||
+  break_match ||
+  in_crush ||
+  handler_simpl.
+                
+
+Lemma pointers_wf_request :
+  chord_request_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one. intros; simpl in *.
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite; simpl in *.
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpler).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    Time repeat (handler_def || handler_simpler).
+  - apply all_states_update; eauto; intros.
+    Time repeat (handler_def || handler_simpler).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    Time repeat (handler_def || handler_simpler).
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpler).
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpler).
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpler).
+  - apply all_msgs_app; eauto; intros; simpl in *.
+    repeat (handler_def || handler_simpler).
+  - apply all_states_update; eauto; intros.
+    repeat (handler_def || handler_simpler).
+Qed.
+
+Lemma pointers_wf_input :
+  chord_input_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one. intros; simpl in *.
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite; simpl in *; eauto.
+  - apply all_msgs_cons; eauto. intros.
+    inv_prop succs_msg; inv_prop client_payload.
+  - apply all_msgs_cons; eauto. intros. subst.
+    inv_prop client_payload.
+  -  apply all_msgs_cons; eauto. intros. subst.
+    inv_prop client_payload.
+Qed.
+
+Lemma pointers_wf_output :
+  chord_output_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one. intros; simpl in *.
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite; simpl in *; eauto.
+Qed.
+
+Lemma pointers_wf_fail :
+  chord_fail_invariant (all_ptrs wf_ptr).
+Proof.
+  do 2 autounfold_one. intros; simpl in *.
+  inv_prop all_ptrs.
+  constructor; repeat find_rewrite; simpl in *; eauto.
+Qed.
+
+
 Theorem pointers_wf :
   forall gst,
     reachable_st gst -> 
@@ -682,13 +770,11 @@ Proof.
   intros until 1. pattern gst.
   eapply chord_net_invariant.
   (* TODO(doug) need more theorems for each case here *)
-  all:(try exact pointers_wf_recv; try exact pointers_wf_init; try exact pointers_wf_start); auto.
-  - do 2 autounfold_one.
-    intuition. inv_prop all_ptrs. constructor; repeat find_rewrite; auto.
-  -
-    
-    + 
-Admitted.
+  all:(try exact pointers_wf_recv; try exact pointers_wf_init; try exact pointers_wf_start;
+       try exact pointers_wf_fail; try exact pointers_wf_tick; try exact pointers_wf_rectify;
+       try exact pointers_wf_keepalive; try exact pointers_wf_request;
+       try exact pointers_wf_input; try exact pointers_wf_output); auto.
+Qed.
 
 (*
 Theorem succs_joined :
