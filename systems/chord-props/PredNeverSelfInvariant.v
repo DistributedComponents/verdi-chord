@@ -19,19 +19,3 @@ Proof.
   unfold has_pred.
   eauto.
 Qed.
-
-(*
-Theorem pred_never_self :
-  forall gst h p,
-    reachable_st gst ->
-    has_pred gst h (Some p) ->
-    h <> (addr_of p).
-Proof.
-(*
-Easy consequence of the (difficult) Zave invariant.
-
-DIFFCULTY: 1
-USED: In phase two.
-*)
-Admitted.
-*)
