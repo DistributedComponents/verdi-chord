@@ -1334,3 +1334,4 @@ Proof.
   - eapply phase_one_error_continuously_nonincreasing; eauto.
   - eauto using always_continuously, phase_one_nonzero_error_causes_measure_drop.
 Qed.
+Print Assumptions phase_one_continuously.
