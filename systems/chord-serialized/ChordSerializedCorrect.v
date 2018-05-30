@@ -12,6 +12,7 @@ Require Import Cheerios.Cheerios.
 Require Import Chord.Chord.
 Require Import Chord.ChordSerialized.
 Require Import Chord.ChordSerializedSimulations.
+(*
 Require Import Chord.ChordStabilization.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
@@ -570,3 +571,4 @@ Proof.
         assumption.
     + apply revert_circular_wait. assumption.
 Qed.
+*)
