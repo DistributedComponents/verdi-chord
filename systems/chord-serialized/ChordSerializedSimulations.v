@@ -9,7 +9,6 @@ Require Import Cheerios.Cheerios.
 Require Import Chord.Chord.
 Require Import Chord.ChordSerialized.
 Require Import Chord.QueriesEventuallyStop.
-Require Import Chord.ChordStabilization.
 Require Import Chord.SystemReachable.
 
 (* useful definitions and lemmas *)
