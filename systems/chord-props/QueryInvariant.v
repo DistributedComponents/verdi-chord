@@ -1575,7 +1575,9 @@ Lemma no_requests_app :
     no_requests ys ->
     no_requests (xs ++ ys).
 Proof.
-Admitted.
+  unfold no_requests.
+  in_crush; eauto.
+Qed.
 
 Lemma no_responses_app :
   forall xs ys,
@@ -1583,7 +1585,9 @@ Lemma no_responses_app :
     no_responses ys ->
     no_responses (xs ++ ys).
 Proof.
-Admitted.
+  unfold no_responses.
+  in_crush; eauto.
+Qed.
 
 Lemma unique_triv :
   forall {A} (P : A -> Prop) l,
@@ -1592,7 +1596,14 @@ Lemma unique_triv :
 Proof.
   unfold unique; intros.
   split; auto.
-Admitted.
+  intros.
+  find_copy_apply_lem_hyp (f_equal (@length A)).
+  destruct xs, ys; simpl in *.
+  - tauto.
+  - omega.
+  - rewrite app_length in *; simpl in *; omega.
+  - rewrite app_length in *; simpl in *; omega.
+Qed.
 
 Theorem query_message_ok'_request_invariant_dst_live :
  chord_request_invariant
