@@ -842,8 +842,7 @@ Inductive response_payload : payload -> Prop :=
 | res_GotBestPredecessor : forall p, response_payload (GotBestPredecessor p)
 | res_GotSuccList : forall l, response_payload (GotSuccList l)
 | res_GotPredAndSuccs : forall p l, response_payload (GotPredAndSuccs p l)
-| res_Pong : response_payload Pong
-| res_Busy : response_payload Busy.
+| res_Pong : response_payload Pong.
 
 Definition response_payload_dec :
   forall p,

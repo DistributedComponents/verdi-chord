@@ -930,8 +930,12 @@ Proof using.
       assert (~response_payload p) by eauto.
       find_copy_apply_lem_hyp timeouts_in_Some.
       destruct p; try (exfalso; find_eapply_prop response_payload; now constructor);
-        right; repeat (handler_def; simpl; autorewrite with list;
-                       try solve [eauto with datatypes | intuition congruence]).
+        repeat (handler_def; simpl; autorewrite with list;
+                try solve [eauto with datatypes | intuition congruence]).
+      match goal with
+      | |- In ?m ?l \/ ~ In ?m ?l =>
+        destruct (In_dec timeout_eq_dec m l); tauto
+      end.
 Qed.
 
 Lemma reassembled_msg_still_eq :
