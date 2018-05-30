@@ -200,8 +200,8 @@ namespace :chord do
     end
 
     # 4. stop one randomly chosen node
-    stopped_name = names.sample
-    node = nodes[stopped_name]
+    stopped = names.sample
+    node = nodes[stopped]
     on node do
       execute '/sbin/start-stop-daemon',
         '--stop',
@@ -210,7 +210,7 @@ namespace :chord do
     end
 
     # 5. send second set of queries
-    names = names - [stopped_name]
+    names = names - [stopped]
     words.each do |word|
       ENV['NODE'] = names.sample
       ENV['QUERY'] = word.strip

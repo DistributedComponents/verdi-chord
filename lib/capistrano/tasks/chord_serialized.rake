@@ -160,8 +160,56 @@ namespace :chord_serialized do
     sleep(20)
 
     # 3. send queries
-    f = File.open('words10.txt')
+    f = File.open('words100.txt')
     words = f.readlines
+    words.each do |word|
+      ENV['NODE'] = names.sample
+      ENV['QUERY'] = word.strip
+      Rake::Task['chord_serialized:client_lookup'].execute
+      sleep(5)
+    end
+
+    # 4. stop ring
+    Rake::Task['chord_serialized:stop'].execute
+  end
+
+  desc 'experiment 2'
+  task :experiment_2 do
+    names = roles(:node).collect { |node| node.properties.name }
+    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+
+    # 0. truncate logs
+    Rake::Task['chord_serialized:truncate_log'].execute
+    Rake::Task['chord_serialized:truncate_client_log'].execute
+
+    # 1. start up whole ring
+    Rake::Task['chord_serialized:start'].execute
+
+    # 2. pause 20 seconds
+    sleep(20)
+
+    # 3. send first set of queries
+    f = File.open('words50.txt')
+    words = f.readlines
+    words.each do |word|
+      ENV['NODE'] = names.sample
+      ENV['QUERY'] = word.strip
+      Rake::Task['chord_serialized:client_lookup'].execute
+      sleep(5)
+    end
+
+    # 4. stop one randomly chosen node
+    stopped = names.sample
+    node = nodes[stopped]
+    on node do
+      execute '/sbin/start-stop-daemon',
+        '--stop',
+        '--oknodo',
+        "--pidfile #{chord_serialized_pidfile_path}"
+    end
+
+    # 5. send second set of queries
+    names = names - [stopped]
     words.each do |word|
       ENV['NODE'] = names.sample
       ENV['QUERY'] = word.strip
