@@ -14,6 +14,17 @@ Require Import Chord.LiveNodesNotClients.
 
 Set Bullet Behavior "Strict Subproofs".
 
+Lemma request_response_pair_response :
+  forall req res,
+    request_response_pair req res ->
+    response_payload res.
+Proof.
+  intros.
+  inv_prop request_response_pair;
+    constructor.
+Qed.
+Hint Resolve request_response_pair_response.
+
 Definition at_most_one_request_timeout' (ts : list timeout) :=
   forall xs ys dst p,
     ts = xs ++ Request dst p :: ys ->
@@ -900,6 +911,129 @@ Inductive query_message_ok'
       no_responses inbound ->
       query_message_ok' src dst cr dqs failed outbound inbound.
 
+Definition unique {A : Type} (P : A -> Prop) (l : list A) (a : A) : Prop :=
+  P a /\
+  forall xs ys,
+    l = xs ++ a :: ys ->
+    forall b,
+      In b (xs ++ ys) ->
+      ~ P b.
+
+Lemma no_responses_unique :
+  forall l res,
+    response_payload res ->
+    (forall xs ys, l = xs ++ res :: ys -> no_responses (xs ++ ys)) ->
+    unique response_payload l res.
+Proof.
+  unfold unique, no_responses.
+  intros.
+  eauto.
+Qed.
+
+Lemma unique_no_responses :
+  forall l res,
+    unique response_payload l res ->
+    (forall xs ys, l = xs ++ res :: ys -> no_responses (xs ++ ys)).
+Proof.
+  unfold unique, no_responses.
+  intros.
+  intuition eauto.
+Qed.
+
+Lemma no_requests_unique :
+  forall l res,
+    request_payload res ->
+    (forall xs ys, l = xs ++ res :: ys -> no_requests (xs ++ ys)) ->
+    unique request_payload l res.
+Proof.
+  unfold unique, no_requests.
+  intros.
+  eauto.
+Qed.
+
+Lemma unique_no_requests :
+  forall l res,
+    unique request_payload l res ->
+    (forall xs ys, l = xs ++ res :: ys -> no_requests (xs ++ ys)).
+Proof.
+  unfold unique, no_requests.
+  intros.
+  intuition eauto.
+Qed.
+
+Lemma unique_cons :
+  forall {A : Type} (P : A -> Prop) l u x,
+    unique P l u ->
+    ~ P x ->
+    unique P (x :: l) u.
+Proof.
+  unfold unique.
+  intros.
+  intuition.
+  destruct xs.
+  - simpl in *; find_injection; tauto.
+  - simpl in *; find_injection.
+    break_or_hyp; eauto.
+Qed.
+
+Lemma unique_cons_add :
+  forall {A : Type} (P : A -> Prop) l x,
+    (forall y, In y l -> ~ P y) ->
+    P x ->
+    unique P (x :: l) x.
+Proof.
+  unfold unique.
+  intros.
+  intuition.
+  destruct xs.
+  - simpl in *; find_injection; eauto.
+  - simpl in *; find_injection.
+    break_or_hyp; subst; find_eapply_prop False; in_crush.
+Qed.
+
+Lemma unique_app :
+  forall {A : Type} (P : A -> Prop) xs ys x,
+    unique P xs x ->
+    (forall y, In y ys -> ~ P y) ->
+    unique P (ys ++ xs) x.
+Proof.
+  induction ys; intros.
+  - assumption.
+  - simpl.
+    apply unique_cons; in_crush; eauto.
+Qed.
+
+Lemma unique_app_comm :
+  forall {A : Type} (P : A -> Prop) xs ys x,
+    unique P (xs ++ ys) x ->
+    unique P (ys ++ xs) x.
+Proof.
+Admitted.
+
+Lemma unique_app_r :
+  forall {A : Type} (P : A -> Prop) xs ys x,
+    unique P xs x ->
+    (forall y, In y ys -> ~ P y) ->
+    unique P (xs ++ ys) x.
+Proof.
+  intros.
+  apply unique_app_comm.
+  apply unique_app; auto.
+Qed.
+
+Lemma unique_app_none :
+  forall {A : Type} (P : A -> Prop) xs ys x,
+    unique P xs x ->
+    (forall y, In y ys -> ~ P y) ->
+    unique P (ys ++ xs) x.
+Proof.
+  induction ys; intros.
+  - assumption.
+  - simpl.
+    apply unique_cons; in_crush; eauto.
+Qed.
+
+
 Lemma initial_nodes_not_failed :
   forall gst,
     initial_st gst ->
@@ -1081,34 +1215,6 @@ Proof.
   handler_def.
 Admitted.
 
-Theorem query_message_ok'_keepalive_invariant :
- chord_keepalive_invariant
-   (fun g : global_state =>
-    forall (src dst : addr) (st__src st__dst : data),
-    sigma g src = Some st__src ->
-    sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src)
-      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
-      (channel g dst src)).
-Proof.
-  repeat autounfold; intros.
-  handler_def.
-Admitted.
-
-Theorem query_message_ok'_rectify_invariant :
- chord_rectify_invariant
-   (fun g : global_state =>
-    forall (src dst : addr) (st__src st__dst : data),
-    sigma g src = Some st__src ->
-    sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src)
-      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
-      (channel g dst src)).
-Proof.
-  repeat autounfold; intros.
-  handler_def.
-Admitted.
-
 Lemma uniq_list_eq :
   forall A (A_eq_dec : forall (x y : A), {x = y} + {x <> y}) P l (a b : A),
     In a l ->
@@ -1128,17 +1234,6 @@ Proof.
   find_eapply_prop In; try find_eapply_prop (P b).
   eauto using in_middle_reduce, app_cons_in.
 Qed.
-
-Lemma request_response_pair_response :
-  forall req res,
-    request_response_pair req res ->
-    response_payload res.
-Proof.
-  intros.
-  inv_prop request_response_pair;
-    constructor.
-Qed.
-Hint Resolve request_response_pair_response.
 
 Lemma splits_uniq_eq :
   forall A (P : A -> Prop) l xs ys xs' ys' a,
@@ -1198,6 +1293,168 @@ Ltac chan2msg :=
          | H: In _ (channel _ _ _) |- _ =>
            apply in_channel_in_msgs in H
          end.
+
+Lemma channel_app :
+  forall gst gst' src dst ms,
+    msgs gst' = map (send src) ms ++ msgs gst ->
+    channel gst' src dst = filterMap (fun m => if addr_eq_dec (fst m) dst
+                                            then Some (snd m)
+                                            else None) ms
+                               ++ channel gst src dst.
+Proof.
+  unfold channel.
+  intros until 0.
+  generalize (msgs gst').
+  generalize (msgs gst).
+  clear gst gst'.
+  induction ms; intros.
+  - simpl in *; congruence.
+  - repeat find_rewrite.
+    rewrite filterMap_app.
+    f_equal.
+    unfold send in *.
+    simpl in *.
+    replace (ssrbool.is_left (addr_eq_dec src src)) with true in *.
+    simpl.
+    destruct (addr_eq_dec (fst a) dst).
+    + simpl.
+      f_equal.
+      erewrite IHms;
+        [|symmetry; eapply app_nil_r].
+      simpl.
+      rewrite app_nil_r; auto.
+    + simpl.
+      erewrite IHms;
+        [|symmetry; eapply app_nil_r].
+      simpl.
+      rewrite app_nil_r; auto.
+    + unfold ssrbool.is_left; break_if; try congruence.
+Qed.
+
+
+Theorem query_message_ok'_keepalive_invariant :
+ chord_keepalive_invariant
+   (fun g : global_state =>
+    forall (src dst : addr) (st__src st__dst : data),
+    sigma g src = Some st__src ->
+    sigma g dst = Some st__dst ->
+    query_message_ok' src dst (cur_request st__src)
+      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
+      (channel g dst src)).
+Proof.
+  repeat autounfold; intros.
+  repeat handler_def || handler_simpl.
+  assert (Hst: forall h, sigma gst h = sigma gst' h).
+  {
+    intros.
+    repeat find_rewrite.
+    update_destruct; rewrite_update; congruence.
+  }
+  assert (query_message_ok' src dst (cur_request st__src) (delayed_queries st__dst)
+    (failed_nodes gst) (channel gst src dst) (channel gst dst src)).
+  find_eapply_prop query_message_ok';
+    rewrite Hst; auto.
+  assert (no_responses (channel gst dst src) ->
+          no_responses (channel gst' dst src)).
+  {
+    unfold no_responses.
+    intros.
+    chan2msg.
+    repeat find_rewrite; in_crush; eauto.
+    unfold send in *; find_injection.
+    unfold send_keepalives in *.
+    in_crush.
+    find_injection; inv_prop response_payload.
+  }
+  assert (no_requests (channel gst src dst) ->
+          no_requests (channel gst' src dst)).
+  {
+    unfold no_requests.
+    intros.
+    chan2msg.
+    repeat find_rewrite; in_crush; eauto.
+    unfold send in *; find_injection.
+    unfold send_keepalives in *.
+    in_crush.
+    find_injection; inv_prop request_payload.
+  }
+  assert (forall p, unique request_payload (channel gst src dst) p ->
+               unique request_payload (channel gst' src dst) p).
+  {
+    intros.
+    repeat find_rewrite.
+    destruct (addr_eq_dec h src); eauto.
+    - subst.
+      erewrite channel_app; eauto.
+      apply unique_app; auto.
+      intros.
+      find_apply_lem_hyp In_filterMap.
+      break_exists; break_and; break_match; try congruence.
+      unfold send_keepalives in *.
+      in_crush; intros.
+      find_injection; inv_prop request_payload.
+    - erewrite (channel_msgs_unchanged _ gst' gst); eauto.
+  }
+  assert (forall p, unique response_payload (channel gst dst src) p ->
+               unique response_payload (channel gst' dst src) p).
+  {
+    intros.
+    repeat find_rewrite.
+    destruct (addr_eq_dec h dst); eauto.
+    - subst.
+      erewrite (channel_app gst gst'); eauto.
+      apply unique_app; auto.
+      intros.
+      find_apply_lem_hyp In_filterMap.
+      break_exists; break_and; break_match; try congruence.
+      unfold send_keepalives in *.
+      in_crush; intros.
+      find_injection; inv_prop response_payload.
+    - erewrite (channel_msgs_unchanged _ gst' gst); eauto.
+  }
+  assert (forall src dst p, In p (channel gst src dst) ->
+                       In p (channel gst' src dst)).
+  {
+    intros.
+    destruct (addr_eq_dec h src0); eauto; intros.
+    - subst.
+      erewrite (channel_app gst gst'); eauto.
+      in_crush; eauto.
+    - erewrite (channel_msgs_unchanged _ gst' gst); eauto.
+  }
+  inv_prop query_message_ok'.
+  - constructor 1; [congruence|].
+    inv_prop query_message_ok;
+      try solve [constructor; eauto];
+      match goal with
+      | H: context[no_responses (_ ++ _)] |- _ =>
+        eapply no_responses_unique in H; eauto
+      | H: context[no_requests (_ ++ _)] |- _ =>
+        eapply no_requests_unique in H; eauto
+      end;
+      try solve [econstructor; eauto;
+                 eapply unique_no_requests;
+                 eauto
+                |econstructor; eauto;
+                 eapply unique_no_responses;
+                 eauto].
+  - solve [econstructor; congruence || eauto using unique_no_responses, no_responses_unique].
+  - solve [econstructor; congruence || eauto using unique_no_responses, no_responses_unique].
+Qed.
+
+Theorem query_message_ok'_rectify_invariant :
+ chord_rectify_invariant
+   (fun g : global_state =>
+    forall (src dst : addr) (st__src st__dst : data),
+    sigma g src = Some st__src ->
+    sigma g dst = Some st__dst ->
+    query_message_ok' src dst (cur_request st__src)
+      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
+      (channel g dst src)).
+Proof.
+  repeat autounfold; intros.
+  handler_def.
+Admitted.
 
 Theorem dq_res_qmo :
   forall gst gst' src dst req res st__src st__src' st__dst st__dst' l ms,
@@ -1408,165 +1665,6 @@ Proof.
   repeat handler_def || handler_simpl.
   - find_apply_lem_hyp option_map_Some; expand_def; inv_prop response_payload.
   - inv_prop response_payload.
-Qed.
-
-Definition unique {A : Type} (P : A -> Prop) (l : list A) (a : A) : Prop :=
-  P a /\
-  forall xs ys,
-    l = xs ++ a :: ys ->
-    forall b,
-      In b (xs ++ ys) ->
-      ~ P b.
-
-Lemma no_responses_unique :
-  forall l res,
-    response_payload res ->
-    (forall xs ys, l = xs ++ res :: ys -> no_responses (xs ++ ys)) ->
-    unique response_payload l res.
-Proof.
-  unfold unique, no_responses.
-  intros.
-  eauto.
-Qed.
-
-Lemma unique_no_responses :
-  forall l res,
-    unique response_payload l res ->
-    (forall xs ys, l = xs ++ res :: ys -> no_responses (xs ++ ys)).
-Proof.
-  unfold unique, no_responses.
-  intros.
-  intuition eauto.
-Qed.
-
-Lemma no_requests_unique :
-  forall l res,
-    request_payload res ->
-    (forall xs ys, l = xs ++ res :: ys -> no_requests (xs ++ ys)) ->
-    unique request_payload l res.
-Proof.
-  unfold unique, no_requests.
-  intros.
-  eauto.
-Qed.
-
-Lemma unique_no_requests :
-  forall l res,
-    unique request_payload l res ->
-    (forall xs ys, l = xs ++ res :: ys -> no_requests (xs ++ ys)).
-Proof.
-  unfold unique, no_requests.
-  intros.
-  intuition eauto.
-Qed.
-
-Lemma unique_cons :
-  forall {A : Type} (P : A -> Prop) l u x,
-    unique P l u ->
-    ~ P x ->
-    unique P (x :: l) u.
-Proof.
-  unfold unique.
-  intros.
-  intuition.
-  destruct xs.
-  - simpl in *; find_injection; tauto.
-  - simpl in *; find_injection.
-    break_or_hyp; eauto.
-Qed.
-
-Lemma unique_cons_add :
-  forall {A : Type} (P : A -> Prop) l x,
-    (forall y, In y l -> ~ P y) ->
-    P x ->
-    unique P (x :: l) x.
-Proof.
-  unfold unique.
-  intros.
-  intuition.
-  destruct xs.
-  - simpl in *; find_injection; eauto.
-  - simpl in *; find_injection.
-    break_or_hyp; subst; find_eapply_prop False; in_crush.
-Qed.
-
-Lemma unique_app :
-  forall {A : Type} (P : A -> Prop) xs ys x,
-    unique P xs x ->
-    (forall y, In y ys -> ~ P y) ->
-    unique P (ys ++ xs) x.
-Proof.
-  induction ys; intros.
-  - assumption.
-  - simpl.
-    apply unique_cons; in_crush; eauto.
-Qed.
-
-Lemma unique_app_comm :
-  forall {A : Type} (P : A -> Prop) xs ys x,
-    unique P (xs ++ ys) x ->
-    unique P (ys ++ xs) x.
-Proof.
-Admitted.
-
-Lemma unique_app_r :
-  forall {A : Type} (P : A -> Prop) xs ys x,
-    unique P xs x ->
-    (forall y, In y ys -> ~ P y) ->
-    unique P (xs ++ ys) x.
-Proof.
-  intros.
-  apply unique_app_comm.
-  apply unique_app; auto.
-Qed.
-
-Lemma unique_app_none :
-  forall {A : Type} (P : A -> Prop) xs ys x,
-    unique P xs x ->
-    (forall y, In y ys -> ~ P y) ->
-    unique P (ys ++ xs) x.
-Proof.
-  induction ys; intros.
-  - assumption.
-  - simpl.
-    apply unique_cons; in_crush; eauto.
-Qed.
-
-Lemma channel_app :
-  forall gst gst' src dst ms,
-    msgs gst' = map (send src) ms ++ msgs gst ->
-    channel gst' src dst = filterMap (fun m => if addr_eq_dec (fst m) dst
-                                            then Some (snd m)
-                                            else None) ms
-                               ++ channel gst src dst.
-Proof.
-  unfold channel.
-  intros until 0.
-  generalize (msgs gst').
-  generalize (msgs gst).
-  clear gst gst'.
-  induction ms; intros.
-  - simpl in *; congruence.
-  - repeat find_rewrite.
-    rewrite filterMap_app.
-    f_equal.
-    unfold send in *.
-    simpl in *.
-    replace (ssrbool.is_left (addr_eq_dec src src)) with true in *.
-    simpl.
-    destruct (addr_eq_dec (fst a) dst).
-    + simpl.
-      f_equal.
-      erewrite IHms;
-        [|symmetry; eapply app_nil_r].
-      simpl.
-      rewrite app_nil_r; auto.
-    + simpl.
-      erewrite IHms;
-        [|symmetry; eapply app_nil_r].
-      simpl.
-      rewrite app_nil_r; auto.
-    + unfold ssrbool.is_left; break_if; try congruence.
 Qed.
 
 Lemma no_requests_app :
