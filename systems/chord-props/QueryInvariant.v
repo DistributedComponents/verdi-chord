@@ -1201,20 +1201,6 @@ Proof.
     intuition congruence || auto.
 Qed.
 
-Theorem query_message_ok'_recv_invariant :
- chord_recv_handler_invariant
-   (fun g : global_state =>
-    forall (src dst : addr) (st__src st__dst : data),
-    sigma g src = Some st__src ->
-    sigma g dst = Some st__dst ->
-    query_message_ok' src dst (cur_request st__src)
-      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
-      (channel g dst src)).
-Proof.
-  repeat autounfold; intros.
-  handler_def.
-Admitted.
-
 Lemma uniq_list_eq :
   forall A (A_eq_dec : forall (x y : A), {x = y} + {x <> y}) P l (a b : A),
     In a l ->
@@ -1331,6 +1317,19 @@ Proof.
     + unfold ssrbool.is_left; break_if; try congruence.
 Qed.
 
+Theorem query_message_ok'_recv_invariant :
+ chord_recv_handler_invariant
+   (fun g : global_state =>
+    forall (src dst : addr) (st__src st__dst : data),
+    sigma g src = Some st__src ->
+    sigma g dst = Some st__dst ->
+    query_message_ok' src dst (cur_request st__src)
+      (delayed_queries st__dst) (failed_nodes g) (channel g src dst)
+      (channel g dst src)).
+Proof.
+  repeat autounfold; intros.
+  handler_def.
+Admitted.
 
 Theorem query_message_ok'_keepalive_invariant :
  chord_keepalive_invariant
@@ -1442,6 +1441,15 @@ Proof.
   - solve [econstructor; congruence || eauto using unique_no_responses, no_responses_unique].
 Qed.
 
+Lemma delayed_queries_preserved_by_do_rectify :
+  forall h st st' ms nts cts eff,
+    do_rectify h st = (st', ms, nts, cts, eff) ->
+    delayed_queries st = delayed_queries st'.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl.
+Qed.
+
 Theorem query_message_ok'_rectify_invariant :
  chord_rectify_invariant
    (fun g : global_state =>
@@ -1453,8 +1461,134 @@ Theorem query_message_ok'_rectify_invariant :
       (channel g dst src)).
 Proof.
   repeat autounfold; intros.
-  handler_def.
-Admitted.
+  destruct (sigma gst src) as [oldst__src|] eqn:?;
+    [|repeat find_rewrite; update_destruct; rewrite_update; try congruence].
+  destruct (sigma gst dst) as [oldst__dst|] eqn:?;
+    [|repeat find_rewrite; update_destruct; rewrite_update; try congruence].
+  assert (query_message_ok' src dst (cur_request oldst__src) (delayed_queries oldst__dst) 
+             (failed_nodes gst) (channel gst src dst) (channel gst dst src))
+    by auto.
+  assert (Hdq: forall h st st',
+             sigma gst h = Some st ->
+             sigma gst' h = Some st' ->
+             delayed_queries st = delayed_queries st').
+  {
+    intros.
+    find_rewrite.
+    update_destruct; rewrite_update; try congruence.
+    subst; repeat find_rewrite || find_injection.
+    eauto using delayed_queries_preserved_by_do_rectify.
+  }
+  assert (forall src dst,
+             no_responses (channel gst dst src) ->
+             no_responses (channel gst' dst src)).
+  {
+    unfold no_responses.
+    intros.
+    chan2msg.
+    repeat find_rewrite.
+    in_crush; eauto.
+    repeat handler_def || handler_simpl;
+      find_apply_lem_hyp option_map_Some; expand_def;
+        inv_prop response_payload.
+  }
+  destruct (list_eq_dec send_eq_dec ms []).
+  - assert (msgs gst = msgs gst').
+    {
+      repeat find_rewrite.
+      reflexivity.
+    }
+    assert (Hcr: forall h st st',
+               sigma gst h = Some st ->
+               sigma gst' h = Some st' ->
+               cur_request st = cur_request st').
+    {
+      intros.
+      find_rewrite.
+      update_destruct; rewrite_update;
+        try intuition congruence.
+      find_injection.
+      repeat handler_def; simpl in *;
+        intuition congruence.
+    }
+    erewrite <- Hdq by eauto.
+    erewrite <- (Hcr src oldst__src) by eauto.
+    erewrite <- !(msgs_eq_channels_eq gst gst') by eauto.
+    congruence.
+  - repeat handler_def || handler_simpl.
+    find_apply_lem_hyp option_map_Some; expand_def.
+    destruct (addr_eq_dec src h).
+    + subst; repeat find_rewrite || find_injection || rewrite_update.
+      simpl.
+      inv_prop query_message_ok'.
+      * apply QMLive; eauto.
+        inv_prop query_message_ok;
+          repeat find_rewrite || find_injection || subst || rewrite_update.
+        destruct (addr_eq_dec dst (addr_of x1)); subst.
+        -- eapply CIreq; eauto.
+           erewrite channel_msgs_cons by eauto; in_crush.
+           apply unique_no_requests.
+           erewrite channel_msgs_cons by eauto.
+           eapply unique_cons_add; eauto.
+           erewrite <- Hdq; eauto.
+        -- eapply CIother; eauto.
+           unfold no_requests in *; intros.
+           chan2msg; repeat find_rewrite; in_crush; eauto.
+           unfold send in *; simpl in *; congruence.
+           erewrite <- Hdq; eauto.
+      * eapply QMFailedNothing; auto.
+    + change (send h ?m :: ?l)
+        with (map (send h) [m] ++ l) in *.
+      assert (forall m,
+                 unique response_payload (channel gst dst src) m ->
+                 unique response_payload (channel gst' dst src) m).
+      {
+        intros.
+        destruct (addr_eq_dec (addr_of x1) src).
+        destruct (addr_eq_dec h dst).
+        subst.
+        simpl in *.
+        erewrite channel_msgs_cons; eauto.
+        apply unique_cons; eauto.
+        erewrite channel_msgs_unchanged; eauto.
+        erewrite channel_msgs_unchanged; eauto.
+        right.
+        simpl; intros.
+        in_crush.
+        congruence.
+      }
+      erewrite channel_msgs_unchanged; eauto.
+      inv_prop query_message_ok'.
+      * apply QMLive.
+        congruence.
+        inv_prop query_message_ok;
+          repeat find_rewrite || find_injection || subst || rewrite_update;
+          match goal with H: _ = _ |- _ => rewrite <- H end.
+        -- econstructor; eauto.
+           erewrite <- Hdq; eauto.
+        -- econstructor; eauto.
+           erewrite <- Hdq; eauto.
+        -- solve [econstructor; eauto;
+                  try erewrite <- Hdq; eauto].
+        -- eapply CIres; eauto using no_responses_unique, unique_no_responses.
+           chan2msg.
+           repeat find_rewrite; in_crush; auto.
+           erewrite <- Hdq; eauto.
+        -- econstructor 5; eauto;
+             erewrite <- Hdq; eauto.
+      * erewrite (channel_msgs_unchanged [(addr_of x1, Ping)] gst' gst);
+          intuition eauto.
+        erewrite <- Hdq by eauto.
+        repeat find_rewrite || rewrite_update.
+        congruence.
+        left; intro; subst; tauto.
+      * erewrite (channel_msgs_unchanged [(addr_of x1, Ping)] gst' gst);
+          intuition eauto.
+        erewrite <- Hdq by eauto.
+        repeat find_rewrite || rewrite_update.
+        congruence.
+        left; intro; subst; tauto.
+Qed.
 
 Theorem dq_res_qmo :
   forall gst gst' src dst req res st__src st__src' st__dst st__dst' l ms,
@@ -2090,6 +2224,42 @@ Theorem query_message_ok'_start_invariant :
       (channel g dst src)).
 Proof.
   repeat autounfold; intros.
+  assert (forall st, sigma gst h = Some st -> False) by eauto.
+  assert (Hdq: forall h st st',
+             sigma gst h = Some st ->
+             sigma gst' h = Some st' ->
+             delayed_queries st = delayed_queries st').
+  {
+    intros.
+    find_rewrite.
+    update_destruct; rewrite_update; try congruence.
+  }
+  assert (forall src dst,
+             no_responses (channel gst dst src) ->
+             no_responses (channel gst' dst src)).
+  {
+    unfold no_responses.
+    intros.
+    chan2msg.
+    repeat find_rewrite.
+    in_crush; eauto.
+    unfold send in *.
+    find_injection.
+    repeat handler_def || handler_simpl;
+      find_apply_lem_hyp option_map_Some; expand_def;
+        inv_prop response_payload.
+  }
+  rewrite start_handler_with_single_known in *.
+  simpl in *; find_injection.
+  assert (h <> k) by (intro; subst; tauto).
+  destruct (addr_eq_dec src h), (addr_eq_dec dst k); subst.
+  - erewrite channel_msgs_cons; [|simpl in *; eauto].
+    erewrite channel_msgs_unchanged with (gst':=gst'); eauto.
+    eapply QMLive; try congruence.
+    repeat find_rewrite || rewrite_update || find_injection.
+    simpl; change k with (addr_of (make_pointer k)).
+    eapply CIreq; eauto.
+    in_crush.
 Admitted.
 
 Theorem query_message_ok'_invariant :
