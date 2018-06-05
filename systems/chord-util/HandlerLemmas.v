@@ -1749,7 +1749,6 @@ Proof.
     + eapply handle_delayed_queries_GotPredAndSuccs_response_accurate; eauto.
 Qed.
 
-
 Lemma joining_start_handler_st_joined:
   forall h k st ms nts,
     start_handler h [k] = (st, ms, nts) ->
@@ -1760,6 +1759,26 @@ Proof.
   simpl in *; find_injection.
   reflexivity.
 Qed.
+
+Lemma start_handler_with_single_known :
+  forall h k,
+    start_handler h (k :: nil) = pi (start_query h (init_state_join h k) (Join (make_pointer k))).
+Proof.
+  easy.
+Qed.
+Hint Rewrite start_handler_with_single_known.
+
+Lemma open_pi :
+  forall (x : res) a b c,
+    pi x = (a, b, c) ->
+    exists d,
+      x = (a, b, c, d).
+Proof.
+  intros.
+  destruct x as [[[? ?] ?] ?]; simpl in *; tuple_inversion.
+  eauto.
+Qed.
+
 
 Lemma sort_one_element :
   forall h x,

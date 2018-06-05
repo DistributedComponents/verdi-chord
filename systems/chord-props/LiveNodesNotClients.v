@@ -66,3 +66,38 @@ Proof.
     in_crush; eauto with datatypes.
 Qed.
 Hint Resolve sent_non_client_message_means_in_nodes.
+
+Lemma sent_client_message_means_client_or_in_nodes :
+  forall gst src dst p,
+    reachable_st gst ->
+    client_payload p ->
+    In (src, (dst, p)) (msgs gst) ->
+    In src (nodes gst) \/ client_addr src.
+Proof.
+  intros.
+  generalize dependent p.
+  generalize dependent dst.
+  generalize dependent src.
+  pattern gst.
+  apply chord_net_invariant; do 2 autounfold; simpl; intros;
+    unfold send in *;
+    repeat find_rewrite; intuition eauto;
+      try solve [
+            find_apply_lem_hyp in_app_or; break_or_hyp;
+            [find_apply_lem_hyp in_map_iff; break_exists; break_and;
+             unfold send in *; find_injection; in_crush
+            |in_crush; eauto with datatypes]
+          ].
+  - inv_prop initial_st; break_and.
+    repeat find_rewrite.
+    in_crush.
+  - in_crush; eauto.
+    find_injection; tauto.
+    find_apply_hyp_hyp; tauto.
+  - in_crush; eauto.
+    find_injection; tauto.
+  - simpl in *.
+    eapply H6; eauto.
+    in_crush; eauto.
+Qed.
+Hint Resolve sent_client_message_means_client_or_in_nodes.

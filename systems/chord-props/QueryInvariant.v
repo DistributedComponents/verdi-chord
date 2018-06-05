@@ -11,6 +11,7 @@ Require Import Chord.SystemReachable.
 Require Import Chord.TimeoutMeansActive.
 Require Import Chord.NodesHaveState.
 Require Import Chord.LiveNodesNotClients.
+Require Import Chord.QueryTargetsJoined.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -154,8 +155,6 @@ Proof.
       eapply Hnoreq; eauto.
     + simpl in *; find_injection.
       eapply Hnoreq; eauto.
-      repeat find_rewrite.
-      eauto with datatypes.
 Qed.
 Hint Resolve at_most_one_request_timeout'_remove.
 
@@ -514,7 +513,6 @@ Proof.
                 inv_prop cur_request_timeouts_ok; try congruence;
                   find_injection;
                   eapply at_most_one_request_timeout'_remove_drops_all; eauto.
-              repeat find_rewrite; auto with datatypes.
         -- assert (cur_request_timeouts_ok (cur_request st) (timeouts gst h))
             by auto.
            repeat (handler_def || handler_simpl).
@@ -553,25 +551,6 @@ Lemma init_state_preset_definition :
 Proof.
   unfold init_state_preset; intros.
   repeat find_reverse_rewrite; tauto.
-Qed.
-
-Lemma start_handler_with_single_known :
-  forall h k,
-    start_handler h (k :: nil) = pi (start_query h (init_state_join h k) (Join (make_pointer k))).
-Proof.
-  easy.
-Qed.
-Hint Rewrite start_handler_with_single_known.
-
-Lemma open_pi :
-  forall (x : res) a b c,
-    pi x = (a, b, c) ->
-    exists d,
-      x = (a, b, c, d).
-Proof.
-  intros.
-  destruct x as [[[? ?] ?] ?]; simpl in *; tuple_inversion.
-  eauto.
 Qed.
 
 Lemma cur_request_timeouts_related_init :
@@ -2260,6 +2239,11 @@ Proof.
     simpl; change k with (addr_of (make_pointer k)).
     eapply CIreq; eauto.
     in_crush.
+    eapply unique_no_requests.
+    eapply unique_cons_add; [|constructor].
+    intros.
+    chan2msg.
+    find_eapply_lem_hyp sent_client_message_means_client_or_in_nodes.
 Admitted.
 
 Theorem query_message_ok'_invariant :
