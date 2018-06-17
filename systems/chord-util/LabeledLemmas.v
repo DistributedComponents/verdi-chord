@@ -1267,7 +1267,6 @@ Proof.
         repeat find_rewrite. break_if.
         -- subst. exfalso.
            eapply channel_empty_not_in; eauto.
-           repeat find_rewrite. in_crush.
         -- find_inversion.
            unfold do_delayed_queries in *.
            repeat find_rewrite.
@@ -1296,7 +1295,6 @@ Proof.
         repeat find_rewrite. break_if.
         -- subst. exfalso.
            eapply channel_empty_not_in; eauto.
-           repeat find_rewrite. in_crush.
         -- find_inversion.
            unfold do_delayed_queries in *.
            repeat find_rewrite.
@@ -1325,7 +1323,6 @@ Proof.
         repeat find_rewrite. break_if.
         -- subst. exfalso.
            eapply channel_empty_not_in; eauto.
-           repeat find_rewrite. in_crush.
         -- find_inversion.
            unfold do_delayed_queries in *.
            repeat find_rewrite.
@@ -1354,7 +1351,6 @@ Proof.
         repeat find_rewrite. break_if.
         -- subst. exfalso.
            eapply channel_empty_not_in; eauto.
-           repeat find_rewrite. in_crush.
         -- find_inversion.
            unfold do_delayed_queries in *.
            repeat find_rewrite.
@@ -1397,7 +1393,6 @@ Proof.
         repeat find_rewrite. break_if.
         -- subst. exfalso.
            eapply channel_empty_not_in; eauto.
-           repeat find_rewrite. in_crush.
         -- find_inversion.
            unfold do_delayed_queries in *.
            repeat find_rewrite.
