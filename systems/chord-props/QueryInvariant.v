@@ -982,12 +982,34 @@ Proof.
     apply unique_cons; in_crush; eauto.
 Qed.
 
+Lemma unique_perm :
+  forall {A : Type} (P : A -> Prop) xs xs' x,
+    unique P xs x ->
+    Permutation.Permutation xs xs' ->
+    unique P xs' x.
+Proof.
+  intros.
+  unfold unique in *.
+  break_and; split.
+  intuition.
+  intros.
+  assert (In x xs)
+    by eauto using Permutation.Permutation_in, Permutation.Permutation_sym.
+  find_copy_apply_lem_hyp in_split; expand_def.
+  assert (In b (x0 ++ x1)).
+  eauto using Permutation.Permutation_in, Permutation.Permutation_sym, Permutation.Permutation_app_inv.
+  eauto.
+Qed.
+
 Lemma unique_app_comm :
   forall {A : Type} (P : A -> Prop) xs ys x,
     unique P (xs ++ ys) x ->
     unique P (ys ++ xs) x.
 Proof.
-Admitted.
+  intros.
+  eapply unique_perm;
+    eauto using Permutation.Permutation_app_comm, Permutation.Permutation_refl.
+Qed.
 
 Lemma unique_app_r :
   forall {A : Type} (P : A -> Prop) xs ys x,
