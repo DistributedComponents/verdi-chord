@@ -2259,13 +2259,27 @@ Proof.
     eapply QMLive; try congruence.
     repeat find_rewrite || rewrite_update || find_injection.
     simpl; change k with (addr_of (make_pointer k)).
+    assert (forall src m, ~ In m (channel gst src h)).
+    {
+      admit.
+    }
+    assert (forall dst m, ~ In m (channel gst h dst)).
+    {
+      admit.
+    }
     eapply CIreq; eauto.
-    in_crush.
-    eapply unique_no_requests.
-    eapply unique_cons_add; [|constructor].
-    intros.
-    chan2msg.
-    find_eapply_lem_hyp sent_client_message_means_client_or_in_nodes.
+    + in_crush.
+    + eapply unique_no_requests.
+      eapply unique_cons_add; [|constructor].
+      intros.
+      intuition eauto.
+    + unfold no_responses; intros.
+      intuition eauto.
+    + intros.
+      admit.
+  - admit.
+  - admit.
+  - admit.
 Admitted.
 
 Theorem query_message_ok'_invariant :
