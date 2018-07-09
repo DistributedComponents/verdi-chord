@@ -897,8 +897,8 @@ Proof using.
     }
     assert (exists st__src, sigma gst src = Some st__src) by eauto.
     break_exists_name st__src.
-    assert (query_message_ok' h src (cur_request st) (delayed_queries st__src)
-                              (failed_nodes gst)
+    assert (query_message_ok' h src (cur_request st) (Some (delayed_queries st__src))
+                              (nodes gst) (failed_nodes gst)
                              (channel gst h src) (channel gst src h))
       by eauto using query_message_ok'_invariant.
     assert (Request (addr_of dstp) req0 = Request dst req)
