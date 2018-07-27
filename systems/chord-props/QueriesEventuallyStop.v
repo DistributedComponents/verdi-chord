@@ -313,6 +313,9 @@ Proof.
         admit.
       * assert (res0 = r) by admit; subst.
         admit.
+      * inv_option_map.
+        repeat find_rewrite.
+        admit.
     + assert (live_node (occ_gst o') h) by invar_eauto.
       apply c; invar_eauto.
       * admit.
@@ -471,10 +474,8 @@ Proof.
   break_exists_name st__h.
   find_copy_apply_lem_hyp (live_node_means_state_exists gst dst).
   break_exists_name st__dst.
-  specialize (Qok st__h st__dst ltac:(eauto) ltac:(eauto)).
-
+  specialize (Qok st__h ltac:(eauto)).
   find_copy_apply_lem_hyp always_now; simpl in *.
-
   inv_prop query_message_ok';
     try inv_prop query_message_ok.
   - find_apply_hyp_hyp; congruence.
@@ -483,6 +484,7 @@ Proof.
   - admit.
   - eapply always_continuously, always_stuck_blocked_always_blocked;
       invar_eauto.
+    admit.
   - admit.
   - admit.
 Admitted.

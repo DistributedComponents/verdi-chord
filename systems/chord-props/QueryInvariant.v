@@ -1454,7 +1454,12 @@ Proof.
     match goal with H: context[dst] |- _ => rewrite H end.
     constructor 1; try congruence.
     unfold option_bind in *.
-      admit.
+    inv_option_map.
+    repeat find_rewrite || find_injection.
+    update_destruct; rewrite_update; subst.
+    repeat find_rewrite || find_injection.
+    admit.
+    admit.
   - unfold option_map in *.
     repeat break_match; try find_injection;
       rewrite Hst in *;
