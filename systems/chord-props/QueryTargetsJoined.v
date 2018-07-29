@@ -837,6 +837,49 @@ Definition all_joined_query_ptr (P : pointer -> Prop) (sigma : addr -> option da
 
 Hint Unfold all_joined_query_ptr.
 
+Inductive joined_sender_msg : payload -> Prop :=
+| JSMNotify : joined_sender_msg Notify
+| JSMGotPredAndSuccs : forall p s, joined_sender_msg (GotPredAndSuccs p s)
+(*| JSMGotSuccList : forall s, joined_sender_msg (GotSuccList s)*)
+.
+
+Hint Constructors joined_sender_msg.
+
+Definition all_joined_senders_net (P : pointer -> Prop) ms :=
+  all_msgs (fun src _ p => joined_sender_msg p -> (P (make_pointer src))) ms.
+
+Hint Unfold all_joined_senders_net.
+
+Inductive joined_receiver_msg : payload -> Prop :=
+| JSRGetPredAndSuccs : joined_receiver_msg GetPredAndSuccs
+(*| JSMGotSuccList : forall s, joined_sender_msg (GotSuccList s)*)
+.
+
+Hint Constructors joined_receiver_msg.
+  
+Definition all_joined_receivers_net (P : pointer -> Prop) ms :=
+  all_msgs (fun _ dst p => joined_receiver_msg p -> (P (make_pointer dst))) ms.
+
+Hint Unfold all_joined_receivers_net.
+
+Definition all_joined_receivers_delayed_queries_state (P : pointer -> Prop) sigma :=
+  all_states (fun st => forall h p, In (h, p) (delayed_queries st) -> joined_receiver_msg p -> P (ptr st))
+             sigma.
+
+Hint Unfold all_joined_receivers_delayed_queries_state.
+
+Inductive joined_query : _query -> Prop :=
+| JRStabilize : joined_query Stabilize
+| JRStabilize2 : forall p, joined_query (Stabilize2 p).
+
+Hint Constructors joined_query.
+
+Definition all_joined_cur_request_state (P : pointer -> Prop) sigma :=
+  all_states (fun st => forall dstp q m, cur_request st = Some (dstp, q, m) -> joined_query q -> P (ptr st))
+             sigma.
+
+Hint Unfold all_joined_cur_request_state.
+
 Inductive all_joined_ptrs P (gst : global_state) :=
 | AllJoinedPtrs :
     all_succs_state (P gst) (sigma gst) ->
@@ -844,6 +887,10 @@ Inductive all_joined_ptrs P (gst : global_state) :=
     all_preds_state (P gst) (sigma gst) ->
     all_preds_net (P gst) (msgs gst) ->
     all_rectify_with (P gst) (sigma gst) ->
+    all_joined_senders_net (P gst) (msgs gst) ->
+    all_joined_receivers_net (P gst) (msgs gst) ->
+    all_joined_receivers_delayed_queries_state (P gst) (sigma gst) ->
+    all_joined_cur_request_state (P gst) (sigma gst) ->
     all_joined_query_ptr (P gst) (sigma gst) ->
     all_joined_ptrs P gst.
   
@@ -898,6 +945,18 @@ Qed.
 
 Hint Resolve initial_st_joined.
 
+Lemma pointer_joined_ptr_h :
+  forall gst h st,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    pointer_joined gst (ptr st) ->
+    pointer_joined gst (make_pointer h).
+Proof.
+  intros. erewrite <- ptr_correct; eauto.
+Qed.
+
+Hint Resolve pointer_joined_ptr_h.
+
 Lemma pointers_joined_init :
   chord_init_invariant (all_joined_ptrs pointer_joined).
 Proof.
@@ -930,6 +989,21 @@ Proof.
     find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
     subst.
     unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
+  - do 2 autounfold_one; simpl. intros.
+    unfold initial_st in *. intuition. repeat find_rewrite. in_crush.
+  - do 2 autounfold_one; simpl. intros.
+    unfold initial_st in *. intuition. repeat find_rewrite. in_crush.
+  - do 2 autounfold_one; simpl.
+    intros.
+    find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
+  - do 2 autounfold_one; simpl.
+    intros.
+    find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
+    subst.
+    unfold start_handler in *. repeat break_match; simpl in *; in_crush; try congruence.
+    find_inversion. solve_by_inversion.
   - do 3 autounfold_one; simpl.
     intros.
     find_eapply_lem_hyp sigma_initial_st_start_handler; auto.
@@ -970,20 +1044,114 @@ Proof.
 Qed.
 Hint Resolve in_partition.
 
+Lemma in_partition_if1 :
+  forall A (x : A) xs y ys,
+    In x xs ->
+    In x (xs ++ y :: ys).
+Proof. in_crush. Qed.
+
+Hint Resolve in_partition_if1.
+
+Lemma in_partition_if2 :
+  forall A (x : A) xs y ys,
+    In x ys ->
+    In x (xs ++ y :: ys).
+Proof. in_crush. Qed.
+
+Hint Resolve in_partition_if2.
+
+Ltac handler_simpler_joined :=
+  discriminate ||
+  solve [eauto] ||
+  match goal with
+  | H : In _ [] |- _ =>
+    invcs H
+  | H : In _ (concat _) |- _ =>
+    apply in_concat in H; break_exists; intuition
+  | H : In _ (handle_delayed_query _ _ _) |- _ =>
+    unfold handle_delayed_query, handle_query_req in *
+  | H : In _ (handle_query_req _ _ _) |- _ =>
+    unfold handle_query_req in *
+  | H : option_map _ _ = Some _ |- _ =>
+    apply option_map_Some in H; break_exists
+  | H : succs_msg _ _ |- _ =>
+    invcs H
+  | H : In ?x ?l, _ : ?l' = _ :: ?l, _ : In ?x ?l' |- _ =>
+    idtac
+  | H : In ?x ?l, _ : ?l' = _ :: ?l |- _ =>
+    assert (In x l') by (repeat find_rewrite; in_crush)
+  | H : hd_error _ = Some _ |- _ =>
+    apply hd_error_in in H
+  | H : ptr _ = ?x |- context [?x] =>
+    symmetry in H; rewrite H
+  | |- context [best_predecessor ?x ?l ?p] =>
+    pose proof (best_predecessor_in_succs_or_ptr x l (best_predecessor x l p) p);
+    in_crush
+  | H : joined_sender_msg _ |- _ =>
+    try solve [inversion H]
+  | H : joined_receiver_msg _ |- _ =>
+    try solve [inversion H]
+  | H : query_joined_ptr _ _ _ |- _ =>
+    try solve [inversion H; subst; eauto]
+  end ||
+  break_match ||
+  in_crush ||
+  handler_simpl.
+
+Lemma pointer_h_ptr_joined :
+  forall gst h st,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    pointer_joined gst (make_pointer h) ->
+    pointer_joined gst (ptr st).
+Proof.
+  intros. erewrite ptr_correct; eauto.
+Qed.
+    
+Hint Resolve pointer_h_ptr_joined.
+
+Hint Resolve in_dedup_was_in.
+
+
 Lemma pointers_joined_recv :
   chord_recv_handler_invariant (all_joined_ptrs pointer_joined).
 Proof.
   do 2 autounfold_one. intros; simpl in *.
   inv_prop all_joined_ptrs.
   constructor; repeat find_rewrite; simpl in *.
-  - Time (repeat (handler_def || handler_simpler);
-            solve
-              [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - (* Time (repeat (handler_def || handler_simpler);
-            try solve
-                [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]). *)
-    admit.
-Admitted.
+  - repeat (handler_def || handler_simpler_joined);
+      try solve
+        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto];
+      try solve
+         [repeat find_rewrite; in_crush]).
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
+  - Time (repeat (handler_def || handler_simpler_joined);
+      try solve
+          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
+Qed.
 
 Lemma find_pred_in :
   forall h p l,
