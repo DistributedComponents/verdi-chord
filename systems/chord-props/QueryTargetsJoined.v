@@ -1042,7 +1042,7 @@ Lemma in_partition :
 Proof.
   intros. in_crush.
 Qed.
-Local Hint Resolve in_partition.
+Hint Resolve in_partition.
 
 Lemma in_partition_if1 :
   forall A (x : A) xs y ys,
