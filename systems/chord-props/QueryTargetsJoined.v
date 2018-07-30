@@ -138,17 +138,17 @@ Definition all_states (P : data -> Prop) (sigma : addr -> option data) : Prop :=
   forall h st,
     sigma h = Some st ->
     P st.
-Hint Unfold all_states.
+Local Hint Unfold all_states.
 
 Definition all_msgs (P : addr -> addr -> payload -> Prop) (ms : list msg) :=
   forall src dst p,
     In (src, (dst, p)) ms ->
     P src dst p.
-Hint Unfold all_msgs.
+Local Hint Unfold all_msgs.
 
 Definition all_succs_state (P : pointer -> Prop) (sigma : addr -> option data): Prop :=
   all_states (fun st => forall s, In s (succ_list st) -> P s) sigma.
-Hint Unfold all_succs_state.
+Local Hint Unfold all_succs_state.
 
 Definition all_succs_net (P : pointer -> Prop) (ms : list msg) : Prop :=
   all_msgs (fun src dst p =>
@@ -157,11 +157,11 @@ Definition all_succs_net (P : pointer -> Prop) (ms : list msg) : Prop :=
                 In s succs ->
                 P s)
            ms.
-Hint Unfold all_succs_net.
+Local Hint Unfold all_succs_net.
 
 Definition all_preds_state (P : pointer -> Prop) (sigma : addr -> option data): Prop :=
   all_states (fun st => forall p, pred st = Some p -> P p) sigma.
-Hint Unfold all_preds_state.
+Local Hint Unfold all_preds_state.
 
 Definition all_preds_net (P : pointer -> Prop) (ms : list msg) : Prop :=
   all_msgs (fun src dst p =>
@@ -169,37 +169,37 @@ Definition all_preds_net (P : pointer -> Prop) (ms : list msg) : Prop :=
                 p = GotPredAndSuccs (Some pred) succs ->
                 P pred)
            ms.
-Hint Unfold all_preds_net.
+Local Hint Unfold all_preds_net.
 
 Definition all_self_ptr (P : pointer -> Prop) : (addr -> option data) -> Prop :=
   all_states (fun st => P (ptr st)).
-Hint Unfold all_self_ptr.
+Local Hint Unfold all_self_ptr.
 
 Definition all_rectify_with (P : pointer -> Prop) (sigma : addr -> option data) : Prop :=
   all_states (fun st => forall rw, rectify_with st = Some rw -> P rw) sigma.
-Hint Unfold all_rectify_with.
+Local Hint Unfold all_rectify_with.
 
 Definition all_cur_request (P : pointer -> query -> Prop) (sigma : addr -> option data) : Prop :=
   all_states (fun st => forall dstp q m,
                   cur_request st = Some (dstp, q, m) ->
                   P dstp q)
              sigma.
-Hint Unfold all_cur_request.
+Local Hint Unfold all_cur_request.
 
 Inductive query_ptr : query -> pointer -> Prop :=
 | QPRectify : forall p, query_ptr (Rectify p) p
 | QPStabilize2 : forall p, query_ptr (Stabilize2 p) p
 | QPJoin : forall p, query_ptr (Join p) p
 | QPJoin2 : forall p, query_ptr (Join2 p) p.
-Hint Constructors query_ptr.
+Local Hint Constructors query_ptr.
 
 Definition all_query_ptr (P : pointer -> Prop) (sigma : addr -> option data) : Prop :=
   all_cur_request (fun _ q => forall p, query_ptr q p -> P p) sigma.
-Hint Unfold all_query_ptr.
+Local Hint Unfold all_query_ptr.
 
 Definition all_lookup_results (P : pointer -> Prop) : list msg -> Prop :=
   all_msgs (fun _ _ p => forall res, p = GotBestPredecessor res -> P res).
-Hint Unfold all_lookup_results.
+Local Hint Unfold all_lookup_results.
 
 Inductive all_ptrs P (gst : global_state) :=
 | AllPtrs :
@@ -222,7 +222,7 @@ Theorem all_msgs_app :
 Proof.
   autounfold; in_crush.
 Qed.
-Hint Resolve all_msgs_app.
+Local Hint Resolve all_msgs_app.
 
 Theorem all_msgs_split :
   forall P l m xs ys,
@@ -232,7 +232,7 @@ Theorem all_msgs_split :
 Proof.
   autounfold; in_crush.
 Qed.
-Hint Resolve all_msgs_split.
+Local Hint Resolve all_msgs_split.
 
 Theorem all_msgs_cons :
   forall (P : addr -> addr -> payload -> Prop) src dst p xs,
@@ -242,7 +242,7 @@ Theorem all_msgs_cons :
 Proof.
   autounfold; in_crush; congruence.
 Qed.
-Hint Resolve all_msgs_cons.
+Local Hint Resolve all_msgs_cons.
 
 Theorem all_states_update :
   forall P h st' sigma,
@@ -256,7 +256,7 @@ Proof.
   - congruence.
   - eauto.
 Qed.
-Hint Resolve all_states_update.
+Local Hint Resolve all_states_update.
 
 Lemma cons_make_succs :
   forall p succs,
@@ -271,7 +271,7 @@ Proof.
   auto.
 Qed.
 
-Hint Resolve make_pointer_wf.
+Local Hint Resolve make_pointer_wf.
 
 Lemma recv_handler_succs_msg_accurate :
   forall src dst st p st' ms nts cts h m succs,
@@ -830,12 +830,12 @@ Inductive query_joined_ptr : pointer -> query -> pointer -> Prop :=
 | QJPJoin2H : forall h p, query_joined_ptr h (Join2 p) h
 | QJPJoin2P : forall h p, query_joined_ptr h (Join2 p) p.
 
-Hint Constructors query_joined_ptr.
+Local Hint Constructors query_joined_ptr.
 
 Definition all_joined_query_ptr (P : pointer -> Prop) (sigma : addr -> option data) : Prop :=
   all_cur_request (fun h q => forall p, query_joined_ptr h q p -> P p) sigma.
 
-Hint Unfold all_joined_query_ptr.
+Local Hint Unfold all_joined_query_ptr.
 
 Inductive joined_sender_msg : payload -> Prop :=
 | JSMNotify : joined_sender_msg Notify
@@ -843,42 +843,42 @@ Inductive joined_sender_msg : payload -> Prop :=
 (*| JSMGotSuccList : forall s, joined_sender_msg (GotSuccList s)*)
 .
 
-Hint Constructors joined_sender_msg.
+Local Hint Constructors joined_sender_msg.
 
 Definition all_joined_senders_net (P : pointer -> Prop) ms :=
   all_msgs (fun src _ p => joined_sender_msg p -> (P (make_pointer src))) ms.
 
-Hint Unfold all_joined_senders_net.
+Local Hint Unfold all_joined_senders_net.
 
 Inductive joined_receiver_msg : payload -> Prop :=
 | JSRGetPredAndSuccs : joined_receiver_msg GetPredAndSuccs
 (*| JSMGotSuccList : forall s, joined_sender_msg (GotSuccList s)*)
 .
 
-Hint Constructors joined_receiver_msg.
+Local Hint Constructors joined_receiver_msg.
   
 Definition all_joined_receivers_net (P : pointer -> Prop) ms :=
   all_msgs (fun _ dst p => joined_receiver_msg p -> (P (make_pointer dst))) ms.
 
-Hint Unfold all_joined_receivers_net.
+Local Hint Unfold all_joined_receivers_net.
 
 Definition all_joined_receivers_delayed_queries_state (P : pointer -> Prop) sigma :=
   all_states (fun st => forall h p, In (h, p) (delayed_queries st) -> joined_receiver_msg p -> P (ptr st))
              sigma.
 
-Hint Unfold all_joined_receivers_delayed_queries_state.
+Local Hint Unfold all_joined_receivers_delayed_queries_state.
 
 Inductive joined_query : _query -> Prop :=
 | JRStabilize : joined_query Stabilize
 | JRStabilize2 : forall p, joined_query (Stabilize2 p).
 
-Hint Constructors joined_query.
+Local Hint Constructors joined_query.
 
 Definition all_joined_cur_request_state (P : pointer -> Prop) sigma :=
   all_states (fun st => forall dstp q m, cur_request st = Some (dstp, q, m) -> joined_query q -> P (ptr st))
              sigma.
 
-Hint Unfold all_joined_cur_request_state.
+Local Hint Unfold all_joined_cur_request_state.
 
 Inductive all_joined_ptrs P (gst : global_state) :=
 | AllJoinedPtrs :
@@ -943,7 +943,7 @@ Proof.
   specialize (H10 d l0 l); intuition. repeat find_rewrite. congruence.
 Qed.
 
-Hint Resolve initial_st_joined.
+Local Hint Resolve initial_st_joined.
 
 Lemma pointer_joined_ptr_h :
   forall gst h st,
@@ -955,7 +955,7 @@ Proof.
   intros. erewrite <- ptr_correct; eauto.
 Qed.
 
-Hint Resolve pointer_joined_ptr_h.
+Local Hint Resolve pointer_joined_ptr_h.
 
 Lemma pointers_joined_init :
   chord_init_invariant (all_joined_ptrs pointer_joined).
@@ -1023,7 +1023,7 @@ Proof.
     omega.
 Qed.
 
-Hint Resolve pointer_joined_stable.
+Local Hint Resolve pointer_joined_stable.
 
 Lemma pointer_joined_make_pointer :
   forall gst h,
@@ -1033,7 +1033,7 @@ Proof.
   unfold pointer_joined. simpl in *. intuition.
 Qed.
 
-Hint Resolve pointer_joined_make_pointer.
+Local Hint Resolve pointer_joined_make_pointer.
 
 Lemma in_partition :
   forall A (l : list A) xs a ys,
@@ -1042,7 +1042,7 @@ Lemma in_partition :
 Proof.
   intros. in_crush.
 Qed.
-Hint Resolve in_partition.
+Local Hint Resolve in_partition.
 
 Lemma in_partition_if1 :
   forall A (x : A) xs y ys,
@@ -1050,7 +1050,7 @@ Lemma in_partition_if1 :
     In x (xs ++ y :: ys).
 Proof. in_crush. Qed.
 
-Hint Resolve in_partition_if1.
+Local Hint Resolve in_partition_if1.
 
 Lemma in_partition_if2 :
   forall A (x : A) xs y ys,
@@ -1058,7 +1058,7 @@ Lemma in_partition_if2 :
     In x (xs ++ y :: ys).
 Proof. in_crush. Qed.
 
-Hint Resolve in_partition_if2.
+Local Hint Resolve in_partition_if2.
 
 Ltac handler_simpler_joined :=
   discriminate ||
@@ -1108,9 +1108,9 @@ Proof.
   intros. erewrite ptr_correct; eauto.
 Qed.
     
-Hint Resolve pointer_h_ptr_joined.
+Local Hint Resolve pointer_h_ptr_joined.
 
-Hint Resolve in_dedup_was_in.
+Local Hint Resolve in_dedup_was_in.
 
 
 Lemma pointers_joined_recv :
@@ -1152,7 +1152,14 @@ Proof.
       try solve
           [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
 Qed.
-
+(*
+Lemma pointers_joined_recv :
+  chord_start_handler_invariant (all_joined_ptrs pointer_joined).
+Proof.
+  do 2 autounfold_one. intros; simpl in *.
+  inv_prop all_joined_ptrs.
+  constructor; repeat find_rewrite; simpl in *.
+*)
 Lemma find_pred_in :
   forall h p l,
     find_pred h l = Some p ->
