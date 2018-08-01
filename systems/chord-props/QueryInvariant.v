@@ -1357,6 +1357,151 @@ Definition option_bind {A B : Type} (f : A -> option B) (a : option A) : option 
   | None => None
   end.
 
+Lemma query_message_ok_Busy_invariant :
+  forall gst gst' src dst st__src st__dst h ms,
+    nodes gst = nodes gst' ->
+    failed_nodes gst = failed_nodes gst' ->
+    sigma gst dst = Some st__dst ->
+    sigma gst src = Some st__src ->
+    sigma gst' src = Some st__src ->
+    timeouts gst' =
+    update addr_eq_dec (timeouts gst) h
+           (KeepaliveTick :: remove timeout_eq_dec KeepaliveTick (timeouts gst h)) ->
+    msgs gst' = map (send h) ms ++ msgs gst ->
+    Forall (fun x => snd x = Busy) ms ->
+    query_message_ok src dst (cur_request st__src) (delayed_queries st__dst)
+                     (channel gst src dst) (channel gst dst src) ->
+    query_message_ok src dst (cur_request st__src) (delayed_queries st__dst)
+                     (channel gst' src dst) (channel gst' dst src).
+Proof.
+  intros.
+  rewrite Forall_forall in *.
+  inv_prop query_message_ok.
+  - constructor; eauto.
+    + unfold no_responses.
+      intros.
+      chan2msg.
+      find_rewrite.
+      in_crush.
+      unfold send in *.
+      find_injection.
+      * assert (m = Busy)
+          by (change m with (snd (src, m)); eauto).
+        invcs_prop response_payload; congruence.
+      * find_eapply_prop no_responses; eauto.
+    + unfold no_requests.
+      intros.
+      chan2msg.
+      repeat find_rewrite.
+      in_crush.
+      * unfold send in *; find_injection.
+        inv_prop request_payload;
+          find_apply_hyp_hyp; simpl in *; congruence.
+      * find_eapply_prop no_requests; eauto.
+  - constructor 2; eauto.
+    + unfold no_responses.
+      intros.
+      chan2msg.
+      find_rewrite.
+      in_crush.
+      unfold send in *.
+      find_injection.
+      * assert (m = Busy)
+          by (change m with (snd (src, m)); eauto).
+        invcs_prop response_payload; congruence.
+      * find_eapply_prop no_responses; eauto.
+    + unfold no_requests.
+      intros.
+      chan2msg.
+      repeat find_rewrite.
+      in_crush.
+      * unfold send in *; find_injection.
+        inv_prop request_payload;
+          find_apply_hyp_hyp; simpl in *; congruence.
+      * find_eapply_prop no_requests; eauto.
+  - constructor 3; eauto.
+    + chan2msg; find_rewrite; in_crush.
+    + eapply unique_no_requests.
+      find_apply_lem_hyp no_requests_unique; eauto.
+      destruct (addr_eq_dec src h).
+      * subst.
+        erewrite channel_app in * by eauto.
+        eapply unique_app; eauto.
+        intros.
+        find_apply_lem_hyp In_filterMap; expand_def.
+        break_match; try congruence.
+        find_injection.
+        replace (snd x) with Busy; [|symmetry; eauto].
+        intuition; inv_prop request_payload.
+      * erewrite channel_msgs_unchanged; eauto.
+    + unfold no_responses.
+      intros.
+      chan2msg.
+      repeat find_rewrite.
+      in_crush.
+      * unfold send in *; find_injection.
+        inv_prop response_payload;
+          find_apply_hyp_hyp; simpl in *; congruence.
+      * find_eapply_prop no_responses; eauto.
+  - econstructor 4; eauto.
+    + chan2msg; repeat find_rewrite; in_crush.
+    + eapply unique_no_responses.
+      find_apply_lem_hyp no_responses_unique; eauto.
+      destruct (addr_eq_dec (addr_of dstp) h).
+      * subst.
+        erewrite channel_app in * by eauto.
+        eapply unique_app; eauto.
+        intros.
+        find_apply_lem_hyp In_filterMap; expand_def.
+        break_match; try congruence.
+        find_injection.
+        replace (snd x) with Busy; [|symmetry; eauto].
+        intuition; inv_prop response_payload.
+      * erewrite channel_msgs_unchanged; eauto.
+    + unfold no_requests.
+      intros.
+      chan2msg.
+      find_rewrite.
+      in_crush.
+      unfold send in *.
+      find_injection.
+      * assert (m = Busy)
+          by (change m with (snd (addr_of dstp, m)); eauto).
+        invcs_prop request_payload; congruence.
+      * find_eapply_prop no_requests; eauto.
+  - econstructor 5; eauto.
+    + unfold no_responses.
+      intros.
+      chan2msg.
+      find_rewrite.
+      in_crush.
+      unfold send in *.
+      find_injection.
+      * assert (m = Busy)
+          by (change m with (snd (src, m)); eauto).
+        invcs_prop response_payload; congruence.
+      * find_eapply_prop no_responses; eauto.
+    + unfold no_requests.
+      intros.
+      chan2msg.
+      find_rewrite.
+      in_crush.
+      unfold send in *.
+      find_injection.
+      * assert (m = Busy)
+          by (change m with (snd (addr_of dstp, m)); eauto).
+        invcs_prop request_payload; congruence.
+      * find_eapply_prop no_requests; eauto.
+Qed.
+
+Lemma send_keepalives_Busy_only :
+  forall st m,
+    In m (send_keepalives st) ->
+    snd m = Busy.
+Proof.
+Admitted.
+Hint Resolve send_keepalives_Busy_only.
+
 Theorem query_message_ok'_keepalive_invariant :
  chord_keepalive_invariant
    (fun g : global_state =>
@@ -1368,6 +1513,8 @@ Theorem query_message_ok'_keepalive_invariant :
 Proof.
   repeat autounfold; intros.
   repeat handler_def || handler_simpl.
+
+
   assert (Hst: forall h, sigma gst h = sigma gst' h).
   {
     intros.
@@ -1448,18 +1595,20 @@ Proof.
     - erewrite (channel_msgs_unchanged _ gst' gst); eauto.
   }
   inv_prop query_message_ok'.
-  - find_copy_apply_lem_hyp nodes_have_state; expand_def; auto.
+  -
+    find_copy_apply_lem_hyp nodes_have_state; expand_def; auto.
     assert (exists st, sigma gst' dst = Some st); expand_def.
     eapply nodes_have_state; solve [congruence || econstructor; eauto].
-    match goal with H: context[dst] |- _ => rewrite H end.
+    repeat find_rewrite.
+    simpl.
     constructor 1; try congruence.
-    unfold option_bind in *.
-    inv_option_map.
-    repeat find_rewrite || find_injection.
-    update_destruct; rewrite_update; subst.
-    repeat find_rewrite || find_injection.
-    admit.
-    admit.
+    eapply query_message_ok_Busy_invariant.
+    symmetry; eauto.
+    all:congruence || eauto.
+    apply Forall_forall; eauto.
+    replace (delayed_queries x0) with dqs; eauto.
+    inv_option_map; repeat find_rewrite || find_injection.
+    congruence.
   - unfold option_map in *.
     repeat break_match; try find_injection;
       rewrite Hst in *;
@@ -1470,8 +1619,7 @@ Proof.
       rewrite Hst in *;
       try assert (d0 = d) by congruence; subst;
        solve [congruence | econstructor; congruence || eauto using unique_no_responses, no_responses_unique].
-  - repeat erewrite <- Hst.
-    admit.
+  - admit.
 Admitted.
 
 Lemma delayed_queries_preserved_by_do_rectify :
