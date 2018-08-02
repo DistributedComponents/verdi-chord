@@ -1502,6 +1502,13 @@ Proof.
 Admitted.
 Hint Resolve send_keepalives_Busy_only.
 
+Lemma send_keepalives_delayed_only :
+  forall st m,
+    In m (send_keepalives st) ->
+    exists q, In q (delayed_queries st) /\ fst q = fst m.
+Proof.
+Admitted.
+
 Theorem query_message_ok'_keepalive_invariant :
  chord_keepalive_invariant
    (fun g : global_state =>
@@ -1619,8 +1626,28 @@ Proof.
       rewrite Hst in *;
       try assert (d0 = d) by congruence; subst;
        solve [congruence | econstructor; congruence || eauto using unique_no_responses, no_responses_unique].
-  - admit.
-Admitted.
+  - inv_option_map.
+    assert (dst <> h) by (intro; subst; intuition).
+    erewrite channel_msgs_unchanged with (src := dst); eauto.
+    repeat find_rewrite.
+    replace (channel gst dst src) with (@nil payload) by auto.
+    assert (channel gst' src dst = channel gst src dst).
+    {
+      destruct (addr_eq_dec src h).
+      - subst.
+        erewrite channel_app with (gst := gst) (gst' := gst'); eauto.
+        rewrite filterMap_all_None; auto.
+        intros.
+        find_apply_lem_hyp send_keepalives_delayed_only; expand_def.
+        destruct x0.
+        find_eapply_lem_hyp delayed_query_sources_active; eauto.
+        simpl in *.
+        break_match; subst; auto.
+        exfalso; eauto.
+      - erewrite channel_msgs_unchanged; eauto.
+    }
+    congruence.
+Qed.
 
 Lemma delayed_queries_preserved_by_do_rectify :
   forall h st st' ms nts cts eff,

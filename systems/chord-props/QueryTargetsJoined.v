@@ -1676,3 +1676,13 @@ Proof.
   unfold best_succ. exists st. break_exists_exists.
   intuition.
 Qed.
+
+Lemma delayed_query_sources_active :
+  forall gst h st,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    forall src m,
+      In (src, m) (delayed_queries st) ->
+      In src (nodes gst).
+Proof.
+Admitted.
