@@ -1499,7 +1499,11 @@ Lemma send_keepalives_Busy_only :
     In m (send_keepalives st) ->
     snd m = Busy.
 Proof.
-Admitted.
+  unfold send_keepalives.
+  intros.
+  find_apply_lem_hyp in_map_iff; expand_def.
+  reflexivity.
+Qed.
 Hint Resolve send_keepalives_Busy_only.
 
 Lemma send_keepalives_delayed_only :
@@ -1507,7 +1511,11 @@ Lemma send_keepalives_delayed_only :
     In m (send_keepalives st) ->
     exists q, In q (delayed_queries st) /\ fst q = fst m.
 Proof.
-Admitted.
+  unfold send_keepalives.
+  intros.
+  find_apply_lem_hyp in_map_iff; expand_def.
+  eauto.
+Qed.
 
 Theorem query_message_ok'_keepalive_invariant :
  chord_keepalive_invariant
