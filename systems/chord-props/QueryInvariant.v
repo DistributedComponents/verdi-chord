@@ -1793,7 +1793,6 @@ Proof.
       * inv_prop query_message_ok'; repeat inv_option_map.
         -- admit.
         -- admit.
-        -- admit.
       * admit.
     + change (send h ?m :: ?l)
         with (map (send h) [m] ++ l) in *.
