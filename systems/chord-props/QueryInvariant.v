@@ -1666,6 +1666,17 @@ Proof.
   repeat handler_def || handler_simpl.
 Qed.
 
+Lemma state_none_not_in_nodes :
+  forall gst h,
+    reachable_st gst ->
+    sigma gst h = None ->
+    ~ In h (nodes gst).
+Proof.
+  intuition.
+  find_eapply_lem_hyp nodes_have_state; auto.
+  expand_def; congruence.
+Qed.
+
 Theorem query_message_ok'_rectify_invariant :
  chord_rectify_invariant
    (fun g : global_state =>
@@ -1745,32 +1756,44 @@ Proof.
       erewrite <- Hdq by eauto.
       erewrite <- (Hcr src oldst__src) by eauto.
       erewrite <- !(msgs_eq_channels_eq gst gst') by eauto.
-      admit.
-    + admit.
+      replace (nodes gst') with (nodes gst); eauto.
+      replace (failed_nodes gst') with (failed_nodes gst); eauto.
+      replace (Some (delayed_queries x)) with (option_map delayed_queries (sigma gst dst)); eauto.
+      replace (sigma gst dst) with (Some x).
+      reflexivity.
+    + match goal with
+      | H: _, Hdst: sigma gst' dst = None |- _ => rewrite H in Hdst
+      end.
+      update_destruct; subst; rewrite_update; try congruence.
+      erewrite channel_msgs_unchanged with (dst := src); eauto.
+      find_copy_apply_lem_hyp state_none_not_in_nodes; eauto.
+      inv_prop query_message_ok';
+        repeat inv_option_map;
+        try congruence.
+      replace (nodes gst') with (nodes gst) by auto.
+      replace (failed_nodes gst') with (failed_nodes gst) by auto.
+      assert (Hnomsgs: channel gst' src dst = []).
+      {
+        destruct (channel gst' src dst) eqn:?; [reflexivity|exfalso].
+        assert (In p (channel gst' src dst)) by (rewrite Heql; in_crush).
+        assert (~ In dst (nodes gst')) by congruence.
+        find_eapply_prop dst.
+        eapply msgs_only_to_live_nodes.
+        chan2msg.
+        eauto.
+      }
+      rewrite Hnomsgs.
+      constructor; eauto.
   - repeat handler_def || handler_simpl.
     find_apply_lem_hyp option_map_Some; expand_def.
     destruct (addr_eq_dec src h).
     + subst; repeat find_rewrite || find_injection || rewrite_update.
       simpl.
-      inv_prop query_message_ok'.
-      * unfold option_map in * |- ; break_match_hyp; find_injection || congruence.
-        update_destruct; rewrite_update.
-        admit.
-        find_rewrite; simpl.
-        apply QMLive; eauto.
-        inv_prop query_message_ok;
-          repeat find_rewrite || find_injection || subst || rewrite_update.
-        destruct (addr_eq_dec dst (addr_of x1)); subst.
-        -- eapply CIreq; eauto.
-           erewrite channel_msgs_cons by eauto; in_crush.
-           apply unique_no_requests.
-           erewrite channel_msgs_cons by eauto.
-           eapply unique_cons_add; eauto.
-        -- eapply CIother; eauto.
-           unfold no_requests in *; intros.
-           chan2msg; repeat find_rewrite; in_crush; eauto.
-           unfold send in *; simpl in *; congruence.
-      * admit.
+      update_destruct; subst; rewrite_update.
+      * inv_prop query_message_ok'; repeat inv_option_map.
+        -- admit.
+        -- admit.
+        -- admit.
       * admit.
     + change (send h ?m :: ?l)
         with (map (send h) [m] ++ l) in *.
@@ -1849,7 +1872,16 @@ Proof.
         repeat find_rewrite || rewrite_update.
         congruence.
         left; intro; subst; tauto.
-      * admit.
+      * inv_option_map.
+        inv_prop query_message_ok'; try congruence || tauto.
+        inv_option_map.
+        erewrite channel_msgs_unchanged with (dst := src); eauto.
+        repeat find_reverse_rewrite.
+        replace (sigma gst' dst) with (@None data).
+        eapply QMNotStarted; congruence || eauto.
+        repeat find_rewrite.
+        rewrite_update.
+        symmetry; auto.
 Admitted.
 
 Theorem dq_res_qmo :
