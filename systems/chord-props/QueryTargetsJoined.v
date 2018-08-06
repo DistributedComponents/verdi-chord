@@ -1686,3 +1686,10 @@ Lemma delayed_query_sources_active :
       In src (nodes gst).
 Proof.
 Admitted.
+
+Lemma msgs_only_to_live_nodes :
+forall gst src dst p,
+    In (src, (dst, p)) (msgs gst) ->
+    In dst (nodes gst).
+Proof.
+Admitted.

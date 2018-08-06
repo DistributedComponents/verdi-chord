@@ -2509,9 +2509,46 @@ Proof.
     rewrite <- H18.
     eapply H14; eauto.
     congruence.
-  - repeat find_rewrite.
-    admit.
-Admitted.
+  - assert (~ In dst0 (nodes gst)).
+    {
+      intro.
+      find_eapply_lem_hyp nodes_have_state; eauto.
+      expand_def; congruence.
+    }
+    repeat find_rewrite.
+    update_destruct; rewrite_update; try congruence.
+    repeat find_rewrite; simpl.
+    update_destruct; subst; rewrite_update.
+    + assert (query_message_ok' src dst0 (cur_request st)
+          (option_map delayed_queries (sigma gst dst0)) (nodes gst) 
+          (failed_nodes gst) (channel gst src dst0) (channel gst dst0 src))
+        by auto.
+      inv_prop query_message_ok'; inv_option_map.
+      erewrite channel_msgs_unchanged with (src := dst0) by eauto.
+      erewrite channel_msgs_unchanged with (src := src); eauto.
+      repeat find_reverse_rewrite.
+      eapply QMNotStarted; eauto.
+      right.
+      intros.
+      find_injection.
+      intro; subst.
+      find_eapply_prop nodes.
+      replace (nodes gst) with (nodes gst').
+      eapply msgs_only_to_live_nodes.
+      repeat find_rewrite.
+      apply in_or_app; left.
+      apply in_map_iff.
+      eexists; split; eauto.
+    + assert (query_message_ok' src dst0 (cur_request st__src)
+          (option_map delayed_queries (sigma gst dst0)) (nodes gst) 
+          (failed_nodes gst) (channel gst src dst0) (channel gst dst0 src))
+        by auto.
+      inv_prop query_message_ok'; inv_option_map.
+      erewrite channel_msgs_unchanged with (src := dst0) by eauto.
+      erewrite channel_msgs_unchanged with (src := src); eauto.
+      repeat find_reverse_rewrite.
+      eapply QMNotStarted; eauto.
+Qed.
 
 Theorem query_message_ok'_start_invariant :
  chord_start_invariant
