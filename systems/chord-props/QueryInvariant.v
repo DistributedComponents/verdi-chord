@@ -1817,7 +1817,21 @@ Proof.
         }
         rewrite Hnomsgs.
         constructor; eauto.
-      * admit.
+      * replace (nodes gst') with (nodes gst) by auto.
+        replace (failed_nodes gst') with (failed_nodes gst) by auto.
+        assert (Hnomsgs: channel gst' src dst = []).
+        {
+          destruct (channel gst' src dst) eqn:?; [reflexivity|exfalso].
+          assert (In p (channel gst' src dst)) by (rewrite Heql; in_crush).
+          assert (~ In dst (nodes gst')) by congruence.
+          find_eapply_prop dst.
+          eapply msgs_only_to_live_nodes.
+          chan2msg.
+          eauto.
+        }
+        rewrite Hnomsgs.
+        constructor; eauto.
+        intros; in_crush.
   - repeat handler_def || handler_simpl.
     find_apply_lem_hyp option_map_Some; expand_def.
     destruct (addr_eq_dec src h).
@@ -1889,7 +1903,13 @@ Proof.
            replace (channel gst h dst) with (@nil payload) by congruence.
            apply QMNotStarted; eauto.
            right; intros; in_crush; congruence.
-        -- admit.
+        -- repeat find_rewrite || rewrite_update.
+           change (send h (addr_of x1, Ping) :: msgs gst)
+             with (map (send h) [(addr_of x1, Ping)] ++ msgs gst) in *.
+           erewrite channel_msgs_unchanged with (dst:=h); eauto.
+           erewrite channel_msgs_unchanged with (dst:=dst); eauto.
+           apply QMClient; eauto.
+           right; intros; in_crush; congruence.
     + change (send h ?m :: ?l)
         with (map (send h) [m] ++ l) in *.
       assert (forall m,
@@ -1977,8 +1997,21 @@ Proof.
            repeat find_rewrite.
            rewrite_update.
            symmetry; auto.
-        -- admit.
-Admitted.
+        -- inv_option_map.
+           erewrite channel_msgs_unchanged with (dst := src); eauto.
+           repeat find_reverse_rewrite.
+           replace (sigma gst' dst) with (@None data).
+           eapply QMNotStarted; congruence || eauto.
+           repeat find_rewrite.
+           rewrite_update.
+           symmetry; auto.
+      * inv_option_map.
+        erewrite channel_msgs_unchanged with (dst := src); eauto.
+        repeat find_rewrite.
+        rewrite_update.
+        repeat find_rewrite; simpl.
+        eapply QMClient; eauto.
+Qed.
 
 Theorem query_message_ok'_tick_invariant :
  chord_tick_invariant
