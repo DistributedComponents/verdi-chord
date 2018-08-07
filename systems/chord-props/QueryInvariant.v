@@ -896,7 +896,13 @@ Inductive query_message_ok'
 | QMNotStarted :
     forall dst cr active failed,
       ~ In dst active ->
-      query_message_ok' src dst cr None active failed [] [].
+      query_message_ok' src dst cr None active failed [] []
+| QMClient :
+    forall dst cr active failed outbound inbound,
+      client_addr dst ->
+      (forall p, In p inbound -> client_payload p) ->
+      (forall p, In p outbound -> (exists r, p = GotBestPredecessor r) \/ exists l, p = GotSuccList l) ->
+      query_message_ok' src dst cr None active failed outbound inbound.
 
 Definition unique {A : Type} (P : A -> Prop) (l : list A) (a : A) : Prop :=
   P a /\
@@ -1655,7 +1661,8 @@ Proof.
       - erewrite channel_msgs_unchanged; eauto.
     }
     congruence.
-Qed.
+  - admit.
+Admitted.
 
 Lemma delayed_queries_preserved_by_do_rectify :
   forall h st st' ms nts cts eff,
@@ -1784,20 +1791,21 @@ Proof.
       inv_prop query_message_ok';
         repeat inv_option_map;
         try congruence.
-      replace (nodes gst') with (nodes gst) by auto.
-      replace (failed_nodes gst') with (failed_nodes gst) by auto.
-      assert (Hnomsgs: channel gst' src dst = []).
-      {
-        destruct (channel gst' src dst) eqn:?; [reflexivity|exfalso].
-        assert (In p (channel gst' src dst)) by (rewrite Heql; in_crush).
-        assert (~ In dst (nodes gst')) by congruence.
-        find_eapply_prop dst.
-        eapply msgs_only_to_live_nodes.
-        chan2msg.
-        eauto.
-      }
-      rewrite Hnomsgs.
-      constructor; eauto.
+      * replace (nodes gst') with (nodes gst) by auto.
+        replace (failed_nodes gst') with (failed_nodes gst) by auto.
+        assert (Hnomsgs: channel gst' src dst = []).
+        {
+          destruct (channel gst' src dst) eqn:?; [reflexivity|exfalso].
+          assert (In p (channel gst' src dst)) by (rewrite Heql; in_crush).
+          assert (~ In dst (nodes gst')) by congruence.
+          find_eapply_prop dst.
+          eapply msgs_only_to_live_nodes.
+          chan2msg.
+          eauto.
+        }
+        rewrite Hnomsgs.
+        constructor; eauto.
+      * admit.
   - repeat handler_def || handler_simpl.
     find_apply_lem_hyp option_map_Some; expand_def.
     destruct (addr_eq_dec src h).
@@ -1869,6 +1877,7 @@ Proof.
            replace (channel gst h dst) with (@nil payload) by congruence.
            apply QMNotStarted; eauto.
            right; intros; in_crush; congruence.
+        -- admit.
     + change (send h ?m :: ?l)
         with (map (send h) [m] ++ l) in *.
       assert (forall m,
@@ -1948,15 +1957,27 @@ Proof.
         left; intro; subst; tauto.
       * inv_option_map.
         inv_prop query_message_ok'; try congruence || tauto.
-        inv_option_map.
-        erewrite channel_msgs_unchanged with (dst := src); eauto.
-        repeat find_reverse_rewrite.
-        replace (sigma gst' dst) with (@None data).
-        eapply QMNotStarted; congruence || eauto.
-        repeat find_rewrite.
-        rewrite_update.
-        symmetry; auto.
-Qed.
+        -- inv_option_map.
+           erewrite channel_msgs_unchanged with (dst := src); eauto.
+           repeat find_reverse_rewrite.
+           replace (sigma gst' dst) with (@None data).
+           eapply QMNotStarted; congruence || eauto.
+           repeat find_rewrite.
+           rewrite_update.
+           symmetry; auto.
+        -- admit.
+Admitted.
+
+Theorem query_message_ok'_tick_invariant :
+ chord_tick_invariant
+   (fun g : global_state =>
+    forall src dst st__src,
+    sigma g src = Some st__src ->
+    query_message_ok' src dst (cur_request st__src)
+      (option_map delayed_queries (sigma g dst)) (nodes g) (failed_nodes g) (channel g src dst)
+      (channel g dst src)).
+Proof.
+Admitted.
 
 Theorem dq_res_qmo :
   forall gst gst' src dst req res st__src st__dst st__dst' st__src' l ms,
@@ -2600,6 +2621,7 @@ Proof.
          replace (channel gst src dst0) with (@nil payload).
          replace (channel gst dst0 src) with (@nil payload).
          eapply QMNotStarted; eauto.
+      -- admit.
     * erewrite !(channel_msgs_unchanged _ gst' gst) by eauto.
       replace (Some d) with (sigma gst dst0) by auto.
       eauto.
@@ -2630,31 +2652,33 @@ Proof.
           (failed_nodes gst) (channel gst src dst0) (channel gst dst0 src))
         by auto.
       inv_prop query_message_ok'; inv_option_map.
-      erewrite channel_msgs_unchanged with (src := dst0) by eauto.
-      erewrite channel_msgs_unchanged with (src := src); eauto.
-      repeat find_reverse_rewrite.
-      eapply QMNotStarted; eauto.
-      right.
-      intros.
-      find_injection.
-      intro; subst.
-      find_eapply_prop nodes.
-      replace (nodes gst) with (nodes gst').
-      eapply msgs_only_to_live_nodes.
-      repeat find_rewrite.
-      apply in_or_app; left.
-      apply in_map_iff.
-      eexists; split; eauto.
+      -- erewrite channel_msgs_unchanged with (src := dst0) by eauto.
+         erewrite channel_msgs_unchanged with (src := src); eauto.
+         repeat find_reverse_rewrite.
+         eapply QMNotStarted; eauto.
+         right.
+         intros.
+         find_injection.
+         intro; subst.
+         find_eapply_prop nodes.
+         replace (nodes gst) with (nodes gst').
+         eapply msgs_only_to_live_nodes.
+         repeat find_rewrite.
+         apply in_or_app; left.
+         apply in_map_iff.
+         eexists; split; eauto.
+      -- admit.
     + assert (query_message_ok' src dst0 (cur_request st__src)
           (option_map delayed_queries (sigma gst dst0)) (nodes gst) 
           (failed_nodes gst) (channel gst src dst0) (channel gst dst0 src))
         by auto.
       inv_prop query_message_ok'; inv_option_map.
-      erewrite channel_msgs_unchanged with (src := dst0) by eauto.
-      erewrite channel_msgs_unchanged with (src := src); eauto.
-      repeat find_reverse_rewrite.
-      eapply QMNotStarted; eauto.
-Qed.
+      * erewrite channel_msgs_unchanged with (src := dst0) by eauto.
+        erewrite channel_msgs_unchanged with (src := src); eauto.
+        repeat find_reverse_rewrite.
+        eapply QMNotStarted; eauto.
+      * admit.
+Admitted.
 
 Theorem query_message_ok'_start_invariant :
  chord_start_invariant
@@ -2739,15 +2763,20 @@ Proof.
   intros gst Hreachable; pattern gst; revert Hreachable; revert gst.
   eapply chord_net_invariant.
   - autounfold; intros.
-    assert (exists stsrc, sigma gst dst = Some stsrc) by admit.
-    break_exists; find_rewrite.
-    apply QMLive; auto.
-    eapply only_nodes_have_state;
-      solve [eauto | constructor; eauto].
-    repeat rewrite initial_st_channels_empty by auto.
-    erewrite initial_st_cur_request_None by eauto.
-    erewrite initial_st_delayed_queries_empty by eauto.
-    eapply CInone; unfold no_requests, no_responses; eauto.
+    destruct (sigma gst dst) eqn:?.
+    + apply QMLive; auto.
+      eapply only_nodes_have_state;
+        solve [eauto | constructor; eauto].
+      repeat rewrite initial_st_channels_empty by auto.
+      erewrite initial_st_cur_request_None by eauto.
+      erewrite initial_st_delayed_queries_empty by eauto.
+      eapply CInone; unfold no_requests, no_responses; eauto.
+    + rewrite !initial_st_channels_empty by auto.
+      eapply QMNotStarted; eauto.
+      intro.
+      find_apply_lem_hyp nodes_have_state;
+        solve [expand_def; congruence
+              |constructor; auto].
   - eapply query_message_ok'_start_invariant.
   - repeat (autounfold; intros).
     repeat find_rewrite.
@@ -2765,16 +2794,17 @@ Proof.
     }
     destruct (addr_eq_dec dst h).
     + inv_prop query_message_ok'; try tauto.
-      inv_prop query_message_ok;
-        solve [eapply QMFailedNothing; simpl; eauto
-              |eapply QMFailedRes; simpl;
-               try erewrite msgs_eq_channels_eq; eauto].
+      * inv_prop query_message_ok;
+          solve [eapply QMFailedNothing; simpl; eauto
+                |eapply QMFailedRes; simpl;
+                 try erewrite msgs_eq_channels_eq; eauto].
+      * exfalso.
+        eapply nodes_not_clients; eauto.
     + repeat erewrite (msgs_eq_channels_eq gst' gst) by eauto.
       inv_prop query_message_ok';
         solve [constructor; simpl; intuition
               |econstructor; eauto with datatypes].
-  - repeat (autounfold; intros).
-    admit.
+  - eapply query_message_ok'_tick_invariant.
   - eapply query_message_ok'_keepalive_invariant.
   - eapply query_message_ok'_rectify_invariant.
   - eapply query_message_ok'_request_invariant.
@@ -2785,7 +2815,59 @@ Proof.
       eapply only_nodes_have_state; eauto.
       solve [econstructor; eauto].
     }
-    admit.
+    assert (h <> src).
+    {
+      intro; eapply nodes_not_clients; subst; eauto.
+    }
+    destruct m as [? [? ?]]; simpl in *.
+    assert (msgs gst' = map (send h) [(to, i)] ++ msgs gst).
+    {
+      subst; simpl; congruence.
+    }
+    destruct (addr_eq_dec h dst).
+    + subst h.
+      subst; simpl in *.
+      specialize (H5 src dst st__src).
+      concludes.
+      assert (~ In dst (nodes gst)).
+      {
+        intro.
+        eapply nodes_not_clients; eauto.
+      }
+      destruct (sigma gst dst) eqn:?.
+      exfalso; find_eapply_prop In; eauto using only_nodes_have_state.
+      unfold send in *; find_injection.
+      destruct (addr_eq_dec src to); subst.
+      * eapply QMClient; eauto.
+        -- erewrite channel_msgs_cons; simpl; eauto.
+           intros.
+           break_or_hyp; eauto.
+           inv_prop query_message_ok'; eauto.
+           repeat find_reverse_rewrite; in_crush.
+        -- erewrite channel_msgs_unchanged;
+             simpl;
+             change ((dst, (to, i)) :: msgs gst)
+               with (map (send dst) [(to, i)] ++ msgs gst); eauto.
+           inv_prop query_message_ok'; eauto || in_crush.
+      * erewrite channel_msgs_unchanged;
+          simpl;
+          change ((dst, (to, i)) :: msgs gst)
+            with (map (send dst) [(to, i)] ++ msgs gst); eauto.
+        erewrite channel_msgs_unchanged with (dst := src); simpl;
+          change (send dst (to, i) :: msgs gst)
+            with (map (send dst) [(to, i)] ++ msgs gst);
+          eauto.
+        right.
+        intros; in_crush; find_injection; eauto.
+    + erewrite channel_msgs_unchanged;
+        simpl;
+        change ((dst, (to, i)) :: msgs gst)
+          with (map (send dst) [(to, i)] ++ msgs gst); eauto.
+      erewrite channel_msgs_unchanged with (dst := src); simpl;
+          change (send dst (to, i) :: msgs gst)
+            with (map (send dst) [(to, i)] ++ msgs gst);
+          eauto.
+      in_crush; find_injection; eauto.
   - repeat autounfold; intros.
     assert (h <> src).
     {
@@ -2796,18 +2878,19 @@ Proof.
     }
     assert (h <> dst).
     {
-      repeat find_rewrite.
+      destruct m as [? [? ?]]; simpl in *.
+      repeat find_rewrite; simpl in *.
       intro; subst.
-      eapply nodes_not_clients; try eassumption.
-      eapply only_nodes_have_state; eauto.
-      admit.
+      eapply nodes_not_clients; [ | | eauto]; eauto.
+      eapply msgs_only_to_live_nodes.
+      find_rewrite; in_crush.
     }
     erewrite (channel_msgs_remove_unchanged gst' gst);
       try solve [repeat find_rewrite; simpl; eauto].
     erewrite (channel_msgs_remove_unchanged gst' gst);
       try solve [repeat find_rewrite; simpl; eauto];
       eauto.
-Admitted.
+Qed.
 Hint Resolve query_message_ok'_invariant.
 
 Theorem at_most_one_request_timeout_invariant :
