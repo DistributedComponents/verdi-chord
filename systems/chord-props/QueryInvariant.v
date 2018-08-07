@@ -1677,6 +1677,20 @@ Proof.
   expand_def; congruence.
 Qed.
 
+Lemma no_responses_nil :
+  no_responses [].
+Proof.
+  unfold no_responses; in_crush.
+Qed.
+Hint Resolve no_responses_nil.
+
+Lemma no_requests_nil :
+  no_requests [].
+Proof.
+  unfold no_requests; in_crush.
+Qed.
+Hint Resolve no_requests_nil.
+
 Theorem query_message_ok'_rectify_invariant :
  chord_rectify_invariant
    (fun g : global_state =>
@@ -1789,11 +1803,72 @@ Proof.
     destruct (addr_eq_dec src h).
     + subst; repeat find_rewrite || find_injection || rewrite_update.
       simpl.
-      update_destruct; subst; rewrite_update.
+      destruct (addr_eq_dec (addr_of x1) dst); subst.
+      * update_destruct; subst; rewrite_update.
+        -- repeat find_rewrite || find_injection || rewrite_update.
+           simpl in *.
+           constructor; eauto.
+           inv_prop query_message_ok'; eauto; try intuition.
+           inv_prop query_message_ok.
+           eapply CIreq; eauto.
+           ++ chan2msg; find_rewrite; in_crush.
+           ++ eapply unique_no_requests.
+              erewrite channel_msgs_cons; eauto.
+              apply unique_cons_add; eauto.
+        -- assert (exists st, sigma gst (addr_of x1) = Some st).
+           {
+             pose proof (pointers_joined gst ltac:(eauto)); eauto.
+             inv_prop all_joined_ptrs.
+             unfold all_preds_state in *.
+             eapply_prop_hyp all_states pred; eauto.
+             unfold pointer_joined in *; intuition.
+           }
+           expand_def; repeat find_rewrite.
+           change (send h (addr_of x1, Ping) :: msgs gst)
+             with (map (send h) [(addr_of x1, Ping)] ++ msgs gst) in *.
+           inv_prop query_message_ok'; eauto.
+           ++ eapply QMLive; eauto.
+              inv_prop query_message_ok.
+              eapply CIreq; auto.
+              ** chan2msg; find_rewrite; in_crush.
+              ** eapply unique_no_requests.
+                 simpl in *.
+                 erewrite channel_msgs_cons; eauto.
+                 apply unique_cons_add; eauto.
+           ++ eapply QMFailedNothing; eauto.
       * inv_prop query_message_ok'; repeat inv_option_map.
-        -- admit.
-        -- admit.
-      * admit.
+        -- update_destruct; rewrite_update.
+           ++ apply QMLive; eauto.
+              inv_prop query_message_ok.
+              apply CIother; eauto.
+              erewrite channel_msgs_unchanged with (h := dst); eauto.
+              instantiate (1:=[(addr_of x1, Ping)]); simpl; eauto.
+              right.
+              intros.
+              in_crush; congruence.
+              intuition.
+              repeat find_rewrite || find_injection.
+              eauto.
+           ++ repeat find_rewrite.
+              apply QMLive; eauto.
+              inv_prop query_message_ok.
+              apply CIother; eauto.
+              erewrite channel_msgs_unchanged with (h := h); eauto.
+              instantiate (1:=[(addr_of x1, Ping)]); simpl; eauto.
+              right.
+              intros.
+              in_crush; congruence.
+        -- repeat find_rewrite || rewrite_update.
+           apply QMFailedNothing; eauto.
+        -- repeat find_rewrite || rewrite_update.
+           change (send h (addr_of x1, Ping) :: msgs gst)
+             with (map (send h) [(addr_of x1, Ping)] ++ msgs gst) in *.
+           erewrite channel_msgs_unchanged with (dst:=h); eauto.
+           erewrite channel_msgs_unchanged with (dst:=dst); eauto.
+           replace (channel gst dst h) with (@nil payload) by congruence.
+           replace (channel gst h dst) with (@nil payload) by congruence.
+           apply QMNotStarted; eauto.
+           right; intros; in_crush; congruence.
     + change (send h ?m :: ?l)
         with (map (send h) [m] ++ l) in *.
       assert (forall m,
@@ -1881,7 +1956,7 @@ Proof.
         repeat find_rewrite.
         rewrite_update.
         symmetry; auto.
-Admitted.
+Qed.
 
 Theorem dq_res_qmo :
   forall gst gst' src dst req res st__src st__dst st__dst' st__src' l ms,
