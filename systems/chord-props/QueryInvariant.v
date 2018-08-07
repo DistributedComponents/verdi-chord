@@ -901,7 +901,7 @@ Inductive query_message_ok'
     forall dst cr active failed outbound inbound,
       client_addr dst ->
       (forall p, In p inbound -> client_payload p) ->
-      (forall p, In p outbound -> (exists r, p = GotBestPredecessor r) \/ exists l, p = GotSuccList l) ->
+      (forall p, In p outbound -> p = Busy \/ (exists r, p = GotBestPredecessor r) \/ exists l, p = GotSuccList l) ->
       query_message_ok' src dst cr None active failed outbound inbound.
 
 Definition unique {A : Type} (P : A -> Prop) (l : list A) (a : A) : Prop :=
@@ -1534,8 +1534,6 @@ Theorem query_message_ok'_keepalive_invariant :
 Proof.
   repeat autounfold; intros.
   repeat handler_def || handler_simpl.
-
-
   assert (Hst: forall h, sigma gst h = sigma gst' h).
   {
     intros.
@@ -1661,8 +1659,22 @@ Proof.
       - erewrite channel_msgs_unchanged; eauto.
     }
     congruence.
-  - admit.
-Admitted.
+  - inv_option_map.
+    assert (dst <> h)
+      by (intro; subst; eapply nodes_not_clients; eauto).
+    erewrite channel_msgs_unchanged with (src := dst); eauto.
+    repeat find_rewrite || rewrite_update.
+    eapply QMClient; eauto.
+    intros.
+    destruct (addr_eq_dec src h); subst.
+    + erewrite channel_app with (dst := dst) (src := h) (gst' := gst') in * |-; eauto.
+      in_crush; eauto.
+      find_apply_lem_hyp In_filterMap; expand_def; eauto.
+      break_match; congruence || find_injection.
+      left; eauto.
+    + erewrite channel_msgs_unchanged in * by eauto.
+      eauto.
+Qed.
 
 Lemma delayed_queries_preserved_by_do_rectify :
   forall h st st' ms nts cts eff,
