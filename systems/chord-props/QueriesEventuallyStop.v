@@ -316,6 +316,7 @@ Proof.
       * inv_option_map.
         repeat find_rewrite.
         admit.
+      * admit.
     + assert (live_node (occ_gst o') h) by invar_eauto.
       apply c; invar_eauto.
       * admit.
