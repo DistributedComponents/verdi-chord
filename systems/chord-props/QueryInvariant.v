@@ -901,7 +901,7 @@ Inductive query_message_ok'
     forall dst cr active failed outbound inbound,
       client_addr dst ->
       (forall p, In p inbound -> client_payload p) ->
-      (forall p, In p outbound -> p = Busy \/ (exists r, p = GotBestPredecessor r) \/ exists l, p = GotSuccList l) ->
+      (forall p, In p outbound -> p = Busy \/ response_payload p) ->
       query_message_ok' src dst cr None active failed outbound inbound.
 
 Definition unique {A : Type} (P : A -> Prop) (l : list A) (a : A) : Prop :=
@@ -1811,7 +1811,7 @@ Proof.
           assert (In p (channel gst' src dst)) by (rewrite Heql; in_crush).
           assert (~ In dst (nodes gst')) by congruence.
           find_eapply_prop dst.
-          eapply msgs_only_to_live_nodes.
+          eapply msgs_only_to_live_nodes; [eapply reachableStep; eauto|].
           chan2msg.
           eauto.
         }
@@ -1825,7 +1825,7 @@ Proof.
           assert (In p (channel gst' src dst)) by (rewrite Heql; in_crush).
           assert (~ In dst (nodes gst')) by congruence.
           find_eapply_prop dst.
-          eapply msgs_only_to_live_nodes.
+          eapply msgs_only_to_live_nodes; [eapply reachableStep; eauto|].
           chan2msg.
           eauto.
         }
@@ -2666,7 +2666,12 @@ Proof.
          replace (channel gst src dst0) with (@nil payload).
          replace (channel gst dst0 src) with (@nil payload).
          eapply QMNotStarted; eauto.
-      -- admit.
+      -- inv_option_map.
+         repeat find_rewrite.
+         simpl.
+         find_reverse_rewrite.
+         erewrite !(channel_msgs_unchanged _ gst' gst); eauto.
+         eapply QMClient; eauto.
     * erewrite !(channel_msgs_unchanged _ gst' gst) by eauto.
       replace (Some d) with (sigma gst dst0) by auto.
       eauto.
@@ -2707,12 +2712,47 @@ Proof.
          intro; subst.
          find_eapply_prop nodes.
          replace (nodes gst) with (nodes gst').
-         eapply msgs_only_to_live_nodes.
+          eapply msgs_only_to_live_nodes; [eapply reachableStep; eauto|].
          repeat find_rewrite.
          apply in_or_app; left.
          apply in_map_iff.
          eexists; split; eauto.
-      -- admit.
+      -- erewrite channel_msgs_unchanged with (src := dst0) by eauto.
+         repeat find_reverse_rewrite.
+         eapply QMClient; eauto.
+         intros.
+         erewrite channel_app in * by eauto.
+         in_crush; eauto.
+         find_apply_lem_hyp In_filterMap.
+         expand_def.
+         break_match; congruence || find_injection.
+         handler_def.
+         in_crush.
+         ++ repeat handler_def || handler_simpl || inv_option_map.
+            ** assert (exists n, In n (succ_list st) /\ client_addr (addr_of n)).
+               {
+                 exists x1.
+                 intuition.
+                 repeat find_rewrite.
+                 find_apply_lem_hyp hd_error_in.
+                 in_crush.
+               }
+               expand_def; exfalso.
+               find_eapply_lem_hyp successors_in_nodes; eauto.
+               eapply nodes_not_clients; eauto.
+            ** assert (exists n, In n (succ_list st) /\ client_addr (addr_of n)).
+               {
+                 exists x11.
+                 intuition.
+                 repeat find_rewrite; in_crush.
+               }
+               expand_def; exfalso.
+               find_eapply_lem_hyp successors_in_nodes; eauto.
+               eapply nodes_not_clients; eauto.
+         ++ right.
+            repeat handler_def || handler_simpl;
+            destruct x; simpl in *;
+            eapply handle_delayed_query_only_sends_responses; eauto.
     + assert (query_message_ok' src dst0 (cur_request st__src)
           (option_map delayed_queries (sigma gst dst0)) (nodes gst) 
           (failed_nodes gst) (channel gst src dst0) (channel gst dst0 src))
@@ -2722,8 +2762,11 @@ Proof.
         erewrite channel_msgs_unchanged with (src := src); eauto.
         repeat find_reverse_rewrite.
         eapply QMNotStarted; eauto.
-      * admit.
-Admitted.
+      * erewrite channel_msgs_unchanged with (src := dst0) by eauto.
+        repeat find_reverse_rewrite.
+        eapply QMClient; eauto.
+        erewrite channel_msgs_unchanged; eauto.
+Qed.
 
 Theorem query_message_ok'_start_invariant :
  chord_start_invariant

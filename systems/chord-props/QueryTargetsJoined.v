@@ -1689,7 +1689,17 @@ Admitted.
 
 Lemma msgs_only_to_live_nodes :
 forall gst src dst p,
-    In (src, (dst, p)) (msgs gst) ->
-    In dst (nodes gst).
+  reachable_st gst ->
+  In (src, (dst, p)) (msgs gst) ->
+  In dst (nodes gst).
+Proof.
+Admitted.
+
+Lemma successors_in_nodes :
+  forall gst h st s,
+    reachable_st gst ->
+    sigma gst h = Some st ->
+    In s (succ_list st) ->
+    In (addr_of s) (nodes gst).
 Proof.
 Admitted.
