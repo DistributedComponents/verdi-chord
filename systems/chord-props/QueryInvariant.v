@@ -2803,6 +2803,39 @@ Proof.
       find_apply_lem_hyp option_map_Some; expand_def;
         inv_prop response_payload.
   }
+  assert (forall src m, ~ In m (channel gst src h)).
+  {
+    intros.
+    intro; chan2msg.
+    find_eapply_lem_hyp msgs_out_of_net_go_to_clients; auto.
+  }
+  assert (forall dst m, ~ In m (channel gst h dst)).
+  {
+    intuition.
+    chan2msg.
+    destruct (client_payload_dec m).
+    - find_eapply_lem_hyp sent_client_message_means_client_or_in_nodes; eauto.
+      tauto.
+    - find_apply_lem_hyp sent_non_client_message_means_in_nodes; eauto.
+  }
+  assert (forall dst, channel gst h dst = []).
+  {
+    intros.
+    destruct (channel gst h dst0) eqn:?; auto.
+    exfalso.
+    eapply H18.
+    erewrite Heql.
+    simpl; auto.
+  }
+  assert (forall src, channel gst src h = []).
+  {
+    intros.
+    destruct (channel gst src0 h) eqn:?; auto.
+    exfalso.
+    eapply H17.
+    erewrite Heql.
+    simpl; auto.
+  }
   rewrite start_handler_with_single_known in *.
   simpl in *; find_injection.
   assert (h <> k) by (intro; subst; tauto).
@@ -2815,14 +2848,6 @@ Proof.
       repeat find_rewrite; in_crush.
       repeat find_rewrite || rewrite_update || find_injection.
       simpl; change k with (addr_of (make_pointer k)).
-      assert (forall src m, ~ In m (channel gst src h)).
-      {
-        admit.
-      }
-      assert (forall dst m, ~ In m (channel gst h dst)).
-      {
-        admit.
-      }
       eapply CIreq; eauto.
       * in_crush.
       * eapply unique_no_requests.
@@ -2831,12 +2856,56 @@ Proof.
         intuition eauto.
       * unfold no_responses; intros.
         intuition eauto.
-      * intros.
+      * intuition.
+        find_eapply_lem_hyp delayed_query_sources_active; eauto.
+    + repeat find_rewrite || find_injection || rewrite_update || simpl || update_destruct.
+      * erewrite channel_app; eauto.
+        replace (channel gst dst dst) with (@nil payload) by auto.
+        autorewrite with list; simpl.
+        destruct (addr_eq_dec k dst); try congruence.
+        eapply QMLive; try solve [in_crush
+                                 |intuition; find_eapply_prop nodes; eauto using in_failed_in_nodes].
+        eapply CIother; eauto.
+      * erewrite channel_msgs_unchanged with (dst:=h); eauto.
+        erewrite channel_app; eauto.
+        replace (channel gst dst h) with (@nil payload) by auto.
+        replace (channel gst h dst) with (@nil payload) by auto.
+        autorewrite with list; simpl.
+        destruct (addr_eq_dec k dst); try congruence.
+        destruct (In_dec addr_eq_dec dst (failed_nodes gst));
+          [|destruct (sigma gst dst) eqn:?].
+        -- find_copy_apply_lem_hyp in_failed_in_nodes; auto.
+           find_copy_apply_lem_hyp nodes_have_state; auto; expand_def.
+           find_rewrite; simpl.
+           eapply QMFailedNothing; in_crush.
+        -- repeat find_rewrite; simpl.
+           eapply QMLive; in_crush; eauto using only_nodes_have_state.
+           eapply CIother; in_crush.
+           find_eapply_lem_hyp delayed_query_sources_active; eauto.
+        -- repeat find_rewrite; simpl.
+           eapply QMNotStarted.
+           in_crush.
+           find_apply_lem_hyp nodes_have_state; expand_def; congruence.
+    + repeat find_rewrite || find_injection || rewrite_update || simpl || update_destruct.
+      erewrite channel_msgs_unchanged with (src := src); eauto.
+      erewrite channel_msgs_unchanged with (src := k); eauto.
+      admit.
+    + repeat find_rewrite || find_injection || rewrite_update || simpl || update_destruct;
+        subst.
+      * erewrite channel_msgs_unchanged with (src := src); eauto.
+        erewrite channel_app with (gst' := gst'); eauto.
+        replace (channel gst dst src) with (@nil payload) by auto.
+        replace (channel gst src dst) with (@nil payload) by auto.
+        autorewrite with list; simpl.
+        destruct (addr_eq_dec k src).
         admit.
-    + admit.
-    + admit.
-    + admit.
-  - admit.
+        admit.
+      * erewrite channel_msgs_unchanged with (src := src); eauto.
+        erewrite channel_msgs_unchanged with (src := dst); eauto.
+        admit.
+  - find_apply_lem_hyp nodes_have_state; eauto; expand_def.
+    repeat find_rewrite || rewrite_update.
+    congruence.
 Admitted.
 
 Theorem query_message_ok'_invariant :

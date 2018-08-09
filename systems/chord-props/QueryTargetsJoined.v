@@ -1703,3 +1703,13 @@ Lemma successors_in_nodes :
     In (addr_of s) (nodes gst).
 Proof.
 Admitted.
+
+Theorem msgs_out_of_net_go_to_clients :
+  forall gst,
+    reachable_st gst ->
+    forall src dst p,
+      In (src, (dst, p)) (msgs gst) ->
+      ~ In dst (nodes gst) ->
+      client_addr dst.
+Proof.
+Admitted.
