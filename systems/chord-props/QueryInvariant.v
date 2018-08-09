@@ -2970,7 +2970,7 @@ Proof.
       repeat find_rewrite; simpl in *.
       intro; subst.
       eapply nodes_not_clients; [ | | eauto]; eauto.
-      eapply msgs_only_to_live_nodes.
+      eapply msgs_only_to_live_nodes; auto.
       find_rewrite; in_crush.
     }
     erewrite (channel_msgs_remove_unchanged gst' gst);

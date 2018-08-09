@@ -1081,6 +1081,7 @@ Proof.
            ++ repeat find_rewrite; eapply_prop no_requests; eauto.
            ++ eapply_prop no_responses; eauto.
            ++ inv_option_map; congruence.
+           ++ inv_option_map; congruence.
         -- destruct m as [? [? ?]]; simpl in *.
            repeat find_rewrite; in_crush.
       * split.
