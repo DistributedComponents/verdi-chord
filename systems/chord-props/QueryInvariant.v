@@ -2807,6 +2807,16 @@ Proof.
     solve [econstructor; eauto; in_crush].
 Qed.
 
+Lemma cur_request_in_nodes :
+  forall gst,
+    reachable_st gst ->
+    forall src dst q m st,
+      sigma gst src = Some st ->
+      cur_request st = Some (dst, q, m) ->
+      In (addr_of dst) (nodes gst).
+Proof.
+Admitted.
+
 Theorem query_message_ok'_start_invariant :
  chord_start_invariant
    (fun g : global_state =>
@@ -2961,7 +2971,11 @@ Proof.
                 - assert (addr_of p <> addr_of p).
                   eapply H30; eauto.
                   congruence.
-                - admit.
+                - inv_option_map.
+                  find_eapply_lem_hyp cur_request_in_nodes; eauto.
+                  find_copy_apply_lem_hyp nodes_have_state; eauto; expand_def.
+                  split; [|now eauto].
+                  inv_prop query_message_ok'; inv_option_map; congruence || eauto.
               }
               eapply CIother;
                 try solve [unfold no_responses, no_requests; intros; in_crush;
@@ -2973,19 +2987,29 @@ Proof.
                                      (nodes gst) (failed_nodes gst)
                                      (channel gst src dst) (channel gst dst src))
             by eauto.
-           replace (sigma gst dst) with (@None data) in *.
+           destruct (sigma gst dst) eqn:?;
+                    try solve [find_eapply_lem_hyp (only_nodes_have_state gst dst); tauto].
            inv_prop query_message_ok'; inv_option_map; try congruence.
-           admit.
-           destruct (sigma gst dst) eqn:?; auto.
-           find_apply_lem_hyp (only_nodes_have_state gst dst); auto.
-           exfalso; eauto.
+           destruct (cur_request st__src) as [[[dstp q] m]|] eqn:?;
+           try assert (query_message_ok' src (addr_of dstp) (cur_request st__src) (option_map delayed_queries (sigma gst (addr_of dstp))) (nodes gst) (failed_nodes gst) (channel gst src (addr_of dstp)) (channel gst (addr_of dstp) src)) by eauto.
+           ++ eapply QMLive; try solve [in_crush].
+              intro.
+              find_eapply_lem_hyp in_failed_in_nodes; tauto.
+              eapply CIother; eauto.
+              intro; subst.
+              find_eapply_lem_hyp cur_request_in_nodes; eauto.
+              find_eapply_prop query_request; eauto.
+           ++ eapply QMLive; try solve [in_crush].
+              intro; find_eapply_lem_hyp in_failed_in_nodes; tauto.
+              eapply CInone; eauto.
       * erewrite channel_msgs_unchanged with (src := src); eauto.
         erewrite channel_msgs_unchanged with (src := dst); eauto.
         eapply query_message_ok'_unrelated_node; eauto.
   - find_apply_lem_hyp nodes_have_state; eauto; expand_def.
     repeat find_rewrite || rewrite_update.
     congruence.
-Admitted.
+Qed.
+
 
 Theorem query_message_ok'_invariant :
   forall gst,
