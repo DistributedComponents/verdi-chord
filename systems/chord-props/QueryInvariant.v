@@ -2641,6 +2641,27 @@ Proof.
       repeat rewrite_update; eauto.
 Qed.
 
+Lemma cur_request_in_nodes :
+  forall gst,
+    reachable_st gst ->
+    forall src dst q m st,
+      sigma gst src = Some st ->
+      cur_request st = Some (dst, q, m) ->
+      In (addr_of dst) (nodes gst).
+Proof.
+Admitted.
+
+Lemma request_timeout_handler_query_request :
+  forall src st dst req st' ms nts cts eff,
+    request_timeout_handler src st dst req = (st', ms, nts, cts, eff) ->
+    forall dstp q m,
+      cur_request st' = Some (dstp, q, m) ->
+      query_request q m \/ cur_request st' = cur_request st.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl || inv_option_map.
+Qed.
+
 Theorem query_message_ok'_request_invariant :
  chord_request_invariant
    (fun g : global_state =>
@@ -2675,23 +2696,12 @@ Proof.
          erewrite !(channel_msgs_unchanged _ gst' gst) by eauto.
          eauto.
          intros.
-         admit.
-      -- inv_option_map.
-         repeat find_rewrite.
-         simpl.
-         find_reverse_rewrite.
-         erewrite !(channel_msgs_unchanged _ gst' gst); eauto.
-         replace (channel gst src dst0) with (@nil payload).
-         replace (channel gst dst0 src) with (@nil payload).
-         eapply QMNotStarted; eauto.
-         intros.
-         admit.
-      -- inv_option_map.
-         repeat find_rewrite.
-         simpl.
-         find_reverse_rewrite.
-         erewrite !(channel_msgs_unchanged _ gst' gst); eauto.
-         eapply QMClient; eauto.
+         find_copy_eapply_lem_hyp request_timeout_handler_query_request; eauto.
+         break_or_hyp; eauto.
+         find_eapply_prop query_request; repeat find_rewrite.
+         symmetry; eauto.
+      -- inv_option_map; congruence.
+      -- inv_option_map; congruence.
     * erewrite !(channel_msgs_unchanged _ gst' gst) by eauto.
       replace (Some d) with (sigma gst dst0) by auto.
       eauto.
@@ -2726,19 +2736,29 @@ Proof.
          erewrite channel_msgs_unchanged with (src := src); eauto.
          repeat find_reverse_rewrite.
          eapply QMNotStarted; eauto.
-         intros.
-         admit.
-         right.
-         intros.
-         find_injection.
-         intro; subst.
-         find_eapply_prop nodes.
-         replace (nodes gst) with (nodes gst').
-          eapply msgs_only_to_live_nodes; [eapply reachableStep; eauto|].
-         repeat find_rewrite.
-         apply in_or_app; left.
-         apply in_map_iff.
-         eexists; split; eauto.
+         intuition.
+         ++ repeat find_rewrite || find_injection; eauto.
+            find_copy_eapply_lem_hyp request_timeout_handler_query_request; eauto.
+            break_or_hyp; eauto.
+            find_eapply_prop query_request; repeat find_rewrite.
+            symmetry; eauto.
+         ++ subst.
+            find_eapply_lem_hyp (cur_request_in_nodes gst'); eauto.
+            repeat find_rewrite || find_injection; eauto.
+            solve [econstructor; eauto].
+            repeat find_rewrite; eauto.
+            rewrite update_same; auto.
+         ++ right.
+            intros.
+            find_injection.
+            intro; subst.
+            find_eapply_prop nodes.
+            replace (nodes gst) with (nodes gst').
+            eapply msgs_only_to_live_nodes; [eapply reachableStep; eauto|].
+            repeat find_rewrite.
+            apply in_or_app; left.
+            apply in_map_iff.
+            eexists; split; eauto.
       -- erewrite channel_msgs_unchanged with (src := dst0) by eauto.
          repeat find_reverse_rewrite.
          eapply QMClient; eauto.
@@ -2788,7 +2808,7 @@ Proof.
         repeat find_reverse_rewrite.
         eapply QMClient; eauto.
         erewrite channel_msgs_unchanged; eauto.
-Admitted.
+Qed.
 
 Lemma query_message_ok'_unrelated_node :
   forall src dst st__src gst,
@@ -2806,16 +2826,6 @@ Proof.
   inv_prop query_message_ok'; inv_option_map;
     solve [econstructor; eauto; in_crush].
 Qed.
-
-Lemma cur_request_in_nodes :
-  forall gst,
-    reachable_st gst ->
-    forall src dst q m st,
-      sigma gst src = Some st ->
-      cur_request st = Some (dst, q, m) ->
-      In (addr_of dst) (nodes gst).
-Proof.
-Admitted.
 
 Theorem query_message_ok'_start_invariant :
  chord_start_invariant
