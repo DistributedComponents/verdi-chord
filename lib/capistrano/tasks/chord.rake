@@ -31,11 +31,46 @@ namespace :chord do
     end
   end
 
+  desc 'start chord ring base'
+  task :start_base do
+    ring = roles(:base).collect { |node| "-ring #{node.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
+    on roles(:base) do |node|
+      execute '/sbin/start-stop-daemon',
+        '--start',
+        '--quiet',
+        '--oknodo',
+        '--make-pidfile',
+        "--pidfile #{chord_pidfile_path}",
+        '--background',
+        "--chdir #{current_path}/extraction/chord",
+        '--startas /bin/bash',
+        "-- -c 'exec ./chord.native -bind #{node.properties.ip}:#{fetch(:chord_node_port)} #{ring} > log/chord.log 2>&1'"
+    end
+  end
+
   desc 'start chord with known'
   task :start_known do
     nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
     on roles(:node) do |node|
       known = nodes[ENV['KNOWN']]
+      execute '/sbin/start-stop-daemon',
+        '--start',
+        '--quiet',
+        '--oknodo',
+        '--make-pidfile',
+        "--pidfile #{chord_pidfile_path}",
+        '--background',
+        "--chdir #{current_path}/extraction/chord",
+        '--startas /bin/bash',
+        "-- -c 'exec ./chord.native -bind #{node.properties.ip}:#{fetch(:chord_node_port)} -known #{known.properties.ip}:#{fetch(:chord_node_port)} > log/chord.log 2>&1'"
+    end
+  end
+
+  desc 'start chord ext'
+  task :start_ext do
+    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+    on roles(:node) do |node|
+      known = nodes[node.properties.known]
       execute '/sbin/start-stop-daemon',
         '--start',
         '--quiet',
@@ -220,6 +255,72 @@ namespace :chord do
 
     # 4. stop ring
     Rake::Task['chord:stop'].execute
+  end
+
+  desc 'experiment 3'
+  task :experiment_3 do
+    # for lookup
+    nodes = Hash[roles(:node).collect { |node| [node.properties.name, node] }]
+    
+    # 0. truncate logs
+    Rake::Task['chord:truncate_log'].execute
+    Rake::Task['chord:truncate_client_log'].execute
+
+    # 1. start up 3 "randomly" chosen nodes        
+    ring = roles(:base).collect { |node| "-ring #{node.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
+    on roles(:base) do |node|
+      execute '/sbin/start-stop-daemon',
+        '--start',
+        '--quiet',
+        '--oknodo',
+        '--make-pidfile',
+        "--pidfile #{chord_pidfile_path}",
+        '--background',
+        "--chdir #{current_path}/extraction/chord",
+        '--startas /bin/bash',
+        "-- -c 'exec ./chord.native -bind #{node.properties.ip}:#{fetch(:chord_node_port)} #{ring} > log/chord.log 2>&1'"
+    end
+
+    # 2. pause to stabilize 3-node ring
+    sleep(20)
+
+    # 3. start 3 new "randomly" chosen nodes
+    on roles(:ext) do |node|
+      known = nodes[node.properties.known]
+      execute '/sbin/start-stop-daemon',
+        '--start',
+        '--quiet',
+        '--oknodo',
+        '--make-pidfile',
+        "--pidfile #{chord_pidfile_path}",
+        '--background',
+        "--chdir #{current_path}/extraction/chord",
+        '--startas /bin/bash',
+        "-- -c 'exec ./chord.native -bind #{node.properties.ip}:#{fetch(:chord_node_port)} -known #{known.properties.ip}:#{fetch(:chord_node_port)} > log/chord.log 2>&1'"
+    end
+
+    # 4. pause to stabilize 6-node ring
+    sleep(20)
+
+    # 5. shut down the 3 new nodes
+    on roles(:ext) do
+      execute '/sbin/start-stop-daemon',
+        '--stop',
+        '--oknodo',
+        "--pidfile #{chord_pidfile_path}"
+    end
+
+    # 6. pause to stabilize 3-node ring
+    sleep(20)
+
+    # 7. stop remaining nodes
+    on roles(:base) do
+      execute '/sbin/start-stop-daemon',
+        '--stop',
+        '--oknodo',
+        "--pidfile #{chord_pidfile_path}"
+    end
+
   end
 
 end

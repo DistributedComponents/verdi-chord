@@ -14,7 +14,7 @@ log
 *.vio
 *.pyc
 .vagrant
-
+.coqdeps.d
 deps/*.dpd
 deps/*.dot
 deps/*.svg
