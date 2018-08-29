@@ -1388,6 +1388,74 @@ Proof.
     + unfold ssrbool.is_left; break_if; try congruence.
 Qed.
 
+Lemma handle_msg_preserves_cur_request_None :
+  forall src dst st p st' ms nts cts,
+    handle_msg src dst st p = (st', ms, nts, cts) ->
+    cur_request st = None ->
+    cur_request st' = None.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl.
+Qed.
+Hint Resolve handle_msg_preserves_cur_request_None.
+
+Lemma do_delayed_queries_preserves_cur_request_None :
+  forall h st st' ms nts cts,
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    cur_request st = None ->
+    cur_request st' = None.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl.
+Qed.
+Hint Resolve do_delayed_queries_preserves_cur_request_None.
+
+Lemma handle_msg_sets_cur_request_when_sending_request :
+  forall src dst st p st' ms nts cts,
+    handle_msg src dst st p = (st', ms, nts, cts) ->
+    forall h m,
+      In (h, m) ms ->
+      request_payload m ->
+      exists dstp q m,
+        cur_request st' = Some (dstp, q, m) /\
+        addr_of dstp = h /\
+        query_request q m.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl; inv_prop request_payload;
+    try solve [repeat eexists; eauto
+              |find_apply_lem_hyp handle_query_req_only_sends_responses; exfalso; eauto].
+Qed.
+
+Lemma responses_from_only_one_node :
+  forall gst,
+    (forall src dst st__src,
+        sigma gst src = Some st__src ->
+        query_message_ok' src dst (cur_request st__src)
+                          (option_map delayed_queries (sigma gst dst)) (nodes gst) (failed_nodes gst)
+                          (channel gst src dst) (channel gst dst src)) ->
+    forall src dst dstp st q m res,
+      sigma gst src = Some st ->
+      cur_request st = Some (dstp, q, m) ->
+      response_payload res ->
+      In res (channel gst dst src) ->
+      dst = addr_of dstp.
+Proof.
+  intros.
+  find_copy_apply_lem_hyp in_split; expand_def.
+  assert (query_message_ok' src dst (cur_request st)
+                            (option_map delayed_queries (sigma gst dst)) (nodes gst) (failed_nodes gst)
+                            (channel gst src dst) (channel gst dst src))
+    by eauto.
+  inv_prop query_message_ok'.
+  - repeat find_rewrite; inv_prop query_message_ok; try congruence.
+    exfalso; find_eapply_prop no_responses; eauto.
+  - congruence.
+  - exfalso; find_eapply_prop no_responses; eauto.
+  - repeat find_reverse_rewrite; in_crush.
+  - assert (client_payload res0) by eauto; inv_prop client_payload; inv_prop response_payload.
+Qed.
+
 Theorem query_message_ok'_recv_invariant :
  chord_recv_handler_invariant
    (fun g : global_state =>
@@ -1417,20 +1485,74 @@ Proof.
     simpl in *.
     
     inv_prop query_message_ok.
-    + admit.
+    + replace (cur_request x) with (@None (pointer * query * payload)) .
+      constructor; auto.
+      admit.
+      admit.
     + admit.
     + admit.
     + admit.
     + admit.
   - match goal with
-    | H: _ |- _ => specialize (H src0 dst st); conclude H assumption
+    | H: _ |- _ => pose proof H as ?; specialize (H src0 dst st); conclude H assumption
     end.
     repeat find_rewrite; simpl in *.
     inv_prop query_message_ok'; try tauto.
     + inv_option_map.
       repeat find_rewrite || find_injection || rewrite_update.
-      admit.
-    + admit.
+      eapply QMLive; eauto.
+      inv_prop query_message_ok.
+      * assert (cur_request st__src = None) by eauto.
+        assert (cur_request x = None) by eauto.
+        replace (cur_request st__src) with (@None (pointer * query * payload)) by congruence.
+        econstructor; auto.
+        -- unfold no_responses in *; intros; chan2msg; unfold send in *.
+           repeat find_rewrite || find_injection || in_crush.
+           find_eapply_prop response_payload; eauto; chan2msg; repeat find_rewrite; in_crush.
+           find_eapply_prop response_payload; eauto; chan2msg; repeat find_rewrite; in_crush.
+        -- intros.
+           unfold no_requests in *; intros; chan2msg; unfold send in *.
+           repeat find_rewrite || find_injection || in_crush;
+             try solve [find_eapply_prop request_payload; eauto;
+                        chan2msg; repeat find_rewrite; in_crush].
+           find_apply_lem_hyp do_delayed_queries_definition; expand_def; eauto.
+           find_eapply_lem_hyp handle_msg_sets_cur_request_when_sending_request; eauto.
+           expand_def; congruence.
+      * admit.
+      * admit.
+      * admit.
+      * admit.
+    + inv_option_map.
+      destruct (payload_eq_dec res0 p); subst.
+      * assert (src = addr_of dstp).
+        eapply responses_from_only_one_node;
+          [eauto | | eauto | | ];
+          solve [try eapply request_response_pair_response; eauto].
+        subst.
+        eapply QMFailedNothing; eauto.
+        -- match goal with
+           | H: In p (channel gst ?dst ?src) |- no_responses (channel gst' ?dst ?src) =>
+             copy_eapply in_split H; expand_def
+           end.
+           replace (channel gst' (addr_of dstp) src0) with (x7 ++ x8); eauto.
+           (* need splitting lemma for this and cases elsewhere *)
+           admit.
+        -- intros.
+           erewrite <- cur_request_preserved_by_do_delayed_queries in * by eauto.
+           assert (query_request q req) by eauto.
+           repeat handler_def || handler_simpl.
+      * replace (cur_request st__src) with (Some (dstp, q, req)).
+        eapply QMFailedRes; eauto.
+        -- match goal with
+           | H: In res0 (channel gst _ _) |- _ =>
+             copy_eapply in_split H; expand_def
+           end.
+           chan2msg; repeat find_rewrite || find_injection || in_crush.
+        -- admit.
+        -- unfold no_requests in *; intros; eauto.
+           admit.
+        -- repeat handler_def || handler_simpl.
+           all:admit. (* want one big lemma for these facts *)
     + admit.
     + admit.
     + admit.
