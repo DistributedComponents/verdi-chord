@@ -1223,6 +1223,43 @@ Proof.
     intuition congruence || auto.
 Qed.
 
+Lemma channel_msgs_remove_send_unchanged :
+  forall gst gst' xs ys m src dst,
+    msgs gst = xs ++ m :: ys ->
+    forall h ms, 
+      msgs gst' = map (send h) ms ++ xs ++ ys ->
+      fst m <> src \/ fst (snd m) <> dst ->
+      h <> src \/ (forall s p, In (s, p) ms -> s <> dst) ->
+      channel gst' src dst = channel gst src dst.
+Proof.
+  intros.
+  unfold channel.
+  repeat find_rewrite.
+  repeat rewrite filterMap_app.
+  match goal with
+  | |- ?xs ++ ?rest = _ =>
+    assert (xs = nil)
+  end.
+  {
+    eapply filterMap_all_None.
+    intros.
+    find_apply_lem_hyp in_map_iff.
+    break_exists_name pk; destruct pk; break_and.
+    unfold send in *; subst.
+    simpl in *.
+    destruct (addr_eq_dec h src), (addr_eq_dec a dst); simpl; auto.
+    subst; break_or_hyp; try congruence.
+    find_apply_hyp_hyp; congruence.
+  }
+  repeat find_rewrite.
+  simpl ([] ++ _).
+  f_equal; auto.
+  simpl.
+  destruct (addr_eq_dec (fst m) src), (addr_eq_dec (fst (snd m)) dst);
+    simpl; auto.
+  intuition congruence.
+Qed.
+
 Lemma uniq_list_eq :
   forall A (A_eq_dec : forall (x y : A), {x = y} + {x <> y}) P l (a b : A),
     In a l ->
@@ -1302,6 +1339,18 @@ Ltac chan2msg :=
            apply in_channel_in_msgs in H
          end.
 
+Ltac inv_option_map :=
+  repeat match goal with
+         | H: option_map _ _ = Some _ |- _ =>
+           apply option_map_Some in H; expand_def
+         | H: option_map _ _ = None |- _ =>
+           apply option_map_None in H
+         | H: Some _ = option_map _ _ |- _ =>
+           symmetry in H
+         | H: None = option_map _ _ |- _ =>
+           symmetry in H
+         end.
+
 Lemma channel_app :
   forall gst gst' src dst ms,
     msgs gst' = map (send src) ms ++ msgs gst ->
@@ -1350,19 +1399,58 @@ Theorem query_message_ok'_recv_invariant :
 Proof.
   repeat autounfold; intros.
   handler_def.
-Admitted.
+  repeat (update_destruct; subst; rewrite_update) || find_rewrite || find_injection.
+  - match goal with
+    | H: _ |- _ => specialize (H dst dst st); conclude H assumption
+    end.
+    repeat find_rewrite; simpl in *.
+    inv_prop query_message_ok'; try tauto.
+    eapply QMLive; eauto;
+      repeat match goal with
+             | H: do_delayed_queries _ _ = _ |- _ =>
+               apply do_delayed_queries_definition in H; expand_def;
+                 simpl in *
+             end.
+    admit.
 
-Ltac inv_option_map :=
-  repeat match goal with
-         | H: option_map _ _ = Some _ |- _ =>
-           apply option_map_Some in H; expand_def
-         | H: option_map _ _ = None |- _ =>
-           apply option_map_None in H
-         | H: Some _ = option_map _ _ |- _ =>
-           symmetry in H
-         | H: None = option_map _ _ |- _ =>
-           symmetry in H
-         end.
+    subst.
+    simpl in *.
+    
+    inv_prop query_message_ok.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+  - match goal with
+    | H: _ |- _ => specialize (H src0 dst st); conclude H assumption
+    end.
+    repeat find_rewrite; simpl in *.
+    inv_prop query_message_ok'; try tauto.
+    + inv_option_map.
+      repeat find_rewrite || find_injection || rewrite_update.
+      admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+  - match goal with
+    | H: _ |- _ => specialize (H src0 dst st__src); conclude H assumption
+    end.
+    repeat find_rewrite; simpl in *.
+    inv_prop query_message_ok'; try tauto.
+    eapply QMLive; eauto.
+    inv_prop query_message_ok.
+    + destruct (addr_eq_dec src0 src); subst.
+      * admit.
+      * admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+  - erewrite !(channel_msgs_remove_send_unchanged gst gst') by eauto.
+    eauto.
+Admitted.
 
 Definition option_bind {A B : Type} (f : A -> option B) (a : option A) : option B :=
   match a with
