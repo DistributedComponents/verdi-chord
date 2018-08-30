@@ -9,6 +9,7 @@ Require Import Chord.Chord.
 Require Import Chord.SystemLemmas.
 Require Import Chord.SystemReachable.
 Require Import Chord.SystemPointers.
+Require Import Chord.QueryTargetsJoined.
 
 Lemma wf_ptr_succ_list_invariant' :
   forall gst h st p,
@@ -17,18 +18,11 @@ Lemma wf_ptr_succ_list_invariant' :
     In p (succ_list st) ->
     wf_ptr p.
 Proof.
-(*
-IGNORE
-
-This invariant says pointers in successor lists are well-formed. It
-should be inductive if we tack on something about the contents of
-GotPredAndSuccs/GotSuccList messages.
-
-DIFFICULTY: 3
-USED: In phase one.
-*)
-Admitted.
-
+  intros.
+  cut (all_ptrs wf_ptr gst); eauto using pointers_wf.
+  intros.
+  inv_prop all_ptrs. eauto.
+Qed.
 
 Lemma wf_ptr_succ_list_invariant :
   forall gst h st p rest,
