@@ -1702,7 +1702,11 @@ Lemma successors_in_nodes :
     In s (succ_list st) ->
     In (addr_of s) (nodes gst).
 Proof.
-Admitted.
+  intros.
+  cut (pointer_joined gst s); [unfold pointer_joined; solve [intuition]|].
+  cut (all_joined_ptrs pointer_joined gst); eauto using pointers_joined. 
+  intros. inv_prop all_joined_ptrs. eauto.
+Qed.
 
 Theorem msgs_out_of_net_go_to_clients :
   forall gst,
