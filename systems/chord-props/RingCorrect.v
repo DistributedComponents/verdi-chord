@@ -120,29 +120,92 @@ Proof.
   break_exists_exists. intuition.
 Qed.
 
+Definition succs_on_msg m :=
+  match m with
+  | GotSuccList succs => Some succs
+  | GotPredAndSuccs p succs => Some succs
+  | _ => None
+  end.
+
+Lemma succs_on_msg_succs_msg :
+  forall m succs,
+    succs_on_msg m = Some succs ->
+    succs_msg m succs.
+Proof.
+  intros. destruct m; simpl in *; solve_by_inversion.
+Qed.
+
+Lemma succs_msg_succs_on_msg :
+  forall m succs,
+    succs_msg m succs ->
+    succs_on_msg m = Some succs.
+Proof.
+  intros. inv_prop succs_msg; simpl; intuition.
+Qed.
+
+Definition no_live_node_skips_dec :
+  forall gst h,
+    {no_live_node_skips gst h} + {~ no_live_node_skips gst h}.
+Proof.
+  intros.
+  destruct (forallb (fun h' => match sigma gst h' with
+                            | Some st => not_skipped_bool (hash h')
+                                                         (map id_of (succ_list st)) (hash h)
+                            | None => true
+                            end) (live_addrs gst)) eqn:?; autounfold; [left|right]; intuition.
+  - find_eapply_lem_hyp forallb_forall; eauto using live_addr_In_live_addrs.
+    repeat find_rewrite. eauto using not_skipped_bool_not_skipped.
+  - find_apply_lem_hyp forallb_exists.
+    break_exists. intuition. find_apply_lem_hyp In_live_addrs_live.
+    break_match; try congruence.
+    eapply_prop_hyp live_node live_node; eauto.
+    find_eapply_lem_hyp not_skipped_not_skipped_bool.
+    unfold ChordIDSpace.hash in *. congruence.
+Qed.
+
+Definition no_msg_to_live_node_skips_dec :
+  forall gst h,
+    {no_msg_to_live_node_skips gst h} + {~ no_msg_to_live_node_skips gst h}.
+Proof.
+  intros.
+  destruct (forallb (fun p =>
+                       let '(src, (dst, m)) := p in
+                       match in_dec addr_eq_dec dst (nodes gst) with
+                       | left _ => 
+                         match in_dec addr_eq_dec dst (failed_nodes gst) with
+                         | left _ => true
+                         | right _ =>
+                           match succs_on_msg m with
+                           | Some succs => not_skipped_bool (hash src) (map id_of succs) (hash h)
+                           | None => true
+                           end
+                         end
+                       | right _ => true
+                       end)
+                    (msgs gst)) eqn:?; autounfold; [left|right]; intuition.
+  - find_eapply_lem_hyp forallb_forall; eauto.
+    simpl in *. repeat (break_match; try congruence).
+    + find_apply_lem_hyp succs_msg_succs_on_msg. repeat find_rewrite. find_inversion.
+      eauto using not_skipped_bool_not_skipped.
+    + find_apply_lem_hyp succs_msg_succs_on_msg. repeat find_rewrite. congruence.
+  - find_apply_lem_hyp forallb_exists.
+    break_exists. intuition.
+    repeat (break_match; try congruence). subst.
+    find_apply_lem_hyp succs_on_msg_succs_msg.
+    eapply_prop_hyp msgs msgs; eauto.
+    find_eapply_lem_hyp not_skipped_not_skipped_bool.
+    unfold ChordIDSpace.hash in *. congruence.
+Qed.
+    
 Definition principal_dec :
   forall gst h,
     {principal gst h} + {~ principal gst h}.
 Proof.
-  intros.
-  destruct (live_node_dec gst h).
-  - destruct (forallb (fun h' => match sigma gst h' with
-                              | Some st => not_skipped_bool (hash h')
-                                                           (map id_of (succ_list st)) (hash h)
-                              | None => true
-                              end) (live_addrs gst)) eqn:?.
-    + left. unfold principal; autounfold. intuition.
-      find_eapply_lem_hyp forallb_forall; eauto using live_addr_In_live_addrs.
-      repeat find_rewrite. eauto using not_skipped_bool_not_skipped.
-      admit.
-    + right. intro. find_apply_lem_hyp forallb_exists.
-      break_exists. intuition. find_apply_lem_hyp In_live_addrs_live.
-      break_match; try congruence.
-      unfold principal in *; autounfold in *.
-      intuition.
-      admit.
-  - right. intuition. unfold principal in *; autounfold in *. intuition.
-Admitted.
+  intros. unfold principal.
+  destruct (live_node_dec gst h); intuition.
+  destruct (no_live_node_skips_dec gst h); intuition.
+  destruct (no_msg_to_live_node_skips_dec gst h); intuition.
+Qed.
 
 Definition compute_principals (gst : global_state) : list addr :=
   dedup
