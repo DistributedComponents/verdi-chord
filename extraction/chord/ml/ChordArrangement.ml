@@ -1,11 +1,118 @@
 open ExtractedChord
 open Printf
 open Str
+module VRUtil = Util
+open Yojson.Basic
 
 let chord_default_port = 7000
 
+let type_of_msg = function
+  | ChordSystem.GetBestPredecessor _ -> "GetBestPredecessor"
+  | ChordSystem.GotBestPredecessor _ -> "GotBestPredecessor"
+  | ChordSystem.GetSuccList -> "GetSuccList"
+  | ChordSystem.GotSuccList _ -> "GotSuccList"
+  | ChordSystem.GetPredAndSuccs -> "GetPredAndSuccs"
+  | ChordSystem.GotPredAndSuccs _ -> "GotPredAndSuccs"
+  | ChordSystem.Notify -> "Notify"
+  | ChordSystem.Ping -> "Ping"
+  | ChordSystem.Pong -> "Pong"
+  | ChordSystem.Busy -> "Busy"
+
+let json_of_addr a =
+  `String (VRUtil.string_of_char_list a)
+
+let json_of_id i =
+  `String (Digest.to_hex (VRUtil.string_of_char_list (id_to_ascii i)))
+
+let json_of_pointer p =
+  json_of_id p.ChordIDSpace.ptrId
+
+let json_of_opt_pointer po =
+  VRUtil.map_default json_of_pointer `Null po
+
+let json_of_msg = function
+  | ChordSystem.GetBestPredecessor p ->
+     `Assoc [("pointer", json_of_pointer p)]
+  | ChordSystem.GotBestPredecessor p ->
+     `Assoc [("pointer", json_of_pointer p)]
+  | ChordSystem.GetSuccList ->
+     `Null
+  | ChordSystem.GotSuccList ps ->
+     `Assoc [("pointers", `List (List.map json_of_pointer ps))]
+  | ChordSystem.GetPredAndSuccs ->
+     `Null
+  | ChordSystem.GotPredAndSuccs (pred, succs) ->
+     `Assoc [ ("pred", json_of_opt_pointer pred)
+            ; ("succs", `List (List.map json_of_pointer succs))]
+  | ChordSystem.Notify ->
+     `Null
+  | ChordSystem.Ping ->
+     `Null
+  | ChordSystem.Pong ->
+     `Null
+  | ChordSystem.Busy ->
+     `Null
+
+let json_of_query = function
+  | ChordSystem.Rectify p ->
+     `Assoc [("type", `String "Rectify")
+            ; ("pointer", json_of_pointer p)]
+  | ChordSystem.Stabilize ->
+     `Assoc [("type", `String "Stabilize")]
+  | ChordSystem.Stabilize2 p ->
+     `Assoc [("type", `String "Stabilize2")
+            ; ("pointer", json_of_pointer p)]
+  | ChordSystem.Join p ->
+     `Assoc [("type", `String "Join")
+            ; ("pointer", json_of_pointer p)]
+  | ChordSystem.Join2 p ->
+     `Assoc [("type", `String "Join2")
+            ; ("pointer", json_of_pointer p)]
+
+let json_of_st_ptr st =
+  json_of_pointer st.ChordSystem.ptr
+
+let json_of_request ((ptr, q), _) =
+  `Assoc [("pointer", json_of_pointer ptr)
+         ; ("query", json_of_query q)]
+
+let json_of_st_cur_request st =
+  VRUtil.map_default json_of_request `Null st.ChordSystem.cur_request
+
+let json_of_st st =
+  `Assoc [ ("succ_list", `List (List.map json_of_pointer st.ChordSystem.succ_list))
+         ; ("pred", json_of_opt_pointer st.ChordSystem.pred)
+         ; ("known", json_of_pointer st.ChordSystem.known)
+         ; ("joined", `Bool st.ChordSystem.joined)
+         ; ("rectify_with", json_of_opt_pointer st.ChordSystem.rectify_with)
+         ; ("cur_request", json_of_st_cur_request st)]
+
+let json_of_recv st src msg =
+  `Assoc [ ("from", json_of_addr src)
+         ; ("to", json_of_st_ptr st)
+         ; ("type", `String (type_of_msg msg))
+         ; ("body", json_of_msg msg)]
+
+let json_of_send st dst msg =
+  `Assoc [ ("from", json_of_st_ptr st)
+         ; ("to", json_of_addr dst)
+         ; ("type", `String (type_of_msg msg))
+         ; ("body", json_of_msg msg)]
+
+let json_of_timeout = function
+  | ChordSystem.Tick ->
+     `Assoc [("type", `String "Tick")]
+  | ChordSystem.RectifyTick ->
+     `Assoc [("type", `String "RectifyTick")]
+  | ChordSystem.KeepaliveTick ->
+     `Assoc [("type", `String "KeepaliveTick")]
+  | ChordSystem.Request (dead, msg) ->
+     `Assoc [ ("type", `String "Request")
+            ; ("dead", json_of_addr dead)
+            ; ("msg", json_of_msg msg)]
+
 let show_id i =
-  Digest.to_hex (Util.string_of_char_list (id_to_ascii i))
+  Digest.to_hex (VRUtil.string_of_char_list (id_to_ascii i))
 
 let show_pointer p =
   show_id p.ChordIDSpace.ptrId
@@ -15,13 +122,13 @@ let show_pointer_list ps =
   "[" ^ String.concat ", " strs ^ "]"
 
 let show_addr a =
-  Util.string_of_char_list a
+  VRUtil.string_of_char_list a
 
 let caps_bool b =
   if b then "True" else "False"
 
 let show_opt_pointer p =
-  Util.map_default show_pointer "None" p
+  VRUtil.map_default show_pointer "None" p
 
 let show_msg = function
   | ChordSystem.GetBestPredecessor p -> "GetBestPredecessor " ^ show_pointer p
@@ -49,15 +156,15 @@ let show_request ((ptr, q), _) =
   Printf.sprintf "query(%s, %s)" (show_pointer ptr) (show_query q)
 
 let show_st_cur_request st =
-  Util.map_default show_request "None" st.ChordSystem.cur_request
+  VRUtil.map_default show_request "None" st.ChordSystem.cur_request
 
 let log_info_from st msg =
   let prefix = Printf.sprintf "node(%s):" (show_st_ptr st) in
-  Util.info (prefix ^ msg)
+  VRUtil.info (prefix ^ msg)
 
 let log_dbg_from st msg =
   let prefix = Printf.sprintf "node(%s):" (show_st_ptr st) in
-  Util.debug (prefix ^ msg)
+  VRUtil.debug (prefix ^ msg)
 
 let log_st st =
   let log = log_info_from st in
@@ -103,8 +210,8 @@ module ChordArrangement (C : ChordConfig) = struct
   type timeout = ChordSystem._timeout
   type res = state * (name * msg) list * (timeout list) * (timeout list)
   let port = chord_default_port
-  let addr_of_name = Util.string_of_char_list
-  let name_of_addr = Util.char_list_of_string
+  let addr_of_name = VRUtil.string_of_char_list
+  let name_of_addr = VRUtil.char_list_of_string
   let start_handler n ks =
     Random.self_init ();
     rebracket3 (init n ks)
@@ -131,12 +238,18 @@ module ChordArrangement (C : ChordConfig) = struct
   let default_timeout = 1.0
   let debug = C.debug
   let debug_recv st (src, msg) =
-    log_st st;
-    log_recv st src msg;
+    let js =
+      `Assoc [ ("update-state", `Assoc [(show_st_ptr st, json_of_st st)])
+             ; ("deliver-message", json_of_recv st src msg)]
+    in
+    Printf.printf "[%s] %s" (VRUtil.timestamp ()) (to_string js);
     flush_all ()
   let debug_send st (dst, msg) =
-    log_st st;
-    log_send st dst msg;
+    let js =
+      `Assoc [ ("update-state", `Assoc [(show_st_ptr st, json_of_st st)])
+             ; ("deliver-message", json_of_send st dst msg)]
+    in
+    Printf.printf "[%s] %s" (VRUtil.timestamp ()) (to_string js);
     flush_all ()
   let debug_timeout st t =
     log_timeout st t;

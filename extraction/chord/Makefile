@@ -1,4 +1,4 @@
-OCAMLBUILD = ocamlbuild -package verdi-runtime -I ml -I coq -cflag -g
+OCAMLBUILD = ocamlbuild -package verdi-runtime -package yojson -I ml -I coq -cflag -g
 
 CHORDMLFILES = coq/ExtractedChord.ml coq/ExtractedChord.mli
 
