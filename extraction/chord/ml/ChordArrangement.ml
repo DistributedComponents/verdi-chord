@@ -23,7 +23,10 @@ let json_of_addr a =
   `String (VRUtil.string_of_char_list a)
 *)
 let json_of_addr a =
-  `String (Digest.to_hex (VRUtil.string_of_char_list a))
+  let s = VRUtil.string_of_char_list a in
+  let d = Digest.string s in
+  let ds = Digest.to_hex d in
+  `String ds
 
 let json_of_id i =
   `String (Digest.to_hex (VRUtil.string_of_char_list (id_to_ascii i)))
