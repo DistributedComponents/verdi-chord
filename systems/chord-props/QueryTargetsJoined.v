@@ -1687,9 +1687,10 @@ Lemma delayed_query_sources_active :
 Proof.
 Admitted.
 
-Lemma msgs_only_to_live_nodes :
+Lemma non_client_msgs_only_to_live_nodes :
 forall gst src dst p,
   reachable_st gst ->
+  ~ client_addr src ->
   In (src, (dst, p)) (msgs gst) ->
   In dst (nodes gst).
 Proof.
@@ -1708,10 +1709,11 @@ Proof.
   intros. inv_prop all_joined_ptrs. eauto.
 Qed.
 
-Theorem msgs_out_of_net_go_to_clients :
+Theorem non_client_msgs_out_of_net_go_to_clients :
   forall gst,
     reachable_st gst ->
     forall src dst p,
+      ~ client_addr src ->
       In (src, (dst, p)) (msgs gst) ->
       ~ In dst (nodes gst) ->
       client_addr dst.
