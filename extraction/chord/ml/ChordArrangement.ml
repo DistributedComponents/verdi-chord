@@ -258,9 +258,9 @@ module ChordArrangement (C : ChordConfig) = struct
     in
     Printf.printf "%s ; %s\n" (string_of_float (Unix.gettimeofday ())) (to_string js);
     flush_all ()
-  let debug_timeout st t =
-    log_timeout st t;
-    flush_all ()
+  let debug_timeout st t = ()
+    (* log_timeout st t;
+       flush_all () *)
 end
 
 type chord_config =
