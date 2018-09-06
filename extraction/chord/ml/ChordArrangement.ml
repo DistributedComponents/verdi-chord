@@ -18,8 +18,12 @@ let type_of_msg = function
   | ChordSystem.Pong -> "Pong"
   | ChordSystem.Busy -> "Busy"
 
+(*
 let json_of_addr a =
   `String (VRUtil.string_of_char_list a)
+*)
+let json_of_addr a =
+  `String (Digest.to_hex (VRUtil.string_of_char_list a))
 
 let json_of_id i =
   `String (Digest.to_hex (VRUtil.string_of_char_list (id_to_ascii i)))
@@ -242,14 +246,14 @@ module ChordArrangement (C : ChordConfig) = struct
       `Assoc [ ("update-state", `Assoc [(show_st_ptr st, json_of_st st)])
              ; ("deliver-message", json_of_recv st src msg)]
     in
-    Printf.printf "[%s] %s" (VRUtil.timestamp ()) (to_string js);
+    Printf.printf "%s ; %s\n" (string_of_float (Unix.gettimeofday ())) (to_string js);
     flush_all ()
   let debug_send st (dst, msg) =
     let js =
       `Assoc [ ("update-state", `Assoc [(show_st_ptr st, json_of_st st)])
-             ; ("deliver-message", json_of_send st dst msg)]
+             ; ("send-messages", `List [json_of_send st dst msg]) ]
     in
-    Printf.printf "[%s] %s" (VRUtil.timestamp ()) (to_string js);
+    Printf.printf "%s ; %s\n" (string_of_float (Unix.gettimeofday ())) (to_string js);
     flush_all ()
   let debug_timeout st t =
     log_timeout st t;
