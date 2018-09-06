@@ -2268,12 +2268,11 @@ Proof.
         erewrite channel_app with (gst := gst) (gst' := gst'); eauto.
         rewrite filterMap_all_None; auto.
         intros.
+        break_match; try auto; subst.
         find_apply_lem_hyp send_keepalives_delayed_only; expand_def.
-        destruct x0.
-        find_eapply_lem_hyp delayed_query_sources_active; eauto.
-        simpl in *.
-        break_match; subst; auto.
-        exfalso; eauto.
+        destruct x0, x; simpl in *; subst.
+        find_copy_eapply_lem_hyp delayed_query_sources_active_or_clients; eauto.
+        tauto.
       - erewrite channel_msgs_unchanged; eauto.
     }
     congruence.
@@ -2438,19 +2437,10 @@ Proof.
         constructor; eauto.
       * replace (nodes gst') with (nodes gst) by auto.
         replace (failed_nodes gst') with (failed_nodes gst) by auto.
-        assert (Hnomsgs: channel gst' src dst = []).
-        {
-          assert (~ client_addr src) by eauto.
-          destruct (channel gst' src dst) eqn:?; [reflexivity|exfalso].
-          assert (In p (channel gst' src dst)) by (rewrite Heql; in_crush).
-          assert (~ In dst (nodes gst')) by congruence.
-          find_eapply_prop dst.
-          eapply non_client_msgs_only_to_live_nodes;
-            solve [econstructor; eauto | eauto].
-        }
-        rewrite Hnomsgs.
         constructor; eauto.
-        intros; in_crush.
+        replace (channel gst' src dst) with (channel gst src dst) in *
+          by (unfold channel; congruence).
+        eauto.
   - repeat handler_def || handler_simpl.
     find_apply_lem_hyp option_map_Some; expand_def.
     destruct (addr_eq_dec src h).
@@ -3481,7 +3471,7 @@ Proof.
         assert (~ client_addr k) by eauto.
         intuition eauto.
       * intuition.
-        find_eapply_lem_hyp delayed_query_sources_active; eauto.
+        find_eapply_lem_hyp delayed_query_sources_active_or_clients; intuition eauto.
     + repeat find_rewrite || find_injection || rewrite_update || simpl || update_destruct.
       * erewrite channel_app; eauto.
         replace (channel gst dst dst) with (@nil payload) by auto.
@@ -3509,7 +3499,7 @@ Proof.
            replace (channel gst dst h) with (@nil payload) by (symmetry; eauto).
            eapply QMLive; in_crush; eauto using only_nodes_have_state.
            eapply CIother; in_crush.
-           find_eapply_lem_hyp delayed_query_sources_active; eauto.
+           find_eapply_lem_hyp delayed_query_sources_active_or_clients; intuition eauto.
         -- repeat find_rewrite; simpl.
            destruct (client_addr_dec dst).
            ++ eapply QMClient; eauto; in_crush.

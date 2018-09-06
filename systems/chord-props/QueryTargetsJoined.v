@@ -1677,13 +1677,13 @@ Proof.
   intuition.
 Qed.
 
-Lemma delayed_query_sources_active :
+Lemma delayed_query_sources_active_or_clients :
   forall gst h st,
     reachable_st gst ->
     sigma gst h = Some st ->
     forall src m,
       In (src, m) (delayed_queries st) ->
-      In src (nodes gst).
+      In src (nodes gst) \/ client_addr src.
 Proof.
 Admitted.
 
@@ -1691,6 +1691,7 @@ Lemma non_client_msgs_only_to_live_nodes :
 forall gst src dst p,
   reachable_st gst ->
   ~ client_addr src ->
+  ~ client_addr dst ->
   In (src, (dst, p)) (msgs gst) ->
   In dst (nodes gst).
 Proof.
