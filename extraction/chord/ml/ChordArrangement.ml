@@ -246,14 +246,14 @@ module ChordArrangement (C : ChordConfig) = struct
   let debug = C.debug
   let debug_recv st (src, msg) =
     let js =
-      `Assoc [ ("update-state", `Assoc [(show_st_ptr st, json_of_st st)])
+      `Assoc [ ("states", `Assoc [(show_st_ptr st, json_of_st st)])
              ; ("deliver-message", json_of_recv st src msg)]
     in
     Printf.printf "%s ; %s\n" (string_of_float (Unix.gettimeofday ())) (to_string js);
     flush_all ()
   let debug_send st (dst, msg) =
     let js =
-      `Assoc [ ("update-state", `Assoc [(show_st_ptr st, json_of_st st)])
+      `Assoc [ ("states", `Assoc [(show_st_ptr st, json_of_st st)])
              ; ("send-messages", `List [json_of_send st dst msg]) ]
     in
     Printf.printf "%s ; %s\n" (string_of_float (Unix.gettimeofday ())) (to_string js);
