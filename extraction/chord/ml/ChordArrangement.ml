@@ -18,10 +18,12 @@ let type_of_msg = function
   | ChordSystem.Pong -> "Pong"
   | ChordSystem.Busy -> "Busy"
 
-(*
-let json_of_addr a =
-  `String (VRUtil.string_of_char_list a)
-*)
+let type_of_timeout = function
+| ChordSystem.Tick -> "Tick"
+| ChordSystem.RectifyTick -> "RectifyTick"
+| ChordSystem.KeepaliveTick -> "KeepaliveTick"
+| ChordSystem.Request (_,_) -> "Request"
+
 let json_of_addr a =
   let s = VRUtil.string_of_char_list a in
   let d = Digest.string s in
@@ -108,15 +110,14 @@ let json_of_send st dst msg =
 
 let json_of_timeout = function
   | ChordSystem.Tick ->
-     `Assoc [("type", `String "Tick")]
+     `Null
   | ChordSystem.RectifyTick ->
-     `Assoc [("type", `String "RectifyTick")]
+     `Null
   | ChordSystem.KeepaliveTick ->
-     `Assoc [("type", `String "KeepaliveTick")]
+     `Null
   | ChordSystem.Request (dead, msg) ->
-     `Assoc [ ("type", `String "Request")
-            ; ("dead", json_of_addr dead)
-            ; ("msg", json_of_msg msg)]
+     `Assoc [ ("dead", json_of_addr dead)
+            ; ("msg", json_of_msg msg) ]
 
 let show_id i =
   Digest.to_hex (VRUtil.string_of_char_list (id_to_ascii i))
@@ -258,9 +259,13 @@ module ChordArrangement (C : ChordConfig) = struct
     in
     Printf.printf "%s ; %s\n" (string_of_float (Unix.gettimeofday ())) (to_string js);
     flush_all ()
-  let debug_timeout st t = ()
-    (* log_timeout st t;
-       flush_all () *)
+  let debug_timeout st t =
+    let js =
+      `Assoc [ ("states", `Assoc [(show_st_ptr st, json_of_st st)])
+             ; ("set-timeouts", json_of_timeout t) ]
+    in
+    Printf.printf "%s ; %s\n" (string_of_float (Unix.gettimeofday ())) (to_string js);
+    flush_all ()
 end
 
 type chord_config =
