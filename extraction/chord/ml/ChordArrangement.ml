@@ -26,12 +26,17 @@ let type_of_timeout = function
 
 let json_of_addr a =
   let s = VRUtil.string_of_char_list a in
-  let d = Digest.string s in
-  let ds = Digest.to_hex d in
-  `String ds
+  let s = Digest.string s in
+  let s = Digest.to_hex s in
+  let s = String.sub s 0 8 in
+  `String s
 
 let json_of_id i =
-  `String (Digest.to_hex (VRUtil.string_of_char_list (id_to_ascii i)))
+  let s = id_to_ascii i in
+  let s = VRUtil.string_of_char_list s in
+  let s = Digest.to_hex s in
+  let s = String.sub s 0 8 in
+  `String s
 
 let json_of_pointer p =
   json_of_id p.ChordIDSpace.ptrId
