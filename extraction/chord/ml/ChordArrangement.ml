@@ -125,7 +125,11 @@ let json_of_timeout = function
             ; ("msg", json_of_msg msg) ]
 
 let show_id i =
-  Digest.to_hex (VRUtil.string_of_char_list (id_to_ascii i))
+  let s = id_to_ascii i in
+  let s = VRUtil.string_of_char_list s in
+  let s = Digest.to_hex s in
+  let s = String.sub s 0 8 in
+  s
 
 let show_pointer p =
   show_id p.ChordIDSpace.ptrId
