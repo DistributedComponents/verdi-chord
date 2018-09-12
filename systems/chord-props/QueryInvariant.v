@@ -37,6 +37,14 @@ Proof.
 Qed.
 Hint Resolve request_response_pair_request.
 
+Lemma handle_query_timeout_dqs :
+  forall h st dst q st' ms nts cts,
+    handle_query_timeout h st dst q = (st', ms, nts, cts) ->
+    delayed_queries st' = delayed_queries st.
+Proof.
+  intros; repeat handler_def; reflexivity.
+Qed.
+
 Definition at_most_one_request_timeout' (ts : list timeout) :=
   forall xs ys dst p,
     ts = xs ++ Request dst p :: ys ->
@@ -1343,6 +1351,90 @@ Ltac channel_crush :=
          | |- _ => tauto
          end.
 
+Theorem channel_msgs_app_in :
+  forall gst' gst h src dst m ms,
+    msgs gst' = (map (send h) ms) ++ msgs gst ->
+    In m (channel gst' src dst) ->
+    In m (channel gst src dst) \/
+    h = src /\
+    In (dst, m) ms.
+Proof.
+  unfold channel.
+  intros; find_rewrite.
+  rewrite filterMap_app in *.
+  find_apply_lem_hyp in_app_or; break_or_hyp;
+    solve [channel_crush | tauto].
+Qed.
+
+Lemma handle_delayed_query_dst_in_dqs :
+  forall h st l dst p,
+    In (dst, p) (concat (map (handle_delayed_query h st) l)) ->
+    exists r,
+      request_response_pair r p /\
+      In (dst, r) l.
+Proof.
+  intros.
+  find_apply_lem_hyp in_concat; expand_def; in_crush.
+  unfold handle_delayed_query, handle_query_req in *.
+  repeat break_match; repeat handler_simpl;
+    try solve [intuition eauto
+              |eexists; split; eauto; constructor].
+Qed.
+
+Lemma handle_query_res_sends_no_responses :
+  forall src dst st q p st' ms nts cts h m,
+    handle_query_res src dst st q p = (st', ms, nts, cts) ->
+    In (h, m) ms ->
+    ~ response_payload m.
+Proof.
+  intuition.
+  repeat handler_def || handler_simpl;
+    inv_prop response_payload.
+Qed.
+
+Lemma handle_msg_dqs_change_queue_for_reqs :
+  forall src dst st p st' ms nts cts,
+    handle_msg src dst st p = (st', ms, nts, cts) ->
+    delayed_queries st' <> delayed_queries st ->
+    delayed_queries st' = dedup send_eq_dec ((src, p) :: delayed_queries st) /\
+    request_payload p /\
+    is_safe p = false.
+Proof.
+  intros.
+  repeat (handler_def || handler_simpl); repeat split;
+    solve [eauto
+          |apply is_request_same_as_request_payload; eauto
+          |destruct p; simpl in *; congruence].
+Qed.
+
+Lemma handle_msg_dqs_change_queue :
+  forall src dst st p st' ms nts cts,
+    handle_msg src dst st p = (st', ms, nts, cts) ->
+    delayed_queries st' <> delayed_queries st ->
+    delayed_queries st' = dedup send_eq_dec ((src, p) :: delayed_queries st).
+Proof.
+  intros.
+  eapply handle_msg_dqs_change_queue_for_reqs; eauto.
+Qed.
+
+Lemma in_dqs_preserved_by_handle_msg :
+  forall src dst st p st' ms nts cts,
+    handle_msg src dst st p = (st', ms, nts, cts) ->
+    forall x,
+      In x (delayed_queries st) ->
+      In x (delayed_queries st').
+Proof.
+  intros.
+  destruct (list_eq_dec send_eq_dec
+                        (delayed_queries st)
+                        (delayed_queries st')).
+  - congruence.
+  - find_apply_lem_hyp handle_msg_dqs_change_queue; auto.
+    repeat find_rewrite.
+    apply dedup_In.
+    in_crush.
+Qed.
+
 Ltac chan2msg :=
   repeat match goal with
          | |- In _ (channel _ _ _) =>
@@ -1814,6 +1906,400 @@ Lemma cons_no_requests :
 Proof.
 Admitted.
 
+Lemma channel_after_recv_from_not_dst :
+  forall gst gst' from to src dst p ms xs ys,
+    msgs gst = xs ++ (src, (dst, p)) :: ys ->
+    msgs gst' = map (send dst) ms ++ xs ++ ys ->
+    dst <> from ->
+    forall x,
+      In x (channel gst' from to) ->
+      In x (channel gst from to).
+Proof.
+  intros.
+  destruct (addr_eq_dec from src); subst.
+  - unfold channel in *; find_apply_lem_hyp In_filterMap; expand_def; repeat break_match; simpl in *; try congruence.
+    destruct (addr_eq_dec _ _), (addr_eq_dec _ _); simpl in *; try congruence.
+    destruct x0 as [? [? ?]]; simpl in *; find_injection.
+    repeat find_rewrite; in_crush.
+    + unfold send in *; congruence.
+    + eapply filterMap_In; [|eapply in_or_app; left; eauto].
+      simpl; repeat destruct (addr_eq_dec _ _); simpl; try congruence.
+    + eapply filterMap_In; [|eapply in_or_app; right; simpl; right; eauto].
+      simpl; repeat destruct (addr_eq_dec _ _); simpl; try congruence.
+  - erewrite <- channel_after_recv_unrelated; eauto.
+Qed.
+
+Lemma in_concat :
+  forall A l (x : A) xs,
+    In x xs ->
+    In xs l ->
+    In x (concat l).
+Proof.
+  induction l; intros.
+  - in_crush.
+  - simpl in *.
+    in_crush.
+    right; eauto.
+Qed.
+
+Lemma do_delayed_queries_responds :
+  forall h st st' ms nts cts,
+    cur_request st = None ->
+    do_delayed_queries h st = (st', ms, nts, cts) ->
+    forall src req,
+      In (src, req) (delayed_queries st) ->
+      is_safe req = false ->
+      request_payload req ->
+      exists res,
+        In (src, res) ms /\
+        request_response_pair req res.
+Proof.
+  intros.
+  handler_def; try congruence.
+  destruct (handle_query_req st src req) eqn:?.
+  - unfold handle_query_req in *; break_match; inv_prop request_payload; simpl in *; try congruence.
+  - find_copy_eapply_lem_hyp real_requests_get_response_handle_query_req; expand_def; eauto.
+    eexists; split.
+    eapply in_concat; eauto.
+    eapply in_map_iff.
+    eexists; eauto.
+    split; eauto.
+    unfold handle_delayed_query; auto.
+    auto.
+    destruct req; simpl in *; congruence.
+Qed.
+
+Lemma unique_cons_remove :
+  forall A (P : A -> Prop) l x a,
+    unique P (x :: l) a ->
+    unique P l a.
+Proof.
+  unfold unique.
+  intros; break_and; split; auto.
+  intros.
+  assert (In b ((x :: xs) ++ ys)) by in_crush.
+  find_eapply_prop not; eauto.
+  repeat find_rewrite; auto.
+Qed.
+
+Lemma unique_dedup :
+  forall A (P : A -> Prop) A_eq_dec l a,
+    unique P l a ->
+    unique P (dedup A_eq_dec l) a.
+Proof.
+  induction l; eauto.
+  intros.
+  simpl; break_match.
+  - eapply IHl.
+    eapply unique_cons_remove; eauto.
+  - assert (unique P (dedup A_eq_dec l) a0). 
+    eapply IHl; eapply unique_cons_remove; eauto.
+    unfold unique in *; expand_def; auto.
+    split; auto.
+    induction xs; intros; simpl in *.
+    + find_injection.
+      assert (In b ([] ++ l))
+        by eauto using in_dedup_was_in.
+      find_eapply_prop (a0 :: l);
+        [|eauto]; eauto.
+    + break_or_hyp; subst.
+      * destruct (A_eq_dec b a0).
+        -- subst.
+           find_injection.
+           exfalso; find_eapply_prop (~ In a0 l).
+           eapply in_dedup_was_in.
+           replace (dedup _ l) with (xs ++ a0 :: ys) by eauto.
+           in_crush.
+        -- find_injection.
+           assert (In a0 (b :: l)).
+           simpl; right.
+           eapply in_dedup_was_in.
+           replace (dedup _ l) with (xs ++ a0 :: ys) by eauto.
+           in_crush.
+           find_copy_apply_lem_hyp in_split; expand_def.
+           eapply H2; eauto.
+           destruct x;
+             repeat (simpl in * || find_injection || find_rewrite);
+             try solve [congruence | in_crush].
+      * find_injection.
+        eauto.
+Qed.
+
+Lemma filterMap_sumbool_filter :
+  forall A P (f : forall x:A, {P x} + {~ P x}) l,
+    filterMap (fun x => if f x then Some x else None) l = filter (fun x => if f x then true else false) l.
+Proof.
+  induction l.
+  - simpl; auto.
+  - simpl; destruct (f a); eauto.
+    f_equal; eauto.
+Qed.
+
+Lemma filterMap_sumbool_map_filter :
+  forall A B P (f : forall x:A, {P x} + {~ P x}) (g : A -> B) l,
+    filterMap (fun x => if f x then Some (g x) else None) l = map g (filter (fun x => if f x then true else false) l).
+Proof.
+  induction l.
+  - simpl; auto.
+  - simpl; destruct (f a); eauto.
+    simpl; congruence.
+Qed.
+
+Lemma filter_concat :
+  forall A (f : A -> bool) l,
+    filter f (concat l) = concat (map (filter f) l).
+Proof.
+  induction l; simpl; eauto.
+  rewrite <- IHl.
+  rewrite filter_app; auto.
+Qed.
+
+Lemma all_nil_concat :
+  forall A (l : list (list A)),
+    (forall xs, In xs l -> xs = []) ->
+    concat l = [].
+Proof.
+  induction l; auto.
+  simpl; intros.
+  replace a with (@nil A); auto.
+  symmetry; auto.
+Qed.
+
+Lemma no_elements_nil :
+  forall A (l : list A),
+    (forall x, ~ In x l) ->
+    l = [].
+Proof.
+  destruct l; eauto.
+  intros.
+  exfalso; find_eapply_prop not; in_crush.
+Qed.
+
+Lemma do_delayed_queries_singleton :
+  forall src dst req st,
+    unique (fun x => fst x = src) (delayed_queries st) (src, req) ->
+    In (src, req) (delayed_queries st) ->
+    (forall src' req',
+        In (src', req') (delayed_queries st) ->
+        request_payload req' /\ is_safe req' = false) ->
+    cur_request st = None ->
+    forall ms st' nts cts,
+      do_delayed_queries dst st = (st', ms, nts, cts) ->
+      exists res,
+        filter (fun x => if addr_eq_dec (fst x) src then true else false) ms = [(src, res)].
+Proof.
+  intros.
+  repeat handler_def || handler_simpl.
+  find_apply_lem_hyp in_split; expand_def.
+  rewrite filter_concat.
+  repeat find_rewrite; rewrite !map_app; simpl.
+  remember (handle_query_req st src req) as sends; symmetry in Heqsends.
+  assert (request_payload req /\ is_safe req = false) by eauto; break_and.
+  find_copy_eapply_lem_hyp (handle_query_req_gives_response st src req); eauto.
+  find_copy_eapply_lem_hyp real_requests_get_response_handle_query_req; try solve [eauto | destruct req; simpl in *; congruence].
+  break_exists_exists; break_and; break_exists.
+  repeat find_rewrite || find_injection || handler_simpl.
+  destruct (addr_eq_dec src src); try congruence.
+  assert (forall dqs l,
+             dqs = x0 \/ dqs = x ->
+             In l (map (filter (fun x1 => if addr_eq_dec (fst x1) src then true else false))
+                       (map (handle_delayed_query dst st) dqs)) ->
+             l = []).
+  {
+    intros.
+    find_apply_lem_hyp in_map_iff; break_exists; break_and.
+    find_apply_lem_hyp in_map_iff; break_exists; break_and.
+    subst.
+    eapply no_elements_nil; intros; intro.
+    find_apply_lem_hyp filter_In; break_and.
+    break_match; try congruence.
+    assert (exists p, fst p = src /\ In p (x ++ x0)).
+    {
+      unfold handle_delayed_query in *; break_let; subst.
+      assert (request_payload p /\ is_safe p = false)
+        by (find_eapply_prop and; in_crush; eauto).
+      break_and.
+      find_copy_eapply_lem_hyp (handle_query_req_gives_response st a p); eauto.
+      break_exists; break_and.
+      find_rewrite.
+      simpl in *; intuition; simpl in *; subst;
+        exists (a, p); intuition.
+    }
+    break_exists; break_and.
+    unfold unique in *; break_and.
+    find_eapply_prop not; eauto.
+  }
+  repeat rewrite concat_app; simpl.
+  change [(src, x2)] with ([] ++ (src, x2) :: []).
+  f_equal; [|f_equal]; eauto using all_nil_concat.
+Qed.
+
+Lemma concat_in :
+  forall A l (x : A),
+    In x (concat l) ->
+    exists xs,
+      In xs l /\
+      In x xs.
+Proof.
+  induction l; simpl in *.
+  - intros; tauto.
+  - in_crush.
+    + exists a; eauto.
+    + find_apply_hyp_hyp.
+      break_exists_exists.
+      tauto.
+Qed.
+
+Lemma query_message_ok_delayed_queries_all_requests :
+  forall gst,
+    (forall src dst st__src,
+        sigma gst src = Some st__src ->
+        query_message_ok' src dst (cur_request st__src) (option_map delayed_queries (sigma gst dst))
+                          (nodes gst) (failed_nodes gst)
+                          (channel gst src dst) (channel gst dst src)) ->
+    forall h st,
+      sigma gst h = Some st ->
+      forall src req,
+        In (src, req) (delayed_queries st) ->
+        request_payload req /\
+        is_safe req = false.
+Proof.
+Admitted.
+
+Lemma split_of_app_right :
+  forall A (l l' : list A) xs a ys,
+    l ++ l' = xs ++ a :: ys ->
+    In a l' ->
+    exists xs',
+      xs = l ++ xs' /\
+      l' = xs' ++ a :: ys.
+Proof.
+Admitted.
+
+Lemma split_of_app_left :
+  forall A (l l' : list A) xs a ys,
+    l ++ l' = xs ++ a :: ys ->
+    In a l ->
+    exists ys',
+      ys = ys' ++ l' /\
+      l = xs ++ a :: ys'.
+Proof.
+Admitted.
+
+Lemma unique_singleton :
+  forall A (P : A -> Prop) x,
+    P x ->
+    unique P [x] x.
+Proof.
+  unfold unique; intuition eauto.
+  match goal with
+  | H: _ = _ |- _ => symmetry in H
+  end.
+  find_apply_lem_hyp app_cons_singleton_inv.
+  break_and; subst; in_crush.
+Qed.
+
+Lemma recv_responses_unique :
+  forall src dst req res st st' sends nts cts,
+    request_payload req ->
+    recv_handler src dst st req = (st', sends, nts, cts) ->
+    (forall req, ~ In (src, req) (delayed_queries st)) ->
+    In (src, res) sends ->
+    response_payload res ->
+    unique (fun p => fst p = src /\ response_payload (snd p)) sends (src, res).
+Proof.
+  intros.
+  handler_def.
+  in_crush.
+  - exfalso.
+    find_copy_eapply_lem_hyp handle_delayed_queries_res_only_if_req; eauto.
+    expand_def.
+    destruct (list_eq_dec send_eq_dec (delayed_queries x) (delayed_queries st)).
+    + repeat find_rewrite; eauto.
+    + find_eapply_lem_hyp handle_msg_only_changes_delayed_queries_when_busy; eauto.
+      find_apply_lem_hyp do_delayed_queries_definition; expand_def; congruence.
+  - eapply unique_app.
+    + repeat handler_def || handler_simpl;
+        try solve [inv_prop response_payload
+                  |eapply unique_singleton; eauto].
+      find_copy_apply_lem_hyp handle_query_req_only_sends_responses.
+      pose proof (handle_query_req_gives_response st src req).
+      forwards.
+      inv_prop request_payload; simpl; try congruence.
+      concludes.
+      concludes.
+      break_exists; repeat find_rewrite.
+      replace (src, x) with (src, res0).
+      eapply unique_singleton; eauto.
+      eapply in_singleton_eq; eauto.
+    + intuition.
+      destruct y.
+      simpl in *; subst.
+      copy_eapply_lem_prop_hyp handle_delayed_queries_res_only_if_req do_delayed_queries; eauto.
+      expand_def.
+      destruct (list_eq_dec send_eq_dec (delayed_queries x) (delayed_queries st)).
+      * repeat find_rewrite; eauto.
+      * find_copy_eapply_lem_hyp handle_msg_dqs_change_queue; eauto.
+        find_copy_eapply_lem_hyp handle_msg_only_changes_delayed_queries_when_busy; eauto.
+        break_exists.
+        repeat find_rewrite.
+        simpl in *; break_match; eauto.
+        simpl in *; intuition eauto using in_dedup_was_in.
+        find_injection.
+        repeat handler_def; eauto;
+          simpl in *; congruence.
+Qed.
+
+Lemma filterMap_split_inv :
+  forall A B (f : A -> option B) l b xs ys,
+    filterMap f l = xs ++ b :: ys ->
+    exists xs' a ys',
+      l = xs' ++ a :: ys' /\
+      filterMap f xs' = xs /\
+      f a = Some b /\
+      filterMap f ys' = ys.
+Proof.
+  induction l; eauto.
+  - intros; in_crush.
+    destruct xs; simpl in *; congruence.
+  - intros; simpl in *.
+    break_match.
+    + destruct xs; simpl in *; find_injection.
+      * exists nil.
+        repeat eexists; intuition eauto.
+      * find_apply_hyp_hyp; expand_def.
+        exists (a::x), x0, x1.
+        intuition eauto.
+        simpl; repeat find_rewrite; auto.
+    + find_apply_hyp_hyp.
+      expand_def.
+      exists (a::x), x0, x1.
+      intuition eauto.
+      simpl; repeat find_rewrite; auto.
+Qed.
+
+Lemma filterMap_sends_unique :
+  forall (P : payload -> Prop) dst ms m,
+    unique (fun p => fst p = dst /\ P (snd p)) ms (dst, m) ->
+    unique P (filterMap (fun m => if addr_eq_dec (fst m) dst then Some (snd m) else None) ms) m.
+Proof.
+  unfold unique; intuition eauto.
+  intros.
+  find_apply_lem_hyp filterMap_split_inv; expand_def.
+  break_match; try congruence.
+  destruct x0; simpl in *; find_injection.
+  find_eapply_prop False; eauto.
+  channel_crush; in_crush; eauto.
+  eauto.
+Qed.
+
+Lemma unique_remove :
+  forall A (P : A -> Prop) xs x ys u,
+    unique P (xs ++ x :: ys) u ->
+    unique P (xs ++ ys) u.
+Proof.
+Admitted.
+
 Theorem query_message_ok'_recv_dst_recv :
   forall gst gst' src h st p xs ys st' ms nts cts,
     reachable_st gst ->
@@ -1830,6 +2316,11 @@ Theorem query_message_ok'_recv_dst_recv :
     sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
     msgs gst' = map (send h) ms ++ xs ++ ys ->
     trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
+    (forall src dst st__src,
+        sigma gst src = Some st__src ->
+        query_message_ok' src dst (cur_request st__src) (option_map delayed_queries (sigma gst dst))
+                          (nodes gst) (failed_nodes gst)
+                          (channel gst src dst) (channel gst dst src)) ->
     (forall (src : addr) (st__src : data),
         sigma gst src = Some st__src ->
         h <> src ->
@@ -1917,10 +2408,281 @@ Proof.
            eapply_prop no_requests; chan2msg; try eassumption.
            repeat find_rewrite; in_crush.
         -- find_apply_lem_hyp in_dedup_was_in; eauto.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
+  - destruct (send_eq_dec (src, p) (src0, req)); try find_injection.
+    + find_copy_apply_lem_hyp requests_get_response_or_queued; eauto.
+      expand_def.
+      * eapply CIdelayed; eauto.
+        -- inv_prop query_request; simpl; congruence.
+        -- intros.
+           handler_def.
+           find_eapply_lem_hyp do_delayed_queries_definition; expand_def.
+           destruct (list_eq_dec send_eq_dec (delayed_queries x) (delayed_queries st)).
+           ++ exfalso; find_eapply_prop delayed_queries; repeat find_rewrite; eauto.
+           ++ find_eapply_lem_hyp handle_msg_dqs_change_queue; eauto.
+              repeat find_rewrite.
+              replace (dedup send_eq_dec ((src0, req) :: delayed_queries st)) with ((src0, req) :: dedup send_eq_dec (delayed_queries st)) in *.
+              replace xs0 with (@nil (addr * payload)) in *.
+              simpl in *; find_injection; intuition eauto using in_dedup_was_in.
+              destruct xs0; try tauto.
+              simpl in *; find_injection.
+              exfalso; find_eapply_prop delayed_queries.
+              eapply in_dedup_was_in with (x := (src0, req)).
+              eauto.
+              simpl; break_match; eauto.
+              exfalso; find_eapply_prop delayed_queries; eauto.
+        -- handler_def.
+           eapply no_responses_app; eauto.
+           unfold no_responses; intuition.
+           channel_crush.
+           ++ find_apply_lem_hyp do_delayed_queries_definition; expand_def; congruence.
+           ++ repeat handler_def || handler_simpl; inv_prop response_payload.
+        -- unfold no_requests; intros.
+           find_eapply_lem_hyp channel_after_recv_src_dst; eauto.
+           expand_def.
+           assert (no_requests (x ++ x0)) by eauto.
+           repeat find_rewrite.
+           find_apply_lem_hyp in_app_or; break_or_hyp.
+           ++ find_eapply_lem_hyp In_filterMap; expand_def.
+              repeat break_match; congruence.
+           ++ eapply_prop no_requests; eauto.
+      * eapply CIres; eauto.
+        -- eapply in_or_app; left.
+           eapply filterMap_In; eauto.
+           simpl; break_match; congruence.
+        -- intros.
+           find_apply_lem_hyp split_of_app_left; expand_def.
+           rewrite app_assoc.
+           eapply no_responses_app; eauto.
+           assert (unique response_payload (filterMap (fun m => if addr_eq_dec (fst m) src0 then Some (snd m) else None) ms) x).
+           {
+             eapply filterMap_sends_unique; eauto.
+             eauto using recv_responses_unique.
+           }
+           unfold unique, no_responses in *; break_and; eauto.
+           eapply filterMap_In; eauto; simpl.
+           destruct (addr_eq_dec src0 src0); congruence.
+        -- find_copy_eapply_lem_hyp channel_after_recv_src_dst; eauto.
+           expand_def.
+           repeat find_rewrite.
+           eapply no_requests_app; eauto.
+           unfold no_requests; intuition.
+           channel_crush.
+        -- handler_def.
+           find_apply_lem_hyp do_delayed_queries_definition; expand_def; simpl; auto.
+           repeat handler_def || handler_simpl;
+             intuition;
+             repeat find_rewrite || find_injection;
+             try inv_prop request_response_pair.
+    + eapply CIreq.
+      * chan2msg; repeat find_rewrite.
+        in_crush; congruence.
+      * destruct (addr_eq_dec src0 src);
+          [destruct (payload_eq_dec p req)|];
+          try congruence.
+        -- assert (unique request_payload (channel gst src (addr_of dstp)) req)
+             by (unfold unique, no_requests in *; repeat find_rewrite; intuition eauto).
+           find_eapply_lem_hyp channel_after_recv_src_dst; eauto.
+           assert (unique request_payload (channel gst' src0 (addr_of dstp)) req).
+           {
+             repeat find_rewrite.
+             destruct (addr_eq_dec src (addr_of dstp)); try congruence.
+             rewrite filterMap_all_None in * by auto.
+             expand_def; simpl in *.
+             repeat find_rewrite; eapply unique_remove; eauto.
+           }
+           unfold unique, no_requests in *; intuition eauto.
+        -- erewrite channel_after_recv_unrelated; eauto.
+      * unfold no_responses in *; intros; in_crush; eauto.
+        find_copy_apply_lem_hyp In_filterMap; expand_def; break_match; try congruence.
+        destruct x eqn:?; simpl in *; find_injection.
+        find_eapply_lem_hyp recv_handler_res_only_if_req; eauto; expand_def; eauto.
+        assert (unique request_payload (channel gst src (addr_of dstp)) req) by (unfold unique; eauto).
+        assert (x = req).
+        eapply unique_eq; eauto using payload_eq_dec.
+        congruence.
+      * handler_def.
+        intuition.
+        find_copy_eapply_lem_hyp do_delayed_queries_definition; expand_def.
+        destruct (list_eq_dec send_eq_dec (delayed_queries x) (delayed_queries st)).
+        ++ exfalso; find_eapply_prop delayed_queries; repeat find_rewrite; eauto.
+        ++ copy_eapply_lem_prop_hyp handle_msg_dqs_change_queue_for_reqs handle_msg; eauto.
+           expand_def; repeat find_rewrite.
+           find_eapply_lem_hyp in_dedup_was_in.
+           simpl in *; break_or_hyp; try eauto.
+           find_injection.
+           assert (m <> req) by congruence.
+           assert (In m (channel gst src0 (addr_of dstp))) by (chan2msg; eauto).
+           break_match; eauto.
+           eapply_lem_prop_hyp in_split req; expand_def.
+           find_eapply_prop no_requests; try eassumption.
+           repeat find_rewrite. 
+           in_crush.
+      * eauto.
+  - eapply CIres; eauto; try solve [in_crush].
+    + intros.
+      handler_def.
+      rewrite filterMap_app in *.
+      assert (filterMap (fun m => if addr_eq_dec (fst m) src0 then Some (snd m) else None) x4 = []).
+      {
+        eapply filterMap_all_None; intros.
+        find_apply_lem_hyp do_delayed_queries_definition; expand_def.
+        find_apply_lem_hyp concat_in; expand_def.
+        in_crush.
+        destruct x4 as (src', req').
+        assert (request_payload req' /\
+                is_safe req' = false).
+        {
+          destruct (list_eq_dec send_eq_dec (delayed_queries x) (delayed_queries st)).
+          repeat find_rewrite; eauto.
+          eapply query_message_ok_delayed_queries_all_requests with (h := (addr_of dstp)); eauto.
+          find_apply_lem_hyp handle_msg_dqs_change_queue_for_reqs; eauto; expand_def.
+          repeat find_rewrite.
+          find_apply_lem_hyp in_dedup_was_in; eauto.
+          simpl in *; break_or_hyp; [find_injection|].
+          eauto.
+          repeat find_rewrite; eauto.
+          eapply query_message_ok_delayed_queries_all_requests with (h := (addr_of dstp)); eauto.
+        }
+        break_and.
+        unfold handle_delayed_query in *.
+        find_eapply_lem_hyp (handle_query_req_gives_response x src' req'); eauto.
+        expand_def; repeat find_rewrite.
+        simpl in *; intuition subst.
+        simpl; break_match; auto; subst.
+        exfalso.
+        destruct (list_eq_dec send_eq_dec (delayed_queries x) (delayed_queries st)).
+        * find_eapply_prop delayed_queries; repeat find_rewrite; eauto.
+        * find_apply_lem_hyp handle_msg_dqs_change_queue_for_reqs; eauto; expand_def.
+          repeat find_rewrite.
+          find_apply_lem_hyp in_dedup_was_in; eauto.
+          simpl in *; break_or_hyp; eauto.
+          find_injection.
+          find_eapply_prop no_requests; eauto.
+      }
+      assert (no_responses (filterMap (fun m : addr * ChordSemantics.payload => if addr_eq_dec (fst m) src0 then Some (snd m) else None) x0)).
+      {
+        unfold no_responses; intuition.
+        channel_crush.
+        find_eapply_lem_hyp handle_msg_res_only_if_req; eauto.
+        break_and.
+        eapply_prop no_requests; channel_crush; eauto.
+      }
+      repeat find_rewrite; simpl in *.
+      find_copy_eapply_lem_hyp split_of_app_right; eauto.
+      expand_def.
+      rewrite <- app_assoc in *.
+      eapply no_responses_app; eauto.
+    + unfold no_requests; intros.
+      find_eapply_lem_hyp channel_after_recv_from_not_dst; eauto.
+    + handler_def.
+      find_apply_lem_hyp do_delayed_queries_definition; expand_def; simpl; auto.
+      destruct (list_eq_dec send_eq_dec
+                            (delayed_queries x)
+                            (delayed_queries st)).
+      * repeat find_rewrite; eauto.
+      * find_copy_apply_lem_hyp handle_msg_dqs_change_queue_for_reqs; eauto.
+        break_and.
+        repeat find_rewrite.
+        destruct (addr_eq_dec src0 src); subst.
+        -- exfalso; eapply_prop no_requests; chan2msg; eauto.
+        -- simpl; break_match;
+             simpl; intuition; try congruence;
+               eauto using in_dedup_was_in.
+  - find_copy_eapply_lem_hyp recv_handler_definition_existential; expand_def.
+    assert (In (src0, req) (delayed_queries x))
+      by eauto using in_dqs_preserved_by_handle_msg.
+    assert (unique (fun p => fst p = src0) (delayed_queries st) (src0, req)).
+    {
+      unfold unique.
+      intuition eauto.
+      destruct b.
+      simpl in *; subst.
+      find_eapply_prop app; eauto.
+    }
+    find_copy_apply_lem_hyp do_delayed_queries_definition; expand_def.
+    + simpl in *.
+      eapply CIdelayed; eauto.
+      * cut (unique (fun p => fst p = src0) (delayed_queries x) (src0, req));
+          [unfold unique; intuition eauto|].
+        destruct (list_eq_dec send_eq_dec
+                              (delayed_queries x)
+                              (delayed_queries st)).
+        -- congruence.
+        -- find_copy_apply_lem_hyp handle_msg_dqs_change_queue_for_reqs; eauto.
+           break_and.
+           repeat find_rewrite.
+           destruct (addr_eq_dec src0 src); subst.
+           ++ exfalso; eapply_prop no_requests; chan2msg; eauto.
+           ++ eapply unique_dedup.
+              eapply unique_cons; simpl; auto.
+      * unfold no_responses; intros.
+        channel_crush; eauto.
+        intro.
+        eapply_lem_prop_hyp handle_msg_res_only_if_req handle_msg; eauto.
+        expand_def.
+        eapply_prop no_requests; chan2msg; repeat find_rewrite; in_crush; eauto.
+      * unfold no_requests; intros.
+        find_eapply_prop no_requests.
+        eapply channel_after_recv_from_not_dst; eauto.
+    + find_copy_eapply_lem_hyp (do_delayed_queries_responds (addr_of dstp)); eauto.
+      expand_def.
+      eapply CIres; eauto.
+      * eapply in_or_app; left.
+        eapply filterMap_In;
+          [|eapply in_or_app; left; eauto].
+        simpl; break_match; congruence.
+      * eapply unique_no_responses.
+        eapply unique_app_r;
+          [|eapply_prop no_responses].
+        rewrite filterMap_app.
+        eapply unique_app_r.
+        -- assert (unique (fun x4 : addr * payload => fst x4 = src0) (delayed_queries st) (src0, req) /\
+                   forall (src' : addr) (req' : payload), In (src', req') (delayed_queries st) -> request_payload req' /\ is_safe req' = false).
+           {
+             split; eauto.
+             eapply query_message_ok_delayed_queries_all_requests; eauto.
+           }
+           assert (unique (fun x4 : addr * payload => fst x4 = src0) (delayed_queries x) (src0, req) /\
+                   forall (src' : addr) (req' : payload), In (src', req') (delayed_queries x) -> request_payload req' /\ is_safe req' = false).
+           {
+             destruct (list_eq_dec send_eq_dec
+                                   (delayed_queries x)
+                                   (delayed_queries st)).
+             - repeat find_rewrite; eauto.
+             - find_copy_apply_lem_hyp handle_msg_dqs_change_queue_for_reqs; eauto; break_and.
+               repeat find_rewrite.
+               destruct (addr_eq_dec src0 src); subst; split;
+                 try solve [exfalso; eapply_prop no_requests; chan2msg; eauto].
+               ++ eapply unique_dedup.
+                  eapply unique_cons; simpl; auto.
+               ++ intros.
+                  find_apply_lem_hyp in_dedup_was_in.
+                  simpl in *; break_or_hyp; eauto.
+                  find_injection; auto.
+           }
+           break_and.
+           copy_eapply_lem_prop_hyp do_delayed_queries_singleton do_delayed_queries; try eassumption.
+           break_exists.
+           rewrite filterMap_sumbool_map_filter; eauto.
+           repeat find_rewrite.
+           unfold unique; intuition eauto.
+           simpl in *.
+           find_apply_lem_hyp split_eq_singleton; break_and; subst.
+           in_crush.
+        -- intuition.
+           channel_crush.
+           find_eapply_lem_hyp handle_msg_res_only_if_req; eauto.
+           break_and; subst.
+           eapply_prop no_requests; chan2msg; repeat find_rewrite; eauto.
+      * unfold no_requests in *.
+        intros; chan2msg.
+        repeat find_rewrite.
+        channel_crush.
+        -- find_eapply_prop request_payload.
+           chan2msg; repeat find_rewrite; in_crush.
+        -- find_eapply_prop request_payload.
+           chan2msg; repeat find_rewrite; in_crush.
+Qed.
 
 Theorem query_message_ok'_recv_other_recv :
   forall gst gst' src h st p xs ys st' ms nts cts,
@@ -2740,65 +3502,6 @@ Proof.
       unfold send in *; congruence.
     + eapply_prop no_requests; eauto.
   - repeat find_rewrite; auto.
-Qed.
-
-Lemma handle_query_timeout_dqs :
-  forall h st dst q st' ms nts cts,
-    handle_query_timeout h st dst q = (st', ms, nts, cts) ->
-    delayed_queries st' = delayed_queries st.
-Proof.
-  intros; repeat handler_def; reflexivity.
-Qed.
-
-Theorem channel_msgs_app_in :
-  forall gst' gst h src dst m ms,
-    msgs gst' = (map (send h) ms) ++ msgs gst ->
-    In m (channel gst' src dst) ->
-    In m (channel gst src dst) \/
-    h = src /\
-    In (dst, m) ms.
-Proof.
-  unfold channel.
-  intros; find_rewrite.
-  rewrite filterMap_app in *.
-  find_apply_lem_hyp in_app_or; break_or_hyp;
-    solve [channel_crush | tauto].
-Qed.
-
-Lemma handle_delayed_query_dst_in_dqs :
-  forall h st l dst p,
-    In (dst, p) (concat (map (handle_delayed_query h st) l)) ->
-    exists r,
-      request_response_pair r p /\
-      In (dst, r) l.
-Proof.
-  intros.
-  find_apply_lem_hyp in_concat; expand_def; in_crush.
-  unfold handle_delayed_query, handle_query_req in *.
-  repeat break_match; repeat handler_simpl;
-    try solve [intuition eauto
-              |eexists; split; eauto; constructor].
-Qed.
-
-Lemma handle_query_res_sends_no_responses :
-  forall src dst st q p st' ms nts cts h m,
-    handle_query_res src dst st q p = (st', ms, nts, cts) ->
-    In (h, m) ms ->
-    ~ response_payload m.
-Proof.
-  intuition.
-  repeat handler_def || handler_simpl;
-    inv_prop response_payload.
-Qed.
-
-Lemma handle_msg_dqs_change_queue :
-  forall src dst st p st' ms nts cts,
-    handle_msg src dst st p = (st', ms, nts, cts) ->
-    delayed_queries st' <> delayed_queries st ->
-    delayed_queries st' = dedup send_eq_dec ((src, p) :: delayed_queries st).
-Proof.
-  intros.
-  repeat (handler_def || handler_simpl).
 Qed.
 
 Lemma recv_handler_response_req_in_dqs_or_input :
