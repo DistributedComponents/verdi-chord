@@ -1560,46 +1560,6 @@ Proof.
   - assert (client_payload res0) by eauto; inv_prop client_payload; inv_prop response_payload.
 Qed.
 
-Theorem query_message_ok'_recv_src_recv :
-  forall gst gst' src h st p xs ys st' ms nts cts,
-    reachable_st gst ->
-    step_dynamic gst gst' ->
-    recv_handler src h st p = (st', ms, nts, cts) ->
-    msgs gst = xs ++ (src, (h, p)) :: ys ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst') ->
-    sigma gst h = Some st ->
-    nodes gst' = nodes gst ->
-    failed_nodes gst' = failed_nodes gst ->
-    timeouts gst' =
-    update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
-    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
-    msgs gst' = map (send h) ms ++ xs ++ ys ->
-    trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
-    (forall (dst : addr) (st__src : data),
-        sigma gst h = Some st__src ->
-        query_message_ok' h dst (cur_request st__src)
-                          (option_map delayed_queries (sigma gst dst)) (nodes gst) (failed_nodes gst)
-                          (channel gst h dst) (channel gst dst h)) ->
-    forall (dst : addr) (st__src' : data),
-        sigma gst' h = Some st__src' ->
-        query_message_ok' h dst (cur_request st__src')
-                          (option_map delayed_queries (sigma gst' dst)) (nodes gst') (failed_nodes gst')
-                          (channel gst' h dst) (channel gst' dst h).
-Proof.
-  autounfold; intros.
-  match goal with
-  | H: _ |- _ => pose proof H as ?; specialize (H dst st); conclude H eassumption
-  end.
-  repeat find_rewrite; simpl in *.
-  inv_prop query_message_ok'; try tauto; inv_option_map.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
-
 Lemma unique_eq :
   forall A (P : A -> Prop) l x y,
     unique P l y ->
@@ -2683,6 +2643,61 @@ Proof.
         -- find_eapply_prop request_payload.
            chan2msg; repeat find_rewrite; in_crush.
 Qed.
+
+Theorem query_message_ok'_recv_src_recv :
+  forall gst gst' src h st p xs ys st' ms nts cts,
+    reachable_st gst ->
+    step_dynamic gst gst' ->
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    msgs gst = xs ++ (src, (h, p)) :: ys ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst') ->
+    sigma gst h = Some st ->
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' =
+    update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    msgs gst' = map (send h) ms ++ xs ++ ys ->
+    trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
+    (forall (dst : addr) (st__src : data),
+        sigma gst h = Some st__src ->
+        query_message_ok' h dst (cur_request st__src)
+                          (option_map delayed_queries (sigma gst dst)) (nodes gst) (failed_nodes gst)
+                          (channel gst h dst) (channel gst dst h)) ->
+    forall (dst : addr) (st__src' : data),
+        sigma gst' h = Some st__src' ->
+        query_message_ok' h dst (cur_request st__src')
+                          (option_map delayed_queries (sigma gst' dst)) (nodes gst') (failed_nodes gst')
+                          (channel gst' h dst) (channel gst' dst h).
+Proof.
+  autounfold; intros.
+  match goal with
+  | H: _ |- _ => pose proof H as ?; specialize (H dst st); conclude H eassumption
+  end.
+  repeat find_rewrite; simpl in *.
+  inv_prop query_message_ok'; try tauto; inv_option_map.
+  - admit.
+  - admit.
+  - admit.
+  - assert ([] = channel gst' dst h).
+    {
+      symmetry; eapply no_elements_nil.
+      intuition.
+      find_eapply_lem_hyp channel_after_recv_from_not_dst; eauto.
+      repeat find_reverse_rewrite; in_crush.
+    }
+    repeat find_reverse_rewrite.
+    erewrite channel_after_recv_to_not_dst by eauto.
+    rewrite filterMap_all_None.
+    repeat find_rewrite || rewrite_update || update_destruct || simpl.
+    replace (channel _ _ _) with (@nil payload) by congruence.
+    eapply QMNotStarted; eauto.
+    intros.
+    admit.
+    admit.
+  - admit.
+Admitted.
 
 Theorem query_message_ok'_recv_other_recv :
   forall gst gst' src h st p xs ys st' ms nts cts,
