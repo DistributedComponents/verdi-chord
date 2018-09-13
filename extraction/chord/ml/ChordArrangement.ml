@@ -31,15 +31,8 @@ let json_of_addr a =
   let s = String.sub s 0 8 in
   `String s
 
-let json_of_id i =
-  let s = id_to_ascii i in
-  let s = VRUtil.string_of_char_list s in
-  let s = Digest.to_hex s in
-  let s = String.sub s 0 8 in
-  `String s
-
 let json_of_pointer p =
-  json_of_id p.ChordIDSpace.ptrId
+  json_of_addr p.ChordIDSpace.ptrAddr
 
 let json_of_opt_pointer po =
   VRUtil.map_default json_of_pointer `Null po
