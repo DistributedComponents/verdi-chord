@@ -22,6 +22,7 @@ depends: [
   "cheerios" {= "dev"}
   "cheerios-runtime" {= "dev"}
   "ocamlbuild" {build}
+  "yojson" {>= "1.4.1"}
 ]
 
 authors: [

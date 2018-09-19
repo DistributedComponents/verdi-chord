@@ -21,6 +21,7 @@ depends: [
   "verdi-runtime" {= "dev"}
   "cheerios" {= "dev"}
   "ocamlbuild" {build}
+  "yojson" {>= "1.4.1"}
 ]
 
 authors: [
