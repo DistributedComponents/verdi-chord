@@ -27,6 +27,6 @@ case ${MODE} in
     opam pin add chord-serialized . --yes --verbose
     ;;
   *)
-    opam pin add verdi-chord . --yes --verbose
+    opam pin add verdi-chord-checkproofs . --yes --verbose
     ;;
 esac

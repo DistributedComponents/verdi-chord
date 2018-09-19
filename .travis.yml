@@ -11,7 +11,6 @@ env:
     - MODE=build COQ_VERSION=coq8.8-32bit
     - MODE=chord COQ_VERSION=coq8.8
     - MODE=chord-serialized COQ_VERSION=coq8.8
-    - MODE=proofalytics COQ_VERSION=coq8.8
 
 # The "docker run" command will pull if needed.
 # Running this first gives two tries in case of network lossage.

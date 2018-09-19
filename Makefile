@@ -25,6 +25,9 @@ default: Makefile.coq
 quick: Makefile.coq
 	$(MAKE) -f Makefile.coq quick
 
+checkproofs: quick
+	$(MAKE) -f Makefile.coq checkproofs
+
 proofalytics:
 	$(MAKE) -C proofalytics clean
 	$(MAKE) -C proofalytics
@@ -70,7 +73,7 @@ lint:
 distclean: clean
 	rm -f _CoqProject
 
-.PHONY: default quick clean lint distclean chord $(MLFILES) $(SERIALIZEDMLFILES) proofalytics proofalytics-aux
+.PHONY: default quick checkproofs clean lint distclean chord $(MLFILES) $(SERIALIZEDMLFILES) proofalytics proofalytics-aux
 
 .NOTPARALLEL: $(MLFILES)
 .NOTPARALLEL: $(SERIALIZEDMLFILES)

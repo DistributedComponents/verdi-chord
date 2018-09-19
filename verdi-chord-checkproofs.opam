@@ -9,7 +9,8 @@ license: "BSD"
 
 build: [
   [ "./configure" ]
-  [ make "-j%{jobs}%" ]
+  [ make "quick" "-j%{jobs}%" ]
+  [ make "checkproofs" "J=%{jobs}%" ]
 ]
 depends: [
   "coq" {>= "8.7" & < "8.8~"}
