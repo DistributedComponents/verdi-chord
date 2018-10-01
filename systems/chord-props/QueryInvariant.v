@@ -2899,6 +2899,78 @@ Proof.
   repeat handler_def || handler_simpl.
 Qed.
 
+Lemma recv_res_new_req_in_channel :
+  forall h st p st' ms nts cts dstp q m,
+    recv_handler (addr_of dstp) h st p = (st', ms, nts, cts) ->
+    cur_request st = Some (dstp, q, m) ->
+    request_response_pair m p ->
+    query_request q m ->
+    forall dstp' q' m',
+      cur_request st' = Some (dstp', q', m') ->
+      In (addr_of dstp', m') ms.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl;
+    try solve [inv_prop request_response_pair
+              |inv_prop request_response_pair; simpl in *; congruence].
+  - left; f_equal; congruence.
+  - repeat find_rewrite || find_injection.
+    find_eapply_prop query_response.
+    inv_prop query_request; inv_prop request_response_pair; constructor.
+Qed.
+
+Lemma recv_res_new_req_unique :
+  forall h st p st' ms nts cts dstp q m,
+    recv_handler (addr_of dstp) h st p = (st', ms, nts, cts) ->
+    cur_request st = Some (dstp, q, m) ->
+    request_response_pair m p ->
+    query_request q m ->
+    forall dstp' q' m',
+      cur_request st' = Some (dstp', q', m') ->
+      unique (fun s => fst s = addr_of dstp' /\ request_payload (snd s)) ms (addr_of dstp', m').
+Proof.
+  intros.
+  repeat handler_def || handler_simpl;
+    try solve [inv_prop request_response_pair
+              |inv_prop request_response_pair; simpl in *; congruence
+              |find_eapply_lem_hyp is_request_same_as_request_payload; congruence
+              |eauto using unique_triv].
+  eapply unique_triv; simpl; auto.
+  eapply unique_triv; simpl; auto.
+  split; eauto.
+  repeat find_rewrite || find_injection.
+  inv_prop request_response_pair; constructor.
+Qed.
+
+Lemma recv_no_responses :
+  forall src h st p st' ms nts cts,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    forall dst m,
+      In (dst, m) ms ->
+      dst <> src \/ ~ request_payload p ->
+      (forall req, ~ In (dst, req) (delayed_queries st)) ->
+      ~ response_payload m.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl;
+    try solve [inv_prop request_response_pair
+              |inv_prop request_response_pair; simpl in *; congruence
+              |find_eapply_lem_hyp is_request_same_as_request_payload; congruence
+              |eauto using unique_triv
+              |in_crush; find_injection; inv_prop response_payload; eauto];
+    repeat match goal with
+           | H: In _ (_ ++ _) |- _ => in_crush
+           | H: In (dst, m) (concat (map _ _)) |- _ =>
+             eapply handle_delayed_query_dst_in_dqs in H; expand_def; solve [eauto]
+           | H: (_, _) = (_, _) |- _ => injc H
+           | H: response_payload Notify |- _ => injc H
+           | H: In (dst, m) (handle_query_req _ _ _) |- _ =>
+             solve [unfold handle_query_req in H; break_match; in_crush; find_injection; auto]
+           | |- _ => eauto
+           end;
+    inv_prop response_payload.
+Qed.
+
 Theorem query_message_ok_recv_src_distinct_recv :
   forall gst gst' src h st p xs ys st' ms nts cts,
     reachable_st gst ->
@@ -2933,7 +3005,44 @@ Theorem query_message_ok_recv_src_distinct_recv :
                        (delayed_queries st__dst')
                        (channel gst' h dst) (channel gst' dst h).
 Proof.
+  intros.
+  inv_prop query_message_ok.
+  - find_copy_apply_lem_hyp recv_cur_request_None_preserved; eauto.
+    repeat find_rewrite || rewrite_update || find_injection.
+    match goal with
+    | H: None = _ |- _ => rewrite <- H
+    end.
+    find_copy_eapply_lem_hyp channel_after_recv_src_dst; eauto; expand_def.
+    erewrite channel_after_recv_not_src_dst by eauto.
+    admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
 Admitted.
+
+Lemma recv_requests_only_to_tgt :
+  forall st src h p st' ms nts cts dstp q m,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    cur_request st' = Some (dstp, q, m) ->
+    forall a,
+      a <> addr_of dstp ->
+      no_requests (filterMap (fun m => if addr_eq_dec (fst m) a then Some (snd m) else None) ms).
+Proof.
+  unfold no_requests; intros; channel_crush.
+  repeat handler_def || handler_simpl || in_crush || inv_prop request_payload.
+Qed.
+
+Lemma recv_cr_none_no_requests :
+  forall st src h p st' ms nts cts,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    cur_request st' = None ->
+    forall a,
+      no_requests (filterMap (fun m => if addr_eq_dec (fst m) a then Some (snd m) else None) ms).
+Proof.
+  unfold no_requests; intros; channel_crush.
+  repeat handler_def || handler_simpl || in_crush || inv_prop request_payload.
+Qed.
 
 Theorem query_message_ok_recv_src_self_recv :
   forall gst gst' src h st p xs ys st' ms nts cts,
@@ -3007,7 +3116,206 @@ Proof.
       find_rewrite; eauto.
       congruence.
   - admit.
-  - admit.
+  - repeat find_rewrite || find_injection || rewrite_update.
+    destruct (send_eq_dec (src, p) (addr_of dstp, req)).
+    + find_injection.
+      handler_def.
+      find_copy_eapply_lem_hyp channel_after_recv_src_dst; eauto.
+      destruct (payload_eq_dec req Ping); subst.
+      * repeat handler_def; simpl in *; repeat handler_simpl.
+        unfold send in *.
+        repeat find_rewrite || find_injection.
+        eapply CIres; try constructor; eauto.
+        -- repeat find_reverse_rewrite. chan2msg; repeat find_rewrite; in_crush.
+        -- eapply unique_no_responses.
+           destruct (addr_eq_dec _ _); try congruence.
+           eapply unique_cons_add.
+           intros.
+           find_eapply_prop no_responses; in_crush.
+           constructor.
+        -- destruct (addr_eq_dec _ _); try congruence.
+           unfold no_requests; intros; in_crush;
+             solve [inv_prop request_payload
+                   |find_eapply_prop no_requests; eauto; in_crush].
+      * handler_def; try solve [congruence | inv_prop query_request].
+        -- assert (cur_request st = cur_request x3) by admit.
+           repeat find_reverse_rewrite.
+           assert (delayed_queries x3 = dedup send_eq_dec ((addr_of dstp, req) :: delayed_queries st)).
+           {
+             repeat handler_def || handler_simpl.
+           }
+           eapply CIdelayed; eauto.
+           ++ repeat find_rewrite.
+              simpl; break_match; eauto using dedup_In; in_crush.
+           ++ destruct req; simpl in *; congruence.
+           ++ admit.
+           ++ repeat find_rewrite.
+              eapply no_responses_app.
+              admit.
+              unfold no_responses; intros.
+              find_eapply_prop no_responses.
+              in_crush.
+           ++ repeat find_rewrite.
+              eapply no_requests_app; eauto.
+              admit.
+        -- destruct req; simpl in *; try solve [congruence | inv_prop query_request].
+    + assert (cur_request st = cur_request st__src').
+      {
+        symmetry; eapply recv_handler_not_response_from_dst_preserves_cur_request; intuition eauto.
+        destruct (addr_eq_dec src (addr_of dstp)); try eauto.
+        subst.
+        left; intros.
+        find_eapply_prop no_responses.
+        chan2msg.
+        repeat find_rewrite.
+        in_crush.
+        eauto.
+      }
+      repeat find_reverse_rewrite.
+      eapply CIreq.
+      -- admit.
+      -- admit.
+      -- admit.
+      -- admit.
+      -- admit.
+  - destruct (send_eq_dec (src, p) (addr_of dstp, res0)).
+    + repeat find_rewrite || find_injection || rewrite_update.
+      find_copy_eapply_lem_hyp channel_after_recv_src_dst; eauto.
+      assert (no_responses (channel gst' (addr_of dstp) (addr_of dstp))).
+      {
+        unfold no_responses; intros.
+        expand_def.
+        repeat find_rewrite; channel_crush;
+          try solve [eapply recv_no_responses; eauto
+                    |find_eapply_prop no_responses; eauto; in_crush].
+      }
+      expand_def.
+      assert (no_requests (x ++ x0)).
+      {
+        repeat find_rewrite.
+        eapply no_requests_app.
+        eapply (app_no_requests x (res0::x0)); eauto.
+        eapply cons_no_requests.
+        eapply (app_no_requests x (res0::x0)); eauto.
+      }
+      destruct (cur_request st__src') as [[[? ?] ?]|] eqn:?.
+      * destruct (addr_eq_dec (addr_of dstp) (addr_of p)).
+        -- repeat find_rewrite.
+           eapply CIreq; auto.
+           ++ expand_def.
+              destruct (addr_eq_dec _ _); try congruence.
+              repeat find_rewrite.
+              eapply in_or_app; left.
+              repeat find_reverse_rewrite.
+              find_eapply_lem_hyp recv_res_new_req_in_channel; eauto.
+              eapply filterMap_In; eauto.
+              simpl; destruct (addr_eq_dec _ _); try congruence.
+           ++ eapply unique_no_requests.
+              expand_def.
+              destruct (addr_eq_dec _ _); try congruence.
+              repeat find_rewrite.
+              eapply unique_app_r.
+              eapply filterMap_sends_unique.
+              match goal with
+              | H: recv_handler ?src _ _ _  = _ |- _ =>
+                replace src with (addr_of dstp) in H;
+                  eapply recv_res_new_req_unique in H; eauto
+              end.
+              intros.
+              eapply_prop no_requests.
+              in_crush.
+           ++ handler_def.
+              intros.
+              find_eapply_lem_hyp handle_msg_only_appends_incoming_req_to_delayed_queries_when_busy; eauto; expand_def; eauto;
+                handler_def; repeat find_rewrite; simpl in *; eauto;
+                  intuition eauto using in_dedup_was_in. 
+           ++ eapply recv_handler_query_request_cur_request; eauto.
+              intros.
+              repeat find_rewrite || find_injection; eauto.
+        -- eapply CIother; eauto.
+           ++ expand_def; repeat find_rewrite.
+              destruct (addr_eq_dec _ _); try congruence.
+              eapply no_requests_app; auto.
+              eapply recv_requests_only_to_tgt; eauto.
+           ++ handler_def.
+              intros.
+              find_eapply_lem_hyp handle_msg_only_appends_incoming_req_to_delayed_queries_when_busy; eauto; expand_def; eauto;
+                handler_def; repeat find_rewrite; simpl in *; eauto;
+                  intuition eauto using in_dedup_was_in. 
+           ++ eapply recv_handler_query_request_cur_request; eauto.
+              intros.
+              repeat find_rewrite || find_injection; eauto.
+      * eapply CInone; eauto.
+        -- expand_def.
+           repeat find_rewrite.
+           destruct (addr_eq_dec _ _) in *; try congruence.
+           eapply no_requests_app; auto.
+           eapply recv_cr_none_no_requests; eauto.
+        -- erewrite recv_cr_None_empties_dqs by eauto.
+           eauto.
+    + assert (~ query_response q p \/ src <> addr_of dstp).
+      {
+        repeat find_rewrite || rewrite_update || find_injection.
+        destruct (addr_eq_dec src (addr_of dstp)).
+        - subst; left.
+          intro.
+          cut (p = res0); [intro; subst; eauto|].
+          eapply unique_eq; eauto using no_responses_unique, payload_eq_dec.
+        - auto. 
+      }
+      assert (cur_request st = cur_request st__src').
+      {
+        repeat find_rewrite || rewrite_update || find_injection.
+        symmetry.
+        eapply recv_handler_not_response_from_dst_preserves_cur_request; eauto.
+      }
+      repeat find_reverse_rewrite.
+      assert (unique response_payload (channel gst' (addr_of dstp) (addr_of dstp)) res0).
+      {
+        destruct (addr_eq_dec src (addr_of dstp)); subst.
+        - break_or_hyp; try congruence.
+          find_eapply_lem_hyp channel_after_recv_src_dst; eauto.
+          expand_def; repeat find_rewrite.
+          eapply unique_app.
+          eauto using unique_remove, no_responses_unique.
+          intros.
+          channel_crush; eapply recv_no_responses; eauto.
+        - erewrite channel_after_recv_not_src_dst; try eassumption || congruence.
+          eapply unique_app; eauto using no_responses_unique.
+          intros.
+          channel_crush; eapply recv_no_responses; eauto.
+      }
+      eapply CIres; eauto.
+      * chan2msg; repeat find_rewrite; in_crush;
+          find_injection; exfalso; auto.
+      * eapply unique_no_responses; eauto.
+      * unfold no_requests; intros; chan2msg.
+        repeat find_rewrite.
+        find_eapply_lem_hyp in_app_or; break_or_hyp; eauto.
+        -- find_apply_lem_hyp in_map_iff; break_exists; break_and.
+           unfold send in *; find_injection.
+           eapply recv_handler_not_response_from_dst_sends_no_requests; eauto.
+           repeat find_rewrite; eauto.
+        -- find_eapply_prop no_requests.
+           chan2msg.
+           repeat find_rewrite.
+           in_crush.
+      * match goal with
+        | H: context[query_response] |- _ => clear H
+        end.
+        handler_def.
+        find_apply_lem_hyp do_delayed_queries_definition; expand_def;
+          repeat find_rewrite || find_injection || rewrite_update;
+          eauto.
+        destruct (list_eq_dec send_eq_dec (delayed_queries st__src') (delayed_queries st)).
+        -- repeat find_rewrite; eauto.
+        -- find_eapply_lem_hyp handle_msg_dqs_change_queue_for_reqs; eauto; expand_def.
+           intuition.
+           repeat find_rewrite.
+           find_eapply_lem_hyp in_dedup_was_in.
+           in_crush; eauto.
+           find_injection.
+           eapply_prop no_requests; [|eauto]; eauto.
   - admit.
 Admitted.
 
