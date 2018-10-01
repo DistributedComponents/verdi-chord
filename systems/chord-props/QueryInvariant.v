@@ -3138,11 +3138,19 @@ Proof.
              solve [inv_prop request_payload
                    |find_eapply_prop no_requests; eauto; in_crush].
       * handler_def; try solve [congruence | inv_prop query_request].
-        -- assert (cur_request st = cur_request x3) by admit.
-           repeat find_reverse_rewrite.
-           assert (delayed_queries x3 = dedup send_eq_dec ((addr_of dstp, req) :: delayed_queries st)).
+        -- assert (cur_request st = cur_request x3).
            {
              repeat handler_def || handler_simpl.
+           }
+           repeat find_reverse_rewrite.
+           assert (delayed_queries x3 = (addr_of dstp, req) :: dedup send_eq_dec (delayed_queries st)).
+           {
+             repeat handler_def || handler_simpl.
+             - break_match; try eauto.
+               repeat find_rewrite; simpl; in_crush.
+             - break_match;
+                 repeat find_rewrite; simpl; in_crush;
+                   exfalso; eauto.
            }
            eapply CIdelayed; eauto.
            ++ repeat find_rewrite.
