@@ -2922,6 +2922,20 @@ Proof.
       find_injection; inv_prop request_payload. 
 Qed.
 
+Lemma recv_handler_cr_after_None_sends_no_requests :
+  forall src h st p st' ms nts cts,
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    cur_request st' = None ->
+    forall s pp,
+      In (s, pp) ms ->
+      ~ request_payload pp.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl;
+    in_crush; eauto using handle_delayed_query_only_sends_responses;
+      find_injection; inv_prop request_payload. 
+Qed.
+
 Lemma recv_cur_request_None_preserved :
   forall src h st p st' ms nts cts,
     recv_handler src h st p = (st', ms, nts, cts) ->
@@ -3010,7 +3024,7 @@ Proof.
     inv_prop response_payload.
 Qed.
 
-Theorem query_message_ok_recv_src_distinct_recv_other :
+Theorem query_message_ok_recv_src_distinct_recv_same :
   forall gst gst' src h st p xs ys st' ms nts cts,
     reachable_st gst ->
     step_dynamic gst gst' ->
@@ -3027,7 +3041,6 @@ Theorem query_message_ok_recv_src_distinct_recv_other :
     msgs gst' = map (send h) ms ++ xs ++ ys ->
     trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
     (forall (dst : addr) (st__src : data),
-        h <> dst ->
         sigma gst h = Some st__src ->
         query_message_ok' h dst (cur_request st__src)
                           (option_map delayed_queries (sigma gst dst))
@@ -3035,43 +3048,7 @@ Theorem query_message_ok_recv_src_distinct_recv_other :
                           (channel gst h dst) (channel gst dst h)) ->
     forall (dst : addr) (st__src' st__dst st__dst' : data),
       h <> dst ->
-      src <> dst ->
-      sigma gst' h = Some st__src' ->
-      sigma gst dst = Some st__dst ->
-      sigma gst' dst = Some st__dst' ->
-      query_message_ok h dst (cur_request st) (delayed_queries st__dst) (channel gst h dst) (channel gst dst h) ->
-      ~ In dst (failed_nodes gst') ->
-      query_message_ok h dst (cur_request st__src')
-                       (delayed_queries st__dst')
-                       (channel gst' h dst) (channel gst' dst h).
-Proof.
-Admitted.
-
-Theorem query_message_ok_recv_src_distinct_recv :
-  forall gst gst' src h st p xs ys st' ms nts cts,
-    reachable_st gst ->
-    step_dynamic gst gst' ->
-    recv_handler src h st p = (st', ms, nts, cts) ->
-    msgs gst = xs ++ (src, (h, p)) :: ys ->
-    In h (nodes gst) ->
-    ~ In h (failed_nodes gst') ->
-    sigma gst h = Some st ->
-    nodes gst' = nodes gst ->
-    failed_nodes gst' = failed_nodes gst ->
-    timeouts gst' =
-    update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
-    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
-    msgs gst' = map (send h) ms ++ xs ++ ys ->
-    trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
-    (forall (dst : addr) (st__src : data),
-        h <> dst ->
-        sigma gst h = Some st__src ->
-        query_message_ok' h dst (cur_request st__src)
-                          (option_map delayed_queries (sigma gst dst))
-                          (nodes gst') (failed_nodes gst')
-                          (channel gst h dst) (channel gst dst h)) ->
-    forall (dst : addr) (st__src' st__dst st__dst' : data),
-      h <> dst ->
+      src = dst ->
       sigma gst' h = Some st__src' ->
       sigma gst dst = Some st__dst ->
       sigma gst' dst = Some st__dst' ->
@@ -3084,8 +3061,7 @@ Proof.
   intros.
   assert (st__dst' = st__dst)
     by (repeat find_rewrite; rewrite_update; congruence); subst.
-  destruct (addr_eq_dec src dst); subst;
-    eauto using query_message_ok_recv_src_distinct_recv_other.
+  subst.
   find_copy_eapply_lem_hyp channel_after_recv_src_dst; eauto; expand_def.
   repeat find_rewrite.
   destruct (addr_eq_dec dst h); try congruence; simpl.
@@ -3207,6 +3183,214 @@ Proof.
       destruct (addr_eq_dec h h); try congruence.
       unfold no_requests; intros.
       channel_crush; eapply recv_handler_not_response_from_dst_sends_no_requests; eauto.
+Qed.
+
+Lemma recv_cur_request_changes :
+  forall src h st p st' ms nts cts dstp q m dstp' q' m',
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    cur_request st = Some (dstp, q, m) ->
+    cur_request st' = Some (dstp', q', m') ->
+    dstp <> dstp' ->
+    addr_of dstp = src /\ query_response q p.
+Proof.
+  intros.
+  repeat handler_def || handler_simpl;
+    solve [repeat find_rewrite || find_injection; split; eauto; constructor].
+Qed.
+
+Theorem query_message_ok_recv_src_distinct_recv_other :
+  forall gst gst' src h st p xs ys st' ms nts cts,
+    reachable_st gst ->
+    step_dynamic gst gst' ->
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    msgs gst = xs ++ (src, (h, p)) :: ys ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst') ->
+    sigma gst h = Some st ->
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' =
+    update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    msgs gst' = map (send h) ms ++ xs ++ ys ->
+    trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
+    (forall (dst : addr) (st__src : data),
+        sigma gst h = Some st__src ->
+        query_message_ok' h dst (cur_request st__src)
+                          (option_map delayed_queries (sigma gst dst))
+                          (nodes gst') (failed_nodes gst')
+                          (channel gst h dst) (channel gst dst h)) ->
+    forall (dst : addr) (st__src' st__dst st__dst' : data),
+      h <> dst ->
+      src <> dst ->
+      sigma gst' h = Some st__src' ->
+      sigma gst dst = Some st__dst ->
+      sigma gst' dst = Some st__dst' ->
+      query_message_ok h dst (cur_request st) (delayed_queries st__dst) (channel gst h dst) (channel gst dst h) ->
+      ~ In dst (failed_nodes gst') ->
+      query_message_ok h dst (cur_request st__src')
+                       (delayed_queries st__dst')
+                       (channel gst' h dst) (channel gst' dst h).
+Proof.
+  intros.
+  assert (st__dst' = st__dst)
+    by (repeat find_rewrite; rewrite_update; congruence); subst.
+  erewrite channel_after_recv_not_src_dst; eauto.
+  erewrite (channel_after_recv_unrelated gst gst') by eauto.
+  repeat find_rewrite || rewrite_update || find_injection.
+  assert (query_message_ok' h src (cur_request st)
+                            (option_map delayed_queries (sigma gst src))
+                            (nodes gst) (failed_nodes gst)
+                            (channel gst h src) (channel gst src h))
+    by eauto.
+  break_match; try congruence.
+  inv_prop query_message_ok.
+  - find_copy_apply_lem_hyp recv_cur_request_None_preserved; eauto.
+    repeat find_rewrite || rewrite_update || find_injection.
+    match goal with
+    | H: None = _ |- _ => rewrite <- H
+    end.
+    destruct (addr_eq_dec h h); try congruence.
+    replace (cur_request st) with (@None (pointer * query * payload)) by congruence.
+    eapply CInone; eauto.
+    + eapply no_requests_app; auto.
+      unfold no_requests; intros.
+      channel_crush.
+      eauto using recv_handler_cr_None_sends_no_requests.
+  - destruct (cur_request st__src') as [[[? ?] ?]|] eqn:?.
+    + destruct (addr_eq_dec dst (addr_of p0)); subst.
+      * find_copy_eapply_lem_hyp recv_cur_request_changes; eauto.
+        break_and; subst.
+        assert (request_response_pair req p).
+        {
+          inv_prop query_message_ok'; repeat find_rewrite || find_injection;
+                try congruence.
+          - assert (~ no_responses (channel gst (addr_of dstp) h)).
+                 {
+                   intro; eapply_prop no_responses.
+                   chan2msg.
+                   repeat find_rewrite.
+                   in_crush.
+                   eauto.
+                 }
+                 inv_prop (query_message_ok h (addr_of dstp));
+                   try solve [exfalso; eapply_prop not; eauto
+                             |congruence].
+                 assert (req = req0) by congruence; subst.
+                 assert (p = res0).
+                 eapply unique_eq; eauto using no_responses_unique, payload_eq_dec.
+                 chan2msg; repeat find_rewrite; in_crush.
+                 subst; eauto.
+          - assert (req = req0) by congruence; subst.
+                 assert (p = res0).
+                 eapply unique_eq; eauto using no_responses_unique, payload_eq_dec.
+                 chan2msg; repeat find_rewrite; in_crush.
+          - assert (~ no_responses (channel gst (addr_of dstp) h)).
+                 {
+                   intro; eapply_prop no_responses.
+                   chan2msg.
+                   repeat find_rewrite.
+                   in_crush.
+                   eauto.
+                 }
+                 exfalso; eauto.
+          - assert (In p []).
+                 replace [] with (channel gst (addr_of dstp) h) by congruence.
+                 chan2msg; repeat find_rewrite; in_crush; intuition eauto.
+                 simpl in *; tauto.
+          - assert (client_payload p).
+                 find_eapply_prop client_payload; chan2msg; eauto.
+                 inv_prop client_payload; inv_prop query_response.
+        }
+        assert (query_request q0 p1).
+        {
+          eapply recv_handler_query_request_cur_request; eauto.
+          congruence.
+        }
+        assert (In (addr_of p0, p1) ms)
+          by eauto using recv_res_new_req_in_channel.
+        eapply CIreq; eauto.
+        ++ in_crush; left.
+           eapply filterMap_In; eauto.
+           simpl; break_match; try congruence.
+        ++ eapply unique_no_requests.
+           eapply unique_app_r; eauto using no_requests_unique.
+           eapply filterMap_sends_unique.
+           match goal with
+           | H: recv_handler ?src _ _ _  = _ |- _ =>
+             eapply recv_res_new_req_unique in H; eauto
+           end.
+      * eapply CIother; eauto.
+        -- eapply no_requests_app; auto.
+           unfold no_requests; intros.
+           channel_crush.
+           intro.
+           find_eapply_lem_hyp request_sent_by_recv; eauto.
+           expand_def; congruence.
+        -- eapply recv_handler_query_request_cur_request; eauto.
+           congruence.
+    + eapply CInone; eauto.
+      eapply no_requests_app; eauto.
+      unfold no_requests; intros.
+      channel_crush.
+      eauto using recv_handler_cr_after_None_sends_no_requests.
+  - replace (cur_request st__src') with (Some (dstp, q, req))
+      by (repeat find_rewrite; symmetry; eauto using recv_msg_not_right_response_from_dst_preserves_cur_request).
+    eapply CIreq; eauto; try solve [in_crush].
+    eapply unique_no_requests.
+    eapply unique_app; eauto using no_requests_unique.
+    intros.
+    channel_crush; eapply recv_handler_not_response_from_dst_sends_no_requests; eauto.
+  - replace (cur_request st__src') with (Some (dstp, q, req))
+      by (repeat find_rewrite; symmetry; eauto using recv_msg_not_right_response_from_dst_preserves_cur_request).
+    eapply CIres; eauto; try solve [in_crush].
+    eapply no_requests_app; eauto.
+    unfold no_requests; intros.
+    channel_crush; eapply recv_handler_not_response_from_dst_sends_no_requests; eauto.
+  - replace (cur_request st__src') with (Some (dstp, q, req))
+      by (repeat find_rewrite; symmetry; eauto using recv_msg_not_right_response_from_dst_preserves_cur_request).
+    eapply CIdelayed; eauto; try solve [in_crush].
+    eapply no_requests_app; eauto.
+    unfold no_requests; intros.
+    channel_crush; eapply recv_handler_not_response_from_dst_sends_no_requests; eauto.
+Qed.
+
+Theorem query_message_ok_recv_src_distinct_recv :
+  forall gst gst' src h st p xs ys st' ms nts cts,
+    reachable_st gst ->
+    step_dynamic gst gst' ->
+    recv_handler src h st p = (st', ms, nts, cts) ->
+    msgs gst = xs ++ (src, (h, p)) :: ys ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst') ->
+    sigma gst h = Some st ->
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' =
+    update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (timeouts gst h)) ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    msgs gst' = map (send h) ms ++ xs ++ ys ->
+    trace gst' = trace gst ++ [e_recv (src, (h, p))] ->
+    (forall (dst : addr) (st__src : data),
+        sigma gst h = Some st__src ->
+        query_message_ok' h dst (cur_request st__src)
+                          (option_map delayed_queries (sigma gst dst))
+                          (nodes gst') (failed_nodes gst')
+                          (channel gst h dst) (channel gst dst h)) ->
+    forall (dst : addr) (st__src' st__dst st__dst' : data),
+      h <> dst ->
+      sigma gst' h = Some st__src' ->
+      sigma gst dst = Some st__dst ->
+      sigma gst' dst = Some st__dst' ->
+      query_message_ok h dst (cur_request st) (delayed_queries st__dst) (channel gst h dst) (channel gst dst h) ->
+      ~ In dst (failed_nodes gst') ->
+      query_message_ok h dst (cur_request st__src')
+                       (delayed_queries st__dst')
+                       (channel gst' h dst) (channel gst' dst h).
+Proof.
+  intros.
+  destruct (addr_eq_dec src dst);
+    eauto using query_message_ok_recv_src_distinct_recv_same, query_message_ok_recv_src_distinct_recv_other.
 Qed.
 
 Lemma recv_requests_only_to_tgt :
