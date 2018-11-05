@@ -4900,6 +4900,66 @@ Proof.
         eapply QMClient; eauto.
 Qed.
 
+Lemma cur_request_not_none_state_preserved_by_tick:
+  forall h st,
+    chord_tick_pre_post
+      (fun g =>
+         sigma g h = Some st /\
+         cur_request st <> None)
+      (fun g =>
+         sigma g h = Some st).
+Proof.
+  unfold chord_tick_invariant, chord_tick_pre_post; intros.
+  repeat find_rewrite; update_destruct; subst; break_and.
+  - repeat handler_def || handler_simpl || inv_option_map.
+  - repeat find_rewrite; rewrite_update; eauto.
+Qed.
+
+Lemma delayed_queries_preserved_by_tick:
+  forall h dqs,
+    chord_tick_pre_post
+      (fun g =>
+         forall st,
+           sigma g h = Some st ->
+           delayed_queries st = dqs)
+      (fun g =>
+         forall st',
+           sigma g h = Some st' ->
+           delayed_queries st' = dqs).
+Proof.
+  unfold chord_tick_invariant, chord_tick_pre_post; intros.
+  repeat find_rewrite; update_destruct; subst; break_and.
+  - repeat find_rewrite; rewrite_update.
+    repeat handler_def || handler_simpl.
+  - repeat find_rewrite; rewrite_update; eauto.
+Qed.
+
+Lemma cur_request_not_none_channels_preserved_by_tick:
+  forall gst gst' h st st' ms nts cts eff,
+    reachable_st gst ->
+    step_dynamic gst gst' ->
+    In Tick (timeouts gst h) ->
+    In h (nodes gst) ->
+    ~ In h (failed_nodes gst) ->
+    sigma gst h = Some st ->
+    tick_handler h st = (st', ms, nts, cts, eff) ->
+    nodes gst' = nodes gst ->
+    failed_nodes gst' = failed_nodes gst ->
+    timeouts gst' = update addr_eq_dec (timeouts gst) h (nts ++ remove_all timeout_eq_dec cts (remove timeout_eq_dec Tick (timeouts gst h))) ->
+    sigma gst' = update addr_eq_dec (sigma gst) h (Some st') ->
+    msgs gst' = map (send h) ms ++ msgs gst -> trace gst' = trace gst ++ [e_timeout h Tick] ->
+    cur_request st <> None ->
+    forall src dst,
+    channel gst src dst = channel gst' src dst.
+Proof.
+  intros.
+  repeat find_rewrite; subst; break_and.
+  unfold channel in *.
+  repeat find_rewrite.
+  replace ms with (@nil (addr * payload)); auto.
+  repeat handler_def || handler_simpl || inv_option_map.
+Qed.
+
 Theorem query_message_ok'_tick_invariant :
  chord_tick_invariant
    (fun g : global_state =>
@@ -4909,6 +4969,101 @@ Theorem query_message_ok'_tick_invariant :
       (option_map delayed_queries (sigma g dst)) (nodes g) (failed_nodes g) (channel g src dst)
       (channel g dst src)).
 Proof.
+  repeat autounfold; intros.
+  destruct (sigma gst src) eqn:?;
+    [|repeat find_rewrite || rewrite_update; congruence].
+  assert (cur_request st <> None -> st' = st).
+  {
+    intros.
+    cut (Some st' = Some st); [congruence|].
+    replace (Some st') with (sigma gst' h); [|repeat find_rewrite; rewrite_update; auto].
+    eapply cur_request_not_none_state_preserved_by_tick; eauto.
+  }
+  assert (query_message_ok' src dst (cur_request d) (option_map delayed_queries (sigma gst dst)) (nodes gst) (failed_nodes gst)
+                            (channel gst src dst) (channel gst dst src))
+    by eauto.
+  assert (Hdqs: option_map delayed_queries (sigma gst' dst) = option_map delayed_queries (sigma gst dst)).
+  {
+    destruct (sigma gst dst) eqn:?, (sigma gst' dst) eqn:?; simpl.
+    - f_equal.
+      eapply delayed_queries_preserved_by_tick; eauto; intros; congruence.
+    - repeat find_rewrite || rewrite_update || update_destruct; congruence.
+    - repeat find_rewrite || rewrite_update || update_destruct; congruence.
+    - auto.
+  }
+  rewrite Hdqs.
+  inv_prop query_message_ok'; inv_option_map.
+  - repeat find_rewrite || find_injection.
+    admit.
+  - assert (h <> addr_of dstp)
+      by (intro; subst; tauto).
+    destruct (addr_eq_dec h src).
+    + replace (cur_request st__src) with (Some (dstp, q, req)).
+      destruct (sigma gst' (addr_of dstp)) eqn:?;
+               [|repeat find_rewrite; update_destruct || rewrite_update;
+                 update_destruct; rewrite_update; congruence].
+      replace (channel gst' (addr_of dstp) src) with (channel gst (addr_of dstp) src)
+        by eauto using cur_request_not_none_channels_preserved_by_tick.
+      replace (channel gst' src (addr_of dstp)) with (channel gst src (addr_of dstp))
+        by eauto using cur_request_not_none_channels_preserved_by_tick.
+      replace (nodes gst') with (nodes gst).
+      replace (failed_nodes gst') with (failed_nodes gst).
+      eapply QMFailedRes; eauto.
+      replace st__src with d; eauto.
+      repeat find_rewrite || find_injection || rewrite_update.
+      symmetry; eauto.
+    + repeat find_rewrite || find_injection || rewrite_update.
+      replace (cur_request d) with (Some (dstp, q, req)).
+      erewrite channel_msgs_unchanged with (src := src); eauto.
+      erewrite channel_msgs_unchanged with (src := (addr_of dstp)); eauto.
+      eapply QMFailedRes; eauto.
+  - eapply QMFailedNothing; congruence || eauto.
+    + unfold no_responses; intros.
+      chan2msg; repeat find_rewrite; in_crush.
+      * unfold send in *; find_injection.
+        repeat handler_def || handler_simpl.
+      * eapply_prop no_responses; chan2msg; eauto.
+    + intros.
+      repeat find_rewrite || find_injection || rewrite_update || update_destruct; subst; eauto.
+      handler_def; eauto.
+      repeat handler_def || handler_simpl.
+  - assert (forall m, ~ In (dst, m) ms).
+    {
+      intros.
+      repeat handler_def; auto.
+      simpl in *.
+      inv_option_map.
+      intuition; find_injection.
+      find_eapply_prop nodes.
+      find_eapply_lem_hyp hd_error_in; eauto.
+      find_eapply_lem_hyp successors_in_nodes; eauto.
+    }
+    replace (channel gst' src dst) with (@nil payload).
+    replace (channel gst' dst src) with (@nil payload).
+    eapply QMNotStarted; congruence || eauto.
+    + admit.
+    + symmetry.
+      eapply no_elements_nil.
+      intuition; chan2msg.
+      repeat find_rewrite; in_crush.
+      unfold send in *; find_injection.
+      eauto.
+      eapply in_nil.
+      replace [] with (channel gst dst src).
+      chan2msg; eauto.
+    + symmetry.
+      eapply no_elements_nil.
+      intuition; chan2msg.
+      repeat find_rewrite; in_crush.
+      unfold send in *; find_injection.
+      eauto.
+      eapply in_nil.
+      replace [] with (channel gst src dst).
+      chan2msg; eauto.
+      congruence.
+  - eapply QMClient; eauto.
+    admit.
+    admit.
 Admitted.
 
 Theorem dq_res_qmo :
