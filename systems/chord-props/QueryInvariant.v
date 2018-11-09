@@ -2322,7 +2322,12 @@ Lemma unique_remove :
     unique P (xs ++ x :: ys) u ->
     unique P (xs ++ ys) u.
 Proof.
-Admitted.
+  intros.
+  find_apply_lem_hyp (@unique_app_comm A).
+  simpl in *.
+  find_apply_lem_hyp (@unique_cons_remove A).
+  eauto using unique_app_comm.
+Qed.
 
 Theorem query_message_ok'_recv_dst_recv :
   forall gst gst' src h st p xs ys st' ms nts cts,
