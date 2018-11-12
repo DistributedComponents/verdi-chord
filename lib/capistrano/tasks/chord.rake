@@ -33,7 +33,7 @@ namespace :chord do
 
   desc 'start chord ring base'
   task :start_base do
-    ring = roles(:base).collect { |node| "-ring #{node.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
+    ring = roles([:root, :base]).collect { |node| "-ring #{node.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
     on roles(:base) do |node|
       execute '/sbin/start-stop-daemon',
         '--start',
@@ -266,9 +266,9 @@ namespace :chord do
     Rake::Task['chord:truncate_log'].execute
     Rake::Task['chord:truncate_client_log'].execute
 
-    # 1. start up 3 "randomly" chosen nodes        
-    ring = roles(:base).collect { |node| "-ring #{node.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
-    on roles(:base) do |node|
+    # 1. start up 4 "randomly" chosen nodes
+    ring = roles([:root, :base]).collect { |node| "-ring #{node.properties.ip}:#{fetch(:chord_node_port)}" }.join(' ')
+    on roles([:root, :base]) do |node|
       execute '/sbin/start-stop-daemon',
         '--start',
         '--quiet',
@@ -281,10 +281,10 @@ namespace :chord do
         "-- -c 'exec ./chord.native -bind #{node.properties.ip}:#{fetch(:chord_node_port)} #{ring} > log/chord.log 2>&1'"
     end
 
-    # 2. pause to stabilize 3-node ring
+    # 2. pause to stabilize 4-node ring
     sleep(20)
 
-    # 3. start 3 new "randomly" chosen nodes
+    # 3. start 4 new "randomly" chosen nodes
     on roles(:ext) do |node|
       known = nodes[node.properties.known]
       execute '/sbin/start-stop-daemon',
@@ -299,10 +299,10 @@ namespace :chord do
         "-- -c 'exec ./chord.native -bind #{node.properties.ip}:#{fetch(:chord_node_port)} -known #{known.properties.ip}:#{fetch(:chord_node_port)} > log/chord.log 2>&1'"
     end
 
-    # 4. pause to stabilize 6-node ring
+    # 4. pause to stabilize 8-node ring
     sleep(20)
 
-    # 5. shut down the 3 new nodes
+    # 5. shut down the 4 new nodes
     on roles(:ext) do
       execute '/sbin/start-stop-daemon',
         '--stop',
@@ -310,11 +310,11 @@ namespace :chord do
         "--pidfile #{chord_pidfile_path}"
     end
 
-    # 6. pause to stabilize 3-node ring
+    # 6. pause to stabilize 4-node ring
     sleep(20)
 
     # 7. stop remaining nodes
-    on roles(:base) do
+    on roles([:root, :base]) do
       execute '/sbin/start-stop-daemon',
         '--stop',
         '--oknodo',
