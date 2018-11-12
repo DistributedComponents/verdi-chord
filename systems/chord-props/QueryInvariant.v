@@ -4999,7 +4999,12 @@ Proof.
   rewrite Hdqs.
   inv_prop query_message_ok'; inv_option_map.
   - repeat find_rewrite || find_injection.
-    admit.
+    inv_prop query_message_ok.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
   - assert (h <> addr_of dstp)
       by (intro; subst; tauto).
     destruct (addr_eq_dec h src).
@@ -5067,8 +5072,16 @@ Proof.
       chan2msg; eauto.
       congruence.
   - eapply QMClient; eauto.
-    admit.
-    admit.
+    + intros.
+      chan2msg.
+      repeat find_rewrite; in_crush.
+      unfold send in *; find_injection.
+      exfalso; eapply nodes_not_clients; eauto.
+    + intros.
+      chan2msg.
+      repeat find_rewrite; in_crush.
+      unfold send in *; find_injection.
+      admit.
 Admitted.
 
 Theorem dq_res_qmo :
