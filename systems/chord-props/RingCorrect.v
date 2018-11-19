@@ -1166,11 +1166,14 @@ Proof.
       simpl in *; break_or_hyp.
       * unfold send in *; find_injection; inv_prop succs_msg.
       * assert (principal gst p) by (eapply Forall_forall; eauto).
-        inv_prop principal;
-          expand_def.
-        exfalso; find_eapply_prop client_addr;
-          eapply msgs_out_of_net_go_to_clients; eauto.
-        eauto.
+        assert (~ client_payload m) by (inv_prop succs_msg; intro; inv_prop client_payload).
+        find_copy_eapply_lem_hyp LiveNodesNotClients.sent_non_client_message_means_in_nodes; eauto.
+        inv_prop principal; expand_def.
+        exfalso; find_eapply_prop client_addr.
+        assert (~ client_addr src)
+          by eauto using LiveNodesNotClients.live_nodes_not_clients.
+        eapply non_client_msgs_out_of_net_go_to_clients; eauto.
+        find_eapply_prop no_msg_to_live_node_skips; eauto.
   - find_eapply_prop In.
     inv_prop principal.
     split; eauto using live_after_start_was_live.

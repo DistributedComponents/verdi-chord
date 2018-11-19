@@ -4965,6 +4965,24 @@ Proof.
   repeat handler_def || handler_simpl || inv_option_map.
 Qed.
 
+
+Lemma tick_handler_respects_query_request :
+  forall h st st' ms nts cts eff,
+    tick_handler h st = (st', ms, nts, cts, eff) ->
+    (forall dstp q m,
+        cur_request st = Some (dstp, q, m) ->
+        query_request q m) ->
+    forall dstp' q' m',
+      cur_request st' = Some (dstp', q', m') ->
+      query_request q' m'.
+Proof.
+  intros.
+  repeat handler_def; eauto.
+  simpl in *; find_injection.
+  inv_option_map; auto.
+  simpl in *; congruence.
+Qed.
+
 Theorem query_message_ok'_tick_invariant :
  chord_tick_invariant
    (fun g : global_state =>
@@ -5036,7 +5054,10 @@ Proof.
     + intros.
       repeat find_rewrite || find_injection || rewrite_update || update_destruct; subst; eauto.
       handler_def; eauto.
-      repeat handler_def || handler_simpl.
+      repeat handler_def; simpl in *; inv_option_map;
+        repeat find_rewrite || find_injection.
+      eauto.
+      congruence.
   - assert (forall m, ~ In (dst, m) ms).
     {
       intros.
@@ -5050,8 +5071,20 @@ Proof.
     }
     replace (channel gst' src dst) with (@nil payload).
     replace (channel gst' dst src) with (@nil payload).
-    eapply QMNotStarted; congruence || eauto.
-    + admit.
+    eapply QMNotStarted; try congruence.
+    + intros.
+      destruct (addr_eq_dec h src);
+        repeat find_rewrite || find_injection || rewrite_update || simpl in *; eauto.
+      split.
+      eapply tick_handler_respects_query_request; eauto; firstorder.
+      intro; subst.
+      find_eapply_prop nodes.
+      replace (nodes gst) with (nodes gst').
+      eapply cur_request_targets_in_nodes.
+      econstructor 2; eauto.
+      repeat find_rewrite.
+      rewrite update_same; eauto.
+      eauto.
     + symmetry.
       eapply no_elements_nil.
       intuition; chan2msg.
@@ -5081,7 +5114,12 @@ Proof.
       chan2msg.
       repeat find_rewrite; in_crush.
       unfold send in *; find_injection.
-      admit.
+      repeat handler_def || handler_simpl.
+      inv_option_map.
+      exfalso.
+      find_eapply_lem_hyp hd_error_in.
+      find_eapply_lem_hyp successors_in_nodes; eauto.
+      eapply nodes_not_clients; eauto.
 Admitted.
 
 Theorem dq_res_qmo :
