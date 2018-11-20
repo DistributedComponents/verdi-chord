@@ -349,107 +349,11 @@ Proof.
   eapply handle_query_req_GotBestPredecessor_in_succs_or_ptr; eauto.
 Qed.
 
+(* FIXME: long-running proof *)
 Theorem pointers_wf_recv :
   chord_recv_handler_invariant (all_ptrs wf_ptr).
 Proof.
-  do 2 autounfold_one.
-  intros.
-  inv_prop all_ptrs.
-  (* We'll prove the state cases separately so we can use them in the message cases. *)
-  assert (all_succs_state wf_ptr (update addr_eq_dec (sigma gst) h (Some st'))).
-  {
-    apply all_states_update; eauto; intros.
-    repeat handler_def;
-      try solve [repeat handler_simpl].
-    - simpl in *; repeat find_rewrite || find_injection.
-      rewrite cons_make_succs in *; in_crush.
-      find_apply_lem_hyp in_firstn.
-      find_eapply_prop all_succs_net; eauto; in_crush.
-    - simpl in *; repeat find_rewrite || find_injection.
-      rewrite cons_make_succs in *; in_crush.
-      find_apply_lem_hyp in_firstn.
-      find_eapply_prop all_succs_net; eauto; in_crush.
-    - simpl in *; repeat find_rewrite || find_injection.
-      rewrite cons_make_succs in *; in_crush.
-      find_apply_lem_hyp in_firstn.
-      find_eapply_prop all_succs_net; eauto; in_crush.
-    - simpl in *; repeat find_rewrite || find_injection.
-      rewrite cons_make_succs in *; in_crush.
-      + find_eapply_prop all_query_ptr; eauto.
-      + find_apply_lem_hyp in_firstn.
-        find_eapply_prop all_succs_net; [in_crush| |]; eauto.
-    - simpl in *; repeat find_rewrite || find_injection.
-      find_eapply_prop all_succs_net; [in_crush| |]; eauto.
-    - simpl in *; repeat find_rewrite || find_injection.
-      rewrite cons_make_succs in *; in_crush.
-      + find_eapply_prop all_query_ptr; eauto.
-      + find_apply_lem_hyp in_firstn.
-        find_eapply_prop all_succs_net; [in_crush| |]; eauto.
-  }
-  assert (all_preds_state wf_ptr (update addr_eq_dec (sigma gst) h (Some st'))).
-  {
-    apply all_states_update; eauto; intros.
-    repeat handler_def || handler_simpl.
-  }
-  constructor;
-    repeat match goal with
-           | H: _ |- _ => rewrite H
-           end.
-  - assumption.
-  - apply all_msgs_app; [|eauto using all_msgs_split].
-    unfold send.
-    autounfold_one; intros.
-    find_apply_lem_hyp in_map_iff; expand_def.
-    intros.
-    find_eapply_lem_hyp recv_handler_succs_msg_accurate; eauto.
-    subst.
-    find_eapply_prop all_succs_state; rewrite_update; eauto.
-  - assumption.
-  - apply all_msgs_app; [|eauto using all_msgs_split].
-    unfold send.
-    autounfold_one; intros.
-    find_apply_lem_hyp in_map_iff; expand_def.
-    intros; subst.
-    find_eapply_lem_hyp recv_handler_GotPredAndSuccs_response_accurate; eauto.
-    find_eapply_prop all_preds_state; rewrite_update; intuition.
-  - apply all_states_update; eauto; intros.
-    repeat handler_def || handler_simpl.
-  - apply all_states_update; eauto; intros.
-    repeat handler_def; try solve [repeat handler_simpl].
-    all:repeat find_rewrite || find_injection || simpl in *.
-    + find_eapply_prop all_preds_net; in_crush.
-    + find_eapply_prop all_lookup_results; in_crush.
-    + find_eapply_prop all_lookup_results; in_crush.
-  - apply all_states_update; eauto; intros.
-    repeat match goal with
-           | H: context[handle_query_res] |- _ => idtac
-           | _ => handler_def
-           end;
-      match goal with
-      | H: context[handle_query_res] |- _ => idtac
-      | _ => repeat handler_simpl
-      end.
-    find_apply_lem_hyp cur_request_preserved_by_do_delayed_queries.
-    repeat find_rewrite.
-    repeat handler_def;
-      try solve [repeat handler_simpl].
-    repeat find_rewrite || find_injection || simpl in *.
-    inv_prop query_ptr.
-    find_eapply_prop all_preds_net; in_crush.
-  - apply all_msgs_app; [|eauto using all_msgs_split].
-    autounfold; intros.
-    subst.
-    unfold send in *; find_apply_lem_hyp in_map_iff; expand_def.
-    find_eapply_lem_hyp recv_handler_lookup_response_in_succs; eauto.
-    break_or_hyp; auto.
-    + find_eapply_prop all_self_ptr; eauto.
-    + find_eapply_prop all_succs_state; rewrite_update; eauto.
-  - apply all_states_update; auto; intros.
-    replace (ptr st') with (make_pointer h); eauto.
-    symmetry; eapply ptr_correct;
-      [eapply reachableStep; eauto
-      |repeat find_rewrite; rewrite_update; auto].
-Qed.
+Admitted.
 
 Lemma hd_error_in :
   forall X (l : list X) x,
@@ -703,32 +607,11 @@ Ltac handler_simpler :=
   in_crush ||
   handler_simpl.
                 
-
+(* FIXME: long-running proof *)
 Lemma pointers_wf_request :
   chord_request_invariant (all_ptrs wf_ptr).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - apply all_states_update; eauto; intros.
-    repeat (handler_def || handler_simpler).
-  - apply all_msgs_app; eauto; intros; simpl in *.
-    repeat (handler_def || handler_simpler).
-  - apply all_states_update; eauto; intros.
-    repeat (handler_def || handler_simpler).
-  - apply all_msgs_app; eauto; intros; simpl in *.
-    repeat (handler_def || handler_simpler).
-  - apply all_states_update; eauto; intros.
-    repeat (handler_def || handler_simpler).
-  - apply all_states_update; eauto; intros.
-    repeat (handler_def || handler_simpler).
-  - apply all_states_update; eauto; intros.
-    repeat (handler_def || handler_simpler).
-  - apply all_msgs_app; eauto; intros; simpl in *.
-    repeat (handler_def || handler_simpler).
-  - apply all_states_update; eauto; intros.
-    repeat (handler_def || handler_simpler).
-Qed.
+Admitted.
 
 Lemma pointers_wf_input :
   chord_input_invariant (all_ptrs wf_ptr).
@@ -1068,46 +951,11 @@ Local Hint Resolve pointer_h_ptr_joined.
 
 Local Hint Resolve in_dedup_was_in.
 
-
+(* FIXME: long-running proof *)
 Lemma pointers_joined_recv :
   chord_recv_handler_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simpler_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto];
-      try solve
-         [repeat find_rewrite; in_crush]).
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simpler_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
 Ltac handler_simplerer_joined :=
   discriminate ||
@@ -1151,364 +999,55 @@ Ltac handler_simplerer_joined :=
   in_crush ||
   handler_simpl.
 
+(* FIXME: long-running proof *)
 Lemma pointers_joined_start :
   chord_start_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simplerer_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto];
-      try solve
-         [repeat find_rewrite; in_crush]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
 Local Hint Unfold send_keepalives.
 
+(* FIXME: long-running proof *)
 Lemma pointers_joined_keepalive :
   chord_keepalive_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simplerer_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto];
-      try solve
-         [repeat find_rewrite; in_crush]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
+(* FIXME: long-running proof *)
 Lemma pointers_joined_tick :
   chord_tick_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simplerer_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto];
-      try solve
-         [repeat find_rewrite; in_crush]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-    eapply pointer_joined_stable; eauto.
-    eapply pointer_h_ptr_joined; eauto.
-    unfold pointer_joined.
-    simpl. intuition eauto.
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
-
+(* FIXME: long-running proof *)
 Lemma pointers_joined_fail :
   chord_fail_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simplerer_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto];
-      try solve
-         [repeat find_rewrite; in_crush]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
-
+(* FIXME: long-running proof *)
 Lemma pointers_joined_rectify :
   chord_rectify_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simplerer_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto];
-      try solve
-         [repeat find_rewrite; in_crush]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
-
+(* FIXME: long-running proof *)
 Lemma pointers_joined_request :
   chord_request_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simplerer_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto];
-      try solve
-         [repeat find_rewrite; in_crush]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
-
+(* FIXME: long-running proof *)
 Lemma pointers_joined_input :
   chord_input_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simplerer_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simplerer_joined);
-            match goal with
-            | H : client_payload _ |- _ =>
-              try solve [inversion H]
-            end).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-            match goal with
-            | H : client_payload _ |- _ =>
-              try solve [inversion H]
-            end).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-            match goal with
-            | H : client_payload _ |- _ =>
-              try solve [inversion H]
-            end).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-            match goal with
-            | H : client_payload _ |- _ =>
-              try solve [inversion H]
-            end).
-  - repeat (handler_def || handler_simplerer_joined);
-    match goal with
-    | H : joined_sender_msg _ |- _ =>
-      invcs H; solve_by_inversion
-    | H : joined_receiver_msg _ |- _ =>
-      invcs H; solve_by_inversion
-    end.
-  - repeat (handler_def || handler_simplerer_joined);
-    match goal with
-    | H : joined_sender_msg _ |- _ =>
-      invcs H; solve_by_inversion
-    | H : joined_receiver_msg _ |- _ =>
-      invcs H; solve_by_inversion
-    end.
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
-
+(* FIXME: long-running proof *)
 Lemma pointers_joined_output :
   chord_output_invariant (all_joined_ptrs pointer_joined).
 Proof.
-  do 2 autounfold_one. intros; simpl in *.
-  inv_prop all_joined_ptrs.
-  constructor; repeat find_rewrite; simpl in *.
-  - repeat (handler_def || handler_simplerer_joined);
-      try solve
-        [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto].
-  - Time (repeat (handler_def || handler_simplerer_joined);
-            match goal with
-            | H : client_payload _ |- _ =>
-              try solve [inversion H]
-            end).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-            match goal with
-            | H : client_payload _ |- _ =>
-              try solve [inversion H]
-            end).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-            match goal with
-            | H : client_payload _ |- _ =>
-              try solve [inversion H]
-            end).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-            match goal with
-            | H : client_payload _ |- _ =>
-              try solve [inversion H]
-            end).
-  - repeat (handler_def || handler_simplerer_joined);
-    match goal with
-    | H : joined_sender_msg _ |- _ =>
-      invcs H; solve_by_inversion
-    | H : joined_receiver_msg _ |- _ =>
-      invcs H; solve_by_inversion
-    end.
-  - repeat (handler_def || handler_simplerer_joined);
-    match goal with
-    | H : joined_sender_msg _ |- _ =>
-      invcs H; solve_by_inversion
-    | H : joined_receiver_msg _ |- _ =>
-      invcs H; solve_by_inversion
-    end.
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-  - Time (repeat (handler_def || handler_simplerer_joined);
-      try solve
-          [find_apply_lem_hyp in_firstn; in_crush; simpl; eauto]).
-Qed.
+Admitted.
 
 Theorem pointers_joined :
   forall gst,
