@@ -1888,6 +1888,16 @@ Proof.
   in_crush; eauto.
 Qed.
 
+Lemma no_responses_cons :
+  forall p l,
+    ~ response_payload p ->
+    no_responses l ->
+    no_responses (p :: l).
+Proof.
+  unfold no_responses.
+  in_crush; eauto.
+Qed.
+
 Lemma no_responses_app :
   forall xs ys,
     no_responses xs ->
@@ -4983,6 +4993,39 @@ Proof.
   simpl in *; congruence.
 Qed.
 
+Lemma tick_only_sends_requests :
+  forall gst gst' h st st' ms nts cts eff,
+    tick_handler h st = (st', ms, nts, cts, eff) ->
+    msgs gst' = map (send h) ms ++ msgs gst ->
+    forall src dst,
+      channel gst' src dst = channel gst src dst \/
+      channel gst' src dst = GetPredAndSuccs :: channel gst src dst.
+Proof.
+  intros.
+  pose proof (channel_msgs_unchanged ms gst' gst src dst h ltac:(eauto)).
+  repeat handler_def || handler_simpl; inv_option_map.
+  destruct (addr_eq_dec src h), (addr_eq_dec dst (addr_of x)); subst; eauto.
+  - right.
+    erewrite channel_msgs_cons; eauto.
+  - left.
+    match goal with
+    | H: context[send ?h ?m :: ?l] |- _ =>
+      replace (send h m :: l) with (map (send h) [m] ++ l) in H
+    end.
+    erewrite channel_msgs_unchanged; eauto.
+    right; intros; in_crush.
+    congruence.
+    now simpl.
+Qed.
+
+Ltac split_tick_channel src dst :=
+  match goal with
+  | H: step_dynamic ?gst ?gst' |- _ =>
+    assert (channel gst' src dst = channel gst src dst \/
+            channel gst' src dst = GetPredAndSuccs :: channel gst src dst);
+      [eapply tick_only_sends_requests; eauto|]
+  end.
+
 Theorem query_message_ok'_tick_invariant :
  chord_tick_invariant
    (fun g : global_state =>
@@ -5017,12 +5060,79 @@ Proof.
   rewrite Hdqs.
   inv_prop query_message_ok'; inv_option_map.
   - repeat find_rewrite || find_injection.
-    inv_prop query_message_ok.
-    + admit.
-    + admit.
-    + admit.
-    + admit.
-    + admit.
+    eapply QMLive; eauto.
+    destruct (addr_eq_dec src h); subst; rewrite_update.
+    + repeat find_injection || find_rewrite || inv_option_map || rewrite_update || simpl in *.
+      destruct (cur_request d) eqn:?.
+      * assert (st__src = d) by (find_eapply_prop st__src; congruence).
+        subst.
+        repeat find_reverse_rewrite.
+        assert (ms = []).
+        {
+          repeat handler_def; congruence.
+        }
+        subst.
+        erewrite channel_msgs_unchanged with (dst:=dst); eauto.
+        erewrite channel_msgs_unchanged with (dst:=h); eauto.
+      * split_tick_channel dst h.
+        inv_prop query_message_ok.
+        repeat (match goal with
+                | H: context[tick_handler ?h ?st] |- _ =>
+                  eapply tick_handler_definition in H; repeat destruct H || break_and
+                | H:start_query _ _ _ = _ |- _ => apply start_query_definition in H; destruct H
+                | H:context [ start_query ?h ?st ?q ]
+                  |- _ => destruct (start_query h st q) as [[[? ?] ?] ?] eqn:?
+                | H: add_tick _ = _ |- _ => apply add_tick_definition in H; destruct H
+                end; repeat break_exists || break_and) || simpl in *;
+          inv_option_map; simpl in *;
+          try solve [unfold channel in *; repeat find_rewrite; eauto
+                    |congruence].
+        -- destruct (addr_eq_dec (addr_of x1) dst); subst.
+           ++ repeat find_rewrite.
+              erewrite channel_msgs_cons; eauto.
+              eapply CIreq; try solve [in_crush].
+              eapply unique_no_requests, unique_cons_add; eauto.
+           ++ repeat find_rewrite.
+              match goal with
+              | H: context[?l' = send ?h ?p :: ?l] |- _ =>
+                change (send h p :: l) with (map (send h) [p] ++ l) in H
+              end.
+              erewrite channel_msgs_unchanged; eauto.
+              eapply CIother; eauto.
+              right; intros; in_crush; congruence.
+        -- destruct (addr_eq_dec (addr_of x1) dst); subst.
+           ++ repeat find_rewrite.
+              erewrite channel_msgs_cons; eauto.
+              eapply CIreq; try solve [in_crush].
+              eapply unique_no_requests, unique_cons_add; eauto.
+              eapply no_responses_cons; eauto.
+           ++ repeat find_rewrite.
+              match goal with
+              | H: context[?l' = send ?h ?p :: ?l] |- _ =>
+                change (send h p :: l) with (map (send h) [p] ++ l) in H
+              end.
+              erewrite channel_msgs_unchanged; eauto.
+              eapply CIother; eauto.
+              eapply no_responses_cons; eauto.
+              right; intros; in_crush; congruence.
+        -- subst; simpl.
+           simpl in *.
+           erewrite !(msgs_eq_channels_eq gst' gst) by eauto.
+           eapply CInone; eauto.
+    + repeat find_rewrite || find_injection.
+      erewrite channel_msgs_unchanged; eauto.
+      split_tick_channel dst src.
+      break_or_hyp; find_rewrite; eauto.
+      simpl in *.
+      inv_prop query_message_ok;
+        [econstructor 1
+        |econstructor 2
+        |econstructor 3
+        |econstructor 4
+        |econstructor 5]; eauto using no_responses_cons.
+      in_crush.
+      eapply unique_no_responses.
+      eapply unique_cons; eauto using no_responses_unique.
   - assert (h <> addr_of dstp)
       by (intro; subst; tauto).
     destruct (addr_eq_dec h src).
@@ -5120,7 +5230,7 @@ Proof.
       find_eapply_lem_hyp hd_error_in.
       find_eapply_lem_hyp successors_in_nodes; eauto.
       eapply nodes_not_clients; eauto.
-Admitted.
+Qed.
 
 Theorem dq_res_qmo :
   forall gst gst' src dst req res st__src st__dst st__dst' st__src' l ms,
