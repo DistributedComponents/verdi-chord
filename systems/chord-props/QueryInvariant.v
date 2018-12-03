@@ -2059,6 +2059,7 @@ Lemma query_message_ok_delayed_queries_all_requests :
 Proof.
 Admitted.
 
+(*
 Lemma split_of_app_right :
   forall A (l l' : list A) xs a ys,
     l ++ l' = xs ++ a :: ys ->
@@ -2068,11 +2069,34 @@ Lemma split_of_app_right :
       l' = xs' ++ a :: ys.
 Proof.
 Admitted.
+*)
+Lemma split_of_app_right :
+  forall A (l l' : list A) xs a ys,
+    l ++ l' = xs ++ a :: ys ->
+    ~ In a l ->
+    In a l' ->
+    exists xs',
+      xs = l ++ xs' /\
+      l' = xs' ++ a :: ys.
+Proof.
+Admitted.
 
+(*
 Lemma split_of_app_left :
   forall A (l l' : list A) xs a ys,
     l ++ l' = xs ++ a :: ys ->
     In a l ->
+    exists ys',
+      ys = ys' ++ l' /\
+      l = xs ++ a :: ys'.
+Proof.
+Admitted.
+*)
+Lemma split_of_app_left :
+  forall A (l l' : list A) xs a ys,
+    l ++ l' = xs ++ a :: ys ->
+    In a l ->
+    ~ In a l' ->
     exists ys',
       ys = ys' ++ l' /\
       l = xs ++ a :: ys'.
