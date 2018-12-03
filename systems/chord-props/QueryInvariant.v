@@ -1930,7 +1930,9 @@ Lemma app_no_requests :
     no_requests xs /\
     no_requests ys.
 Proof.
-Admitted.
+  unfold no_requests in *; intros.
+  split; intros; find_eapply_prop request_payload; in_crush.
+Qed.
 
 Lemma cons_no_requests :
   forall x xs,
@@ -1938,7 +1940,9 @@ Lemma cons_no_requests :
     ~ request_payload x /\
     no_requests xs.
 Proof.
-Admitted.
+  unfold no_requests in *; intros.
+  split; intros; find_eapply_prop request_payload; in_crush.
+Qed.
 
 Lemma channel_after_recv_from_not_dst :
   forall gst gst' from to src dst p ms xs ys,
@@ -2184,8 +2188,31 @@ Proof.
       tauto.
 Qed.
 
+Lemma delayed_queries_all_requests :
+  forall gst,
+    reachable_st gst ->
+    (fun gst =>
+       forall h st src p,
+         sigma gst h = Some st ->
+         In (src, p) (delayed_queries st) ->
+         request_payload p /\ is_safe p = false) gst.
+Proof.
+  eapply chord_net_invariant; repeat autounfold; eauto; intros.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+Admitted.
+
 Lemma query_message_ok_delayed_queries_all_requests :
   forall gst,
+    reachable_st gst ->
     (forall src dst st__src,
         sigma gst src = Some st__src ->
         query_message_ok' src dst (cur_request st__src) (option_map delayed_queries (sigma gst dst))
@@ -2193,12 +2220,14 @@ Lemma query_message_ok_delayed_queries_all_requests :
                           (channel gst src dst) (channel gst dst src)) ->
     forall h st,
       sigma gst h = Some st ->
+      ~ In h (failed_nodes gst) ->
       forall src req,
         In (src, req) (delayed_queries st) ->
         request_payload req /\
         is_safe req = false.
 Proof.
-Admitted.
+  eauto using delayed_queries_all_requests.
+Qed.
 
 Lemma split_of_app_right :
   forall A (l l' : list A) xs a ys,
